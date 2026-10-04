@@ -5,6 +5,7 @@ import {
   y2Suffix, y2SuffixRoot, y2Homophones, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
 } from '../../../src/curriculum/year2';
 import { y2OddEven } from '../../../src/curriculum/year2-oddeven';
+import { y2Equiv } from '../../../src/curriculum/year2-equiv';
 import { y2WordClass } from '../../../src/curriculum/year2-wordclass';
 import { y2StoryAdd } from '../../../src/curriculum/year2-story-add';
 import { y2StoryMoney } from '../../../src/curriculum/year2-story-money';
@@ -18,7 +19,7 @@ import { y2Objects3d } from '../../../src/curriculum/year2-objects3d';
 /** `YEAR2_TOPICS`'s ids, in order (#889): a move or a reorder of the registry cannot pass silently. */
 export const Y2_IDS = [
   'y2-pv', 'y2-compare', 'y2-skip', 'y2-add', 'y2-sub', 'y2-three', 'y2-inverse', 'y2-story-add', 'y2-tables', 'y2-story-times', 'y2-oddeven',
-  'y2-fractions', 'y2-money', 'y2-story-money', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-shapes', 'y2-objects3d', 'y2-symmetry',
+  'y2-fractions', 'y2-equiv', 'y2-money', 'y2-story-money', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-shapes', 'y2-objects3d', 'y2-symmetry',
   'y2-patterns', 'y2-position', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp', 'y2-duration', 'y2-balance',
   'y2-stats', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-suffix-root', 'y2-homophones', 'y2-wordclass',
   'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-trace',
@@ -30,7 +31,7 @@ export const Y2_IDS = [
  */
 export const Y2_GENS: Record<string, Topic['gen']> = {
   'y2-pv': y2PlaceValue, 'y2-compare': y2Compare, 'y2-skip': y2Skip, 'y2-add': y2Add, 'y2-sub': y2Sub,
-  'y2-three': y2Three, 'y2-inverse': y2Inverse, 'y2-story-add': y2StoryAdd, 'y2-story-times': y2StoryTimes, 'y2-tables': y2Tables, 'y2-oddeven': y2OddEven, 'y2-fractions': y2Fractions,
+  'y2-three': y2Three, 'y2-inverse': y2Inverse, 'y2-story-add': y2StoryAdd, 'y2-story-times': y2StoryTimes, 'y2-tables': y2Tables, 'y2-oddeven': y2OddEven, 'y2-fractions': y2Fractions, 'y2-equiv': y2Equiv,
   'y2-money': y2Money, 'y2-story-money': y2StoryMoney, 'y2-time': y2Time, 'y2-words': y2Words, 'y2-order': y2Order, 'y2-line': y2Line,
   'y2-shapes': y2Shapes, 'y2-objects3d': y2Objects3d, 'y2-symmetry': y2Symmetry, 'y2-patterns': y2Patterns, 'y2-position': y2Position, 'y2-length': y2Length,
   'y2-mass': y2Mass, 'y2-capacity': y2Capacity, 'y2-temp': y2Temp, 'y2-duration': y2Duration, 'y2-balance': y2Balance,
@@ -82,5 +83,6 @@ export const NO_REPEATED_SET = new Set([
   'y2-story-times d1', // #995: the array on d1 cards is the whole question and its decoys derive from the card, so no option set recurs with a different answer
   'y2-story-add d1', 'y2-story-add d3', // #994: the decoys are the other operation and answer ±1/±10, all derived from the card, so no option set recurs with a different answer
   'r-initial d3', // #928: any-order, the target set is every picture sharing the keyword's sound, so no two cards offer the same bubbles with different answers
+  'y2-equiv d1', 'y2-equiv d2', 'y2-equiv d3', // #1001: both fraction answers share one decoy set and quantity decoys derive from the whole, so no option set recurs with a different answer
   'y3-count d2', 'y3-count d3', // #1050/#1448: moreOrLess's decoys (otherPower/wrongDirection/both/sameLead) are all derived from base/answer, the same structural reason as every other entry above
 ]);
