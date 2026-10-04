@@ -28,6 +28,7 @@
 🅰	0.6	A button (blood type)
 🌅	0.6	sunrise
 🌈	0.6	rainbow
+🌍	0.7	globe showing Europe-Africa
 🌙	0.6	crescent moon
 🌡	0.7	thermometer
 🌧	0.7	cloud with rain
@@ -37,6 +38,7 @@
 🌻	0.6	sunflower
 🌼	0.6	blossom
 🍅	0.6	tomato
+🍊	0.6	tangerine
 🍌	0.6	banana
 🍎	0.6	red apple
 🍓	0.6	strawberry
@@ -62,6 +64,7 @@
 🎲	0.6	game die
 🎵	0.6	musical note
 🎻	0.6	violin
+🏀	0.6	basketball
 🏃	0.6	person running
 🏇	1.0	horse racing
 🏊	0.6	person swimming
@@ -133,6 +136,7 @@
 📶	0.6	antenna bars
 🔁	1.0	repeat button
 🔊	0.6	speaker high volume
+🔋	0.6	battery
 🔍	0.6	magnifying glass tilted left
 🔒	0.6	locked
 🔔	0.6	bell
@@ -175,6 +179,7 @@
 🟦	12.0	blue square
 🤝	3.0	handshake
 🤸	3.0	person cartwheeling
+🥁	3.0	drum
 🥄	3.0	spoon
 🥅	3.0	goal net
 🥔	3.0	potato

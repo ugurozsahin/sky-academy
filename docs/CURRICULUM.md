@@ -103,6 +103,7 @@ Maths:
 - y2-order — order to 100
 - y2-line — number line in steps
 - y2-shapes — 3-D shapes: name them, count flat faces, and — for the cube, cuboid and square-based pyramid, the only ones KS1 can state without argument — edges and vertices at d2–d3
+- y2-objects3d — everyday objects and the solid each is: a drum is a cylinder, an orange a sphere (d1 object → name, d2 name → object, d3 both); no `SHAPES_3D` glyphs, and cube and cuboid never share a card
 - y2-symmetry — line symmetry in a vertical line: is the dotted line a mirror line for this picture — a half drawn beside its own reflection, with one, two or three squares moved when the answer is no — and which capital letter reads the same folded down the middle
 - y2-patterns — order and arrange objects in patterns and sequences: a unit of two or three repeated three times with one object hidden — the last one, or, at d3, one inside the pattern; two whole repeats are always visible, so exactly one object fits
 - y2-position — turns clockwise & anti-clockwise, rotation as right angles, name the turn from start→end
