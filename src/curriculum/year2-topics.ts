@@ -13,6 +13,7 @@ import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
+import { y2AnyOrder } from './year2-anyorder';
 import { y2StoryMoney } from './year2-story-money';
 import { y2CoinCombo } from './year2-coincombo';
 import { y2StoryTimes } from './year2-story-times';
@@ -30,6 +31,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-three', title: 'Three Numbers', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 A&S: add three 1-digit', gen: y2Three },
   { id: 'y2-inverse', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year2', nc: 'Y2 A&S: inverse, missing number', gen: y2Inverse },
   { id: 'y2-story-add', title: 'Story Sums', icon: '📖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: solve problems with addition and subtraction in context', gen: y2StoryAdd },
+  { id: 'y2-anyorder', title: 'Swap It Round', icon: '🔁', subject: 'maths', year: 'year2', nc: 'Y2 A&S, M&D: addition and multiplication can be done in any order; subtraction and division cannot', gen: y2AnyOrder },
   { id: 'y2-tables', title: '2, 5, 10 Times Tables', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 2, 5, 10 tables ×÷', gen: y2Tables },
   { id: 'y2-tables-2', title: '2× table', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 2 times table', drill: true, gen: tableDrill(2) },
   { id: 'y2-tables-5', title: '5× table', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 5 times table', drill: true, gen: tableDrill(5) },
