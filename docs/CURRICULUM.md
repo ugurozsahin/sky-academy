@@ -68,6 +68,7 @@ Writing:
 - y1-alien — Real or Alien?: decode a printed word (not by ear), phonics screening check practice; d1 phase 3, d2 phase 4 adjacent consonants, d3 phase 5 alternatives, half "slice the alien 👾"
 - y1-soundhunt — Sound Hunt by ear: d1 phase 3, d2 phase 5 alternatives ay/ou/ie/ea/oy/ir/ue/aw/wh/ph/ew/oe/au, d3 adds split digraphs a-e/i-e/o-e/u-e
 - y1-spelling — 45 CEW
+- y1-spellrules — Spelling Rules: the word is spoken, slice the right spelling of two non-word decoys; d1 ff/ll/ss/zz/ck, d2 adds nk and -ve, d3 adds -tch; hand-curated bank (Y1_SPELL_RULES), no real-word decoys
 - y1-plurals — -s/-es
 - y1-suffix — -ing -ed -er -est
 - y1-prefix — Un- Words: un- changes the meaning ("means not kind" → unkind); d3 half "opposite of lock" → unlock; hand-curated bank, root spelling unchanged
