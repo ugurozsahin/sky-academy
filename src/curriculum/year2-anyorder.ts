@@ -48,7 +48,7 @@ function yesNo(rng: Rng, op: '+' | '−' | '×' | '÷', d: Difficulty): Question
     if (op === '−' && a < b) [a, b] = [b, a];
   }
   const prompt = `Is ${a} ${op} ${b} the same as ${b} ${op} ${a}?`;
-  return wordQ(rng, prompt, op === '+' || op === '×' ? 'Yes' : 'No', ['Yes', 'No'], { say: symSay(prompt), hint: 'Swap the two numbers', hintIsData: false });
+  return wordQ(rng, prompt, op === '+' || op === '×' ? 'Yes' : 'No', ['Yes', 'No'], { say: symSay(prompt.replace(/\?$/, '')), hint: 'Swap the two numbers', hintIsData: false });
 }
 
 export const y2AnyOrder: Generator = (d, rng) => {

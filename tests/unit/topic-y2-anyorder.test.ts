@@ -21,14 +21,17 @@ describe('y2-anyorder (#999)', () => {
     it(`d${d}: yes/no answers "Yes" exactly for + and ×; the numbers differ and stay in range`, () => {
       const rng = mulberry32(999 + d);
       let seen = 0;
+      const mix = new Set<string>();
       for (let i = 0; i < DRAWS; i++) {
         const q = y2AnyOrder(d, rng), m = yesNo(q.prompt);
         expect(q.say).toBeTruthy();
+        expect(q.say).not.toMatch(/what|[+−×÷?]/);
         if (!m) continue;
         seen++;
         const [a, op, b] = m[1].split(' '), [c, op2, e] = m[2].split(' ');
         expect([c, op2, e]).toEqual([b, op, a]);
         expect(a).not.toBe(b);
+        mix.add(op + q.answer);
         expect(q.answer).toBe(op === '+' || op === '×' ? 'Yes' : 'No');
         expect([...q.options].sort()).toEqual(['No', 'Yes']);
         for (const n of nums(q.prompt)) expect(n).toBeLessThanOrEqual(d === 1 ? 20 : 100);
@@ -38,6 +41,7 @@ describe('y2-anyorder (#999)', () => {
         if (op === '×') expect([2, 5, 10].some(t => t === Number(a) || t === Number(b))).toBe(true);
       }
       expect(seen).toBeGreaterThan(d === 1 ? 250 : 100);
+      expect(mix).toEqual(new Set(d === 1 ? ['+Yes', '−No'] : ['×Yes', '÷No']));
     });
   }
 
@@ -70,6 +74,7 @@ describe('y2-anyorder (#999)', () => {
         else expect(Number(a) + Number(b)).toBeLessThanOrEqual(99);
         expect(Number(a)).not.toBe(Number(b));
         expect(q.say).toBeTruthy();
+        expect(q.say).not.toMatch(/what|[+−×÷?]/);
       }
       expect(seen).toBeGreaterThan(100);
     });
@@ -82,8 +87,8 @@ describe('y2-anyorder (#999)', () => {
   });
 
   it('the value-collision filter holds over many draws (2 × 2-style clashes, edge n of 1, 9 and 10)', () => {
-    for (let i = 0; i < 3000; i++) {
-      const q = y2AnyOrder(3, mulberry32(i));
+    for (let i = 0; i < 6000; i++) {
+      const q = y2AnyOrder(i % 2 ? 3 : 2, mulberry32(i));
       const mm = same(q.prompt);
       if (!mm) continue;
       expect(q.options.filter(o => evalX(o) === evalX(mm[1]))).toHaveLength(1);
