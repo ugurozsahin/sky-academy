@@ -2758,7 +2758,7 @@ describe('save format v5 (#903)', () => {
     expect(m.v).toBe(SAVE_VERSION);
     expect(m.slips).toEqual([]);
     expect(m.log).toEqual([]);
-    expect(m.settings).toEqual({ slow: false });
+    expect(m.settings).toEqual({ slow: false, timeX: 1 });
     expect(m.name).toBe('Mo');
     expect(m.coins).toBe(12);
     expect(m.progress['y1-add']).toEqual({ stars: 2, best: 40, plays: 3 });
@@ -2766,7 +2766,7 @@ describe('save format v5 (#903)', () => {
 
   it('the e2e seed at v: 1 also lands on the v5 defaults, walking every step in between', () => {
     const m = migrate({ v: 1, name: 'Seed' });
-    expect(m.slips).toEqual([]); expect(m.log).toEqual([]); expect(m.settings).toEqual({ slow: false });
+    expect(m.slips).toEqual([]); expect(m.log).toEqual([]); expect(m.settings).toEqual({ slow: false, timeX: 1 });
   });
 
   it('slips: well-formed rows survive migration in their stored, newest-first order', () => {
@@ -2811,10 +2811,10 @@ describe('save format v5 (#903)', () => {
   });
 
   it('settings: a wrong-typed or missing `slow` resets to the default rather than throwing', () => {
-    expect(migrate({ v: 4, settings: { slow: 'yes' } }).settings).toEqual({ slow: false });
-    expect(migrate({ v: 4, settings: 'nope' }).settings).toEqual({ slow: false });
-    expect(migrate({ v: 4 }).settings).toEqual({ slow: false });
-    expect(migrate({ v: 4, settings: { slow: true } }).settings).toEqual({ slow: true });
+    expect(migrate({ v: 4, settings: { slow: 'yes' } }).settings).toEqual({ slow: false, timeX: 1 });
+    expect(migrate({ v: 4, settings: 'nope' }).settings).toEqual({ slow: false, timeX: 1 });
+    expect(migrate({ v: 4 }).settings).toEqual({ slow: false, timeX: 1 });
+    expect(migrate({ v: 4, settings: { slow: true } }).settings).toEqual({ slow: true, timeX: 1 });
   });
 
   it('streak.rest: dropped unless it is a stored ISO day; the rest of streak is untouched either way', () => {
@@ -2837,7 +2837,7 @@ describe('save format v5 (#903)', () => {
 
   it('export then import round-trips every new field unchanged', () => {
     save({
-      slips: [slip()], log: [logDay()], settings: { slow: true },
+      slips: [slip()], log: [logDay()], settings: { slow: true, timeX: 1.5 }, ks2: { schoolYear: "year3", facts: { "7×8": { right: 3, wrong: 1, slow: 0, last: "rsw", day: "2026-09-28", locked: true } }, checks: [{ date: "2026-09-28", score: 20, missed: ["6×7"] }], words: { February: "rw" }, bestSpeed: 2.4, checkDate: "2026-09-29" },
       streak: { last: '2026-09-28', days: 4, rest: '2026-09-25' },
       progress: { 'y1-add': { stars: 3, best: 50, plays: 5, last: '2026-09-28', sprint: 60, crown: true } },
     });
@@ -2847,12 +2847,12 @@ describe('save format v5 (#903)', () => {
     const d = load();
     expect(d.slips).toEqual([slip()]);
     expect(d.log).toEqual([logDay()]);
-    expect(d.settings).toEqual({ slow: true });
+    expect(d.settings).toEqual({ slow: true, timeX: 1.5 });
     expect(d.streak).toEqual({ last: '2026-09-28', days: 4, rest: '2026-09-25' });
     expect(d.progress['y1-add']).toEqual({ stars: 3, best: 50, plays: 5, last: '2026-09-28', sprint: 60, crown: true });
   });
 
-  it('a v6 blob (a future build) is still refused, exactly as before v5 existed', () => {
+  it('a v7 blob (a future build) is still refused, exactly as before v6 existed', () => {
     expect(isFutureSave({ v: SAVE_VERSION + 1 })).toBe(true);
     expect(importSave(JSON.stringify({ v: SAVE_VERSION + 1, name: 'Future' }))).toBe(false);
   });
@@ -2865,7 +2865,7 @@ describe('save format v5 (#903)', () => {
   it('a save already at v5 with a malformed field is sanitized on every load, not only on the v4 → v5 hop', () => {
     expect(migrate({ v: SAVE_VERSION, slips: 'not an array' }).slips).toEqual([]);
     expect(migrate({ v: SAVE_VERSION, log: 'not an array' }).log).toEqual([]);
-    expect(migrate({ v: SAVE_VERSION, settings: 'nope' }).settings).toEqual({ slow: false });
+    expect(migrate({ v: SAVE_VERSION, settings: 'nope' }).settings).toEqual({ slow: false, timeX: 1 });
     expect(migrate({ v: SAVE_VERSION, streak: { last: '2026-09-28', days: 3, rest: 12345 } }).streak)
       .toEqual({ last: '2026-09-28', days: 3 });
     expect(migrate({
@@ -2879,7 +2879,7 @@ describe('save format v5 (#903)', () => {
     expect(importSave(JSON.stringify({ v: SAVE_VERSION, coins: 3, slips: 'not an array', settings: 42 }))).toBe(true);
     const d = load();
     expect(d.slips).toEqual([]);
-    expect(d.settings).toEqual({ slow: false });
+    expect(d.settings).toEqual({ slow: false, timeX: 1 });
     expect(d.coins).toBe(3);
   });
 

@@ -1,6 +1,7 @@
 // New v5 save fields (#903) — kept out of storage.ts, which is at its #714 ratchet cap. Also holds the
 // field-check infrastructure storage.ts's own CERT_FIELDS/DUEL_FIELDS used to define locally (`Fields`,
 // `checkFields`, `str`, `fin`, `strOrNull`, `count`), moved here for the same reason and imported back.
+import { YEARS, type YearId } from './curriculum/types';
 export type Fields<T> = { [K in keyof T]-?: (v: unknown) => v is T[K] };
 export const checkFields = <T>(fields: Fields<T>, x: Record<string, unknown>): boolean =>
   (Object.keys(fields) as (keyof T)[]).every(k => fields[k](x[k as string]));
@@ -99,10 +100,12 @@ export function logGame(log: readonly LogDay[], date: string, g: { q: number; ok
 }
 
 /** Device-wide play settings kept in the save rather than `sna:three` (#940 keeps that one separate). */
-export interface Settings { slow: boolean }
-export const DEFAULT_SETTINGS: Settings = { slow: false };
-export const sanitizeSettings = (v: unknown): Settings =>
-  isRecord(v) && typeof v.slow === 'boolean' ? { slow: v.slow } : { ...DEFAULT_SETTINGS };
+export interface Settings { slow: boolean; timeX: 1 | 1.5 | 0 }   // timeX (#1054): time allowance, 0 = no time limit
+export const DEFAULT_SETTINGS: Settings = { slow: false, timeX: 1 };
+export const sanitizeSettings = (v: unknown): Settings => {
+  const r = isRecord(v) ? v : {};
+  return { slow: typeof r.slow === 'boolean' ? r.slow : false, timeX: r.timeX === 1.5 || r.timeX === 0 ? r.timeX : 1 };
+};
 
 /**
  * Drops `rest` unless it is a stored day (#950 reads it as the Daily Dojo's rest-day marker).
@@ -162,6 +165,7 @@ export function sanitizeV5Fields(clean: Record<string, unknown>): void {
   if ('slips' in clean) clean.slips = sanitizeSlips(clean.slips);
   if ('log' in clean) clean.log = sanitizeLog(clean.log);
   if ('settings' in clean) clean.settings = sanitizeSettings(clean.settings);
+  if ('ks2' in clean) clean.ks2 = sanitizeKs2(clean.ks2);   // #1054
   if (isRecord(clean.streak)) clean.streak = sanitizeStreakRest(clean.streak as Record<string, unknown>);
   if (isRecord(clean.progress)) clean.progress = sanitizeProgressExtras(clean.progress as Record<string, unknown>);
 }
@@ -183,3 +187,68 @@ export function toV5(s: Record<string, unknown>): Record<string, unknown> {
   if (isRecord(s.progress)) out.progress = sanitizeProgressExtras(s.progress);
   return out;
 }
+
+/**
+ * The KS2 save fields (#1054), every one under a single `ks2` key so parallel KS2 tickets never collide on
+ * `SAVE_VERSION`. This adds no readers and no writers: each owning ticket adds its own.
+ * `save(patch)` replaces whole top-level keys, so a writer must pass the whole object —
+ * `{ ks2: { ...d.ks2, bestSpeed } }`, never `{ ks2: { bestSpeed } }`.
+ */
+export interface Ks2Fact { right: number; wrong: number; slow: number; last?: string; day?: string; locked?: true }
+export interface Ks2Check { date: string; score: number; missed: string[] }
+export interface Ks2Save {
+  schoolYear?: YearId; facts: Record<string, Ks2Fact>; checks: Ks2Check[]; words: Record<string, string>;
+  bestSpeed?: number; checkDate?: string;
+}
+export const DEFAULT_KS2: Ks2Save = { facts: {}, checks: [], words: {} };
+const FACT_KEY = /^(\d{1,2})×(\d{1,2})$/;
+const isFactKey = (k: unknown): k is string => {
+  const m = typeof k === 'string' ? FACT_KEY.exec(k) : null;
+  return !!m && +m[1] >= 2 && +m[1] <= 12 && +m[2] >= 2 && +m[2] <= 12;
+};
+const MAX_CHECKS = 10, MAX_MISSED = 25, MAX_WORDS = 200;
+function sanitizeFacts(v: unknown): Record<string, Ks2Fact> {
+  const out: Record<string, Ks2Fact> = Object.create(null);
+  if (!isRecord(v)) return out;
+  for (const [k, f] of Object.entries(v)) {
+    if (!isFactKey(k) || !isRecord(f) || !count(f.right) || !count(f.wrong) || !count(f.slow)) continue;
+    const e: Ks2Fact = { right: f.right, wrong: f.wrong, slow: f.slow };
+    if (typeof f.last === 'string' && /^[rsw]{0,3}$/.test(f.last)) e.last = f.last;
+    if (isoDay(f.day)) e.day = f.day;
+    if (f.locked === true) e.locked = true;
+    out[k] = e;
+  }
+  return out;
+}
+function sanitizeChecks(v: unknown): Ks2Check[] {
+  if (!Array.isArray(v)) return [];
+  const out: Ks2Check[] = [];
+  for (const c of v) {
+    if (out.length >= MAX_CHECKS) break;
+    if (!isRecord(c) || !isoDay(c.date) || !count(c.score) || c.score > 25) continue;
+    out.push({ date: c.date, score: c.score, missed: (Array.isArray(c.missed) ? c.missed : []).filter(isFactKey).slice(0, MAX_MISSED) });
+  }
+  return out;
+}
+function sanitizeWords(v: unknown): Record<string, string> {
+  const out: Record<string, string> = Object.create(null);
+  if (!isRecord(v)) return out;
+  let n = 0;
+  for (const [w, r] of Object.entries(v)) {
+    if (n >= MAX_WORDS) break;
+    if (/^[A-Za-z]{1,20}$/.test(w) && typeof r === 'string' && /^[rw]{1,3}$/.test(r)) { out[w] = r; n++; }
+  }
+  return out;
+}
+/** Filters `ks2` through its guards, filling each missing sub-field with its default; runs on every load. */
+export function sanitizeKs2(v: unknown): Ks2Save {
+  const r = isRecord(v) ? v : {};
+  const out: Ks2Save = { facts: sanitizeFacts(r.facts), checks: sanitizeChecks(r.checks), words: sanitizeWords(r.words) };
+  if (typeof r.schoolYear === 'string' && YEARS.some(y => y.id === r.schoolYear)) out.schoolYear = r.schoolYear as YearId;
+  if (fin(r.bestSpeed) && r.bestSpeed > 0 && r.bestSpeed <= 60) out.bestSpeed = r.bestSpeed;
+  if (isoDay(r.checkDate)) out.checkDate = r.checkDate;
+  return out;
+}
+/** v5 → v6 (#1054): additive — `ks2` is filtered, `settings.timeX` defaults; nothing is reshaped. */
+export const toV6 = (s: Record<string, unknown>): Record<string, unknown> =>
+  ({ ...s, ks2: sanitizeKs2(s.ks2), settings: sanitizeSettings(s.settings) });

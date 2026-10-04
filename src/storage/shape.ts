@@ -3,7 +3,7 @@ import { freshDojo, type DojoState } from '../game/dojo';
 import type { ItemKind } from '../game/shop';
 import type { YearId } from '../curriculum';
 import type { DuelOutcome } from '../game/duel';
-import type { LogDay, Settings, Slip } from '../save-records';
+import type { Ks2Save, LogDay, Settings, Slip } from '../save-records';
 /**
  * A tally of questions answered for one topic — `hits` right of `tries` attempted — while it is still being
  * built, before `recordAccuracy()` folds it into `TopicProgress`'s own optional `hits?`/`tries?` below (the
@@ -77,7 +77,7 @@ export interface StoredDuel {
   scoreA: number; scoreB: number; rounds: number;
 }
 export interface SaveData {
-  v: 5;
+  v: 6;
   name: string;
   avatar: string | null;
   year: YearId;
@@ -104,8 +104,9 @@ export interface SaveData {
   slips: Slip[];                     // wrong answers for the parent view, newest first (#903; reader: #938)
   log: LogDay[];                     // daily play summary for the parent view, oldest first (#903; reader: #939)
   settings: Settings;                // device-wide play settings kept in the save (#903; reader: #905)
+  ks2: Ks2Save;                      // every KS2 field under one key (#1054); readers and writers come with their tickets
 }
-export const SAVE_VERSION = 5 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
-export const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false, duels: [], slips: [], log: [], settings: { slow: false } };
+export const SAVE_VERSION = 6 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
+export const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false, duels: [], slips: [], log: [], settings: { slow: false, timeX: 1 }, ks2: { facts: {}, checks: [], words: {} } };
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 export type RawSave = Record<string, unknown>;

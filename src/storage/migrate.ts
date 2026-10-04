@@ -1,6 +1,6 @@
 // Bringing a stored blob up to the current shape: the migration ladder, the version rules and the front-door sanitiser.
 import type { DojoState } from '../game/dojo';
-import { sanitizeV5Fields, toV5 } from '../save-records';
+import { sanitizeV5Fields, toV5, toV6 } from '../save-records';
 import { isCert, isDuel } from './album-checks';
 import { cleanName } from './name';
 import { DEFAULT, SAVE_VERSION, type RawSave, type SaveData } from './shape';
@@ -51,6 +51,8 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
   // (toV5, save-records.ts) is additive: `slips`/`log`/`settings` default and are filtered, and `streak`/
   // `progress` keep their existing shape and only gain the optional extras those seven tickets will read.
   4: toV5,
+  // v5 → v6: #1054's one KS2 save change — `ks2` and `settings.timeX`, additive (toV6, save-records.ts).
+  5: toV6,
 };
 
 /**
