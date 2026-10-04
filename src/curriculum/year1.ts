@@ -414,6 +414,32 @@ const y1Spelling: Generator = (d, rng) => {
   const idx = ri(rng, 0, w.length - 1);
   return gapQ(rng, w, idx, gapLetters(w, idx), undefined, `Which letter is missing from the word ${w}?`);
 };
+/**
+ * Year 1 spelling rules (#990): ff/ll/ss/zz/ck after a short vowel, n before k, -tch and the -ve ending
+ * (English Appendix 1, Year 1). The word is spoken, never printed (`listen`/`peek: true`, the no-voice path of
+ * Find the word you hear): the child slices the right spelling from two curated non-word misspellings, each
+ * breaking exactly its entry's rule. No decoy is a real word or a real word's homophone, and the App. 1
+ * exceptions and the heteronym *live* are left out. `spellChoiceQ` is exported for #991 to reuse.
+ */
+export const spellChoiceQ = (rng: () => number, word: string, decoys: string[]) =>
+  wordQ(rng, 'Find the right spelling', word, decoys, { say: `Which is the right spelling of ${word}?`, listen: word, peek: true, hint: 'Slice the right spelling', hintIsData: false });
+export type SpellRuleFamily = 'double' | 'nk' | 'tch' | 've';
+export const Y1_SPELL_RULES: [string, SpellRuleFamily, [string, string]][] = [
+  ['puff', 'double', ['puf', 'puph']], ['huff', 'double', ['huf', 'hufe']], ['bell', 'double', ['belh', 'behl']], ['well', 'double', ['welh', 'wehl']],
+  ['kiss', 'double', ['kis', 'kice']], ['dress', 'double', ['dres', 'dresz']], ['buzz', 'double', ['buz', 'buzs']], ['fizz', 'double', ['fiz', 'fizs']],
+  ['back', 'double', ['bak', 'bacc']], ['sock', 'double', ['sok', 'socc']], ['duck', 'double', ['duk', 'dukk']], ['neck', 'double', ['nek', 'nec']],
+  ['bank', 'nk', ['bamk', 'bangk']], ['think', 'nk', ['thingk', 'thinc']], ['honk', 'nk', ['hongk', 'honc']], ['sunk', 'nk', ['sungk', 'sunc']],
+  ['pink', 'nk', ['pingk', 'pinc']], ['tank', 'nk', ['tangk', 'tanc']],
+  ['catch', 'tch', ['cach', 'catsh']], ['fetch', 'tch', ['fech', 'fetsh']], ['notch', 'tch', ['noch', 'notsh']], ['hutch', 'tch', ['huch', 'hutsh']],
+  ['witch', 'tch', ['wich', 'witsh']], ['ditch', 'tch', ['dich', 'ditsh']],
+  ['have', 've', ['hav', 'havv']], ['give', 've', ['giv', 'givv']], ['love', 've', ['lurv', 'lof']], ['glove', 've', ['gluv', 'glov']],
+  ['shove', 've', ['shuv', 'shov']], ['above', 've', ['abuv', 'abov']],
+];
+const y1SpellRules: Generator = (d, rng) => {
+  const families: SpellRuleFamily[] = d === 1 ? ['double'] : d === 2 ? ['double', 'nk', 've'] : ['double', 'nk', 'tch', 've'];
+  const [w, , decoys] = pick(rng, Y1_SPELL_RULES.filter(e => families.includes(e[1])));
+  return spellChoiceQ(rng, w, decoys);
+};
 const y1Plurals: Generator = (d, rng) => {
   const S: [string, string][] = [['cat', 's'], ['dog', 's'], ['book', 's'], ['hat', 's'], ['car', 's'], ['tree', 's'], ['fox', 'es'], ['box', 'es'], ['bus', 'es'], ['dish', 'es'], ['bench', 'es'], ['wish', 'es'], ['glass', 'es'], ['brush', 'es']];
   const [w, suf] = pick(rng, d === 1 ? S.filter(x => x[1] === 's') : S);
@@ -487,6 +513,11 @@ const y1Trace: Generator = (d, rng) => {
   const t = d === 2 && rng() < 0.5 ? l.toUpperCase() : l;
   return { prompt: `Trace the letter ${t}`, say: `Trace the letter ${l}`, answer: t, options: [t], visual: { type: 'word', text: t } };
 };
+const Y1_DIGITS: string[][] = [['1', '2', '3', '4', '5'], ['0', '6', '7', '8', '9'], ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']];
+const y1TraceNum: Generator = (d, rng) => {
+  const n = pick(rng, Y1_DIGITS[d - 1]);
+  return { prompt: `Trace the number ${n}`, say: `Trace the number ${n}`, answer: n, options: [n], visual: { type: 'word', text: n } };
+};
 
 export const YEAR1_TOPICS: Topic[] = [
   // Year 1 maths
@@ -523,6 +554,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-alien', title: 'Real or Alien?', icon: '👾', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: decode words containing taught GPCs, including some pseudo-words', gen: y1Alien },
   { id: 'y1-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: respond speedily to graphemes; phase 3 & 5 alternatives, split digraphs', gen: y1SoundHunt },
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', sequenceFrom: 3, gen: y1Spelling },
+  { id: 'y1-spellrules', title: 'Spelling Rules', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: ff, ll, ss, zz, ck; n before k; -tch; -ve', gen: y1SpellRules },
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },
   { id: 'y1-prefix', title: 'Un- Words', icon: '🚫', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: the prefix un-', gen: y1Prefix },
@@ -532,4 +564,5 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-syllables', title: 'How Many Beats?', icon: '👏', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: division of words into syllables', gen: (d, rng) => syllableQ(rng, d, 3) },
   { id: 'y1-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year1', nc: 'Y1 Writing: sequence words into sentences, and', sequenceFrom: 1, gen: y1Sentence },
   { id: 'y1-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting', input: 'tracing', gen: y1Trace },
+  { id: 'y1-tracenum', title: 'Trace Numbers', icon: '✏️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting: form digits 0-9', input: 'tracing', gen: y1TraceNum },
 ];
