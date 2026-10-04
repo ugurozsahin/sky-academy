@@ -9,12 +9,14 @@ import {
   y2Mass, y2Capacity, y2Temp, y2Duration, y2Balance, y2Stats, y2Spelling, y2Contractions, y2Suffix,
   y2SuffixRoot, y2Homophones, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
 } from './year2';
+import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2AnyOrder } from './year2-anyorder';
 import { y2StoryMoney } from './year2-story-money';
 import { y2StoryTimes } from './year2-story-times';
+import { y2Objects3d } from './year2-objects3d';
 import { tableDrill } from './tables';
 
 export const YEAR2_TOPICS: Topic[] = [
@@ -24,6 +26,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-skip', title: 'Count in 2s, 3s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year2', nc: 'Y2 NPV: count in steps', gen: y2Skip },
   { id: 'y2-add', title: 'Adding to 100', icon: '➕', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit addition', gen: y2Add },
   { id: 'y2-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit subtraction', gen: y2Sub },
+  { id: 'y2-related', title: 'Related Facts', icon: '🔗', subject: 'maths', year: 'year2', nc: 'Y2 A&S: derive and use related facts up to 100', gen: y2Related },
   { id: 'y2-three', title: 'Three Numbers', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 A&S: add three 1-digit', gen: y2Three },
   { id: 'y2-inverse', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year2', nc: 'Y2 A&S: inverse, missing number', gen: y2Inverse },
   { id: 'y2-story-add', title: 'Story Sums', icon: '📖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: solve problems with addition and subtraction in context', gen: y2StoryAdd },
@@ -42,6 +45,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', sequenceFrom: 1, gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
+  { id: 'y2-objects3d', title: 'Shapes Around Us', icon: '🥁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: compare and sort common 3-D shapes and everyday objects', gen: y2Objects3d },
   { id: 'y2-symmetry', title: 'Mirror Lines', icon: '🦋', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: line symmetry in a vertical line', gen: y2Symmetry },
   { id: 'y2-patterns', title: 'What Comes Next?', icon: '🔁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: order and arrange objects in patterns and sequences', gen: y2Patterns },
   { id: 'y2-position', title: 'Turns & Right Angles', icon: '🧭', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: position, direction, rotation as right angles', gen: y2Position },
