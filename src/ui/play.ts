@@ -4,7 +4,7 @@ import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
-import { Tracer, traceFeedback } from '../game/tracing';
+import type { Tracer } from '../game/tracing';
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
 } from '../storage';
@@ -13,6 +13,7 @@ import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { createHud } from './hud';
+import { inputFor, inputMarkup, mountTracer } from './play-input';   // #1064: how a child answers
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
@@ -27,14 +28,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   const trailItem = equippedItem(wallet(), 'trail');
   const skin = trailItem?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
   const fx = trailItem?.fx ?? av.fx;   // a bought element trail overrides the avatar's own particle/sound effect too (#69)
-  const tracing = o.topic?.input === 'tracing';
+  const input = inputFor(o); const tracing = input === 'tracing'; const bubbles = input === 'bubbles';
   const spec = MODES[o.mode];
   const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool && !o.practice;
   const villainMode = spec.villain;                     // Hammer Man on screen, TNT bubbles in the mix
   const title = o.practice ? 'Fix my mistakes' : spec.staged ? (training ? 'Sensei Training' : o.topic!.title) : spec.title;
   render(`
   <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
-    ${tracing ? '' : '<canvas id="arena" aria-label="Game arena"></canvas>'}
+    ${bubbles ? inputMarkup(input) : ''}
     <div class="hud">
       <div class="hud-top">
         <button class="icon-btn" id="pause" aria-label="Pause">⏸</button>
@@ -47,11 +48,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
         <div class="vis-wrap" id="vis"></div>
         <div class="hint" id="hint"></div>
       </div>
-      ${tracing ? '<div class="trace-wrap"><canvas id="trace"></canvas><div class="trace-btns"><button class="btn" id="tclear">Clear</button><button class="btn primary" id="tcheck">Check ✓</button></div></div>' : ''}
+      ${bubbles ? '' : inputMarkup(input)}
       <div class="toast" id="toast" aria-live="polite"></div>
       ${villainMode ? `<div class="villain${boss ? ' boss' : ''}" id="villain">${boss ? '<div class="hp" role="progressbar" aria-label="Hammer Man health"><i id="hp"></i></div>' : ''}<img src="${VILLAIN.img}" alt="Hammer Man"><span class="bubble" id="taunt" hidden></span></div>` : ''}
     </div>
-    ${!tracing && !d.tutorialSeen ? `<div class="tutorial" id="tutorial" hidden aria-hidden="true"><div class="tut-sensei"><img src="${SENSEI.img}" alt=""></div><div class="tut-bubble">3</div><div class="tut-hand">☝️</div><div class="tut-text">Slice the bubble!</div></div>` : ''}
+    ${bubbles && !d.tutorialSeen ? `<div class="tutorial" id="tutorial" hidden aria-hidden="true"><div class="tut-sensei"><img src="${SENSEI.img}" alt=""></div><div class="tut-bubble">3</div><div class="tut-hand">☝️</div><div class="tut-text">Slice the bubble!</div></div>` : ''}
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
@@ -108,7 +109,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     if (!arena?.paused && !session.ended) session.tick(dt);
   }, 100);
 
-  if (!tracing) {
+  if (bubbles) {
     arena = new Arena($('#arena') as HTMLCanvasElement, {
       onHit(b, viaSwipe) {
         if (!load().tutorialSeen) { save({ tutorialSeen: true }); hideTutorial(); }
@@ -138,22 +139,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     });
   }
 
-  function startTrace(q: Question) {
-    tracer?.destroy();
-    const c = $('#trace') as HTMLCanvasElement;
-    tracer = new Tracer(c, q.answer, r => {
-      if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
-      const msg = traceFeedback(r, q.answer, 'stroke', tracer!.strokes); if (msg) speakTrace(msg);
-    }, av.glow);
-    $('#tclear').onclick = () => { sfx.tap(); tracer?.clear(); };
-    $('#tcheck').onclick = () => {
-      const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
-      const msg = traceFeedback(r, q.answer, 'check', tracer!.strokes); if (msg) speakTrace(msg);
-    };
-  }
-  /** Toast tracing feedback and speak the same words (#895): a child who cannot yet read gets more than a toast.
-   *  say() respects the read-aloud setting itself; the em dash becomes a spoken pause, not a read-aloud symbol. */
-  function speakTrace(msg: string) { toast(msg, 'bad'); say(msg.replace(' — ', ', ')); }
+  function startTrace(q: Question) { tracer?.destroy(); tracer = mountTracer(q, { hit: a => session.hit(a), toast, glow: av.glow }); }
   /** First-play demo: show the animated hand over the arena; returns how long to hold the first wave (ms). */
   function showTutorial(): number {
     const t = $('#tutorial'); if (!t || !t.hidden) return 0;

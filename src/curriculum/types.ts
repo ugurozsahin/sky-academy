@@ -121,7 +121,7 @@ export interface Topic {
   subject: 'maths' | 'writing';
   year: YearId;
   nc: string;             // curriculum reference (short)
-  input?: 'bubbles' | 'tracing';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
+  input?: 'bubbles' | 'tracing' | 'keypad';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
   drill?: true;           // a narrow practice topic (#915): offered by the Sprint chooser only, never counted, mixed or duelled
   sequenceFrom?: Difficulty;   // draws a `Question.sequence` from this difficulty up — the truth `duelPool()` reads (#562)
   gen: Generator;

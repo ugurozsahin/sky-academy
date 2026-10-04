@@ -18,7 +18,7 @@
     "src/main.ts::(anonymous)": 16,
     "src/storage/migrate.ts::sanitizeTypes": 39,
     "src/ui/play-results.ts::showResults": 21,
-    "src/ui/play.ts::playScreen": 27,
+    "src/ui/play.ts::playScreen": 26,
     "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,
     "src/ui/visuals.ts::renderVisual": 47,
@@ -33,7 +33,7 @@
     "src/ui/parents.ts::parentsScreen": 102,
     "src/ui/parents.ts::(anonymous)": 77,
     "src/ui/play-session.ts::createPlaySession": 186,
-    "src/ui/play.ts::playScreen": 210,
+    "src/ui/play.ts::playScreen": 197,
     "src/ui/solid.ts::createSolidSlot": 110,
     "src/ui/visuals.ts::renderVisual": 86
   },
