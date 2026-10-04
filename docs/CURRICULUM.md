@@ -87,6 +87,7 @@ Maths:
 - y2-skip — 2,3,5,10 incl. backwards
 - y2-add — 2-digit ± ones/tens/2-digit
 - y2-sub — 2-digit ± ones/tens/2-digit
+- y2-related — related facts: 3 + 4 = 7, so 30 + 40 = ?; d1 adds, d2 subtracts, d3 hides the second number or the result
 - y2-three — three 1-digit
 - y2-inverse — missing number
 - y2-story-add — short story problems within 100: add or take away, ones (d1), tens (d2), two 2-digit numbers or one-unit measures (d3)
