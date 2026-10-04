@@ -31,6 +31,16 @@ describe('y2-story-money (#996)', () => {
     });
   }
 
+  it('names two different items, with a/an agreement', () => {
+    const rng = mulberry32(3);
+    for (let i = 0; i < DRAWS; i++) for (const d of [1, 3] as const) {
+      const nouns = [...y2StoryMoney(d, rng).prompt.matchAll(/\b(a|an) (\w+)/gi)];
+      expect(nouns.length).toBe(2);
+      expect(nouns[0][2]).not.toBe(nouns[1][2]);
+      for (const m of nouns) expect(m[1].toLowerCase()).toBe(/^[aeiou]/.test(m[2]) ? 'an' : 'a');
+    }
+  });
+
   it('prints no decimal and speaks no mixed amount', () => {
     const rng = mulberry32(5);
     for (let i = 0; i < DRAWS; i++) for (const d of [1, 2, 3] as const) {
@@ -48,8 +58,11 @@ describe('y2-story-money (#996)', () => {
       const q3 = y2StoryMoney(3, rng);
       const [, p, q] = amounts(q3.prompt);
       expect(p % 5).toBe(0);
-      const forgot = 100 - Math.max(p, q);
-      if (forgot !== pence(q3.answer)) expect(q3.options.map(pence)).toContain(forgot);
+      expect(q % 5).toBe(0);
+      expect(p + q).toBeLessThanOrEqual(95);
+      expect(q3.options.map(pence)).toContain(100 - Math.max(p, q));
+      expect(q3.say).toContain('You pay a pound for');
+      expect(amounts(q2.prompt)[0]).toBe(50);
     }
   });
 });

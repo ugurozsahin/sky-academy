@@ -6,7 +6,7 @@ import { ri, pick, shuffle, wordQ, coinLabel } from './util';
 
 export const ITEMS = ['pencil', 'rubber', 'apple', 'sticker', 'ruler', 'banana', 'balloon', 'biscuit', 'lolly', 'comic'];
 const a = (item: string) => (/^[aeiou]/.test(item) ? 'an ' : 'a ') + item;
-const spoken = (p: number) => (p === 100 ? 'a pound' : `${p} pence`);
+const spoken = (p: number) => (p === 100 ? 'a pound' : p === 1 ? 'a penny' : `${p} pence`);
 const cap1 = (s: string) => s.replace(/^./, c => c.toUpperCase());
 
 /** Two different items with prices (each `lo`..`hi` pence, in steps of `step`) that total at most `cap`. */
