@@ -82,7 +82,7 @@ export const NO_REPEATED_SET = new Set([
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
 'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
 'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
-  'y2-conjunction d1', 'y2-conjunction d2', // #1007: each bank row carries its own decoys, so an option set never recurs with a different answer at d1/d2 (d3 shares rows' decoys and does compare)
+  'y2-conjunction d1', 'y2-conjunction d2', 'y2-conjunction d3', // #1007: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y1-share d2', 'y1-share d3', // #986: the decoys are the total, k and answer ±1, all derived from the card, so no option set recurs with a different answer at these seeds
   'y2-story-times d1', // #995: the array on d1 cards is the whole question and its decoys derive from the card, so no option set recurs with a different answer
   'y2-story-add d1', 'y2-story-add d3', // #994: the decoys are the other operation and answer ±1/±10, all derived from the card, so no option set recurs with a different answer
