@@ -25,9 +25,13 @@ describe('per-question clock (#1063)', () => {
     expect(ev.onMiss).toHaveBeenCalledTimes(1); expect(s.attempts).toBe(1); expect(s.correct).toBe(0); expect(ev.onCorrect).not.toHaveBeenCalled();
     expect(s.waiting).toBe(true); expect(s.questionLeft).toBe(0); expect(s.lives).toBe(Y1.lives - 1);
   });
-  it('does not count down without a tick (paused)', () => {
-    const { s } = make();
+  it('ignores a zero or negative tick, and a tick while the card is decided', () => {
+    const { s, ev } = make();
+    s.tick(0); s.tick(-5);
     expect(s.questionLeft).toBe(6000);
+    s.tick(1000); s.hit(s.current!.answer);
+    const took = s.lastAnswerMs; s.tick(10000);
+    expect(s.questionLeft).toBe(0); expect(s.lastAnswerMs).toBe(took); expect(ev.onMiss).not.toHaveBeenCalled();
   });
   it('a slice before expiry decides the card, disarms the clock and records the time taken', () => {
     const { s, ev } = make();
@@ -71,5 +75,21 @@ describe('per-question clock (#1063)', () => {
     s.hit(s.current!.answer); s.advance();
     expect(s.questionLeft).toBe(0);
     s.armQuestionClock(ms => ms / 2); expect(s.questionLeft).toBe(3000);
+  });
+  it('a question replaced while armed disarms the clock: no stale miss on the next card', () => {
+    const { s, ev } = make();
+    s.tick(2000); s.advance();
+    expect(s.questionLeft).toBe(0);
+    s.tick(10000);
+    expect(ev.onMiss).not.toHaveBeenCalled(); expect(s.attempts).toBe(0);
+  });
+  it('a deck question replaced while armed disarms the clock too', () => {
+    MODES.mission.questionMs = 6000;
+    const t = topicById('y1-add')!; const q = t.gen(1, () => 0.3);
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck: [{ topic: t, q }, { topic: t, q: t.gen(1, () => 0.6) }] }, ev);
+    s.start(); s.armQuestionClock(); s.tick(2000); s.advance();
+    expect(s.questionLeft).toBe(0); s.tick(10000);
+    expect(ev.onMiss).not.toHaveBeenCalled();
   });
 });

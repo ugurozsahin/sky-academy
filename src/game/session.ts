@@ -268,7 +268,7 @@ export class Session {
     const isTarget = q.sequence
       ? (q.anyOrder ? q.sequence.includes(label) && !this.slicedTargets.has(label) : label === q.sequence[this.seqIndex])
       : label === q.answer;
-    if (!isTarget || this.spec.questionMs) return;   // a timed question (#1063) is decided by a slice or its clock, never by a fall
+    if (!isTarget || this.spec.questionMs !== undefined) return;   // a timed question (#1063) is decided by a slice or its clock, never by a fall
     this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false); this.recordMiss(q, null);
     this.ev.onMiss(q); this.bossHeal();
     if (!this.o.year.gentle) this.loseLife();
