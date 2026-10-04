@@ -130,6 +130,7 @@ Writing:
 - y2-tense — present and past: name the tense of a finished sentence at d1, with the progressive at d2, and fill the gap with the form the sentence needs at d3
 - y2-punct — commas in lists, possessive apostrophe
 - y2-sentence — Story Sentences: 5–7 words, expanded noun phrases, `because`/`when`/`if`/`that`, commands & exclamations; d1 shown, d2–3 listen & build
+- y2-conjunction — Joining Words: gap sentence, slice the joining word; d1 and/or/but (3 bubbles), d2 because/when/if/that (3), d3 any (4); decoys hand-keyed per sentence so only one word fits
 - y2-trace — words
 
 Unit conversion (`1 m = 100 cm`, `1 kg = 1000 g`, `1 l = 1000 ml`) is **not** a KS1 topic and the three Year 2

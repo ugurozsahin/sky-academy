@@ -18,6 +18,7 @@ import { y2StoryMoney } from './year2-story-money';
 import { y2CoinCombo } from './year2-coincombo';
 import { y2StoryTimes } from './year2-story-times';
 import { y2Objects3d } from './year2-objects3d';
+import { y2Conjunction } from './year2-conjunction';
 import { tableDrill } from './tables';
 
 export const YEAR2_TOPICS: Topic[] = [
@@ -69,5 +70,6 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-tense', title: 'Then & Now', icon: '⏳', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: present and past tense, including the progressive', gen: y2Tense },
   { id: 'y2-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: commas, apostrophes', gen: y2Punct },
   { id: 'y2-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year2', nc: 'Y2 Writing: word order, conjunctions, noun phrases', sequenceFrom: 1, gen: y2Sentence },
+  { id: 'y2-conjunction', title: 'Joining Words', icon: '🔗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: co-ordination (and, or, but) and subordination (because, when, if, that)', gen: y2Conjunction },
   { id: 'y2-trace', title: 'Trace Words', icon: '✍️', subject: 'writing', year: 'year2', nc: 'Y2 Handwriting', input: 'tracing', gen: y2Trace },
 ];
