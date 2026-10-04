@@ -910,14 +910,14 @@ describe('coinLabel (#35 — one source for the £/p money label)', () => {
 describe('Year 2 money is recorded the KS1 way (#298 slice 2)', () => {
   // Over every difficulty and a wide seed sweep, because d2 is one of three branches: a per-seed spot check
   // would pass on a run that never drew it. Red on main, where d2 answers and options read `£1.50`.
-  it('no y2-money question, answer or option carries a decimal amount', () => {
-    const topic = TOPICS.find(t => t.id === 'y2-money')!;
+  it.each(['y2-money', 'y2-story-money'])('no %s question, answer or option carries a decimal amount', id => {
+    const topic = TOPICS.find(t => t.id === id)!;
     let seen = 0;
     for (let seed = 0; seed < 400; seed++) {
       for (const d of [1, 2, 3] as const) {
         const q = topic.gen(d, rng(seed * 3 + d));
         for (const text of [q.prompt, q.answer, ...q.options, q.say ?? '', q.hint ?? '']) {
-          expect(text, `y2-money d${d} seed ${seed} records money with a decimal point: ${text}`)
+          expect(text, `${id} d${d} seed ${seed} records money with a decimal point: ${text}`)
             .not.toMatch(/£\d+\.\d/);
           seen++;
         }

@@ -1219,7 +1219,7 @@ describe('the repeat key holds the whole question (#412)', () => {
   const BIG_ENOUGH_TOPICS = [
     'r-soundhunt', 'y1-add', 'y1-alphabet', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
     'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-story', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
-    'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats', 'y2-story-add',
+    'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats', 'y2-story-add', 'y2-story-money',
     'y2-sub', 'y2-temp', 'y2-three',
   ];
   it('the big-topic set is exactly these topics, not just this many (#453 item 3)', () => { // #1050: EYFS/KS1-only pin
