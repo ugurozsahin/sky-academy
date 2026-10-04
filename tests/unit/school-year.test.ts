@@ -13,7 +13,8 @@ describe('schoolYearFromBirthDate (#1055)', () => {
     expect(schoolYearFromBirthDate(at(2019, 6, 15), at(2024, 9, 1))).toBe(1);
   });
   it('is null outside Reception to Year 6', () => {
-    expect(schoolYearFromBirthDate(at(2010, 1, 1), at(2024, 9, 15))).toBeNull();
+    expect(schoolYearFromBirthDate(at(2013, 1, 1), at(2024, 9, 15))).toBeNull();   // Year 7
+    expect(schoolYearFromBirthDate(at(2014, 1, 1), at(2024, 9, 15))).toBe(6);
     expect(schoolYearFromBirthDate(at(2023, 1, 1), at(2024, 9, 15))).toBeNull();
   });
 });

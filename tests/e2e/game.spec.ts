@@ -462,6 +462,9 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#go');
     await expect(page.locator('.intro-card')).toBeVisible();
     await page.click('#intro-go');
+    // #1055: a child with no school year yet is asked on the map first; that tap starts the mission.
+    await expect(page.locator('.home .section-title')).toHaveText('Tap your school year');
+    await page.click('.island[data-year="reception"]');
     await expect(page.locator('.play')).toBeVisible();
     await expect(page.locator('#tutorial')).toBeVisible();
     await page.waitForFunction(() => window.__sna?.state().prompt);
@@ -1887,7 +1890,7 @@ test.describe('Sky Ninja Academy', () => {
     const card = page.locator('.sticker.got').first();
     await expect(card).toBeVisible();
     await card.click();
-    expect(await page.evaluate(() => window.__spoken ?? []), 'an earned sticker has no listener at all').toEqual([]);
+    expect((await page.evaluate(() => window.__spoken ?? [])).filter(l => l !== 'Tap your school year'), 'an earned sticker has no listener at all').toEqual([]);   // #1055: the map's own first-run line is not the tap's
   });
 
   // pr-test-analyzer review of #894: the "Using ✓" pill is a <span>, not a <button>, so the card handler's

@@ -21,6 +21,7 @@ export type StartPlay = (o: PlayOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
   memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string) => void; rewards: () => void; shop: () => void; parents: () => void;
+  pickYear: (year: YearInfo) => void;   // #1055: the school-year tap on a new child's map (a mission after "Let's go!", else the island)
   profiles: () => void;   // #20 slice 2: "Who is playing?"
   up: () => void;
 };
@@ -112,7 +113,7 @@ export function mapScreen(nav: Nav) {
   if (ask && !yearAsked) { yearAsked = true; say('Tap your school year'); }
   $$('.island').forEach(b => b.addEventListener('click', () => {
     const y = shown.find(x => x.id === b.dataset.year)!;
-    save(ask ? { year: y.id, ks2: { ...load().ks2, schoolYear: y.id } } : { year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
+    save(ask ? { year: y.id, ks2: { ...load().ks2, schoolYear: y.id } } : { year: y.id }); sfx.tap(); say(`${y.title} island`); ask ? nav.pickYear(y) : nav.island(y);
   }));
   // #894: a Daily Dojo row has no action of its own, so tapping it just reads it aloud, for a pre-reader.
   $$('.dojo-item').forEach(li => li.addEventListener('click', () => {
