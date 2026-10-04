@@ -13,6 +13,7 @@ import { y2OddEven } from './year2-oddeven';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2StoryMoney } from './year2-story-money';
+import { y2StoryTimes } from './year2-story-times';
 import { tableDrill } from './tables';
 
 export const YEAR2_TOPICS: Topic[] = [
@@ -29,6 +30,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-tables-2', title: '2× table', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 2 times table', drill: true, gen: tableDrill(2) },
   { id: 'y2-tables-5', title: '5× table', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 5 times table', drill: true, gen: tableDrill(5) },
   { id: 'y2-tables-10', title: '10× table', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 10 times table', drill: true, gen: tableDrill(10) },
+  { id: 'y2-story-times', title: 'Story Times', icon: '🍎', subject: 'maths', year: 'year2', nc: 'Y2 M&D: solve problems in contexts using the 2, 5 and 10 tables', gen: y2StoryTimes },
   { id: 'y2-oddeven', title: 'Odd or Even', icon: '🐾', subject: 'maths', year: 'year2', nc: 'Y2 M&D: odd and even', sequenceFrom: 2, gen: y2OddEven },
   { id: 'y2-fractions', title: 'Fractions', icon: '🍕', subject: 'maths', year: 'year2', nc: 'Y2 Fractions: 1/3 1/4 2/4 3/4', gen: y2Fractions },
   { id: 'y2-money', title: 'Money £ and p', icon: '💷', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money, change', gen: y2Money },
