@@ -2107,6 +2107,16 @@ test.describe('Sky Ninja Academy', () => {
     await waitForTarget(page); expect(await answer(page)).toBe(true);
   });
 
+  test('a six-tick labelled number line fits the question card on the phone (#1061)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    // No topic draws a labelled line yet, so inject the app's own renderVisual output into the card.
+    const html = renderVisual({ type: 'numberline', from: 0, to: 5, labels: ['0', '1/5', '2/5', '3/5', '4/5', '1'], marks: [{ label: 'A', at: 2 }] });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await expect(page.locator('#vis .nline span')).toHaveCount(6);
+    await expectFitsViewport(page, 'labelled number line');
+  });
+
   // #65, one test per topic rather than one walk through all of them: the walk ran to ~60 s on a loaded desktop
   // runner and was reported as "page.goto hangs" — the test budget expiring mid-navigation, not a wedged page.
   test('no voice: Sound Hunt prints its keywords, mid-wave and without a pause, and stays answerable (#65)', async ({ page }) => {

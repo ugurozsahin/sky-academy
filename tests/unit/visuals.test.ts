@@ -426,3 +426,41 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
     }
   });
 });
+
+describe('number line labels, markers and exact decimal ticks (#1061)', () => {
+  const ticks = (h: string) => [...h.matchAll(/<span[^>]*>([^<]*)<\/span>/g)].map(m => m[1]);
+  const quiet = () => vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  it('a 0 to 1 line in 0.1 steps prints exactly 11 ticks with no float artefacts', () => {
+    const t = ticks(renderVisual({ type: 'numberline', from: 0, to: 1, step: 0.1 }));
+    expect(t).toEqual(['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1']);
+  });
+  it('a plain integer line is unchanged byte for byte', () => {
+    expect(renderVisual({ type: 'numberline', from: 0, to: 2, mark: 1 }))
+      .toBe('<div class="vis"><div class="nline"><span class="">0</span><span class="mark">?</span><span class="">2</span></div></div>');
+  });
+  it('labels replace the numbers and are escaped', () => {
+    const h = renderVisual({ type: 'numberline', from: 0, to: 2, labels: ['0', '1/2<', '1'] });
+    expect(ticks(h)).toEqual(['0', '1/2&lt;', '1']);
+  });
+  it('lettered markers sit on the tick whose value is `at`', () => {
+    const h = renderVisual({ type: 'numberline', from: 0, to: 1, step: 0.5, marks: [{ label: 'A', at: 0.5 }] });
+    expect(ticks(h)).toEqual(['0', 'A', '1']);
+    expect(h).toContain('class="mark">A');
+  });
+  it('the hidden mark prints "?" even when labels is set', () => {
+    const h = renderVisual({ type: 'numberline', from: 0, to: 2, mark: 1, labels: ['0', 'x', '2'] });
+    expect(ticks(h)).toEqual(['0', '?', '2']);
+  });
+  it('inputs it cannot draw correctly draw nothing and never throw', () => {
+    const warn = quiet();
+    expect(renderVisual({ type: 'numberline', from: 0, to: 6, labels: ['0', '1', '2', '3', '4', '5', '6'] })).toBe('');   // 7 labels
+    expect(renderVisual({ type: 'numberline', from: 0, to: 2, labels: ['a', 'b'] })).toBe('');                              // wrong length
+    expect(renderVisual({ type: 'numberline', from: 0, to: 2, marks: [{ label: 'A', at: 1.5 }] })).toBe('');                // off a tick
+    expect(warn).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+  it('a six-label line is drawn', () => {
+    expect(ticks(renderVisual({ type: 'numberline', from: 0, to: 5, labels: ['a', 'b', 'c', 'd', 'e', 'f'] }))).toHaveLength(6);
+  });
+});

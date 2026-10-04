@@ -10,6 +10,26 @@ export function fiveFrames(n: number, emoji: string, keep = n): string {
   const rows: string[] = []; for (let r = 0; r < slots; r += 5) rows.push(`<span class="five">${cells.slice(r, r + 5).join('')}</span>`);
   return rows.join('');
 }
+/** The tick values of a number line, placed by index at the step's own decimals so 0.1 steps never accumulate float error (#1061). */
+function numberlineTicks(v: Extract<Visual, { type: 'numberline' }>): number[] {
+  const step = v.step ?? 1, dp = Math.max(0, ...[v.from, step].map(x => (String(x).split('.')[1] ?? '').length));
+  const count = step > 0 && v.to >= v.from ? Math.floor((v.to - v.from) / step + 1e-9) + 1 : 0;
+  return Array.from({ length: Math.min(count, 200) }, (_, i) => Number((v.from + i * step).toFixed(dp)));
+}
+const NL_MAX_LABELS = 6;
+/** A number line with optional per-tick labels and lettered markers; one it cannot draw correctly draws nothing, as `symmetry` does (#1061). */
+function numberlineHTML(v: Extract<Visual, { type: 'numberline' }>): string {
+  const ticks = numberlineTicks(v), marks = v.marks ?? [];
+  if ((v.labels && (v.labels.length !== ticks.length || ticks.length > NL_MAX_LABELS)) || marks.some(m => !ticks.includes(m.at))) {
+    console.warn('numberline visual: labels or markers do not fit the ticks — nothing drawn');
+    return '';
+  }
+  const cell = (n: number, i: number) => {
+    const m = marks.find(x => x.at === n);
+    return `<span class="${n === v.mark || m ? 'mark' : ''}">${n === v.mark ? '?' : esc(m?.label ?? v.labels?.[i] ?? String(n))}</span>`;
+  };
+  return `<div class="vis"><div class="nline">${ticks.map(cell).join('')}</div></div>`;
+}
 export function renderVisual(v: Visual | undefined): string {
   if (!v) return '';
   switch (v.type) {
@@ -52,10 +72,7 @@ export function renderVisual(v: Visual | undefined): string {
       }
       return `<div class="vis"><div class="bar">${Array.from({ length: parts }, (_, i) => `<i class="${i < shaded ? 'sh' : ''}"></i>`).join('')}</div></div>`;
     }
-    case 'numberline': {
-      const ticks = []; for (let n = v.from; n <= v.to; n += v.step ?? 1) ticks.push(n);
-      return `<div class="vis"><div class="nline">${ticks.map(n => `<span class="${n === v.mark ? 'mark' : ''}">${n === v.mark ? '?' : n}</span>`).join('')}</div></div>`;
-    }
+    case 'numberline': return numberlineHTML(v);
     case 'scales': {
       const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
       return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
