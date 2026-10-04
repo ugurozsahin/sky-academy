@@ -141,7 +141,25 @@ const y1Words: Generator = (d, rng) => {
   const ds = shuffle(rng, [n - 1, n + 1, n + 2, n - 2, n - 3, n + 3].filter(x => x >= 0 && x <= 20)).slice(0, 3).map(numberWord);
   return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which word says ${n}?`, hint: 'Slice the word', hintIsData: false });
 };
+/**
+ * #987: Year 1 names a half and a quarter of "an object, shape or quantity". The shape card draws the `fraction`
+ * visual and asks which of the three Year 1 words says the shaded part. Only (2,1) half, (4,1) quarter and
+ * (n,n) whole are ever drawn: (4,2) is both "a half" and "two quarters", and equivalence is Year 2.
+ */
+const HALF_WORDS = ['a half', 'a quarter', 'a whole'];
+const y1HalfShape: Generator = (d, rng) => {
+  if (d === 3 && rng() < 0.5) {
+    const quarters = rng() < 0.5;
+    return numQ(rng, `How many ${quarters ? 'quarters' : 'halves'} make a whole?`, quarters ? 4 : 2, { min: 1, max: 4, say: `How many ${quarters ? 'quarters' : 'halves'} make a whole?` });
+  }
+  const word = d === 1 ? pick(rng, [HALF_WORDS[0], HALF_WORDS[2]]) : pick(rng, HALF_WORDS);
+  const parts = word === 'a half' ? 2 : word === 'a quarter' ? 4 : pick(rng, [2, 3, 4]);
+  const shaded = word === 'a whole' ? parts : 1;
+  const others = HALF_WORDS.filter(w => w !== word && (d > 1 || w !== 'a quarter'));
+  return wordQ(rng, 'What part is shaded?', word, others, { visual: { type: 'fraction', parts, shaded, shape: d === 1 || rng() < 0.5 ? 'circle' : 'bar' }, say: 'What part of the shape is shaded?' });
+};
 const y1Half: Generator = (d, rng) => {
+  if (rng() < 0.5) return y1HalfShape(d, rng);
   const quarter = d >= 2 && rng() < 0.5;
   const n = quarter ? 4 * ri(rng, 1, d === 3 ? 5 : 3) : 2 * ri(rng, 1, d === 1 ? 5 : 10);
   const ans = quarter ? n / 4 : n / 2;

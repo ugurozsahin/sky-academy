@@ -45,7 +45,7 @@ Maths:
 - y1-skip — count in 2s/5s/10s; at d2–d3 one card in three is "Slice every multiple of 5/10" (any order, #920)
 - y1-moreless — to 100; half the cards are "Count back: 42, 41, 40, ?", d3 crossing a tens boundary a third of the time (#983)
 - y1-words — 1–20 in words
-- y1-half — ½, ¼ of quantities
+- y1-half — ½, ¼ of quantities and of shapes (shaded part: a half / a quarter / a whole; how many halves or quarters make a whole)
 - y1-arrays — M&D via arrays
 - y1-share — M&D by sharing and grouping objects, exact, within 20 (d1 share, d2 group, d3 both)
 - y1-coins — recognise coins **and the £5/£10 notes**, compare two coins, add two coins within 20p
