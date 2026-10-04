@@ -419,20 +419,20 @@ const y1Spelling: Generator = (d, rng) => {
  * (English Appendix 1, Year 1). The word is spoken, never printed (`listen`/`peek: true`, the no-voice path of
  * Find the word you hear): the child slices the right spelling from two curated non-word misspellings, each
  * breaking exactly its entry's rule. No decoy is a real word or a real word's homophone, and the App. 1
- * exceptions and the heteronym *live* are left out. `spellChoiceQ` is shared with the other Year 1 spelling topics.
+ * exceptions and the heteronym *live* are left out. `spellChoiceQ` is exported for #991 to reuse.
  */
 export const spellChoiceQ = (rng: () => number, word: string, decoys: string[]) =>
   wordQ(rng, 'Find the right spelling', word, decoys, { say: `Which is the right spelling of ${word}?`, listen: word, peek: true, hint: 'Slice the right spelling', hintIsData: false });
 export type SpellRuleFamily = 'double' | 'nk' | 'tch' | 've';
 export const Y1_SPELL_RULES: [string, SpellRuleFamily, [string, string]][] = [
-  ['puff', 'double', ['puf', 'puph']], ['huff', 'double', ['huf', 'hufe']], ['bell', 'double', ['bel', 'behl']], ['well', 'double', ['wel', 'wehl']],
+  ['puff', 'double', ['puf', 'puph']], ['huff', 'double', ['huf', 'hufe']], ['bell', 'double', ['belh', 'behl']], ['well', 'double', ['welh', 'wehl']],
   ['kiss', 'double', ['kis', 'kice']], ['dress', 'double', ['dres', 'dresz']], ['buzz', 'double', ['buz', 'buzs']], ['fizz', 'double', ['fiz', 'fizs']],
-  ['back', 'double', ['bak', 'bac']], ['sock', 'double', ['sok', 'soc']], ['duck', 'double', ['duk', 'dukk']], ['neck', 'double', ['nek', 'nec']],
+  ['back', 'double', ['bak', 'bacc']], ['sock', 'double', ['sok', 'socc']], ['duck', 'double', ['duk', 'dukk']], ['neck', 'double', ['nek', 'nec']],
   ['bank', 'nk', ['bamk', 'bangk']], ['think', 'nk', ['thingk', 'thinc']], ['honk', 'nk', ['hongk', 'honc']], ['sunk', 'nk', ['sungk', 'sunc']],
   ['pink', 'nk', ['pingk', 'pinc']], ['tank', 'nk', ['tangk', 'tanc']],
   ['catch', 'tch', ['cach', 'catsh']], ['fetch', 'tch', ['fech', 'fetsh']], ['notch', 'tch', ['noch', 'notsh']], ['hutch', 'tch', ['huch', 'hutsh']],
   ['witch', 'tch', ['wich', 'witsh']], ['ditch', 'tch', ['dich', 'ditsh']],
-  ['have', 've', ['hav', 'havv']], ['give', 've', ['giv', 'givv']], ['love', 've', ['luv', 'lov']], ['glove', 've', ['gluv', 'glov']],
+  ['have', 've', ['hav', 'havv']], ['give', 've', ['giv', 'givv']], ['love', 've', ['lurv', 'lof']], ['glove', 've', ['gluv', 'glov']],
   ['shove', 've', ['shuv', 'shov']], ['above', 've', ['abuv', 'abov']],
 ];
 const y1SpellRules: Generator = (d, rng) => {
