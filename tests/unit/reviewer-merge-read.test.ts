@@ -20,4 +20,14 @@ describe("review-pr §6's Merge paragraph makes the run read the review it merge
     expect(merge).toContain('`[Merge Without Review]`');
     expect(merge).toMatch(/left for the owner or the next run; never route around it/);
   });
+  it('reads the review by its body in its own call, also on a PR that was never blocked (#1576)', () => {
+    expect(merge).toContain('**Read it by its body, in its own call (#1576):**');
+    expect(merge).toContain('a PR that was never blocked has no `REVIEW: CLEARED`');
+    expect(merge).toContain('a count of comments, or a draft flag, is not a read');
+  });
+  it('brings a behind PR up to date itself, and keeps the merge out of the reads line (#1576)', () => {
+    expect(merge).toContain('If `mergeable_state` is `behind`, do the update-branch step above first');
+    expect(merge).toContain('never leave a behind PR to the owner');
+    expect(merge).toContain('The merge is its own call, never joined to the reads in one shell line');
+  });
 });
