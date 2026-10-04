@@ -98,6 +98,7 @@ Maths:
 - y2-oddeven — is n odd/even (d1); at d2–d3 about 1 in 3 cards is "slice every even/odd number" over six numbers (any order); of the rest, half asks n odd/even and half shows 4 numbers and asks which one is odd/even, d3 decoys within 5 of the answer
 - y2-fractions — ⅓ ¼ 2/4 ¾, of quantities
 - y2-money — £ and p recorded separately — `£1 and 50p`, never `£1.50`; change
+- y2-story-money — shop stories in pence: two prices added (d1), change from 50p (d2), change from £1 after two items (d3); every amount via `coinLabel`, no decimals
 - y2-time — 5 minutes, quarter past/to
 - y2-words — to 100
 - y2-order — order to 100

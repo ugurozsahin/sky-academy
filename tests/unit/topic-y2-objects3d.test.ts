@@ -27,14 +27,17 @@ describe('y2-objects3d (#997)', () => {
       expect(q.say, q.prompt).toBeTruthy();
       expect(new Set(q.options).size, q.prompt).toBe(q.options.length);
       expect(q.options).toContain(q.answer);
+      expect(q.options, q.prompt).toHaveLength(4);
       if (SOLID_NAMES.includes(q.answer)) {                              // object → solid name
         dirs.add('name');
         const emoji = (q.visual as { text: string }).text;
         expect(q.answer, q.prompt).toBe(solidOfEmoji(emoji));
+        if (d === 1) { expect(['sphere', 'cylinder', 'cuboid'], q.prompt).toContain(q.answer); expect(q.options.every(o => ['sphere', 'cylinder', 'cuboid', 'cube', 'cone'].includes(o)), q.prompt).toBe(true); }
         expect(q.options.filter(o => sameShape(o, q.answer)), q.prompt).toHaveLength(1);
         expect(q.options.includes('cube') && q.options.includes('cuboid'), q.prompt).toBe(false);
       } else {                                                           // solid → object
         dirs.add('object');
+        expect(q.options.every(o => solidOfEmoji(o) !== undefined), q.prompt).toBe(true);
         const solid = /Which one is a (\w+)\?/.exec(q.prompt)![1];
         expect(solidOfEmoji(q.answer), q.prompt).toBe(solid);
         expect(q.options.filter(o => sameShape(solidOfEmoji(o)!, solid)), q.prompt).toEqual([q.answer]);
