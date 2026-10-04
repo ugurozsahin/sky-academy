@@ -87,6 +87,7 @@ Maths:
 - y2-sub — 2-digit ± ones/tens/2-digit
 - y2-three — three 1-digit
 - y2-inverse — missing number
+- y2-story-add — short story problems within 100: add or take away, ones (d1), tens (d2), two 2-digit numbers or one-unit measures (d3)
 - y2-tables — 2,5,10 × and ÷
 - y2-tables-2 — drill (Sprint chooser only): the 2× table alone, × at d1, adds ÷ at d2, adds ? × 2 = p at d3
 - y2-tables-5 — drill (Sprint chooser only): the 5× table alone, × at d1, adds ÷ at d2, adds ? × 5 = p at d3

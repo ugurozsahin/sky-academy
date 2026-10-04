@@ -11,6 +11,7 @@ import {
 } from './year2';
 import { y2OddEven } from './year2-oddeven';
 import { y2WordClass } from './year2-wordclass';
+import { y2StoryAdd } from './year2-story-add';
 import { tableDrill } from './tables';
 
 export const YEAR2_TOPICS: Topic[] = [
@@ -22,6 +23,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit subtraction', gen: y2Sub },
   { id: 'y2-three', title: 'Three Numbers', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 A&S: add three 1-digit', gen: y2Three },
   { id: 'y2-inverse', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year2', nc: 'Y2 A&S: inverse, missing number', gen: y2Inverse },
+  { id: 'y2-story-add', title: 'Story Sums', icon: '📖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: solve problems with addition and subtraction in context', gen: y2StoryAdd },
   { id: 'y2-tables', title: '2, 5, 10 Times Tables', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 2, 5, 10 tables ×÷', gen: y2Tables },
   { id: 'y2-tables-2', title: '2× table', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 2 times table', drill: true, gen: tableDrill(2) },
   { id: 'y2-tables-5', title: '5× table', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 5 times table', drill: true, gen: tableDrill(5) },
