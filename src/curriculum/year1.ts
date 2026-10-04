@@ -487,6 +487,11 @@ const y1Trace: Generator = (d, rng) => {
   const t = d === 2 && rng() < 0.5 ? l.toUpperCase() : l;
   return { prompt: `Trace the letter ${t}`, say: `Trace the letter ${l}`, answer: t, options: [t], visual: { type: 'word', text: t } };
 };
+const Y1_DIGITS: string[][] = [['1', '2', '3', '4', '5'], ['0', '6', '7', '8', '9'], ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']];
+const y1TraceNum: Generator = (d, rng) => {
+  const n = pick(rng, Y1_DIGITS[d - 1]);
+  return { prompt: `Trace the number ${n}`, say: `Trace the number ${n}`, answer: n, options: [n], visual: { type: 'word', text: n } };
+};
 
 export const YEAR1_TOPICS: Topic[] = [
   // Year 1 maths
@@ -532,4 +537,5 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-syllables', title: 'How Many Beats?', icon: '👏', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: division of words into syllables', gen: (d, rng) => syllableQ(rng, d, 3) },
   { id: 'y1-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year1', nc: 'Y1 Writing: sequence words into sentences, and', sequenceFrom: 1, gen: y1Sentence },
   { id: 'y1-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting', input: 'tracing', gen: y1Trace },
+  { id: 'y1-tracenum', title: 'Trace Numbers', icon: '✏️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting: form digits 0-9', input: 'tracing', gen: y1TraceNum },
 ];

@@ -77,6 +77,7 @@ Writing:
 - y1-syllables — How Many Beats?: same generator as r-syllables, hand-keyed 1–3 beat words; d1 words of 1–2 beats, d2 1–3, d3 adds a 4 option
 - y1-sentence — Story Sentences: 4–7 words, `and`/`or`/`but`, d1 shown, d2–3 listen & build
 - y1-trace
+- y1-tracenum — Trace Numbers: one digit to trace on the tracing pad; d1 1–5, d2 0 and 6–9, d3 all ten digits
 
 ## Year 2 — 7 q/stage, 3 lives
 Maths:

@@ -2277,6 +2277,17 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
+  test('Trace Numbers: a digit fits the phone, an empty check is refused, tracing it passes (#992)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-tracenum');
+    await expectFitsViewport(page);
+    expect((await state(page)).answer as string).toMatch(/^[0-9]$/);
+    await page.click('#tcheck');
+    await expect(page.locator('.toast.bad')).toBeVisible();
+    await page.evaluate(() => window.__sna.tracer.autoTrace());
+    await expect(page.locator('.toast.good')).toBeVisible();
+  });
+
   test('a viewport resize mid-trace rebuilds the mask instead of scoring against a stale one (#592)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-trace');
