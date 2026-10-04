@@ -14,6 +14,7 @@ import { y2OddEven } from './year2-oddeven';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2StoryMoney } from './year2-story-money';
+import { y2CoinCombo } from './year2-coincombo';
 import { y2StoryTimes } from './year2-story-times';
 import { y2Objects3d } from './year2-objects3d';
 import { tableDrill } from './tables';
@@ -38,6 +39,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-fractions', title: 'Fractions', icon: '🍕', subject: 'maths', year: 'year2', nc: 'Y2 Fractions: 1/3 1/4 2/4 3/4', gen: y2Fractions },
   { id: 'y2-money', title: 'Money £ and p', icon: '💷', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money, change', gen: y2Money },
   { id: 'y2-story-money', title: 'Shop Stories', icon: '🍎', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money problems in a practical context, including change', gen: y2StoryMoney },
+  { id: 'y2-coincombo', title: 'Coin Combinations', icon: '💰', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: find different combinations of coins that equal the same amounts of money', gen: y2CoinCombo },
   { id: 'y2-time', title: 'Telling Time', icon: '🕔', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: time to 5 min', gen: y2Time },
   { id: 'y2-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year2', nc: 'Y2 NPV: numbers to 100 in words', gen: y2Words },
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', sequenceFrom: 1, gen: y2Order },
