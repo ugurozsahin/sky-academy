@@ -123,6 +123,7 @@
 💍	0.6	ring
 💬	0.6	speech balloon
 💯	0.6	hundred points
+💰	0.6	money bag
 💷	1.0	pound banknote
 📅	0.6	calendar
 📊	0.6	bar chart

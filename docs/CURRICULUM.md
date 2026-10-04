@@ -101,6 +101,7 @@ Maths:
 - y2-fractions — ⅓ ¼ 2/4 ¾, of quantities
 - y2-money — £ and p recorded separately — `£1 and 50p`, never `£1.50`; change
 - y2-story-money — shop stories in pence: two prices added (d1), change from 50p (d2), change from £1 after two items (d3); every amount via `coinLabel`, no decimals
+- y2-coincombo — which coins make 20p: coin sets largest first (d1 two coins ≤20p, d2 ≤50p, d3 two or three coins ≤£1); every coin via `coinLabel`, no decimals
 - y2-time — 5 minutes, quarter past/to
 - y2-words — to 100
 - y2-order — order to 100
