@@ -34,13 +34,16 @@ import type { Question, Visual } from '../curriculum';
  * `word` stays out: it carries `orderQ`'s per-draw *shuffled* display order, which is presentation.
  * Adding a type is a deliberate act, and the rails in `tests/unit/session.test.ts` measure both directions.
  */
+/** The printed words of a number line (#1061): empty for a plain line, so every existing key is unchanged. */
+const numberlineText = (v: Extract<Visual, { type: 'numberline' }>) =>
+  v.labels || v.marks ? `/${(v.labels ?? []).join(',')}/${(v.marks ?? []).map(m => `${m.label}@${m.at}`).join(',')}` : '';
 const VISUAL_QUESTION = {
   objects: (v: Extract<Visual, { type: 'objects' }>) => `${v.n}/${v.n2 ?? ''}`,
   sentence: (v: Extract<Visual, { type: 'sentence' }>) => v.text,
   strip: (v: Extract<Visual, { type: 'strip' }>) => v.text,
   symmetry: (v: Extract<Visual, { type: 'symmetry' }>) => v.grid.join('/'),
   coins: (v: Extract<Visual, { type: 'coins' }>) => [...new Set(v.coins)].sort((a, b) => a - b).join('/'),
-  numberline: (v: Extract<Visual, { type: 'numberline' }>) => `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`,
+  numberline: (v: Extract<Visual, { type: 'numberline' }>) => `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}${numberlineText(v)}`,
   chart: (v: Extract<Visual, { type: 'chart' }>) => `${v.kind}/${v.rows.map(r => r.n).join(',')}`,
 } satisfies Partial<{ [T in Visual['type']]: (v: Extract<Visual, { type: T }>) => string }>;
 const visualKey = (v: Visual): string => {

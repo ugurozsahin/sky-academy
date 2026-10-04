@@ -12,7 +12,8 @@ export type Visual =
   | { type: 'coins'; coins: number[] }                   // pence values, 100 = £1, 200 = £2, 500/1000 = £5/£10 notes
   | { type: 'clock'; h: number; m: number }
   | { type: 'fraction'; parts: number; shaded: number; shape?: 'circle' | 'bar' }
-  | { type: 'numberline'; from: number; to: number; mark?: number; step?: number }   // mark = hidden number shown as ?
+  // mark = hidden number shown as ?; labels = one printed text per tick ("3/4", "0.3"); marks = letters A-D on the tick whose value is `at`
+  | { type: 'numberline'; from: number; to: number; mark?: number; step?: number; labels?: string[]; marks?: { label: string; at: number }[] }
   | { type: 'scales'; left: string; right: string }     // balance scales: text/emoji on each pan ("3 + 4" / "? + 2")
   // Categorical data (Y2 statistics): one row per category, `n` = the count it stands for. `kind` picks the
   // chart. Two variants, not three (#133): a tally and a block diagram share their whole contract, and only

@@ -6,6 +6,7 @@ import { islandsHTML, mapLayout } from './map-layout';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
+import { needsSchoolYear } from '../school-year';
 import { SPRINT_SECONDS } from '../game/session';
 import { MODES } from '../game/modes';
 import { senseiTopics, poolWeights } from '../game/sensei';
@@ -20,6 +21,7 @@ export type StartPlay = (o: PlayOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
   memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string) => void; rewards: () => void; shop: () => void; parents: () => void;
+  pickYear: (year: YearInfo) => void;   // #1055: the school-year tap on a new child's map (a mission after "Let's go!", else the island)
   profiles: () => void;   // #20 slice 2: "Who is playing?"
   up: () => void;
 };
@@ -75,6 +77,7 @@ function dojoCard(s: DojoState, cs: Challenge[]) {
     </div>`;
 }
 
+let yearAsked = false;   // #1055: spoken once per page load, not on every redraw
 /** Sky Map: one decision — which island (year group). */
 export function mapScreen(nav: Nav) {
   const d = load();
@@ -86,6 +89,7 @@ export function mapScreen(nav: Nav) {
   const maxStars = (y: YearInfo) => topicsFor(y.id).length * 3;
   const shown = shownYears();
   const layout = mapLayout(shown.length);
+  const ask = needsSchoolYear(d);   // #1055: first run only
   const tb = topbar(nav, () => mapScreen(nav));
   const dojoState = dojoToday(); const dojoChallenges = dailyChallenges(dojoState.date);
   // #1048: the four compact pixel values below belong to map-layout.ts's own compact size — they are
@@ -94,7 +98,7 @@ export function mapScreen(nav: Nav) {
   render(`
   <section class="screen home map">
     ${tb.html}
-    <h2 class="section-title">Where will you train today?</h2>
+    <h2 class="section-title">${ask ? 'Tap your school year' : 'Where will you train today?'}</h2>
     <div class="islands big" style="--cols:${layout.cols}${layout.compact ? ';--isl-h:88px;--isl-pad:118px;--art-w:96px;--art-h:62px' : ''}">
       ${islandsHTML(shown, y => ({ s: totalStars(y), m: maxStars(y) }), d.year, layout.compact)}
     </div>
@@ -106,9 +110,10 @@ export function mapScreen(nav: Nav) {
       </div></footer>
   </section>`, 'bg-sky');
   tb.bind();
+  if (ask && !yearAsked) { yearAsked = true; say('Tap your school year'); }
   $$('.island').forEach(b => b.addEventListener('click', () => {
     const y = shown.find(x => x.id === b.dataset.year)!;
-    save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
+    save(ask ? { year: y.id, ks2: { ...load().ks2, schoolYear: y.id } } : { year: y.id }); sfx.tap(); say(`${y.title} island`); ask ? nav.pickYear(y) : nav.island(y);
   }));
   // #894: a Daily Dojo row has no action of its own, so tapping it just reads it aloud, for a pre-reader.
   $$('.dojo-item').forEach(li => li.addEventListener('click', () => {
