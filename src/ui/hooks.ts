@@ -34,6 +34,8 @@ export interface PlayState {
   prompt: string | undefined;
   answer: string | undefined;
   timeLeft: number;
+  /** Per-question clock, ms left (#1063) — 0 with no clock. */
+  questionLeft: number;
   bossHp: number;
   trail: TrailSkin | null;
   /** Projectiles thrown so far this screen (#48) — a swipe never throws one, a tapped TNT never does either. */

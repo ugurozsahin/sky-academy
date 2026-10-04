@@ -101,7 +101,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   hud.drawLives(o.year.lives); hud.drawTimer(session.secondsLeft); hud.drawHp(session.bossHp, session.bossMax);
   // Sprint clock: real elapsed time, frozen while the pause overlay (or a result) has the arena paused.
   let ticker = 0; let lastTick = 0;
-  if (sprint) ticker = window.setInterval(() => {
+  if (session.clocked) ticker = window.setInterval(() => {
     const now = performance.now();
     const dt = lastTick ? now - lastTick : 0;
     lastTick = now;
@@ -293,7 +293,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     state: () => ({
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
       ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,
-      answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null,
+      answer: session.current?.answer, timeLeft: session.timeLeft, questionLeft: session.questionLeft, bossHp: session.bossHp, trail: skin ?? null,
       shots: arena?.shotsThrown ?? 0, topic: session.currentTopic?.id, paused,
     }),
     // PNG data URL of the certificate for the finished mission — the one `CertInfo` actually filed (#410),
