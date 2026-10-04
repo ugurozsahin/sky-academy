@@ -20,6 +20,7 @@ import { y2CoinCombo } from './year2-coincombo';
 import { y2StoryTimes } from './year2-story-times';
 import { y2Objects3d } from './year2-objects3d';
 import { y2SpellKn } from './year2-spell-kn';
+import { y2SpellLe } from './year2-spell-le';
 import { y2Conjunction } from './year2-conjunction';
 import { tableDrill } from './tables';
 
@@ -69,6 +70,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-suffix-root', title: 'Changing Endings', icon: '🔁', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes that change the root (drop e, double, y→i)', gen: y2SuffixRoot },
   { id: 'y2-homophones', title: 'Sound-alike Words', icon: '👂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: homophones', gen: y2Homophones },
   { id: 'y2-spell-kn', title: 'Silent Letters', icon: '🤫', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: /n/ spelt kn and gn, /r/ spelt wr at the start of words', gen: y2SpellKn },
+  { id: 'y2-spell-le', title: 'Word Endings', icon: '🕯️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /l/ or /əl/ sound spelt -le, -el, -al and -il at the end of words', gen: y2SpellLe },
   { id: 'y2-wordclass', title: 'Word Detective', icon: '🔍', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns, verbs, adjectives, adverbs', sequenceFrom: 2, gen: y2WordClass },
   { id: 'y2-sentencetype', title: 'Sentence Types', icon: '💬', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: statements, questions, commands and exclamations', gen: y2SentenceType },
   { id: 'y2-tense', title: 'Then & Now', icon: '⏳', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: present and past tense, including the progressive', gen: y2Tense },
