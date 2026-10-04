@@ -24,6 +24,14 @@ describe('y2-conjunction (#1007)', () => {
       for (const x of decoys) { expect(JOINERS).toContain(x); expect(x, s).not.toBe(answer); }
     }
   });
+  it('never lists a word that also fits: because/when/if never decoy each other, and/or/but rows never offer and or but', () => {
+    const SUB = ['because', 'when', 'if'];
+    for (const [s, answer, decoys] of JOIN_BANK) {
+      if (SUB.includes(answer)) for (const x of decoys) expect(SUB, `${x} also fits "${s}"`).not.toContain(x);
+      if (answer === 'but') expect(decoys, s).not.toContain('and');
+      if (answer === 'and' || answer === 'or') for (const x of decoys) expect(COORD, s).not.toContain(x);
+    }
+  });
   it('each of the seven words is the answer at least twice', () => {
     for (const w of JOINERS) expect(JOIN_BANK.filter(r => r[1] === w).length, w).toBeGreaterThanOrEqual(2);
   });
@@ -35,6 +43,7 @@ describe('y2-conjunction (#1007)', () => {
         const q = topic.gen(d, r);
         seen[d].add(q.answer);
         expect(q.options.length).toBe(d === 3 ? 4 : 3);
+        expect(new Set(q.options).size).toBe(q.options.length);
         if (d === 1) expect(COORD).toContain(q.answer);
         if (d === 2) expect(COORD).not.toContain(q.answer);
         const row = JOIN_BANK.find(x => (q.visual as { text: string }).text === x[0])!;
