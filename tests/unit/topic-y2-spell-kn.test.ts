@@ -23,7 +23,8 @@ describe('y2-spell-kn (#1009)', () => {
   it('the answer is the bank word and every decoy is a non-word, over the whole bank', () => {
     const homophones = new Set(HOMOPHONE_SETS.flat());
     for (const [word, sentence, decoys] of BANK) {
-      expect(sentence, word).toContain('___');
+      expect(sentence.split('___').length, `${word}: exactly one gap`).toBe(2);
+      expect(sentence.toLowerCase().includes(word), `${word} leaks into its own sentence`).toBe(false);
       expect(decoys.length, word).toBeGreaterThanOrEqual(3);
       expect(/^(kn|wr|gn)/.test(word), `${word} starts with a silent letter pair`).toBe(true);
       expect(homophones.has(word) || NO_HOMOPHONE.includes(word), `${word} has a common homophone`).toBe(false);
