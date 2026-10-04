@@ -442,10 +442,12 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
 
   it('symmetry (#1062): letters draw text up to 7 columns and nothing beyond', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const ok = renderVisual({ type: 'symmetry', grid: ['A#B..C#'], mirror: false });
-    expect(count(ok, /<text\b/g)).toBe(3);
+    const ok = renderVisual({ type: 'symmetry', grid: ['A#B..C#', 'D......'], mirror: false });
+    expect(count(ok, /<text\b/g)).toBe(4);
+    expect(ok, 'D draws its letter too').toContain('>D</text>');
     expect(ok).toContain('font-size="8"');
     expect(renderVisual({ type: 'symmetry', grid: ['A#B..C#.'], mirror: false }), 'eight columns with a letter draws nothing').toBe('');
+    expect(renderVisual({ type: 'symmetry', grid: ['D.......'], mirror: false }), 'a D alone on eight columns draws nothing').toBe('');
     expect(count(renderVisual({ type: 'symmetry', grid: ['#.#.#.#.'] }), /<text\b/g), 'unlettered wide grids still draw').toBe(0);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();

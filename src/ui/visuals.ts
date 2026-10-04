@@ -112,44 +112,44 @@ export function renderVisual(v: Visual | undefined): string {
 
 /** The squares grid (Y2 symmetry, and area/perimeter/nets variants — #299, #1062). */
 function symmetryHtml(v: Extract<Visual, { type: 'symmetry' }>): string {
-    // A vertical line of symmetry drawn as squares on a grid, with a dashed mirror line down the middle
-    // (#299 slice 4). `grid` is documented as `string[]` but nothing pins its *shape* the way the type
-    // pins its element type, so the drawing defends against a shape a generator could still emit: at most
-    // SYM_MAX rows — safe to truncate, since dropping rows cannot change left/right symmetry — and no row
-    // padded or truncated to fit another row's width, since silently reshaping could turn a symmetric grid
-    // asymmetric or the reverse (#391), worse here than no picture. An empty, ragged or over-wide grid
-    // renders as nothing, with a warning, rather than being reshaped or thrown out of `renderVisual` —
-    // which `play-session.ts`'s `show()` does not catch. This is a shape guarantee only: an element that is
-    // not itself a string (`grid: [null]`, say) is outside `Visual`'s own type and still throws, same as
-    // every other visual here.
-    const SYM_MAX = 14;
-    const rows = v.grid.slice(0, SYM_MAX);
-    const cols = rows.length ? [...rows[0]].length : 0;
-    if (!rows.length || cols < 1 || cols > SYM_MAX || rows.some(r => [...r].length !== cols)) {
-      console.warn('symmetry visual: empty, ragged or over-wide grid — nothing drawn');
-      return '';
-    }
-    // Variants for area/perimeter/nets (#1062): `h` is a half square, `A`–`D` an empty square with that letter.
-    // A letter is 8 units tall, legible only while the grid is at most 7 columns wide, so a wider lettered grid
-    // draws nothing rather than a letter too small to read.
-    if (cols > 7 && rows.some(r => /[A-D]/.test(r))) {
-      console.warn('symmetry visual: lettered grid wider than 7 columns — nothing drawn');
-      return '';
-    }
-    const S = 10, w = cols * S, h = rows.length * S;
-    const cells = rows.map((row, r) => {
-      const chars = [...row];
-      return Array.from({ length: cols }, (_, c) => {
-        const ch = chars[c], x = c * S + 1, y = r * S + 1;
-        const sq = `<rect x="${x}" y="${y}" width="${S - 2}" height="${S - 2}" rx="1.5" class="${ch === '#' ? 'on' : ''}"/>`;
-        if (ch === 'h') return `${sq}<rect x="${x}" y="${y}" width="${(S - 2) / 2}" height="${S - 2}" rx="1.5" class="on"/>`;
-        if (/[A-D]/.test(ch)) return `${sq}<text x="${c * S + S / 2}" y="${r * S + S / 2}" font-size="8" text-anchor="middle" dominant-baseline="central" fill="currentColor">${ch}</text>`;
-        return sq;
-      }).join('');
+  // A vertical line of symmetry drawn as squares on a grid, with a dashed mirror line down the middle
+  // (#299 slice 4). `grid` is documented as `string[]` but nothing pins its *shape* the way the type
+  // pins its element type, so the drawing defends against a shape a generator could still emit: at most
+  // SYM_MAX rows — safe to truncate, since dropping rows cannot change left/right symmetry — and no row
+  // padded or truncated to fit another row's width, since silently reshaping could turn a symmetric grid
+  // asymmetric or the reverse (#391), worse here than no picture. An empty, ragged or over-wide grid
+  // renders as nothing, with a warning, rather than being reshaped or thrown out of `renderVisual` —
+  // which `play-session.ts`'s `show()` does not catch. This is a shape guarantee only: an element that is
+  // not itself a string (`grid: [null]`, say) is outside `Visual`'s own type and still throws, same as
+  // every other visual here.
+  const SYM_MAX = 14;
+  const rows = v.grid.slice(0, SYM_MAX);
+  const cols = rows.length ? [...rows[0]].length : 0;
+  if (!rows.length || cols < 1 || cols > SYM_MAX || rows.some(r => [...r].length !== cols)) {
+    console.warn('symmetry visual: empty, ragged or over-wide grid — nothing drawn');
+    return '';
+  }
+  // Variants for area/perimeter/nets (#1062): `h` is a half square, `A`–`D` an empty square with that letter.
+  // A letter is 8 units tall, legible only while the grid is at most 7 columns wide, so a wider lettered grid
+  // draws nothing rather than a letter too small to read.
+  if (cols > 7 && rows.some(r => /[A-D]/.test(r))) {
+    console.warn('symmetry visual: lettered grid wider than 7 columns — nothing drawn');
+    return '';
+  }
+  const S = 10, w = cols * S, h = rows.length * S;
+  const cells = rows.map((row, r) => {
+    const chars = [...row];
+    return Array.from({ length: cols }, (_, c) => {
+      const ch = chars[c], x = c * S + 1, y = r * S + 1;
+      const sq = `<rect x="${x}" y="${y}" width="${S - 2}" height="${S - 2}" rx="1.5" class="${ch === '#' ? 'on' : ''}"/>`;
+      if (ch === 'h') return `${sq}<rect x="${x}" y="${y}" width="${(S - 2) / 2}" height="${S - 2}" rx="1.5" class="on"/>`;
+      if (/[A-D]/.test(ch)) return `${sq}<text x="${c * S + S / 2}" y="${r * S + S / 2}" font-size="8" text-anchor="middle" dominant-baseline="central" fill="currentColor">${ch}</text>`;
+      return sq;
     }).join('');
-    const mirror = v.mirror === false ? '' : `<line x1="${w / 2}" y1="-2" x2="${w / 2}" y2="${h + 2}" class="mirror"/>`;
-    // The mirror line overshoots the grid top and bottom so it reads as a fold line, not as another cell edge.
-    return `<div class="vis"><svg viewBox="-1 -2 ${w + 2} ${h + 4}" class="symgrid">${cells}${mirror}</svg></div>`;
+  }).join('');
+  const mirror = v.mirror === false ? '' : `<line x1="${w / 2}" y1="-2" x2="${w / 2}" y2="${h + 2}" class="mirror"/>`;
+  // The mirror line overshoots the grid top and bottom so it reads as a fold line, not as another cell edge.
+  return `<div class="vis"><svg viewBox="-1 -2 ${w + 2} ${h + 4}" class="symgrid">${cells}${mirror}</svg></div>`;
 }
 
 /** One chart row's data cell. Tally groups in fives (four uprights and a gate stroke), the way a child is taught to read them. */
