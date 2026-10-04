@@ -263,8 +263,12 @@ projects you ran, and the commit hash — ending, like every comment you post he
 `REVIEW: CLEARED` comment (or the one you just posted), its `Head judged:` SHA against the live head, and the
 checks it names against the live ones; then write one line, `Merging <sha>: reviewed in <comment url>, CI and
 review-gate green`. Claude Code's auto-mode classifier judges the session, not GitHub, and refuses a merge it
-cannot see a review for as `[Merge Without Review]` — a PR cleared in an earlier run is the case it refuses. A
-refused merge is left for the owner or the next run; never route around it.
+cannot see a review for as `[Merge Without Review]` — a PR cleared in an earlier run is the case it refuses.
+**Read it by its body, in its own call (#1576):** a PR that was never blocked has no `REVIEW: CLEARED`, so the
+review is your own summary comment of this run, and you print that comment's body; a count of comments, or a
+draft flag, is not a read. If `mergeable_state` is `behind`, do the update-branch step above first and merge
+only on the new head's green CI — never leave a behind PR to the owner. The merge is its own call, never joined
+to the reads in one shell line. A refused merge is left for the owner or the next run; never route around it.
 
 **Block** — do both marks, or the block does not exist and the next run merges straight over it:
 
