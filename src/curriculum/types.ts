@@ -24,7 +24,9 @@ export type Visual =
   // coloured square and `.` for an empty one; the drawing puts a dashed mirror line down the middle, so the
   // child compares the two halves rather than being told which side to look at. A picture, not a shape name:
   // the whole question is whether the left half and the right half match.
-  | { type: 'symmetry'; grid: string[] }
+  // `mirror: false` omits the fold line (area, perimeter, nets); `h` is a half square, `A`–`D` a lettered
+  // empty square (at most 7 columns) — #1062.
+  | { type: 'symmetry'; grid: string[]; mirror?: false }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string }                   // sentence with a blank "_" (writing — English text)
   // a repeating-pattern glyph strip with a blank "_" (y2-patterns): not language, so the drawing keeps it on
