@@ -7,10 +7,17 @@ function mulberry32(seed: number) {
 
 const DRAWS = 300;
 const nums = (s: string) => (s.match(/\d+/g) ?? []).map(Number);
-const kindOf = (prompt: string): 'times' | 'divide' => {
-  const starts = (bank: string[]) => bank.some(t => prompt.startsWith(t.split(/\{\w\}/)[0]) && prompt.endsWith(t.split(/\}/).pop()!));
-  return starts(TIMES) && !starts(SHARE) && !starts(GROUP) ? 'times' : 'divide';
-};
+/** Which bank and template the prompt came from, with its named numbers; `unknown` when no template matches. */
+function parse(prompt: string): { kind: 'times' | 'divide' | 'unknown'; v: Record<string, number> } {
+  for (const [kind, bank] of [['times', TIMES], ['divide', SHARE], ['divide', GROUP]] as const) {
+    for (const t of bank) {
+      const re = new RegExp('^' + t.replace(/[.?]/g, '\\$&').replace(/\{(\w)\}/g, '(?<$1>\\d+)') + '$');
+      const m = re.exec(prompt);
+      if (m) return { kind, v: Object.fromEntries(Object.entries(m.groups!).map(([k, x]) => [k, Number(x)])) };
+    }
+  }
+  return { kind: 'unknown', v: {} };
+}
 
 describe('y2-story-times (#995)', () => {
   for (const d of [1, 2, 3] as const) {
@@ -18,17 +25,15 @@ describe('y2-story-times (#995)', () => {
       const rng = mulberry32(995 + d);
       for (let i = 0; i < DRAWS; i++) {
         const q = y2StoryTimes(d, rng);
-        const [a, b] = nums(q.prompt);
-        expect(a).toBeDefined(); expect(b).toBeDefined();
-        const times = kindOf(q.prompt) === 'times';
-        if (times) expect(Number(q.answer)).toBe(a * b);
-        else { expect(a % b).toBe(0); expect(Number(q.answer)).toBe(a / b); }
-        expect([2, 5, 10]).toContain(times ? [a, b].find(x => [2, 5, 10].includes(x))! : b);
+        const { kind, v } = parse(q.prompt);
+        expect(kind, q.prompt).not.toBe('unknown');
+        if (kind === 'times') { expect([2, 5, 10]).toContain(v.e); expect(Number(q.answer)).toBe(v.g * v.e); }
+        else { expect([2, 5, 10]).toContain(v.k); expect(v.t % v.k).toBe(0); expect(Number(q.answer)).toBe(v.t / v.k); }
         expect(q.prompt.length).toBeLessThanOrEqual(83);
         expect(q.say).toBeTruthy();
         expect(new Set(q.options).size).toBe(4);
         expect(q.options).toContain(q.answer);
-        for (const o of q.options) expect(Number(o)).toBeLessThanOrEqual(100);
+        for (const o of q.options) { expect(Number.isInteger(Number(o))).toBe(true); expect(Number(o)).toBeGreaterThanOrEqual(0); expect(Number(o)).toBeLessThanOrEqual(100); }
       }
     });
   }
@@ -38,16 +43,19 @@ describe('y2-story-times (#995)', () => {
     let times3 = 0;
     for (let i = 0; i < DRAWS; i++) {
       const q1 = y2StoryTimes(1, rng);
-      expect(kindOf(q1.prompt)).toBe('times');
+      const p1 = parse(q1.prompt);
+      expect(p1.kind).toBe('times');
       expect(q1.visual).toMatchObject({ type: 'array' });
       const v = q1.visual as { rows: number; cols: number };
-      expect(v.rows * v.cols).toBe(Number(q1.answer));
+      expect(v.rows).toBe(p1.v.g); expect(v.cols).toBe(p1.v.e); expect(v.rows * v.cols).toBe(Number(q1.answer));
       expect(v.rows).toBeLessThanOrEqual(3); expect(v.cols).toBeLessThanOrEqual(10);
       const q2 = y2StoryTimes(2, rng);
-      expect(kindOf(q2.prompt)).toBe('divide'); expect(q2.visual).toBeUndefined();
+      expect(parse(q2.prompt).kind).toBe('divide'); expect(q2.visual).toBeUndefined();
       const q3 = y2StoryTimes(3, rng);
       expect(q3.visual).toBeUndefined();
-      if (kindOf(q3.prompt) === 'times') times3++;
+      const k3 = parse(q3.prompt).kind;
+      expect(k3).not.toBe('unknown');
+      if (k3 === 'times') times3++;
     }
     expect(times3).toBeGreaterThan(50); expect(times3).toBeLessThan(DRAWS - 50);
   });
