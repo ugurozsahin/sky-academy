@@ -160,6 +160,16 @@ describe('stepsQ — two-step combo cards (#1067)', () => {
     expect(() => stepsQ(rng(1), { ...ok, check: () => [12, 18] })).toThrow(/disagree/);
   });
 
+  it('formats labels with `display` and passes `say` through; duplicate decoys and a decoy equal to step 2 throw', () => {
+    const q = stepsQ(rng(1), { ...ok, say: 'Go', display: n => `${n}p` });
+    expect(q.say).toBe('Go');
+    expect(q.answer).toBe('12p → 17p');
+    expect(q.options).toContain('7p');
+    expect(() => stepsQ(rng(1), { ...ok, decoys: [7, 7] })).toThrow(/distinct/);
+    expect(() => stepsQ(rng(1), { ...ok, decoys: [7, 17] })).toThrow(/distinct/);
+    expect(() => stepsQ(rng(1), { ...ok, steps: [12.5, 17], check: () => [12.5, 17] })).toThrow(/whole/);
+  });
+
   it('a Session needs the first step then the answer, in order', () => {
     const topic: Topic = { ...topicById('r-build')!, id: 'fx-steps', sequenceFrom: 1, gen: (_d, r) => stepsQ(r, ok) };
     const ev: any = new Proxy({}, { get: () => () => {} });
