@@ -5449,4 +5449,5 @@ test('a 37-topic grouped island tab fits a 390×664 phone, headings legible, car
   for (const fs of await page.locator('#topics .section-title').evaluateAll(els => els.map(e => parseFloat(getComputedStyle(e).fontSize)))) expect(fs).toBeGreaterThanOrEqual(13);
   for (const h of await page.locator('#topics .topic').evaluateAll(els => els.map(e => e.getBoundingClientRect().height))) expect(h).toBeGreaterThanOrEqual(44);
   await expectFitsViewport(page, 'grouped 37-topic island tab');
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence (#1068)
 });

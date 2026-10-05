@@ -34,6 +34,13 @@ describe('topicsHTML', () => {
       expect(topicsHTML(groupTopics(list), {})).not.toContain('section-title');
     }
   });
+  it('draws a card exactly as main did before #1068 (literal, not derived from card())', () => {
+    const t = { ...fake(0), id: 'y1-bonds', icon: '🔗', title: 'Number Bonds', nc: 'NC ref' };
+    const head = '\n      <button class="topic" data-id="y1-bonds" data-subject="maths" title="NC ref">\n        <span class="ic">🔗</span><b>Number Bonds</b>\n        ';
+    expect(topicsHTML(groupTopics([t]), {})).toBe(`${head}<span class="stars" aria-label="0 of 3 stars"><i>★★★</i></span>\n      </button>`);
+    expect(topicsHTML(groupTopics([t]), { 'y1-bonds': { stars: 2, crown: true } as never }))
+      .toBe(`${head}<span class="stars" aria-label="2 of 3 stars">★★<i>★</i></span><small class="pill">👑</small>\n      </button>`);
+  });
   it('keeps every card with a data-id from its input, behind full-width headings', () => {
     const list = fixture(37), html = topicsHTML(groupTopics(list), {});
     const ids = [...html.matchAll(/class="topic" data-id="([^"]+)" data-subject="maths"/g)].map(m => m[1]);
