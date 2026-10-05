@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { load, reset } from '../../src/storage';
 import { firstQuestionLine, resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, missionBestCandidates, recordMissionOutcome, resultsLines, scoreLine, type ResultCandidate } from '../../src/ui/results';
 import { resultsHTML, type ResultsData } from '../../src/ui/overlays';
-import type { Mode } from '../../src/game/modes';
+import { MODES, type Mode } from '../../src/game/modes';
 import type { Question, Topic } from '../../src/curriculum';
 
 // #36: these were dense ternaries buried in play.ts's showResults, reached only by the e2e results screen.
@@ -448,5 +448,24 @@ describe('recordMissionOutcome belt line (#951)', () => {
     recordMissionOutcome(topic, { stars: 1, score: 10 });
     const c = recordMissionOutcome(topic, { stars: 3, score: 90 }).candidates;
     expect(resultsLines(c).map(l => l.kind)).toEqual(['belt', 'best']);
+  });
+});
+
+// #1117: every mode's medal and result stars, as a table — the medal switch is exhaustive over `Mode`, and a
+// new mode must decide `resultStars` rather than inherit the mission's.
+describe('medal and result stars per mode (#1117)', () => {
+  const medals: [Mode, boolean, number, number, string][] = [
+    ['mission', true, 3, 0, '🥇'], ['mission', true, 2, 0, '🥈'], ['mission', true, 1, 0, '🥉'], ['mission', false, 3, 0, '💪'],
+    ['boss', true, 3, 0, '🥇'], ['boss', true, 1, 0, '🥉'], ['boss', false, 2, 0, '💪'],
+    ['sprint', false, 3, 0, '🥇'], ['sprint', false, 2, 0, '🥈'], ['sprint', false, 1, 0, '🥉'], ['sprint', false, 0, 0, '💪'],
+    ['endless', true, 0, 300, '🥇'], ['endless', false, 3, 150, '🥈'], ['endless', true, 3, 10, '🥉'],
+    ['relaxed', true, 3, 100, '💪'],
+  ];
+  it.each(medals)('%s won=%s stars=%i score=%i → %s', (mode, won, stars, score, medal) => {
+    expect(resultMedal({ mode, won, stars, score })).toBe(medal);
+  });
+  it('shows result stars for mission, sprint and boss only', () => {
+    expect(Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, v.resultStars]))).toEqual(
+      { mission: true, endless: false, sprint: true, boss: true, relaxed: false });
   });
 });

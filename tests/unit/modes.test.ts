@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MODES, type Mode, type ModeCtx, type EndCtx } from '../../src/game/modes';
 import { YEARS } from '../../src/curriculum';
+import { menuFor } from '../../src/ui/home';
+import { resultMedal } from '../../src/ui/results';
+import { SOURCES } from './helpers/sources';
 
 const Y1 = YEARS[1];
 const ALL: Mode[] = ['mission', 'endless', 'sprint', 'boss', 'relaxed'];
@@ -231,5 +234,30 @@ describe('Legend run (#932)', () => {
   });
   it('"Slower bubbles" takes one step off the Legend speed', () => {
     for (const stage of stages) expect(MODES.mission.speed(ctx({ year: Y1, stage, legend: true, slower: true }))).toBe(Math.min(3, MODES.mission.speed(ctx({ year: Y1, stage })) + 1) - 1);
+  });
+});
+
+// #1117: no play-screen site may let a new mode fall through to Sky Storm's (or any mode's) records, medal,
+// stars or hearts. The rail reads play.ts's own source; the tables run the real code.
+describe('a new mode cannot fall through to another mode (#1117)', () => {
+  const play = SOURCES['/src/ui/play.ts'];
+  it("play.ts's record chain has no catch-all writer", () => {
+    expect(play.split('\n').filter(l => /^\s*else\s+(newBest\s*=\s*)?record\w+\(/.test(l))).toEqual([]);
+    expect(play).toContain("else if (o.mode === 'endless') recordEndless(");
+  });
+  it('every mode names its medal and its result stars', () => {
+    for (const m of ALL) {
+      expect(typeof resultMedal({ mode: m, won: true, score: 0, stars: 1 }), m).toBe('string');
+      expect(typeof MODES[m].resultStars, m).toBe('boolean');
+    }
+  });
+  it('the play screen draws hearts from hasLives and hands PlayOpts.deck to the Session', () => {
+    expect(play).toContain('heartCount(spec.hasLives, o.year.lives)');
+    expect(play).toMatch(/deck: o\.deck,/);
+  });
+  it('an island menu row with `years` shows only on those islands', () => {
+    const rows = [{ id: 'a' }, { id: 'tables', years: ['year4' as const] }];
+    expect(menuFor(rows, 'year4').map(r => r.id)).toEqual(['a', 'tables']);
+    for (const y of YEARS.filter(y => y.id !== 'year4')) expect(menuFor(rows, y.id).map(r => r.id), y.id).toEqual(['a']);
   });
 });

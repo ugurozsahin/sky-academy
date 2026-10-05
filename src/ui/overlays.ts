@@ -3,7 +3,7 @@
 // the templates are byte-identical to the ones that lived inline, so this is a behaviour-preserving move.
 import { VILLAIN } from '../avatars';
 import { STAGE_NAMES } from '../curriculum';
-import type { Mode } from '../game/session';
+import { MODES, type Mode } from '../game/modes';
 import { esc, stars } from './dom';
 import { resultsModal } from './screen';
 
@@ -50,7 +50,7 @@ export function resultsHTML(d: ResultsData): string {
     heroExtra: ` ${d.won || d.incomplete ? '' : 'sad'}${d.training ? ' sensei' : ''}`,
     glow: d.glow, img: d.img, name: d.name, headline: d.headline,
     medal: d.medal, heading: d.heading,
-    stars: d.mode !== 'endless' && d.mode !== 'relaxed' ? d.starCount : undefined,
+    stars: MODES[d.mode].resultStars ? d.starCount : undefined,
     stats: `<div><b>${d.score}</b><small>score</small></div><div><b>${d.correct}/${d.attempts}</b><small>correct</small></div><div><b>×${d.bestCombo}</b><small>best combo</small></div>`,
     coins: d.coins,
     pills: `${d.newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${d.streak > 1 ? `<span class="streak-pill">🔥 ${d.streak}-day streak</span>` : ''}${d.resultLines ?? ''}`,

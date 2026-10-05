@@ -38,6 +38,7 @@ export interface ModeSpec {
   timed: boolean;           // Ninja Sprint clock
   questionMs?: number;      // a per-question time limit (#1063); unset = no per-question clock. No mode sets it yet
   runLength?: number;       // an unstaged run that ends once this many questions are asked (Relaxed practice, #937)
+  resultStars: boolean;     // the results screen shows stars (#1117) — required, so a new mode must decide
   boss: boolean;            // Boss Battle HP bar
   villain: boolean;         // Hammer Man on screen + TNT bubbles in the mix
   difficulty(c: ModeCtx): Difficulty;
@@ -78,7 +79,7 @@ const baseCoins = (c: EndCtx) => c.correct + c.stageStarsTotal * 5;
 export const MODES: Record<Mode, ModeSpec> = {
   mission: {
     id: 'mission', title: 'Mission', overHeadingWon: 'Mission complete!', overHeadingLost: 'Out of lives',
-    hasLives: true, staged: true, timed: false, boss: false, villain: false,
+    hasLives: true, staged: true, timed: false, resultStars: true, boss: false, villain: false,
     difficulty: c => c.legend ? 3 : c.year.diffs[Math.min(c.stage, c.year.diffs.length) - 1] ?? 3,
     // #932: Legend's step comes before `eased()`'s, so "Slower bubbles" still takes one off the Legend speed; a gentle year gets none (#700).
     speed: c => { const s = c.year.speeds[Math.min(c.stage, c.year.speeds.length) - 1] ?? 3; return eased(c, c.legend && !c.year.gentle ? Math.min(3, s + 1) : s); },
@@ -88,7 +89,7 @@ export const MODES: Record<Mode, ModeSpec> = {
   },
   endless: {
     id: 'endless', title: 'Sky Storm', overHeadingWon: 'Storm over!', overHeadingLost: 'Storm over!',
-    hasLives: true, staged: false, timed: false, boss: false, villain: true,
+    hasLives: true, staged: false, timed: false, resultStars: false, boss: false, villain: true,
     difficulty: c => c.questionsAsked < 8 ? 1 : c.questionsAsked < 20 ? 2 : 3,
     speed: c => { const s = c.questionsAsked < 10 ? 1 : c.questionsAsked < 25 ? 2 : 3; return slowerStep(c, c.year.gentle ? Math.min(2, s) : s); },
     basePoints: rampPoints,
@@ -97,7 +98,7 @@ export const MODES: Record<Mode, ModeSpec> = {
   },
   sprint: {
     id: 'sprint', title: 'Ninja Sprint', overHeadingWon: "Time's up!", overHeadingLost: "Time's up!",
-    hasLives: false, staged: false, timed: true, boss: false, villain: false,
+    hasLives: false, staged: false, timed: true, resultStars: true, boss: false, villain: false,
     difficulty: c => c.questionsAsked < 5 ? 1 : c.questionsAsked < 12 ? 2 : 3,
     speed: c => eased(c, c.year.speeds[1] ?? 2),   // steady pace: the clock is the pressure
     basePoints: () => 10,
@@ -106,7 +107,7 @@ export const MODES: Record<Mode, ModeSpec> = {
   },
   boss: {
     id: 'boss', title: 'Boss Battle', overHeadingWon: 'Knock-out!', overHeadingLost: 'Hammer Man wins this round',
-    hasLives: true, staged: false, timed: false, boss: true, villain: true,
+    hasLives: true, staged: false, timed: false, resultStars: true, boss: true, villain: true,
     difficulty: c => c.questionsAsked < 4 ? 1 : c.questionsAsked < 9 ? 2 : 3,
     speed: c => eased(c, c.year.speeds[c.enraged ? 2 : 1] ?? 2),
     basePoints: rampPoints,
@@ -116,7 +117,7 @@ export const MODES: Record<Mode, ModeSpec> = {
   // #937: no lives, no clock, no villain — ten questions at the year's gentlest speed, one coin per right answer.
   relaxed: {
     id: 'relaxed', title: 'Relaxed practice', overHeadingWon: 'Practice done!', overHeadingLost: 'Practice done!',
-    hasLives: false, staged: false, timed: false, boss: false, villain: false, runLength: 10,
+    hasLives: false, staged: false, timed: false, resultStars: false, boss: false, villain: false, runLength: 10,
     difficulty: c => c.questionsAsked < 5 ? 1 : c.questionsAsked < 12 ? 2 : 3,   // Sprint's ramp
     speed: c => eased(c, c.year.speeds[0] ?? 1),
     basePoints: () => 10,

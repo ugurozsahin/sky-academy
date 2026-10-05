@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CORRECTION_LINE_MAX, correctionLine, createHud, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import { CORRECTION_LINE_MAX, correctionLine, createHud, heartCount, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import { MODES, type Mode } from '../../src/game/modes';
 import { TOPICS, type Difficulty, type Question } from '../../src/curriculum';
 
 const plain = (s: string) => s.replace(/<[^>]+>/g, '');
@@ -318,5 +319,21 @@ describe('correctionLine (#893 — the spoken line after a wrong slice or a miss
       if (NO_SAY_ANSWER_TOPICS.has(topic.id) || ALWAYS_SYMBOLIC.has(topic.id)) continue;
       expect(nonNullByTopic.get(topic.id), `${topic.id}: never spoke a correction across 60 draws`).toBeGreaterThan(0);
     }
+  });
+});
+
+// #1117: play.ts hands createHud `spec.hasLives ? year.lives : 0`, so a mode without lives draws no hearts at all.
+describe('hearts follow ModeSpec.hasLives (#1117)', () => {
+  const el = () => ({ innerHTML: '', classList: { add() {}, remove() {} } }) as unknown as HTMLElement;
+  const draw = (mode: Mode, lives: number) => {
+    const els = { lives: el(), qcard: el(), prompt: el(), hint: el() };
+    createHud(els, heartCount(MODES[mode].hasLives, lives), () => true).drawLives(lives);
+    return els.lives.innerHTML;
+  };
+  it('a mode with hasLives: false draws no hearts', () => {
+    for (const m of Object.keys(MODES) as Mode[]) if (!MODES[m].hasLives) expect(draw(m, 3), m).toBe('');
+  });
+  it('mission, Sky Storm and Boss draw year.lives hearts as before', () => {
+    for (const m of ['mission', 'endless', 'boss'] as const) expect(draw(m, 3), m).toBe(livesHTML(3, 3));
   });
 });

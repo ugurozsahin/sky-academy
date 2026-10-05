@@ -12,7 +12,7 @@ import { equippedItem } from '../game/shop';
 import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
-import { createHud } from './hud';
+import { createHud, heartCount } from './hud';
 import { inputFor, inputMarkup, mountTracer } from './play-input';   // #1064: how a child answers
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
@@ -64,7 +64,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   let lastCert: CertInfo | null = null;   // the one CertInfo actually filed (#410) — hooks read this, not a fresh certInfo() call
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast, holdTimers, onHidden, onBack } = scope; onHidden(() => { hush(); pauseIfLive(); }); onBack(pauseIfLive); pushBackGuard();   // #885, #887
-  const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
+  const hud = createHud(els, heartCount(spec.hasLives, o.year.lives), canHear);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
   // Curriculum base holds (ms). #32: scaled(...) divides them by the test-only speed at each use site, so the
@@ -194,7 +194,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
       else if (training) { if (r.won) recordTraining(o.year.id); }
       else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r));   // #911/#912
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
-      else if (o.mode !== 'relaxed') recordEndless(o.year.id, r.score);   // #937: a relaxed run writes no best
+      else if (o.mode === 'endless') recordEndless(o.year.id, r.score);   // #1117: no catch-all writer — a new mode records nothing until it names its own
     }
     for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t);   // every mode teaches Sensei what is hard
     const bySubject = (s: Topic['subject']) =>

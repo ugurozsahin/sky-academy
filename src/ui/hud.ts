@@ -12,6 +12,9 @@ import { $, esc, fillAnswer } from './dom';
 export const livesHTML = (n: number, total: number): string =>
   Array.from({ length: total }, (_, i) => `<span class="${i < n ? 'on' : 'off'}">❤️</span>`).join('');
 
+/** Hearts a mode draws (#1117): none when `ModeSpec.hasLives` is false, so a lifeless mode never shows Sky Storm's row. */
+export const heartCount = (hasLives: boolean, lives: number): number => hasLives ? lives : 0;
+
 /** How a question ended, as the HUD and the play screen both name it (#36: one union, not four copies). */
 export type Outcome = 'correct' | 'wrong' | 'miss';
 

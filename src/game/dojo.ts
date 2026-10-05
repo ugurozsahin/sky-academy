@@ -1,6 +1,7 @@
 // Daily Dojo: three challenges a day, picked deterministically from the date, with bonus coins and a
 // streak multiplier for finishing the whole set on consecutive days. Pure logic (no DOM, no storage).
 import { missedDays } from './streak';
+import type { Mode } from './modes';
 export type DojoGroup = 'volume' | 'mode' | 'focus';
 export interface Challenge { id: string; group: DojoGroup; icon: string; title: string; goal: number; bonus: number }
 /**
@@ -9,7 +10,7 @@ export interface Challenge { id: string; group: DojoGroup; icon: string; title: 
  * maths the device saw and nothing it cannot honestly attribute to the save's owner.
  */
 export interface DojoEvent {
-  mode: 'mission' | 'endless' | 'sprint' | 'boss' | 'relaxed' | 'memory' | 'duel';
+  mode: Mode | 'memory' | 'duel';   // #1117: follows `Mode`, so a new mode needs no second edit
   won: boolean; correct: number; attempts: number; bestCombo: number; stars: number; score: number;
   training?: boolean;              // Sensei session (a mission over a pool)
   mathsCorrect?: number; writingCorrect?: number;   // per-subject hits (from the session's per-topic tally)

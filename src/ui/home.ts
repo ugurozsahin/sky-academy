@@ -1,6 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { beltFor, totalStarsOf } from '../game/belts';
-import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
@@ -131,6 +131,10 @@ export function mapScreen(nav: Nav) {
   $('#who').addEventListener('click', () => { sfx.tap(); nav.profiles(); });
 }
 
+/** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
+export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
+export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId): T[] => rows.filter(r => !r.years || r.years.includes(year));
+
 /** #932: the Legend run menu row — only with a 3★ topic in hand; opens #910's chooser on exactly those topics, no Mixed. */
 function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>) {
   const list = topicsFor(year.id).filter(t => chooserEligible(t) && (progress[t.id]?.stars ?? 0) >= 3);
@@ -158,7 +162,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const subjectPool = () => topicsFor(year.id, subject).filter(chooserEligible);
   // The island menu in one table (#26): a mode button is one entry. The battle modes take their title from MODES;
   // Sensei-training, Memory-Match and the Legend run (#932) are separate flows, so they live here too.
-  const menu: { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void }[] = [
+  const menu = menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
       title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
@@ -182,7 +186,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
       go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject), topic => { sfx.tap(); topic ? nav.duel(year, topic.id) : nav.duel(year); }, { mixed: true, mixedLabel: 'Random' }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
-  ];
+  ], year.id);
   render(`
   <section class="screen home island-screen">
     ${tb.html}

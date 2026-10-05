@@ -29,10 +29,15 @@ export interface RunOutcome {
  */
 export function resultMedal(r: RunOutcome): string {
   if (r.incomplete) return '💪';
-  if (r.mode === 'endless') return r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉';
-  if (r.mode === 'relaxed') return '💪';   // #937: effort, never stars
-  if (r.mode === 'sprint') return r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪';
-  return r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
+  const tier = (n: number) => n === 3 ? '🥇' : n === 2 ? '🥈' : '🥉';
+  // #1117: exhaustive over Mode — a new mode must name its medal here, never inherit the mission's.
+  switch (r.mode) {
+    case 'endless': return r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉';
+    case 'relaxed': return '💪';   // #937: effort, never stars
+    case 'sprint': return r.stars >= 1 ? tier(r.stars) : '💪';
+    case 'mission': case 'boss': return r.won ? tier(r.stars) : '💪';
+    default: { const never: never = r.mode; return never; }
+  }
 }
 
 /**
