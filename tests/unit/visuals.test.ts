@@ -425,4 +425,69 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
       warn.mockRestore();
     }
   });
+
+  it('symmetry (#1062): mirror false leaves the fold line out, and the default output is untouched', () => {
+    const grid = ['..##..', '.####.'];
+    const plain = renderVisual({ type: 'symmetry', grid, mirror: false });
+    expect(plain, 'no fold line').not.toContain('class="mirror"');
+    expect(plain, 'the squares are unchanged').toBe(renderVisual({ type: 'symmetry', grid }).replace(/<line[^>]*class="mirror"\/>/, ''));
+    expect(renderVisual({ type: 'symmetry', grid }), 'the default still draws it').toContain('class="mirror"');
+  });
+
+  it('symmetry (#1062): h draws a half-width coloured rect on the left of an empty square', () => {
+    const h = renderVisual({ type: 'symmetry', grid: ['h.'], mirror: false });
+    expect(h).toContain('<rect x="1" y="1" width="4" height="8" rx="1.5" class="on"/>');
+    expect(count(h, /class="on"/g)).toBe(1);
+  });
+
+  it('symmetry (#1062): letters draw text up to 7 columns and nothing beyond', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ok = renderVisual({ type: 'symmetry', grid: ['A#B..C#', 'D......'], mirror: false });
+    expect(count(ok, /<text\b/g)).toBe(4);
+    expect(ok, 'D draws its letter too').toContain('>D</text>');
+    expect(ok).toContain('font-size="8"');
+    expect(renderVisual({ type: 'symmetry', grid: ['A#B..C#.'], mirror: false }), 'eight columns with a letter draws nothing').toBe('');
+    expect(renderVisual({ type: 'symmetry', grid: ['D.......'], mirror: false }), 'a D alone on eight columns draws nothing').toBe('');
+    expect(count(renderVisual({ type: 'symmetry', grid: ['#.#.#.#.'] }), /<text\b/g), 'unlettered wide grids still draw').toBe(0);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe('number line labels, markers and exact decimal ticks (#1061)', () => {
+  const ticks = (h: string) => [...h.matchAll(/<span[^>]*>([^<]*)<\/span>/g)].map(m => m[1]);
+  const quiet = () => vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  it('a 0 to 1 line in 0.1 steps prints exactly 11 ticks with no float artefacts', () => {
+    const t = ticks(renderVisual({ type: 'numberline', from: 0, to: 1, step: 0.1 }));
+    expect(t).toEqual(['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1']);
+  });
+  it('a plain integer line is unchanged byte for byte', () => {
+    expect(renderVisual({ type: 'numberline', from: 0, to: 2, mark: 1 }))
+      .toBe('<div class="vis"><div class="nline"><span class="">0</span><span class="mark">?</span><span class="">2</span></div></div>');
+  });
+  it('labels replace the numbers and are escaped', () => {
+    const h = renderVisual({ type: 'numberline', from: 0, to: 2, labels: ['0', '1/2<', '1'] });
+    expect(ticks(h)).toEqual(['0', '1/2&lt;', '1']);
+  });
+  it('lettered markers sit on the tick whose value is `at`', () => {
+    const h = renderVisual({ type: 'numberline', from: 0, to: 1, step: 0.5, marks: [{ label: 'A', at: 0.5 }] });
+    expect(ticks(h)).toEqual(['0', 'A', '1']);
+    expect(h).toContain('class="mark">A');
+  });
+  it('the hidden mark prints "?" even when labels is set', () => {
+    const h = renderVisual({ type: 'numberline', from: 0, to: 2, mark: 1, labels: ['0', 'x', '2'] });
+    expect(ticks(h)).toEqual(['0', '?', '2']);
+  });
+  it('inputs it cannot draw correctly draw nothing and never throw', () => {
+    const warn = quiet();
+    expect(renderVisual({ type: 'numberline', from: 0, to: 6, labels: ['0', '1', '2', '3', '4', '5', '6'] })).toBe('');   // 7 labels
+    expect(renderVisual({ type: 'numberline', from: 0, to: 2, labels: ['a', 'b'] })).toBe('');                              // wrong length
+    expect(renderVisual({ type: 'numberline', from: 0, to: 2, marks: [{ label: 'A', at: 1.5 }] })).toBe('');                // off a tick
+    expect(warn).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+  it('a six-label line is drawn', () => {
+    expect(ticks(renderVisual({ type: 'numberline', from: 0, to: 5, labels: ['a', 'b', 'c', 'd', 'e', 'f'] }))).toHaveLength(6);
+  });
 });

@@ -12,7 +12,8 @@ export type Visual =
   | { type: 'coins'; coins: number[] }                   // pence values, 100 = £1, 200 = £2, 500/1000 = £5/£10 notes
   | { type: 'clock'; h: number; m: number }
   | { type: 'fraction'; parts: number; shaded: number; shape?: 'circle' | 'bar' }
-  | { type: 'numberline'; from: number; to: number; mark?: number; step?: number }   // mark = hidden number shown as ?
+  // mark = hidden number shown as ?; labels = one printed text per tick ("3/4", "0.3"); marks = letters A-D on the tick whose value is `at`
+  | { type: 'numberline'; from: number; to: number; mark?: number; step?: number; labels?: string[]; marks?: { label: string; at: number }[] }
   | { type: 'scales'; left: string; right: string }     // balance scales: text/emoji on each pan ("3 + 4" / "? + 2")
   // Categorical data (Y2 statistics): one row per category, `n` = the count it stands for. `kind` picks the
   // chart. Two variants, not three (#133): a tally and a block diagram share their whole contract, and only
@@ -24,7 +25,9 @@ export type Visual =
   // coloured square and `.` for an empty one; the drawing puts a dashed mirror line down the middle, so the
   // child compares the two halves rather than being told which side to look at. A picture, not a shape name:
   // the whole question is whether the left half and the right half match.
-  | { type: 'symmetry'; grid: string[] }
+  // `mirror: false` omits the fold line (area, perimeter, nets); `h` is a half square, `A`–`D` a lettered
+  // empty square (at most 7 columns) — #1062.
+  | { type: 'symmetry'; grid: string[]; mirror?: false }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string }                   // sentence with a blank "_" (writing — English text)
   // a repeating-pattern glyph strip with a blank "_" (y2-patterns): not language, so the drawing keeps it on

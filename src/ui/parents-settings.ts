@@ -4,6 +4,8 @@ import { REST_SETTINGS, restSetting, setRestSetting, setThreeSetting, THREE_SETT
 import { sfx } from '../audio';
 import { isWriteFailing, load, save } from '../storage';
 import { $, $$ } from './dom';
+import { shownYears, type YearId } from '../curriculum';
+import { schoolYearFromBirthDate, yearIdFromLevel } from '../school-year';
 
 export const THREE_LABEL: Readonly<Record<ThreeSetting, string>> = { auto: 'Auto', on: 'On', off: 'Off' };
 export const REST_LABEL: Readonly<Record<RestSetting, string>> = { off: 'Off', '10': '10 min', '20': '20 min', '30': '30 min' };
@@ -30,6 +32,14 @@ export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean
       <div class="tabs p-rest-pick" role="radiogroup" aria-label="Suggest a break">${REST_SETTINGS.map(v =>
         `<button class="tab${v === rest ? ' on' : ''}" data-rest="${v}" role="radio" aria-checked="${v === rest}">${REST_LABEL[v]}</button>`).join('')}</div>
       <p class="p-three-msg" id="rest-msg" role="status" hidden></p>
+    </div>
+    <div class="p-three p-year">
+      <p class="p-three-say">Set the school year so a new ninja starts on the right island. A birthday can help work it out; it is never saved.</p>
+      <label class="p-three-say" for="school-year">School year</label>
+      <select id="school-year" class="p-year-pick" aria-label="School year"><option value="">Not set</option>${shownYears().map(y =>
+        `<option value="${y.id}"${y.id === load().ks2.schoolYear ? ' selected' : ''}>${y.title}</option>`).join('')}</select>
+      <label class="p-three-say" for="school-birth">Work it out from a birthday</label>
+      <input type="date" id="school-birth" class="p-year-birth" aria-label="Birthday">
     </div>`;
 }
 
@@ -76,4 +86,19 @@ export function bindSettings(): void {
     msg.hidden = stored;
     if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays on ${REST_LABEL[now]}.`; }
   }));
+  // #1055: stored in `ks2.schoolYear` only. The birthday is read once to fill the select and is never saved.
+  const pick = $('#school-year') as HTMLSelectElement;
+  pick.addEventListener('change', () => {
+    sfx.tap();
+    const { schoolYear: _drop, ...rest } = load().ks2;
+    save({ ks2: pick.value ? { ...rest, schoolYear: pick.value as YearId } : rest });
+  });
+  ($('#school-birth') as HTMLInputElement).addEventListener('change', e => {
+    const v = (e.target as HTMLInputElement).value, d = v ? new Date(`${v}T12:00:00`) : null;
+    const id = d && !isNaN(+d) ? yearIdFromLevel(schoolYearFromBirthDate(d, new Date())) : undefined;
+    (e.target as HTMLInputElement).value = '';
+    if (!id) return;
+    pick.value = id;
+    pick.dispatchEvent(new Event('change'));
+  });
 }

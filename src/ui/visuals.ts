@@ -10,6 +10,26 @@ export function fiveFrames(n: number, emoji: string, keep = n): string {
   const rows: string[] = []; for (let r = 0; r < slots; r += 5) rows.push(`<span class="five">${cells.slice(r, r + 5).join('')}</span>`);
   return rows.join('');
 }
+/** The tick values of a number line, placed by index at the step's own decimals so 0.1 steps never accumulate float error (#1061). */
+function numberlineTicks(v: Extract<Visual, { type: 'numberline' }>): number[] {
+  const step = v.step ?? 1, dp = Math.max(0, ...[v.from, step].map(x => (String(x).split('.')[1] ?? '').length));
+  const count = step > 0 && v.to >= v.from ? Math.floor((v.to - v.from) / step + 1e-9) + 1 : 0;
+  return Array.from({ length: Math.min(count, 200) }, (_, i) => Number((v.from + i * step).toFixed(dp)));
+}
+const NL_MAX_LABELS = 6;
+/** A number line with optional per-tick labels and lettered markers; one it cannot draw correctly draws nothing, as `symmetry` does (#1061). */
+function numberlineHTML(v: Extract<Visual, { type: 'numberline' }>): string {
+  const ticks = numberlineTicks(v), marks = v.marks ?? [];
+  if ((v.labels && (v.labels.length !== ticks.length || ticks.length > NL_MAX_LABELS)) || marks.some(m => !ticks.includes(m.at))) {
+    console.warn('numberline visual: labels or markers do not fit the ticks — nothing drawn');
+    return '';
+  }
+  const cell = (n: number, i: number) => {
+    const m = marks.find(x => x.at === n);
+    return `<span class="${n === v.mark || m ? 'mark' : ''}">${n === v.mark ? '?' : esc(m?.label ?? v.labels?.[i] ?? String(n))}</span>`;
+  };
+  return `<div class="vis"><div class="nline">${ticks.map(cell).join('')}</div></div>`;
+}
 export function renderVisual(v: Visual | undefined): string {
   if (!v) return '';
   switch (v.type) {
@@ -52,10 +72,7 @@ export function renderVisual(v: Visual | undefined): string {
       }
       return `<div class="vis"><div class="bar">${Array.from({ length: parts }, (_, i) => `<i class="${i < shaded ? 'sh' : ''}"></i>`).join('')}</div></div>`;
     }
-    case 'numberline': {
-      const ticks = []; for (let n = v.from; n <= v.to; n += v.step ?? 1) ticks.push(n);
-      return `<div class="vis"><div class="nline">${ticks.map(n => `<span class="${n === v.mark ? 'mark' : ''}">${n === v.mark ? '?' : n}</span>`).join('')}</div></div>`;
-    }
+    case 'numberline': return numberlineHTML(v);
     case 'scales': {
       const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
       return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
@@ -103,36 +120,53 @@ export function renderVisual(v: Visual | undefined): string {
       const key = pict && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
       return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;
     }
-    case 'symmetry': {
-      // A vertical line of symmetry drawn as squares on a grid, with a dashed mirror line down the middle
-      // (#299 slice 4). `grid` is documented as `string[]` but nothing pins its *shape* the way the type
-      // pins its element type, so the drawing defends against a shape a generator could still emit: at most
-      // SYM_MAX rows — safe to truncate, since dropping rows cannot change left/right symmetry — and no row
-      // padded or truncated to fit another row's width, since silently reshaping could turn a symmetric grid
-      // asymmetric or the reverse (#391), worse here than no picture. An empty, ragged or over-wide grid
-      // renders as nothing, with a warning, rather than being reshaped or thrown out of `renderVisual` —
-      // which `play-session.ts`'s `show()` does not catch. This is a shape guarantee only: an element that is
-      // not itself a string (`grid: [null]`, say) is outside `Visual`'s own type and still throws, same as
-      // every other visual here.
-      const SYM_MAX = 14;
-      const rows = v.grid.slice(0, SYM_MAX);
-      const cols = rows.length ? [...rows[0]].length : 0;
-      if (!rows.length || cols < 1 || cols > SYM_MAX || rows.some(r => [...r].length !== cols)) {
-        console.warn('symmetry visual: empty, ragged or over-wide grid — nothing drawn');
-        return '';
-      }
-      const S = 10, w = cols * S, h = rows.length * S;
-      const cells = rows.map((row, r) => {
-        const chars = [...row];
-        return Array.from({ length: cols }, (_, c) => `<rect x="${c * S + 1}" y="${r * S + 1}" width="${S - 2}" height="${S - 2}" rx="1.5" class="${chars[c] === '#' ? 'on' : ''}"/>`).join('');
-      }).join('');
-      // The mirror line overshoots the grid top and bottom so it reads as a fold line, not as another cell edge.
-      return `<div class="vis"><svg viewBox="-1 -2 ${w + 2} ${h + 4}" class="symgrid">${cells}<line x1="${w / 2}" y1="-2" x2="${w / 2}" y2="${h + 2}" class="mirror"/></svg></div>`;
-    }
+    case 'symmetry': return symmetryHtml(v);
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>').replace(/\n/g, '<br>')}</div>`;
     case 'strip': return `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }
+}
+
+/** The squares grid (Y2 symmetry, and area/perimeter/nets variants — #299, #1062). */
+function symmetryHtml(v: Extract<Visual, { type: 'symmetry' }>): string {
+  // A vertical line of symmetry drawn as squares on a grid, with a dashed mirror line down the middle
+  // (#299 slice 4). `grid` is documented as `string[]` but nothing pins its *shape* the way the type
+  // pins its element type, so the drawing defends against a shape a generator could still emit: at most
+  // SYM_MAX rows — safe to truncate, since dropping rows cannot change left/right symmetry — and no row
+  // padded or truncated to fit another row's width, since silently reshaping could turn a symmetric grid
+  // asymmetric or the reverse (#391), worse here than no picture. An empty, ragged or over-wide grid
+  // renders as nothing, with a warning, rather than being reshaped or thrown out of `renderVisual` —
+  // which `play-session.ts`'s `show()` does not catch. This is a shape guarantee only: an element that is
+  // not itself a string (`grid: [null]`, say) is outside `Visual`'s own type and still throws, same as
+  // every other visual here.
+  const SYM_MAX = 14;
+  const rows = v.grid.slice(0, SYM_MAX);
+  const cols = rows.length ? [...rows[0]].length : 0;
+  if (!rows.length || cols < 1 || cols > SYM_MAX || rows.some(r => [...r].length !== cols)) {
+    console.warn('symmetry visual: empty, ragged or over-wide grid — nothing drawn');
+    return '';
+  }
+  // Variants for area/perimeter/nets (#1062): `h` is a half square, `A`–`D` an empty square with that letter.
+  // A letter is 8 units tall, legible only while the grid is at most 7 columns wide, so a wider lettered grid
+  // draws nothing rather than a letter too small to read.
+  if (cols > 7 && rows.some(r => /[A-D]/.test(r))) {
+    console.warn('symmetry visual: lettered grid wider than 7 columns — nothing drawn');
+    return '';
+  }
+  const S = 10, w = cols * S, h = rows.length * S;
+  const cells = rows.map((row, r) => {
+    const chars = [...row];
+    return Array.from({ length: cols }, (_, c) => {
+      const ch = chars[c], x = c * S + 1, y = r * S + 1;
+      const sq = `<rect x="${x}" y="${y}" width="${S - 2}" height="${S - 2}" rx="1.5" class="${ch === '#' ? 'on' : ''}"/>`;
+      if (ch === 'h') return `${sq}<rect x="${x}" y="${y}" width="${(S - 2) / 2}" height="${S - 2}" rx="1.5" class="on"/>`;
+      if (/[A-D]/.test(ch)) return `${sq}<text x="${c * S + S / 2}" y="${r * S + S / 2}" font-size="8" text-anchor="middle" dominant-baseline="central" fill="currentColor">${ch}</text>`;
+      return sq;
+    }).join('');
+  }).join('');
+  const mirror = v.mirror === false ? '' : `<line x1="${w / 2}" y1="-2" x2="${w / 2}" y2="${h + 2}" class="mirror"/>`;
+  // The mirror line overshoots the grid top and bottom so it reads as a fold line, not as another cell edge.
+  return `<div class="vis"><svg viewBox="-1 -2 ${w + 2} ${h + 4}" class="symgrid">${cells}${mirror}</svg></div>`;
 }
 
 /** One chart row's data cell. Tally groups in fives (four uprights and a gate stroke), the way a child is taught to read them. */

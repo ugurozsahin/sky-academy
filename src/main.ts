@@ -16,6 +16,7 @@ import { plugin, wireBackButton, type AppPlugin } from './native';
 import { backGuard } from './ui/screen';
 import { topicById, topicsFor, YEARS, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
+import { needsSchoolYear, placementYear } from './school-year';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
 // Each screen below the map pushes a history entry, so the browser's back button steps back one screen —
@@ -49,13 +50,14 @@ const leave = () => { const d = dispose; dispose = null; d?.(); };
 // of a fresh session's history and land there instead of the map on the next hardware-back press.
 // "Let's go!" (#947) also starts the first Mission: `pendingFirstMission` carries that intent across the
 // popstate of `go(-2)`, exactly as `pendingProfiles` does, so the island and play entries are pushed on the
-// far side — after the stack is back at the root, never racing it (#380 review B1). "Skip" lands on the map.
+// far side — after the stack is back at the root, never racing it (#380 review B1). "Skip" lands on the map, and so does "Let's go!" for a child with no school year yet (#1055): the map asks, and that tap starts the mission.
 let pendingFirstMission = false;
-const finishWizard = (go: boolean) => { save({ onboarded: true }); pendingFirstMission = go; history.go(-2); };
+let missionAfterAsk = false;   // #1055: "Let's go!" with no school year yet — the map's question starts the mission
+const finishWizard = (go: boolean) => { save({ onboarded: true }); pendingFirstMission = go && !needsSchoolYear(load()); missionAfterAsk = go && needsSchoolYear(load()); history.go(-2); };
 const renderIntro = () => introScreen(() => finishWizard(true), () => finishWizard(false));
 /** The first Mission of the ninja's current island: its first Maths topic, never a tracing one. */
-const startFirstMission = () => {
-  const y = YEARS.find(i => i.id === load().year), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
+const startFirstMission = (chosen?: YearInfo) => {
+  const y = chosen ?? YEARS.find(i => i.id === (placementYear(load()) ?? 'reception')), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
   if (!y || !topic) { nav.map(); return; }
   year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
   nav.play({ year: y, mode: 'mission', topic });
@@ -75,6 +77,7 @@ const nav = {
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },
   shop: () => { leave(); enter('shop'); shopScreen(nav); },
   parents: () => { leave(); enter('parents'); parentsScreen(nav); },
+  pickYear: (y: YearInfo) => { leave(); if (missionAfterAsk) { missionAfterAsk = false; startFirstMission(y); } else nav.island(y); },   // #1055: the school-year tap on a new child's map
   profiles: () => goProfiles(),   // #20 slice 2: the profile picker — `goProfiles` is the only way in
   launch: () => relaunch(),       // #20 slice 3: the boot decision, re-run — see `relaunch`
   up,
