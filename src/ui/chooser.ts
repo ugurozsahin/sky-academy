@@ -6,6 +6,7 @@
 // single-sourced in `screen.ts`; the surrounding `.overlay` already scrolls on its own if the list is long.
 import { drillsFor, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { duelPool } from '../game/duel';
+import { answerableBy } from '../game/pools';
 import { trophyFor } from '../game/trophies';
 import type { TopicProgress } from '../storage/shape';
 import { $, $$ } from './dom';
@@ -19,8 +20,8 @@ export interface ChooserOpts {
   badge?: (t: Topic) => string;
 }
 
-/** Topics the chooser can offer — every non-tracing topic. Shared with the island's trophy count (#912) so the count and the list cannot drift. */
-export const chooserEligible = (t: Topic): boolean => t.input !== 'tracing';
+/** Topics the chooser can offer — every topic a bubble pool can ask (#1065: no tracing, no keypad). Shared with the island's trophy count (#912) so the count and the list cannot drift. */
+export const chooserEligible = (t: Topic): boolean => answerableBy(t, 'mixed');
 
 /** What the chooser lists for a year's open subject: the regular topics, then that subject's drills (#915). Drills are never in the Mixed pool. */
 export const chooserTopics = (year: YearId, subject: Topic['subject']): Topic[] => [...topicsFor(year, subject).filter(chooserEligible), ...drillsFor(year, subject)];
