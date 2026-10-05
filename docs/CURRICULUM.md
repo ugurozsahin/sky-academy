@@ -163,6 +163,7 @@ Maths:
 - y3-story-as — one-step story problems within 1,000, in one unit: ones, tens or hundreds (d1), a 2- or 3-digit amount with an exchange (d2), two-step stories with the first-step decoy and `slow` (d3)
 - y3-tables — the 4 and 8 times tables built by doubling, with the known 2×/4× fact shown (d1); the 3, 4 and 8 facts as × both ways and ÷ (d2); the missing factor (d3). `y3TablesQ(d, rng, table)` fixes the table for the drills
 - y3-multiply — related facts such as 30 × 4 from the shown 3 × 4 = 12, and 120 ÷ 4 (d1); 2-digit × 1-digit with 11–49 × 2, 3, 4, 5 or 8 (d2); the same products built digit by digit with the sum kept on the card (d3, `sequenceFrom: 3`)
+- y3-story — spoken story problems: scaling ("4 times as tall", ×2–×5 and ×10, d1), correspondence and fair sharing ("3 hats and 4 coats, how many outfits?", d2), ×8 and the inverse ("12 outfits from 3 hats, how many coats?", d3); the adding slip is always a decoy
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
 - y3-fracof — unit fractions of 4–12 stars with a picture (d1), unit and non-unit fractions of wholes up to 60 (d2), the whole from a part, or non-unit fractions of wholes up to 80, with `slow` (d3)
 - y3-fracequiv — equivalent fractions: the shaded bar matched to an equal fraction (d1), "which is equal to" with no picture, both ways round (d2), the missing top or bottom of an equal pair (d3)
