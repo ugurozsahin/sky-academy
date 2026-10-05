@@ -165,6 +165,7 @@ Maths:
 - y3-multiply — related facts such as 30 × 4 from the shown 3 × 4 = 12, and 120 ÷ 4 (d1); 2-digit × 1-digit with 11–49 × 2, 3, 4, 5 or 8 (d2); the same products built digit by digit with the sum kept on the card (d3, `sequenceFrom: 3`)
 - y3-story — spoken story problems: scaling ("4 times as tall", ×2–×5 and ×10, d1), correspondence and fair sharing ("3 hats and 4 coats, how many outfits?", d2), ×8 and the inverse ("12 outfits from 3 hats, how many coats?", d3); the adding slip is always a decoy
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
+- y3-tenths — counting in tenths on a 6-tick line as fractions (`2/10 … ?`, d1); as decimals across a whole, or one tenth more or less (d2); ÷ 10 of a one-digit number with the notation named, and how many tenths make 1–3, with `slow` (d3). Never offers both notations of one value
 - y3-fracof — unit fractions of 4–12 stars with a picture (d1), unit and non-unit fractions of wholes up to 60 (d2), the whole from a part, or non-unit fractions of wholes up to 80, with `slow` (d3)
 - y3-fracequiv — equivalent fractions: the shaded bar matched to an equal fraction (d1), "which is equal to" with no picture, both ways round (d2), the missing top or bottom of an equal pair (d3)
 
