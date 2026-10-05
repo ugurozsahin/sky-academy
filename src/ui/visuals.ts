@@ -30,6 +30,32 @@ function numberlineHTML(v: Extract<Visual, { type: 'numberline' }>): string {
   };
   return `<div class="vis"><div class="nline">${ticks.map(cell).join('')}</div></div>`;
 }
+/** Two to four equal-length bars stacked (#1066): each cell's width is set so a bar is 240 px with its 3 px gaps (cells are border-box, borders included). */
+function fractionStackHTML(v: Extract<Visual, { type: 'fraction' }>): string {
+  const bars = v.stack ?? [];
+  const first = bars[0];
+  const ok = bars.length >= 2 && bars.length <= 4 && first && first.parts === v.parts && first.shaded === v.shaded
+    && bars.every(b => Number.isInteger(b.parts) && Number.isInteger(b.shaded) && b.parts >= 1 && b.parts <= 12 && b.shaded >= 0 && b.shaded <= b.parts);
+  if (!ok) { console.warn('fraction visual: invalid stack — nothing drawn'); return ''; }
+  const rows = bars.map(b => {
+    const w = (240 - 3 * (b.parts - 1)) / b.parts;
+    return `<div class="bar">${Array.from({ length: b.parts }, (_, i) => `<i class="${i < b.shaded ? 'sh' : ''}" style="width:${w}px"></i>`).join('')}</div>`;
+  }).join('');
+  return `<div class="vis" style="flex-direction:column">${rows}</div>`;
+}
+function fractionHTML(v: Extract<Visual, { type: 'fraction' }>): string {
+  const parts = v.parts, shaded = v.shaded;
+  if ((v.shape ?? 'circle') === 'circle') {
+    let paths = '';
+    for (let i = 0; i < parts; i++) {
+      const a0 = (i / parts) * Math.PI * 2 - Math.PI / 2, a1 = ((i + 1) / parts) * Math.PI * 2 - Math.PI / 2;
+      const x0 = 50 + 44 * Math.cos(a0), y0 = 50 + 44 * Math.sin(a0), x1 = 50 + 44 * Math.cos(a1), y1 = 50 + 44 * Math.sin(a1);
+      paths += `<path d="M50 50L${x0.toFixed(1)} ${y0.toFixed(1)}A44 44 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}Z" class="${i < shaded ? 'sh' : ''}"/>`;
+    }
+    return `<div class="vis"><svg viewBox="0 0 100 100" class="frac">${paths}</svg></div>`;
+  }
+  return `<div class="vis"><div class="bar">${Array.from({ length: parts }, (_, i) => `<i class="${i < shaded ? 'sh' : ''}"></i>`).join('')}</div></div>`;
+}
 export function renderVisual(v: Visual | undefined): string {
   if (!v) return '';
   switch (v.type) {
@@ -59,19 +85,7 @@ export function renderVisual(v: Visual | undefined): string {
     }
     case 'coins': return `<div class="vis coins">${v.coins.map(coinSVG).join('')}</div>`;
     case 'clock': return `<div class="vis">${clockSVG(v.h, v.m)}</div>`;
-    case 'fraction': {
-      const parts = v.parts, shaded = v.shaded;
-      if ((v.shape ?? 'circle') === 'circle') {
-        let paths = '';
-        for (let i = 0; i < parts; i++) {
-          const a0 = (i / parts) * Math.PI * 2 - Math.PI / 2, a1 = ((i + 1) / parts) * Math.PI * 2 - Math.PI / 2;
-          const x0 = 50 + 44 * Math.cos(a0), y0 = 50 + 44 * Math.sin(a0), x1 = 50 + 44 * Math.cos(a1), y1 = 50 + 44 * Math.sin(a1);
-          paths += `<path d="M50 50L${x0.toFixed(1)} ${y0.toFixed(1)}A44 44 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}Z" class="${i < shaded ? 'sh' : ''}"/>`;
-        }
-        return `<div class="vis"><svg viewBox="0 0 100 100" class="frac">${paths}</svg></div>`;
-      }
-      return `<div class="vis"><div class="bar">${Array.from({ length: parts }, (_, i) => `<i class="${i < shaded ? 'sh' : ''}"></i>`).join('')}</div></div>`;
-    }
+    case 'fraction': return v.stack ? fractionStackHTML(v) : fractionHTML(v);
     case 'numberline': return numberlineHTML(v);
     case 'scales': {
       const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;

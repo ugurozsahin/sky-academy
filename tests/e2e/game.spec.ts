@@ -2121,6 +2121,19 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'labelled number line');
   });
 
+  test('a four-bar fraction stack with a 12-part bar fits the question card on the phone (#1066)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    // No topic draws a stack yet, so inject the app's own renderVisual output into the card.
+    const html = renderVisual({ type: 'fraction', parts: 1, shaded: 1, shape: 'bar', stack: [{ parts: 1, shaded: 1 }, { parts: 4, shaded: 2 }, { parts: 8, shaded: 4 }, { parts: 12, shaded: 6 }] });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await expect(page.locator('#vis .bar')).toHaveCount(4);
+    const widths = await page.locator('#vis .bar').evaluateAll(bars => bars.map(b => Math.round(b.getBoundingClientRect().width * 100) / 100));
+    expect(new Set(widths).size, `every bar is the same length: ${widths}`).toBe(1);
+    expect(widths[0]).toBeCloseTo(240, 0);
+    await expectFitsViewport(page, 'four-bar fraction stack');
+  });
+
   // #65, one test per topic rather than one walk through all of them: the walk ran to ~60 s on a loaded desktop
   // runner and was reported as "page.goto hangs" — the test budget expiring mid-navigation, not a wedged page.
   test('no voice: Sound Hunt prints its keywords, mid-wave and without a pause, and stays answerable (#65)', async ({ page }) => {
