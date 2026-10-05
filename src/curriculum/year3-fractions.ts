@@ -1,11 +1,9 @@
-// Year 3 fractions strand (#1050). No topic lands here yet — each slot below is a future PR's own ticket.
-// import: y3-fracof
-// import: y3-fracline
-// import: y3-fraccompare
+// Year 3 fractions strand (#1050): each slot below is a topic ticket's own.
 import type { Difficulty, Generator, Question, Rng, Topic } from './types';
 import { y3FracOf } from './year3-fracof';
 import { y3FracLine } from './year3-fracline';
 import { y3FracAdd } from './year3-fracadd';
+import { y3FracCompare } from './year3-fraccompare';
 import { y3Tenths } from './year3-tenths';
 import { ri, pick, shuffle } from './util';
 import { equal, type Frac } from './fractions';
@@ -71,5 +69,5 @@ export const Y3_FRACTIONS: Topic[] = [
   { id: 'y3-fracline', title: 'Fractions on a Number Line', icon: '📏', subject: 'maths', year: 'year3', nc: 'Y3 Fractions: fractions as numbers on a line (3M16)', gen: y3FracLine },
   { id: 'y3-fracequiv', title: 'Equivalent Fractions', icon: '⚖️', subject: 'maths', year: 'year3', nc: 'Y3 Fractions: equivalent fractions with diagrams (3M17)', gen: y3FracEquiv },
   { id: 'y3-fracadd', title: 'Adding and Subtracting Fractions', icon: '➕', subject: 'maths', year: 'year3', nc: 'Y3 Fractions: add and subtract, same denominator, within one whole (3M18)', gen: y3FracAdd },
-  // slot: y3-fraccompare
+  { id: 'y3-fraccompare', title: 'Compare and Order Fractions', icon: '⚖️', subject: 'maths', year: 'year3', nc: 'Y3 Fractions: compare and order unit and same-denominator fractions (3M19)', sequenceFrom: 3, gen: y3FracCompare },
 ];
