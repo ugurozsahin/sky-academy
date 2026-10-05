@@ -77,7 +77,7 @@ export interface DeckItem { topic: Topic; q: Question }
  * their coins were paid in the lost run, so `buildResult()` leaves them out of the coins.
  */
 export interface Resume { stage: number; stageStars: number[] }
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; resume?: Resume; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean; legend?: boolean }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; resume?: Resume; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean; legend?: boolean; timeScale?: number }
 
 /**
  * The "Fix my mistakes" deck (#930): the 5 most recent misses, newest first — `misses` is already newest-last
@@ -104,6 +104,11 @@ export class Session {
   private misses: Miss[] = [];                          // every wrong slice / miss, de-duplicated by repeatKey (#878)
   private slicedTargets = new Set<string>();            // q.anyOrder only: targets sliced so far this question (#918)
   timeLeft: number;                                     // ms, sprint only (0 otherwise)
+  /** Per-question clock (#1063), ms left on the armed question — 0 when there is none. */
+  questionLeft = 0;
+  /** How long the last decided question took, ms (the full budget for an expiry) — #1122 reads it. */
+  lastAnswerMs = 0;
+  private qArmed = false; private qElapsed = 0; private qBudget = 0;
   bossHp: number; readonly bossMax: number;             // boss only (0 otherwise)
   private rng: () => number; readonly stages: number;
   constructor(public o: SessionOpts, private ev: SessionEvents) {
@@ -116,6 +121,8 @@ export class Session {
   get spec(): ModeSpec { return MODES[this.o.mode]; }
   private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, slow: !!this.current?.slow, slower: !!this.o.slower, legend: !!this.o.legend, enraged: this.enraged }; }
   get perStage() { return this.o.year.perStage; }
+  /** Something needs `tick()` driving by real time: the sprint clock or a per-question clock (#1063). */
+  get clocked() { return this.spec.timed || this.spec.questionMs !== undefined; }
   get secondsLeft() { return Math.ceil(this.timeLeft / 1000); }
   get difficulty(): Difficulty { return this.spec.difficulty(this.ctx); }
   get speed() { return this.spec.speed(this.ctx); }
@@ -128,11 +135,43 @@ export class Session {
   }
   /** Sprint clock: advance by `ms`. Emits onTime when the displayed second changes; ends the run at zero. */
   tick(ms: number) {
-    if (!this.spec.timed || this.ended || ms <= 0) return;
+    if (this.ended || ms <= 0) return;
+    this.tickQuestion(ms);
+    if (!this.spec.timed || this.ended) return;
     const before = this.secondsLeft;
     this.timeLeft = Math.max(0, this.timeLeft - ms);
     if (this.secondsLeft !== before) this.ev.onTime?.(this.secondsLeft);
     if (this.timeLeft === 0) this.end(true);
+  }
+  /**
+   * Start the per-question clock (#1063) when the question is really on screen — the UI calls it, not the
+   * Session, so the budget is not spent before the wave launches. The budget is the mode's
+   * `questionMs`, passed through `scale` (the UI's #32 test-speed `scaled`), times `timeScale` (`Infinity` = no limit). A mode without `questionMs`
+   * has no clock, so this is a no-op there.
+   */
+  armQuestionClock(scale: (ms: number) => number = ms => ms) {
+    const base = this.spec.questionMs;
+    if (base === undefined || this.qArmed || !this.current || this.waiting || this.ended) return;   // a second arm (a sequence relaunch) never refills the budget
+    this.qBudget = scale(base) * (this.o.timeScale ?? 1); this.questionLeft = this.qBudget; this.qElapsed = 0; this.qArmed = true;
+  }
+  /** Count the armed question down; at zero it is a miss. Real elapsed time only — the UI never speeds this up (#32). */
+  private tickQuestion(ms: number) {
+    if (!this.qArmed || this.waiting) return;
+    this.qElapsed += ms; this.questionLeft = Math.max(0, this.questionLeft - ms);
+    if (this.questionLeft === 0) this.expire();
+  }
+  /** The question was decided (or replaced): stop the clock and keep how long it took. */
+  private stopClock(expired = false) {
+    this.lastAnswerMs = !this.qArmed ? 0 : expired ? this.qBudget : this.qElapsed;   // 0 = decided before the UI armed it
+    this.qArmed = false; this.questionLeft = 0;
+  }
+  /** Time ran out: the same miss as a fallen target, with `picked: null` in `misses`. */
+  private expire() {
+    const q = this.current!; this.stopClock(true);
+    this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false); this.recordMiss(q, null);
+    this.ev.onMiss(q); this.bossHeal();
+    if (!this.o.year.gentle) this.loseLife();
+    this.maybeCommitFinalStage();
   }
   /** Player hit a bomb / trap bubble: costs a life but the question continues. */
   bomb() {
@@ -184,7 +223,7 @@ export class Session {
       this.end(false, true);
       return;
     }
-    this.current = q; this.seqIndex = 0; this.slicedTargets = new Set(); this.waiting = false; this.questionsAsked++;
+    this.current = q; this.seqIndex = 0; this.slicedTargets = new Set(); this.waiting = false; this.questionsAsked++; this.qArmed = false; this.questionLeft = 0;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
   /** `nextQuestion()` when `o.deck` is set: serve the next deck item, or end once it runs out (#878). */
@@ -192,7 +231,7 @@ export class Session {
     const deck = this.o.deck!;
     if (this.deckIndex >= deck.length) { this.end(true); return; }
     const { topic, q } = deck[this.deckIndex++];
-    this.currentTopic = topic; this.current = q; this.seqIndex = 0; this.slicedTargets = new Set(); this.waiting = false; this.questionsAsked++;
+    this.currentTopic = topic; this.current = q; this.seqIndex = 0; this.slicedTargets = new Set(); this.waiting = false; this.questionsAsked++; this.qArmed = false; this.questionLeft = 0;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
   /** Re-launch the remaining letters of a spelling sequence. */
@@ -229,7 +268,7 @@ export class Session {
     const isTarget = q.sequence
       ? (q.anyOrder ? q.sequence.includes(label) && !this.slicedTargets.has(label) : label === q.sequence[this.seqIndex])
       : label === q.answer;
-    if (!isTarget) return;
+    if (!isTarget || this.qArmed) return;   // an armed question (#1063) is decided by a slice or its clock, never by a fall; unarmed, a fall is the old miss
     this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false); this.recordMiss(q, null);
     this.ev.onMiss(q); this.bossHeal();
     if (!this.o.year.gentle) this.loseLife();
@@ -240,13 +279,13 @@ export class Session {
     if (this.ended) return;
     if (!this.waiting) { // nothing decided (e.g. only decoys fell) – for sequences relaunch remaining letters
       if (this.current?.sequence) { this.respawn(); return; }
-      this.waiting = true; this.attempts++; this.stageAttempts++; this.tally(false); this.recordMiss(this.current!, null); this.ev.onMiss(this.current!); this.bossHeal(); if (!this.o.year.gentle) this.loseLife(); if (this.ended) return;
+      this.stopClock(); this.waiting = true; this.attempts++; this.stageAttempts++; this.tally(false); this.recordMiss(this.current!, null); this.ev.onMiss(this.current!); this.bossHeal(); if (!this.o.year.gentle) this.loseLife(); if (this.ended) return;
       this.maybeCommitFinalStage();
     }
     this.advance();
   }
   private markCorrect() {
-    const q = this.current!; this.waiting = true;
+    const q = this.current!; this.stopClock(); this.waiting = true;
     this.attempts++; this.correct++; this.stageAttempts++; this.stageCorrect++; this.tally(true);
     this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
     const base = this.spec.basePoints(this.ctx);
@@ -257,7 +296,7 @@ export class Session {
     this.maybeCommitFinalStage();
   }
   private markWrong(label: string) {
-    const q = this.current!; this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false); this.recordMiss(q, label);
+    const q = this.current!; this.stopClock(); this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false); this.recordMiss(q, label);
     this.ev.onWrong(q, label); this.bossHeal();
     this.loseLife();
     this.maybeCommitFinalStage();

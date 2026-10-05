@@ -36,6 +36,7 @@ export interface ModeSpec {
   hasLives: boolean;        // false = a slip costs no life (Ninja Sprint)
   staged: boolean;          // true = five staged waves (mission); false = one continuous run
   timed: boolean;           // Ninja Sprint clock
+  questionMs?: number;      // a per-question time limit (#1063); unset = no per-question clock. No mode sets it yet
   runLength?: number;       // an unstaged run that ends once this many questions are asked (Relaxed practice, #937)
   boss: boolean;            // Boss Battle HP bar
   villain: boolean;         // Hammer Man on screen + TNT bubbles in the mix

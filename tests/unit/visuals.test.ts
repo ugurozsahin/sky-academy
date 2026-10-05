@@ -425,6 +425,33 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
       warn.mockRestore();
     }
   });
+
+  it('symmetry (#1062): mirror false leaves the fold line out, and the default output is untouched', () => {
+    const grid = ['..##..', '.####.'];
+    const plain = renderVisual({ type: 'symmetry', grid, mirror: false });
+    expect(plain, 'no fold line').not.toContain('class="mirror"');
+    expect(plain, 'the squares are unchanged').toBe(renderVisual({ type: 'symmetry', grid }).replace(/<line[^>]*class="mirror"\/>/, ''));
+    expect(renderVisual({ type: 'symmetry', grid }), 'the default still draws it').toContain('class="mirror"');
+  });
+
+  it('symmetry (#1062): h draws a half-width coloured rect on the left of an empty square', () => {
+    const h = renderVisual({ type: 'symmetry', grid: ['h.'], mirror: false });
+    expect(h).toContain('<rect x="1" y="1" width="4" height="8" rx="1.5" class="on"/>');
+    expect(count(h, /class="on"/g)).toBe(1);
+  });
+
+  it('symmetry (#1062): letters draw text up to 7 columns and nothing beyond', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ok = renderVisual({ type: 'symmetry', grid: ['A#B..C#', 'D......'], mirror: false });
+    expect(count(ok, /<text\b/g)).toBe(4);
+    expect(ok, 'D draws its letter too').toContain('>D</text>');
+    expect(ok).toContain('font-size="8"');
+    expect(renderVisual({ type: 'symmetry', grid: ['A#B..C#.'], mirror: false }), 'eight columns with a letter draws nothing').toBe('');
+    expect(renderVisual({ type: 'symmetry', grid: ['D.......'], mirror: false }), 'a D alone on eight columns draws nothing').toBe('');
+    expect(count(renderVisual({ type: 'symmetry', grid: ['#.#.#.#.'] }), /<text\b/g), 'unlettered wide grids still draw').toBe(0);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
 
 describe('number line labels, markers and exact decimal ticks (#1061)', () => {

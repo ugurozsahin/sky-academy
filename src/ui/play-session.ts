@@ -287,7 +287,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         const spawn = () => {
           if (waveId !== myWave) return;                                 // superseded while we waited
           const arena = deps.arena()!;
-          say(firstLine); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
+          say(firstLine); session.armQuestionClock(scaled); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
           requestAnimationFrame(() => {
             if (waveId !== myWave) return;
             arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;

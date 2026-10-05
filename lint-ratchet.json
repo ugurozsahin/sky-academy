@@ -21,7 +21,7 @@
     "src/ui/play.ts::playScreen": 26,
     "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,
-    "src/ui/visuals.ts::renderVisual": 47,
+    "src/ui/visuals.ts::renderVisual": 42,
     "tests/unit/curriculum.test.ts::(anonymous)": 28,
     "tests/unit/guardrails.test.ts::(anonymous)": 34
   },
@@ -35,7 +35,7 @@
     "src/ui/play-session.ts::createPlaySession": 186,
     "src/ui/play.ts::playScreen": 197,
     "src/ui/solid.ts::createSolidSlot": 110,
-    "src/ui/visuals.ts::renderVisual": 86
+    "src/ui/visuals.ts::renderVisual": 72
   },
   "fileLines": {
     "tests/unit/arena.test.ts": 948,
