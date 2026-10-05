@@ -30,7 +30,7 @@ function numberlineHTML(v: Extract<Visual, { type: 'numberline' }>): string {
   };
   return `<div class="vis"><div class="nline">${ticks.map(cell).join('')}</div></div>`;
 }
-/** Two to four equal-length bars stacked (#1066): each cell's width is set so a bar is 240 px with its 3 px gaps and 2 px borders. */
+/** Two to four equal-length bars stacked (#1066): each cell's width is set so a bar is 240 px with its 3 px gaps (cells are border-box, borders included). */
 function fractionStackHTML(v: Extract<Visual, { type: 'fraction' }>): string {
   const bars = v.stack ?? [];
   const first = bars[0];
@@ -38,7 +38,7 @@ function fractionStackHTML(v: Extract<Visual, { type: 'fraction' }>): string {
     && bars.every(b => Number.isInteger(b.parts) && Number.isInteger(b.shaded) && b.parts >= 1 && b.parts <= 12 && b.shaded >= 0 && b.shaded <= b.parts);
   if (!ok) { console.warn('fraction visual: invalid stack — nothing drawn'); return ''; }
   const rows = bars.map(b => {
-    const w = (240 - 3 * (b.parts - 1)) / b.parts - 4;
+    const w = (240 - 3 * (b.parts - 1)) / b.parts;
     return `<div class="bar">${Array.from({ length: b.parts }, (_, i) => `<i class="${i < b.shaded ? 'sh' : ''}" style="width:${w}px"></i>`).join('')}</div>`;
   }).join('');
   return `<div class="vis" style="flex-direction:column">${rows}</div>`;

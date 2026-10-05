@@ -662,8 +662,8 @@ describe('guard rails', () => {
   // teardown disposing it too. Moving `tracer?.destroy()` after `new Tracer(` (or dropping it) turns it red.
   it('play.ts disposes the previous Tracer before building a new one (#39)', () => {
     const play = code(SOURCES['/src/ui/play.ts']);
-    const ctors = [...play.matchAll(/new Tracer\(/g)];
-    expect(ctors.length).toBe(1);                                       // one construction site to reason about
+    const ctors = [...play.matchAll(/mountTracer\(q/g)];               // #1064: built by play-input.ts's mountTracer, called once here
+    expect(ctors.length + [...code(SOURCES['/src/ui/play-input.ts']).matchAll(/new Tracer\(/g)].length).toBe(2);
     const start = play.indexOf('function startTrace');
     const before = play.slice(start, ctors[0].index);
     expect({ inStartTrace: start >= 0 && start < ctors[0].index, disposesFirst: /tracer\??\.destroy\(\)/.test(before) })
@@ -3263,7 +3263,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
     'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 318, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a

@@ -2127,6 +2127,9 @@ test.describe('Sky Ninja Academy', () => {
     const html = renderVisual({ type: 'fraction', parts: 1, shaded: 1, shape: 'bar', stack: [{ parts: 1, shaded: 1 }, { parts: 4, shaded: 2 }, { parts: 8, shaded: 4 }, { parts: 12, shaded: 6 }] });
     await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
     await expect(page.locator('#vis .bar')).toHaveCount(4);
+    const widths = await page.locator('#vis .bar').evaluateAll(bars => bars.map(b => Math.round(b.getBoundingClientRect().width * 100) / 100));
+    expect(new Set(widths).size, `every bar is the same length: ${widths}`).toBe(1);
+    expect(widths[0]).toBeCloseTo(240, 0);
     await expectFitsViewport(page, 'four-bar fraction stack');
   });
 
