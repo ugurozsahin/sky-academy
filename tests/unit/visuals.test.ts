@@ -78,6 +78,33 @@ describe('renderVisual — a builder for every Visual.type (#43)', () => {
     expect(count(h, /class="sh"/g)).toBe(2);
   });
 
+  it('a stacked bar fraction draws 2-4 equal-length bars (#1066)', () => {
+    const stack = [{ parts: 2, shaded: 1 }, { parts: 4, shaded: 2 }, { parts: 8, shaded: 4 }];
+    const h = renderVisual({ type: 'fraction', parts: 2, shaded: 1, shape: 'bar', stack });
+    expect(count(h, /class="bar"/g)).toBe(3);
+    expect(count(h, /<i /g)).toBe(14);
+    expect(count(h, /class="sh"/g)).toBe(7);
+    for (const b of stack) {
+      const w = Number(new RegExp(`width:([\\d.]+)px`).exec(h.split('<div class="bar">')[stack.indexOf(b) + 1])![1]);
+      expect(b.parts * w + 3 * (b.parts - 1)).toBeCloseTo(240, 6);   // cells are border-box: borders are inside w
+    }
+  });
+
+  it('a 12-part bar in a stack has 17.25 px cells, borders included (#1066)', () => {
+    const h = renderVisual({ type: 'fraction', parts: 1, shaded: 1, shape: 'bar', stack: [{ parts: 1, shaded: 1 }, { parts: 12, shaded: 3 }] });
+    expect(h).toContain('width:17.25px');
+    expect(h).toContain('width:240px');
+  });
+
+  it('an invalid fraction stack draws nothing and does not throw (#1066)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const one = { parts: 2, shaded: 1 };
+    const bad = [[], [one], [one, one, one, one, one], [one, { parts: 13, shaded: 1 }], [one, { parts: 4, shaded: 5 }], [{ parts: 3, shaded: 1 }, one], [{ parts: 2, shaded: 0 }, one], [{ parts: 0, shaded: 0 }, one], [{ parts: 2.5, shaded: 1 }, one], [one, { parts: 2, shaded: -1 }]];
+    for (const stack of bad) expect(renderVisual({ type: 'fraction', parts: 2, shaded: 1, shape: 'bar', stack })).toBe('');
+    expect(warn).toHaveBeenCalledTimes(bad.length);
+    warn.mockRestore();
+  });
+
   it('a number line spans from..to and hides the marked number as a "?"', () => {
     const h = renderVisual({ type: 'numberline', from: 0, to: 5, mark: 3 });
     expect(count(h, /<span/g)).toBe(6);                       // 0..5 inclusive
