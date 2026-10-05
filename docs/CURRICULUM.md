@@ -183,3 +183,11 @@ KS2 distractor rule (#1058): for a pick-one card whose answer is a whole number 
 
 ## Not yet covered (candidates)
 Free sentence composition (Story Sentences covers word order only), handwriting joins, phonics phase-by-phase sequencing as a mission order (Sound Hunt covers phases 2–5 by ear), Year 3+.
+
+## Year 4 — 7 q/stage, 3 lives
+The second KS2 shell (#1069): hidden behind `meetsShowGate` like Year 3, no island art yet. Built like Year 3 —
+one module per strand (`src/curriculum/year4-*.ts`), a `// slot: <id>` comment per planned topic. Answers run
+0–20,000 and may go down to −50 (negative numbers, NC 4M3).
+
+Maths:
+- y4-count — count in 6s, 7s, 9s, 25s and 1,000s; 1,000 more or less

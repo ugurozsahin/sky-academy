@@ -2,6 +2,7 @@ import { RECEPTION_TOPICS } from './reception';
 import { YEAR1_TOPICS } from './year1';
 import { YEAR2_TOPICS } from './year2-topics';
 import { YEAR3_TOPICS } from './year3-topics';
+import { YEAR4_TOPICS } from './year4-topics';
 import { isKs2 } from './key-stage';
 import { meetsShowGate, previewAllYears } from './shown';
 import { YEARS, type Topic, type YearId, type YearInfo } from './types';
@@ -9,7 +10,7 @@ import { YEARS, type Topic, type YearId, type YearInfo } from './types';
 export * from './types';
 export * from './key-stage';
 export * from './shown';
-export const TOPICS: Topic[] = [...RECEPTION_TOPICS, ...YEAR1_TOPICS, ...YEAR2_TOPICS, ...YEAR3_TOPICS];
+export const TOPICS: Topic[] = [...RECEPTION_TOPICS, ...YEAR1_TOPICS, ...YEAR2_TOPICS, ...YEAR3_TOPICS, ...YEAR4_TOPICS];
 /** The registry minus drill topics (#915): what every star total, pool and unlock reads. `TOPICS` stays whole so `topicById` finds a drill. */
 export const CORE_TOPICS: Topic[] = TOPICS.filter(t => !t.drill);
 export const topicById = (id: string) => TOPICS.find(t => t.id === id);
