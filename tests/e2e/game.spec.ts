@@ -5517,3 +5517,27 @@ for (const h of [664, 640]) {
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT.replace('.png', `-${h}.png`) });   // the PR's 390×664 evidence
   });
 }
+
+// #1091: a y3-tenths d2 line card (six decimal ticks, one hidden) fits a 390×664 phone. Built from the real generator and renderVisual.
+test('a y3-tenths d2 line card fits a 390×664 phone (#1091)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year3', 'y3-tenths');
+  const tenths = TOPICS.find(t => t.id === 'y3-tenths')!;
+  let lines = 0;
+  for (let seed = 1; seed <= 40 && lines < 5; seed++) {
+    const q = tenths.gen(2, seededRng(seed));
+    if (q.visual?.type !== 'numberline') continue;
+    lines++;
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: renderVisual(q.visual), prompt: q.prompt });
+    expect(await page.locator('#vis .nline span').count(), `seed ${seed}: six ticks`).toBe(6);
+    await expectFitsViewport(page, `y3-tenths d2 line, seed ${seed}`);
+  }
+  expect(lines, 'drew line cards').toBeGreaterThan(0);
+});
