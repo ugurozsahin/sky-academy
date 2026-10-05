@@ -14,7 +14,8 @@ import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, 
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
 import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, trophyBadge, trophyCount } from './chooser';
-import { $, $$, capDigits, render, stars } from './dom';
+import { $, $$, capDigits, render } from './dom';
+import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
 
 export type StartPlay = (o: PlayOpts) => void;
@@ -205,11 +206,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   tb.bind();
   const drawTopics = () => {
     const list = topicsFor(year.id, subject);
-    $('#topics').innerHTML = list.map(t => { const p = progress[t.id]; return `
-      <button class="topic" data-id="${t.id}" data-subject="${t.subject}" title="${t.nc}">
-        <span class="ic">${t.icon}</span><b>${t.title}</b>
-        ${stars(p?.stars ?? 0)}${t.input === 'tracing' ? '<small class="pill">tracing</small>' : p?.crown ? '<small class="pill">👑</small>' : ''}
-      </button>`; }).join('');
+    $('#topics').innerHTML = topicsHTML(groupTopics(list), progress);
     $$('.topic').forEach(b => b.addEventListener('click', () => { const t = list.find(x => x.id === b.dataset.id)!; sfx.tap(); nav.play({ year, topic: t, mode: 'mission' }); }));
   };
   drawTopics();

@@ -3,6 +3,7 @@
 // Import direction: year3-topics → year3-* → shared modules (util.ts, ks2num.ts, types.ts). No Year 3 file
 // imports another year's file, and no shared module imports a year file.
 import type { Topic } from './types';
+import type { Strand } from './strands';
 import { Y3_NUMBER } from './year3-number';
 import { Y3_CALC } from './year3-calc';
 import { Y3_FRACTIONS } from './year3-fractions';
@@ -13,7 +14,11 @@ import { Y3_READING } from './year3-reading';
 import { Y3_SPELLING } from './year3-spelling';
 import { Y3_GRAMMAR } from './year3-grammar';
 
+// #1068: each module's rows take its strand unless a row already names its own.
+const tag = (strand: Strand, rows: Topic[]): Topic[] => rows.map(t => ({ ...t, strand: t.strand ?? strand }));
+
 export const YEAR3_TOPICS: Topic[] = [
-  ...Y3_NUMBER, ...Y3_CALC, ...Y3_FRACTIONS, ...Y3_MEASURE, ...Y3_GEOMETRY, ...Y3_STATS,
-  ...Y3_READING, ...Y3_SPELLING, ...Y3_GRAMMAR,
+  ...tag('number', Y3_NUMBER), ...tag('calc', Y3_CALC), ...tag('fractions', Y3_FRACTIONS), ...tag('measure', Y3_MEASURE),
+  ...tag('geometry', Y3_GEOMETRY), ...tag('stats', Y3_STATS),
+  ...tag('reading', Y3_READING), ...tag('spelling', Y3_SPELLING), ...tag('grammar', Y3_GRAMMAR),
 ];

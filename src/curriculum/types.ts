@@ -1,4 +1,5 @@
 // Shared question model for every subject. Generators are pure: (difficulty, rng) => Question.
+import type { Strand } from './strands';
 export type Rng = () => number; // [0,1)
 
 /** One category of a chart visual: its label (emoji + name) and the count it stands for. */
@@ -126,6 +127,7 @@ export interface Topic {
   input?: 'bubbles' | 'tracing' | 'keypad';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
   drill?: true;           // a narrow practice topic (#915): offered by the Sprint chooser only, never counted, mixed or duelled
   sequenceFrom?: Difficulty;   // draws a `Question.sequence` from this difficulty up — the truth `duelPool()` reads (#562)
+  strand?: Strand;        // NC strand heading for long island tabs (#1068); every KS2 row sets it
   gen: Generator;
 }
 

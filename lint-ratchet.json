@@ -28,7 +28,7 @@
   "lines": {
     "src/three/sketchbook/view.ts::createView": 81,
     "src/ui/duel.ts::duelScreen": 201,
-    "src/ui/home.ts::islandScreen": 69,
+    "src/ui/home.ts::islandScreen": 65,
     "src/ui/memory.ts::memoryScreen": 84,
     "src/ui/parents.ts::parentsScreen": 102,
     "src/ui/parents.ts::(anonymous)": 77,
