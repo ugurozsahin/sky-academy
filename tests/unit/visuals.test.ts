@@ -93,7 +93,7 @@ describe('renderVisual — a builder for every Visual.type (#43)', () => {
   it('an invalid fraction stack draws nothing and does not throw (#1066)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const one = { parts: 2, shaded: 1 };
-    const bad = [[one], [one, one, one, one, one], [one, { parts: 13, shaded: 1 }], [one, { parts: 4, shaded: 5 }], [{ parts: 3, shaded: 1 }, one]];
+    const bad = [[one], [one, one, one, one, one], [one, { parts: 13, shaded: 1 }], [one, { parts: 4, shaded: 5 }], [{ parts: 3, shaded: 1 }, one], [{ parts: 2, shaded: 0 }, one], [{ parts: 0, shaded: 0 }, one], [{ parts: 2.5, shaded: 1 }, one], [one, { parts: 2, shaded: -1 }]];
     for (const stack of bad) expect(renderVisual({ type: 'fraction', parts: 2, shaded: 1, shape: 'bar', stack })).toBe('');
     expect(warn).toHaveBeenCalledTimes(bad.length);
     warn.mockRestore();
