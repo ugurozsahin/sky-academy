@@ -192,3 +192,4 @@ one module per strand (`src/curriculum/year4-*.ts`), a `// slot: <id>` comment p
 
 Maths:
 - y4-count — count in 6s, 7s, 9s, 25s and 1,000s; 1,000 more or less
+- y4-tables — multiplication and division facts to 12 × 12: the 6 and 11 tables (d1), 7, 9 and 12 (d2), every table 2–12 weighted as the STA Tables Check weights them, with `? × n = P` cards (d3)
