@@ -1,5 +1,6 @@
 // Train with Sensei: adaptive practice picks the topics a child finds hardest. Pure so it can be unit-tested.
 import type { Topic } from '../curriculum';
+import { answerableBy } from './pools';
 import type { TopicProgress } from '../storage';
 
 export const TRAIN_TOPICS = 3;
@@ -32,7 +33,7 @@ export function accuracy(p: TopicProgress | undefined): number | null {
  * With `now` (#936) the last slot goes to a starred topic not played for 14+ days, if there is one.
  */
 export function weakestTopics(topics: Topic[], progress: Record<string, TopicProgress>, n = TRAIN_TOPICS, now?: Date): Topic[] {
-  const playable = topics.filter(t => t.input !== 'tracing');
+  const playable = topics.filter(t => answerableBy(t, 'mixed'));
   const played = playable.filter(t => accuracy(progress[t.id]) !== null);
   const key = (t: Topic) => { const p = progress[t.id]; return [accuracy(p)!, p.stars, p.plays]; };
   played.sort((a, b) => { const ka = key(a), kb = key(b); for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i]; return 0; });
