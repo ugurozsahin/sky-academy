@@ -10,6 +10,8 @@ export interface KeypadOpts {
   minus?: boolean;
   /** Most characters of digits the readout holds (default 6). */
   maxLen?: number;
+  /** While this answers false every key is ignored — the outcome of the last card is still on screen (#1119). */
+  enabled?: () => boolean;
 }
 
 const DIGITS = '0123456789';
@@ -51,7 +53,7 @@ export function keypadHTML(o: KeypadOpts = {}): string {
     + '</div></div>';
 }
 
-export interface Keypad { value(): string; clear(): void; destroy(): void }
+export interface Keypad { value(): string; clear(): void; press(key: KeypadKey): void; destroy(): void }
 
 /** Bind taps and one keydown listener inside `el`; destroy() removes the listener so the pad never outlives its screen. */
 export function mountKeypad(el: HTMLElement, o: KeypadOpts, onEnter: (value: string) => void,
@@ -60,6 +62,7 @@ export function mountKeypad(el: HTMLElement, o: KeypadOpts, onEnter: (value: str
   const out = el.querySelector('output') as HTMLElement;
   let text = '';
   const press = (key: KeypadKey) => {
+    if (o.enabled && !o.enabled()) return;
     const r = keypadReduce(text, key, o);
     text = r.text; out.textContent = text;
     if (r.enter) onEnter(text);
@@ -67,5 +70,5 @@ export function mountKeypad(el: HTMLElement, o: KeypadOpts, onEnter: (value: str
   el.querySelectorAll<HTMLElement>('[data-key]').forEach(b => { b.onclick = () => { sfx.tap(); press(b.dataset.key as KeypadKey); }; });
   const onKey = (e: Event) => { const k = keyFromEvent((e as KeyboardEvent).key, o); if (k) { e.preventDefault(); press(k); } };
   target.addEventListener('keydown', onKey);
-  return { value: () => text, clear: () => { text = ''; out.textContent = ''; }, destroy: () => target.removeEventListener('keydown', onKey) };
+  return { value: () => text, clear: () => { text = ''; out.textContent = ''; }, press, destroy: () => target.removeEventListener('keydown', onKey) };
 }

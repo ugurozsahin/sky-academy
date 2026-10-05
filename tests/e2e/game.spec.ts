@@ -5494,6 +5494,44 @@ test.describe('number pad (#1073)', () => {
   });
 });
 
+// #1119: a typed number reaches the Session as a slice would. No topic answers by pad yet, so the screen is opened with the
+// test-speed-only `?input=keypad` (a child can never reach it) and the y2-tables mission.
+test.describe('typed answers from the number pad (#1119)', () => {
+  test('wrong then right on a keypad mission, no bubbles, fits the 390×664 phone', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'the 390px phone card');
+    await page.setViewportSize({ width: 390, height: 664 });
+    await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+    await seedPlayer(page);
+    await page.goto('/?input=keypad');
+    await expect(page.locator('.home')).toBeVisible();
+    await startTopic(page, 'year2', 'y2-tables');
+    await expect(page.locator('#keypad .keypad')).toBeVisible();
+    expect(await page.locator('#arena').count(), 'no arena on a keypad screen').toBe(0);
+    expect(await page.evaluate(() => window.__sna.bubbles().length)).toBe(0);
+    await expectFitsViewport(page, 'keypad play screen');
+    const start = await state(page);
+    expect(await page.evaluate(() => window.__sna.wrong()), 'a wrong number is typed and entered').toBe(true);
+    await expect(page.locator('.toast.bad')).toContainText('Not quite');
+    await page.waitForFunction(() => window.__sna.state().index === 1);
+    const afterWrong = await state(page);
+    expect(afterWrong.lives, 'a wrong answer costs a life').toBe(start.lives - 1);
+    expect(afterWrong.score).toBe(start.score);
+    const q = afterWrong.answer as string;   // card 2, by clicking the pad's own keys
+    for (const ch of q) await page.click(`#keypad [data-key="${ch}"]`);
+    await expect(page.locator('#keypad .keypad-out')).toHaveText(q);
+    await page.click('#keypad [data-key="enter"]');
+    await page.waitForFunction(() => window.__sna.state().index === 2);
+    const afterRight = await state(page);
+    expect(afterRight.score, 'the score rises').toBeGreaterThan(afterWrong.score);
+    expect(afterRight.lives).toBe(afterWrong.lives);
+    expect(await page.evaluate(() => window.__sna.answer()), 'the hook types the right answer on card 3').toBe(true);
+    await page.waitForFunction(() => window.__sna.state().index === 3);
+    expect((await state(page)).score).toBeGreaterThan(afterRight.score);
+    await expect(page.locator('#keypad .keypad-out')).toHaveText('');   // the pad is clear for the next card
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  });
+});
+
 // #1068: a 30+ topic tab is drawn in headed strand sections. The fixture is injected, since no registry tab is long enough yet.
 test('a 37-topic grouped island tab fits a 390×664 phone, headings legible, cards tappable-size', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'the 390px phone card');

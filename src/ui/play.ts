@@ -13,7 +13,7 @@ import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { createHud, heartCount } from './hud';
-import { inputFor, inputMarkup, mountTracer } from './play-input';   // #1064: how a child answers
+import { inputFor, inputMarkup, mountPad, mountTracer } from './play-input';   // #1064: how a child answers
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
@@ -60,7 +60,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'),
     overlay: $('#overlay'), qcard: $('#qcard'), speak: $('#speak'),
   };
-  let arena: Arena | null = null; let tracer: Tracer | null = null; let paused = false;   // #884: mirrors the Pause overlay, for state()
+  let arena: Arena | null = null; let tracer: Tracer | null = null; let paused = false; const pad = mountPad(input, () => session, scaled);   // #884: mirrors the Pause overlay; #1119: the number pad
   let lastCert: CertInfo | null = null;   // the one CertInfo actually filed (#410) — hooks read this, not a fresh certInfo() call
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast, holdTimers, onHidden, onBack } = scope; onHidden(() => { hush(); pauseIfLive(); }); onBack(pauseIfLive); pushBackGuard();   // #885, #887
@@ -96,7 +96,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     arena: () => arena,
     mounted: () => window.__sna === hooks,        // the screen the callbacks were built for is still the live one
     later, toast, holdTimers,
-    startTrace, showTutorial, showTaunt, showStageClear, commitResult, showResults,
+    startTrace, startPad: pad.next, showTutorial, showTaunt, showStageClear, commitResult, showResults,
   });
   const { session, waveEnd } = playSession;
   hud.drawLives(o.year.lives); hud.drawTimer(session.secondsLeft); hud.drawHp(session.bossHp, session.bossMax);
@@ -106,7 +106,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     const now = performance.now();
     const dt = lastTick ? now - lastTick : 0;
     lastTick = now;
-    if (!arena?.paused && !session.ended) session.tick(dt);
+    if (!arena?.paused && !paused && !session.ended) session.tick(dt);   // #1119: a no-arena card's clock stops under Pause too
   }, 100);
 
   if (bubbles) {
@@ -255,7 +255,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
   // #35: dispose() stops timers, cancels speech and drops window.__sna.
   function cleanup() {
-    clearInterval(ticker); playSession.dispose(); arena?.destroy(); tracer?.destroy(); scope.dispose();
+    clearInterval(ticker); playSession.dispose(); arena?.destroy(); tracer?.destroy(); pad.destroy(); scope.dispose();
   }
 
   // Test / accessibility hooks — the typed PlayHooks contract (#34)
@@ -263,12 +263,12 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     session, arena, get tracer() { return tracer; },
     answer: () => {
       const q = session.current; if (!q) return false;
-      if (tracing) { tracer?.autoTrace(); return true; }
+      if (pad.on) return pad.answer(); if (tracing) { tracer?.autoTrace(); return true; }
       const label = q.sequence ? session.remaining()[0] : q.answer;
       return arena!.hitLabel(label);
     },
     wrong: () => {
-      const q = session.current; if (!q || !arena) return false;
+      const q = session.current; if (pad.on) return pad.wrong(); if (!q || !arena) return false;
       const targets = q.anyOrder ? session.remaining() : [q.sequence ? session.remaining()[0] : q.answer];
       const b = arena.bubbles.find(x => x.launched && !x.dead && !targets.includes(x.label) && x.label !== BOMB);
       return b ? arena.hitLabel(b.label) : false;

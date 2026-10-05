@@ -79,7 +79,7 @@ export interface PlaySessionDeps {
   /** Freeze/re-arm every pending `later()` beat while an overlay holds the screen (#301) — `scope.holdTimers`. */
   holdTimers: (open: boolean) => void;
   toast: (text: string, cls?: string, ms?: number) => void;
-  startTrace: (q: Question) => void;
+  startTrace: (q: Question) => void; startPad?: (q: Question) => void;   // #1119: startPad = a keypad screen's start of a card (no arena either)
   showTutorial: () => number;
   showTaunt: () => void;
   showStageClear: (stage: number, stars: number, acc: number) => void;
@@ -137,7 +137,7 @@ const SPEAK_LABEL = {
 // #36: onCorrect/onWrong/onMiss each carried a copy of the same closing beat — remember the outcome, mark
 // the mission segment, spotlight the answer under the card, freeze the wave for the hold — and differed
 // only in the rules below, so a fourth outcome is now a row rather than a fourth copy of the body.
-// `advance` is the no-arena (tracing) fallback; 0 is the miss path, where the session has already moved on.
+// `advance` is the no-arena (tracing, keypad) fallback; an arena's miss moves on by its own waveEnd(), so the number is unused there.
 // #138: every scheduled beat in this file goes through scaled() — the outcome holds, the inter-question gap,
 // the tracing `advance` below, the results floor and the breath after it. The one exception is deliberate and
 // a guard rail would be wrong to touch it: `revealUntil - performance.now()` is real time still owed on a
@@ -152,7 +152,7 @@ const SPEAK_LABEL = {
 const OUTCOME = {
   correct: { seg: 'good', taunt: false, hold: 'correct', advance: 900 },
   wrong: { seg: 'bad', taunt: true, hold: 'wrong', advance: 1200 },
-  miss: { seg: 'bad', taunt: true, hold: 'miss', advance: 0 },
+  miss: { seg: 'bad', taunt: true, hold: 'miss', advance: 1200 },
 } as const;
 
 /** Build the session and its callbacks for one play screen. */
@@ -252,7 +252,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     // Both halves: the generator says this hint is data, AND it is the hint that reached the card. The second
     // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
     // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
-    const line = hintText(q, { reveal, tracing: deps.tracing });
+    const line = hintText(q, { reveal, tracing: deps.tracing, keypad: !!deps.startPad });
     setHint(els, line, !!q.hint && !!q.hintIsData);
     return false;
   }
@@ -271,7 +271,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         els.vis.innerHTML = renderVisual(q.visual);
         solid.show(q, session.currentTopic?.id);
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
-        if (deps.tracing) { say(firstLine); deps.startTrace(q); return; }
+        if (deps.tracing || deps.startPad) { say(firstLine); (deps.startPad ?? deps.startTrace)(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
         const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle);
         const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;

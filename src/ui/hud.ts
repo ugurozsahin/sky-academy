@@ -162,9 +162,10 @@ function buildPromptHTML(prompt: string, template: string, sequence: string[], d
  * coloured bubbles and cannot be answered without read-aloud (#65). Only when there is no hint does it fall
  * back to telling the child what to do.
  */
-export function hintText(q: Pick<Question, 'hint'>, o: { reveal: boolean; tracing?: boolean }): string {
+export function hintText(q: Pick<Question, 'hint'>, o: { reveal: boolean; tracing?: boolean; keypad?: boolean }): string {
   if (q.hint) return q.hint;
   if (o.tracing) return 'Trace over the dotted letters';
+  if (o.keypad) return 'Type the answer, then tap ✓';
   return o.reveal ? 'Read, then slice the answer' : 'Tap or slice the answer';
 }
 

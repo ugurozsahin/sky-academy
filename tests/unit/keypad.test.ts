@@ -80,3 +80,22 @@ describe('mountKeypad', () => {
     expect(pad.value()).toBe('');
   });
 });
+
+describe('mountKeypad: press() and the enabled gate (#1119)', () => {
+  const mount = (enabled: () => boolean, entered: string[]) => {
+    const out = { textContent: '' };
+    const el = { innerHTML: '', querySelector: () => out, querySelectorAll: () => [] } as unknown as HTMLElement;
+    const target = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    return { pad: mountKeypad(el, { enabled }, v => entered.push(v), target), out, key: (k: string) => (target.addEventListener.mock.calls[0][1] as (e: unknown) => void)({ key: k, preventDefault() {} }) };
+  };
+  it('press() types and enters like a tap', () => {
+    const entered: string[] = []; const { pad, out } = mount(() => true, entered);
+    pad.press('1'); pad.press('2'); expect(out.textContent).toBe('12'); pad.press('enter');
+    expect(entered).toEqual(['12']);
+  });
+  it('ignores taps and keys while disabled, and works again once enabled', () => {
+    let on = false; const entered: string[] = []; const { pad, out, key } = mount(() => on, entered);
+    pad.press('5'); key('6'); key('Enter'); expect(out.textContent).toBe(''); expect(entered).toEqual([]);
+    on = true; key('7'); key('Enter'); expect(entered).toEqual(['7']);
+  });
+});

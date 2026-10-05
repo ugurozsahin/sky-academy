@@ -1,5 +1,9 @@
 import type { Question, Topic } from '../curriculum';
 import { Tracer, traceFeedback } from '../game/tracing';
+import type { Session } from '../game/session';
+import { gameSpeed } from '../game/speed';
+import { differentNumber, sameNumber } from '../game/typed';
+import { mountKeypad, type KeypadKey } from './keypad';
 import { say, sfx } from '../audio';
 import { $ } from './dom';
 
@@ -8,8 +12,11 @@ export type PlayInput = 'bubbles' | 'tracing' | 'keypad';
 
 /** Chosen once per screen, so it cannot depend on a mission's stage difficulty. Explicit, then the topic's, then bubbles. */
 export function inputFor(o: { topic?: Topic; input?: PlayInput }): PlayInput {
-  return o.input ?? o.topic?.input ?? 'bubbles';
+  return o.input ?? testInput() ?? o.topic?.input ?? 'bubbles';
 }
+
+/** `?input=keypad` opens a keypad screen for e2e (#1119) — only at the #32 test speed, which a child can never reach. */
+const testInput = (): PlayInput | undefined => gameSpeed() > 1 && new URLSearchParams(location.search).get('input') === 'keypad' ? 'keypad' : undefined;
 
 /** The answering surface's markup: the arena canvas, the tracing pad, or the (empty) keypad mount. */
 export function inputMarkup(kind: PlayInput): string {
@@ -40,4 +47,34 @@ export function mountTracer(q: Question, deps: TracerDeps): Tracer {
     const msg = traceFeedback(r, q.answer, 'check', tracer.strokes); if (msg) speakTrace(msg);
   };
   return tracer;
+}
+
+/** The number pad driving one play screen (#1119); `answer()`/`wrong()` are the `window.__sna` hooks' way of typing on it. */
+export interface PadInput { on: boolean; next?(q: Question): void; answer(): boolean; wrong(): boolean; destroy(): void }
+
+/**
+ * Mount the keypad branch (#1064) on its `#keypad` element, or an inert one (`on: false`) on any other screen, so the screen never branches on it. ✓ sends the typed number to
+ * `session.hit` exactly as a slice would — the card's own answer when it is the same number, so "1,000" and "1000" agree.
+ * `session` is a thunk because the pad is built before the Session is.
+ */
+export function mountPad(kind: PlayInput, session: () => Session, scale: (ms: number) => number): PadInput {
+  if (kind !== 'keypad') return { on: false, answer: () => false, wrong: () => false, destroy() {} };
+  const live = () => { const s = session(); return !!s.current && !s.waiting && !s.ended; };
+  const pad = mountKeypad($('#keypad'), { maxLen: 8, enabled: live }, v => {
+    const s = session(); const q = s.current;
+    if (q) s.hit(sameNumber(v, q.answer) ? q.answer : v);
+    pad.clear();
+  });
+  const type = (text: string) => {
+    if (!live()) return false;
+    for (const ch of text) pad.press((ch === '-' ? '−' : ch) as KeypadKey);
+    pad.press('enter'); return true;
+  };
+  return {
+    on: true,
+    next: () => { pad.clear(); session().armQuestionClock(scale); },   // the clock starts as the card does; a mode without one ignores it
+    answer: () => type(session().current?.answer ?? ''),
+    wrong: () => type(differentNumber(session().current?.answer ?? '')),
+    destroy: () => pad.destroy(),
+  };
 }
