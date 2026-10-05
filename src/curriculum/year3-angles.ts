@@ -35,7 +35,7 @@ export function geoAnswer(parts: GeoPart[], ask: GeoAsk): string[] {
 }
 
 const card = (prompt: string, parts: GeoPart[], ask: GeoAsk, rng: Rng): Question => ({
-  ...q(prompt), answer: geoAnswer(parts, ask)[0], options: shuffle(rng, LETTERS.slice()),
+  ...q(prompt), answer: geoAnswer(parts, ask)[0] ?? (() => { throw new Error(`y3-angles: no part answers "${prompt}"`); })(), options: shuffle(rng, LETTERS.slice()),
   visual: { type: 'geometry', parts }, hint: 'Slice the right letter', hintIsData: false,
 });
 

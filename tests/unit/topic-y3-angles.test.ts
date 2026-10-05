@@ -88,6 +88,12 @@ describe('y3-angles (#1075)', () => {
     expect(levelCorrect / corrects).toBeLessThan(0.2);   // the right pair is not always square to the page
   });
 
+  it('the oracle reads direction, not the order of end points', () => {
+    const seg = (a: [number, number], b: [number, number], label: string): GeoPart => ({ kind: 'segment', a, b, label });
+    expect(geoAnswer([seg([0, 5], [20, 5], 'A'), seg([20, 9], [0, 9], 'B'), seg([5, 0], [9, 20], 'C')], 'horizontal')).toEqual(['A', 'B']);
+    expect(geoAnswer([seg([0, 0], [10, 10], 'A'), seg([10, 20], [20, 10], 'A'), seg([0, 0], [10, 0], 'B'), seg([0, 5], [10, 5], 'B')], 'perpendicular')).toEqual(['A']);
+  });
+
   it('the options are letters, Yes/No or 1–4 — no unit digit to leak, so the #1058 limit cannot apply', () => {
     const r = rng(44);
     for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) for (const o of t.gen(d, r).options) expect(o).toMatch(/^(A|B|C|Yes|No|[1-4])$/);
@@ -97,5 +103,8 @@ describe('y3-angles (#1075)', () => {
     const base = (deg: number, label: string): ReturnType<typeof t.gen> => ({ ...t.gen(2, rng(1)), visual: { type: 'geometry', parts: [{ kind: 'angle', at: [10, 10], dir: 10, deg, label }] } });
     expect(repeatKey(base(40, 'A'))).not.toBe(repeatKey(base(45, 'A')));
     expect(repeatKey(base(40, 'A'))).toBe(repeatKey(base(40, 'B')));
+    const line = (b: [number, number], label: string) => ({ ...base(40, 'A'), visual: { type: 'geometry' as const, parts: [{ kind: 'segment' as const, a: [0, 0] as [number, number], b, label }] } });
+    expect(repeatKey(line([10, 0], 'A'))).not.toBe(repeatKey(line([0, 10], 'A')));
+    expect(repeatKey(line([10, 0], 'A'))).toBe(repeatKey(line([10, 0], 'C')));
   });
 });

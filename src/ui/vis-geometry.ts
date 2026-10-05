@@ -59,5 +59,5 @@ export function geometrySVG(v: Extract<Visual, { type: 'geometry' }>): string {
     if (!ok) { console.warn('geometry visual: a part has a non-finite number — skipped'); return ''; }
     return p.kind === 'angle' ? angleSVG(p) : segmentSVG(p);
   }).join('');
-  return `<div class="vis"><svg viewBox="0 0 100 70" class="geo" style="width:clamp(200px,60vw,280px);height:auto">${body}</svg></div>`;
+  return `<div class="vis"><svg viewBox="0 0 100 70" class="geo" style="width:clamp(200px,60vw,220px);height:auto">${body}</svg></div>`;
 }
