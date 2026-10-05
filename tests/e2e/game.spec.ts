@@ -2122,6 +2122,19 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'labelled number line');
   });
 
+  test('y3-fracline: a lettered fraction line and a past-one line fit the question card on the phone (#1093)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    const gen = TOPICS.find(t => t.id === 'y3-fracline')!.gen;
+    // Dress the card with the topic's own output, as the #1061 test does with a hand-built line: d2 lettered, d3 past one.
+    for (const d of [2, 3] as const) {
+      const q = gen(d, seededRng(1093 + d));
+      await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, renderVisual(q.visual!));
+      await expect(page.locator('#vis .nline span')).toHaveCount(q.visual?.type === 'numberline' ? q.visual.labels!.length : 0);
+      await expectFitsViewport(page, `y3-fracline d${d} card`);
+    }
+  });
+
   test('a four-bar fraction stack with a 12-part bar fits the question card on the phone (#1066)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');
