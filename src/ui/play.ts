@@ -2,7 +2,7 @@ import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatar
 import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
-import { MODES } from '../game/modes';
+import { MODES, holdFor } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools';   // #1065: one pool rule
 import {
@@ -75,14 +75,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // are scaled there. One thing here deliberately is NOT scaled, and a guard rail would be wrong to touch
   // it: the sprint ticker below samples the REAL clock — speed.ts must never speed the clock up, which is
   // the mistake this repo has made four times.
-  const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
+  const HOLD = holdFor(o.mode);
 
   // #896: the results overlay lives in play-results.ts. `hold` is a thunk rather than `playSession` itself —
   // `playSession` is assigned just below and `showResults` is only ever called once gameplay ends, long after
   // this object is built — the same TDZ-safe pattern `mounted` below uses for `hooks`.
   const showResults = createResultsScreen({
     training, year: o.year, topic: o.topic, av, name: d.name, els, hold: (open, beats) => playSession.hold(open, beats),
-    later, toast, replay, goHome, cleanup, next, fix, retry, practice: !!o.practice,
+    later, toast, replay, goHome, cleanup, next, fix, retry, deck: o.deck, practice: !!o.practice,
   });
 
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —

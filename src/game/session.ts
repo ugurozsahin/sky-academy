@@ -108,7 +108,7 @@ export class Session {
   questionLeft = 0;
   /** How long the last decided question took, ms (the full budget for an expiry) — #1122 reads it. */
   lastAnswerMs = 0;
-  private qArmed = false; private qElapsed = 0; private qBudget = 0;
+  private qArmed = false; private qDelay = 0; private qElapsed = 0; private qBudget = 0;
   bossHp: number; readonly bossMax: number;             // boss only (0 otherwise)
   private rng: () => number; readonly stages: number;
   constructor(public o: SessionOpts, private ev: SessionEvents) {
@@ -152,11 +152,15 @@ export class Session {
   armQuestionClock(scale: (ms: number) => number = ms => ms) {
     const base = this.spec.questionMs;
     if (base === undefined || this.qArmed || !this.current || this.waiting || this.ended) return;   // a second arm (a sequence relaunch) never refills the budget
+    const wait = this.spec.armDelay ? this.spec.armDelay(this.questionsAsked - 1, ((this.current.options?.length ?? 1) - 1) * 500) : 0;   // #1118: the 6 s starts at the last bubble's launch (speed 0: 500 ms apart); no clock for practice cards
+    if (wait === null) return;
+    this.qDelay = scale(wait);
     this.qBudget = scale(base) * (this.o.timeScale ?? 1); this.questionLeft = this.qBudget; this.qElapsed = 0; this.qArmed = true;
   }
   /** Count the armed question down; at zero it is a miss. Real elapsed time only — the UI never speeds this up (#32). */
   private tickQuestion(ms: number) {
     if (!this.qArmed || this.waiting) return;
+    if (this.qDelay > 0) { this.qDelay -= ms; return; }
     this.qElapsed += ms; this.questionLeft = Math.max(0, this.questionLeft - ms);
     if (this.questionLeft === 0) this.expire();
   }
@@ -312,7 +316,7 @@ export class Session {
     const key = repeatKey(q);
     this.misses = this.misses.filter(m => repeatKey(m.q) !== key);
     this.misses.push({ topic, q, picked });
-    if (this.misses.length > MISSES_CAP) this.misses.shift();
+    if (this.misses.length > (this.spec.missesCap ?? MISSES_CAP)) this.misses.shift();
   }
   private loseLife() {
     if (!this.spec.hasLives || this.o.practice) return;   // no lives in a sprint: a slip only costs time; practice (#930) never loses one either

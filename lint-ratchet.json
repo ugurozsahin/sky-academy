@@ -18,7 +18,7 @@
     "src/main.ts::(anonymous)": 16,
     "src/storage/migrate.ts::sanitizeTypes": 39,
     "src/ui/play-results.ts::showResults": 21,
-    "src/ui/play.ts::playScreen": 26,
+    "src/ui/play.ts::playScreen": 25,
     "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,
     "src/ui/visuals.ts::renderVisual": 23,

@@ -1,6 +1,10 @@
 // Multiplication Tables Check form builder (#1116): 25 questions drawn under the STA's published rules
 // (MTC assessment framework §5.1–5.2). Pure: no DOM, no `src/ui` import.
-import type { Rng } from '../curriculum/types';
+import type { Question, Rng } from '../curriculum/types';
+import { topicById } from '../curriculum';
+import { productDecoys } from '../curriculum/year4-tables';
+import { q, shuffle } from '../curriculum/util';
+import type { DeckItem } from './session';
 
 export type MtcItem = { a: number; b: number };
 
@@ -69,3 +73,33 @@ export function mtcPractice(rng: Rng): readonly MtcItem[] {
   const ns: number[] = [...MTC_TABLES];
   return [0, 1, 2].map(() => ({ a: 1, b: ns.splice(Math.floor(rng() * ns.length), 1)[0] }));
 }
+
+/** The practice cards come first and are never scored (#1118). */
+export const MTC_PRACTICE = 3;
+
+const practiceCard = (b: number, rng: Rng): Question => {
+  const pool = [b - 2, b - 1, b + 1, b + 2].filter(v => v >= 1);
+  const options = [b, ...shuffle(rng, pool).slice(0, 3)].map(String);
+  return { ...q(`1 × ${b} = ?`), answer: String(b), options: shuffle(rng, options) };
+};
+const checkCard = (a: number, b: number, rng: Rng): Question => {
+  const options = [a * b, ...productDecoys(a, b, rng)].map(String);
+  return { ...q(`${a} × ${b} = ?`), answer: String(a * b), options: shuffle(rng, options) };
+};
+
+/** One Tables Check practice run: 3 untimed practice cards, then the 25 of `mtcForm` — `a × b = ?`, four bubbles each. */
+export function mtcDeck(rng: Rng): DeckItem[] {
+  const topic = topicById('y4-tables')!;
+  const practice = mtcPractice(rng), form = mtcForm(rng);   // the same two draws, in this order, as a test replays
+  return [...practice.map(i => practiceCard(i.b, rng)), ...form.map(i => checkCard(i.a, i.b, rng))].map(q => ({ topic, q }));
+}
+
+/** The result: check cards missed (practice ignored), as the facts, in deck order. */
+export function mtcScore(deck: readonly DeckItem[], misses: readonly { q: Question }[]): { score: number; missed: { prompt: string; answer: string }[] } {
+  const gone = new Set(misses.map(m => m.q.prompt));
+  const missed = deck.slice(MTC_PRACTICE).filter(d => gone.has(d.q.prompt)).map(d => ({ prompt: d.q.prompt.replace(' = ?', ''), answer: d.q.answer }));
+  return { score: MTC_SIZE - missed.length, missed };
+}
+
+/** Ms after the wave starts before the 6 s clock is armed: `null` for the practice cards (no clock), else the last bubble's launch. */
+export const mtcArmDelay = (index: number, lastLaunchMs: number): number | null => index < MTC_PRACTICE ? null : lastLaunchMs;

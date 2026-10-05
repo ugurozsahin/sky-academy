@@ -2,8 +2,9 @@
 // ~12 `o.mode === 'endless' ? … : sprint ? …` chains scattered across session.ts, play.ts and home.ts (#26).
 // Session reads the behaviour (difficulty/speed/points/stars/coins/lives); the UI reads the labels.
 import type { Difficulty, YearInfo } from '../curriculum';
+import { MTC_PRACTICE, MTC_SIZE, mtcArmDelay } from './mtc';
 
-export type Mode = 'mission' | 'endless' | 'sprint' | 'boss' | 'relaxed';
+export type Mode = 'mission' | 'endless' | 'sprint' | 'boss' | 'relaxed' | 'mtc';
 
 /** Live state a mode needs while a question is on screen. */
 export interface ModeCtx {
@@ -37,6 +38,9 @@ export interface ModeSpec {
   staged: boolean;          // true = five staged waves (mission); false = one continuous run
   timed: boolean;           // Ninja Sprint clock
   questionMs?: number;      // a per-question time limit (#1063); unset = no per-question clock. No mode sets it yet
+  hold?: { correct: number; wrong: number; miss: number };   // outcome holds (ms), unscaled — unset = `holdFor`'s defaults (#1118)
+  missesCap?: number;       // misses kept on the result; unset = MISSES_CAP (#1118: Tables Check keeps all 25 check misses)
+  armDelay?: (cardIndex: number, launchMs: number) => number | null;   // ms after the wave starts to arm the question clock; null = no clock for that card (#1118)
   runLength?: number;       // an unstaged run that ends once this many questions are asked (Relaxed practice, #937)
   resultStars: boolean;     // the results screen shows stars (#1117) — required, so a new mode must decide
   boss: boolean;            // Boss Battle HP bar
@@ -124,6 +128,20 @@ export const MODES: Record<Mode, ModeSpec> = {
     stars: () => 0,
     coins: c => c.correct,
   },
+  // #1118: Tables Check practice — a deck of 3 practice + 25 check cards, 6 s each, a 3 s rest (hold + the 450/650 ms gap), no stars.
+  mtc: {
+    id: 'mtc', title: 'Tables Check practice', overHeadingWon: 'Tables Check practice', overHeadingLost: 'Tables Check practice',
+    hasLives: false, staged: false, timed: false, resultStars: false, boss: false, villain: false, questionMs: 6000,
+    hold: { correct: 2550, wrong: 2350, miss: 2350 }, missesCap: MTC_PRACTICE + MTC_SIZE, armDelay: mtcArmDelay,
+    difficulty: () => 3,
+    speed: () => 0,
+    basePoints: () => 10,
+    stars: () => 0,
+    coins: baseCoins,
+  },
 };
+
+/** Outcome holds in ms, unscaled: the mode's own, else Ninja Sprint's brisk ones, else the curriculum's. */
+export const holdFor = (m: Mode) => MODES[m].hold ?? (MODES[m].timed ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 });
 
 export const modeSpec = (m: Mode): ModeSpec => MODES[m];

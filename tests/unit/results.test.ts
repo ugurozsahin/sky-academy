@@ -466,6 +466,6 @@ describe('medal and result stars per mode (#1117)', () => {
   });
   it('shows result stars for mission, sprint and boss only', () => {
     expect(Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, v.resultStars]))).toEqual(
-      { mission: true, endless: false, sprint: true, boss: true, relaxed: false });
+      { mission: true, endless: false, sprint: true, boss: true, relaxed: false, mtc: false });
   });
 });

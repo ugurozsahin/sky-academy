@@ -1,4 +1,5 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
+import { mtcDeck } from '../game/mtc';
 import { beltFor, totalStarsOf } from '../game/belts';
 import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
@@ -131,6 +132,10 @@ export function mapScreen(nav: Nav) {
   $('#who').addEventListener('click', () => { sfx.tap(); nav.profiles(); });
 }
 
+/** Tables Check practice (#1118): Year 4 only, through the menu's `years` filter. */
+const mtcRow = (nav: Nav, year: YearInfo): MenuRow => ({ id: 'mtc', mod: 'sprint', vport: '<span class="vport emoji">✖️</span>', title: MODES.mtc.title,
+  blurb: '25 questions · 6 seconds each', years: ['year4'], go: () => nav.play({ year, mode: 'mtc', deck: mtcDeck(Math.random) }) });
+
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
 export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId): T[] => rows.filter(r => !r.years || r.years.includes(year));
@@ -168,7 +173,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress),
+      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress), mtcRow(nav, year),
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,

@@ -2,7 +2,8 @@
 // callbacks into play-session.ts): the DOM build, the certificate button and the closing speech, wired to
 // the screen instance through one deps object rather than living in playScreen()'s own closure.
 import { praiseLine, senseiLine, SENSEI, type Avatar } from '../avatars';
-import type { Miss, Resume, SessionResult } from '../game/session';
+import type { DeckItem, Miss, Resume, SessionResult } from '../game/session';
+import { mtcRowsFor, mtcTally } from './mtc-view';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { say, sfx } from '../audio';
 import { topicsFor, type Topic, type YearInfo } from '../curriculum';
@@ -34,6 +35,7 @@ export interface ResultsScreenDeps {
   next: (t: Topic) => void;                 // #929: start a mission on a different topic ("Next topic →")
   retry: (resume: Resume) => void;          // #931: restart a lost mission at the stage it was lost in
   fix: (misses: Miss[]) => void;            // #930: start a "Fix my mistakes" round on this run's own misses
+  deck?: DeckItem[];                        // #1118: Tables Check practice scores its own deck
   practice: boolean;                        // #930: this run IS a fix round — no action offered, "Mistakes fixed!" heading, 0 coins shown
 }
 
@@ -62,7 +64,7 @@ function nextUnstarredTopic(year: YearInfo, topic: Topic | undefined): Topic | n
  * #940, #897), so today it is always `[]` and the overlay renders exactly as it did before this split.
  */
 export function createResultsScreen(deps: ResultsScreenDeps) {
-  const { training, year, topic, av, name, els, hold, later, toast, replay, goHome, cleanup, next, fix, retry, practice } = deps;
+  const { training, year, topic, av, name, els, hold, later, toast, replay, goHome, cleanup, next, fix, retry, practice, deck } = deps;
   return function showResults(r: SessionResult, payout: ResultPayout) {
     // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
     // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
@@ -94,8 +96,8 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     els.overlay.hidden = false;
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
-      headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
-      bestCombo: r.bestCombo, coins: practice ? 0 : r.coins, newBest, streak, dojoRows: dojoSaved ? dojoRowsHTML(dojo!) : '', stickerHTML, cert: !!earned,
+      headline, medal, heading, starCount: r.stars, score: r.score, ...mtcTally(r, deck),
+      bestCombo: r.bestCombo, coins: practice ? 0 : r.coins, newBest, streak, dojoRows: mtcRowsFor(r, deck) + (dojoSaved ? dojoRowsHTML(dojo!) : ''), stickerHTML, cert: !!earned,
       resultLines: resultPillsHTML(lines),
       action: actionButton(action),
     });

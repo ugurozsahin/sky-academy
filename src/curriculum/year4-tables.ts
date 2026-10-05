@@ -19,7 +19,7 @@ function weightedTable(rng: Rng): number {
 
 /** Three product decoys: a neighbouring fact, then one table product sharing the answer's units digit and one its
  *  leading digit (where such products exist), then other table products. Every decoy is a real table product. */
-function productDecoys(t: number, n: number, rng: Rng): number[] {
+export function productDecoys(t: number, n: number, rng: Rng): number[] {
   const answer = t * n;
   const ok = (v: number) => v !== answer && PRODUCTS.includes(v);
   // The neighbouring fact is #1058's neighbourFact rule, kept inside 2–12 (its 12 × 1 would pass for a product).
