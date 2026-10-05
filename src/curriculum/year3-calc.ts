@@ -16,6 +16,7 @@ import { y3Missing } from './year3-missing';
 import { y3StoryAs } from './year3-story-as';
 import type { Difficulty, Generator, Question, Topic } from './types';
 import { ri, pick, shuffle, numQ, q } from './util';
+import { buildQ } from './build';
 
 /** y3-tables (#1087): the 3, 4 and 8 times tables, × and ÷. `table` fixes the table (the 3×/4×/8× drills, #1125). */
 export function y3TablesQ(d: Difficulty, rng: () => number, table?: 3 | 4 | 8): Question {
@@ -44,6 +45,25 @@ export function y3TablesQ(d: Difficulty, rng: () => number, table?: 3 | 4 | 8): 
 }
 export const y3Tables: Generator = (d, rng) => y3TablesQ(d, rng);
 
+/** y3-multiply (#1088): d1 related facts (30 × 4 from 3 × 4), d2 2-digit × 1-digit, d3 builds the same product digit by digit. */
+export const y3Multiply: Generator = (d, rng) => {
+  const m = pick(rng, [2, 3, 4, 5, 8]);
+  if (d === 1) {
+    const tens = ri(rng, 1, 9), f = tens * m, div = rng() < 0.4;
+    const prompt = div ? `${f * 10} ÷ ${m} = ?` : `${tens * 10} × ${m} = ?`, ans = div ? tens * 10 : f * 10;
+    const fact = div ? `${f} ÷ ${m} = ${tens}` : `${tens} × ${m} = ${f}`;
+    const slips = [div ? tens : f, div ? tens * 100 : f * 100, ans + 10, ans - 10, (tens + 1) * (div ? 10 : m * 10), (tens - 1) * (div ? 10 : m * 10)];
+    const say = `${q(fact).say}. So ${q(prompt).say}`;
+    const card = numQ(rng, prompt, ans, { min: 1, max: 100000, distractors: shuffle(rng, slips), visual: { type: 'word', text: fact }, say });
+    return { ...card, options: card.options.map(o => Number(o).toLocaleString('en-GB')) }; // #1047: 1,200 not 1200
+  }
+  const a = ri(rng, 11, 49), p = a * m, prompt = `${a} × ${m} = ?`;
+  if (d === 3) return buildQ(rng, { prompt, say: `${q(prompt).say} Build the answer.`, answer: String(p), total: 6, hint: 'Slice the digits in order' });
+  // #1058: a place slip (±10) shares the units digit; then ones not multiplied, a dropped carry, the neighbouring multipliers
+  const slips = [p + (rng() < 0.5 ? 10 : -10), Math.floor(a / 10) * m * 10 + a % 10, Math.floor(a / 10) * m * 10 + a % 10 * m % 10, a * (m - 1), a * (m + 1)];
+  return numQ(rng, prompt, p, { min: 1, max: 500, distractors: slips, ...q(prompt) });
+};
+
 export const Y3_CALC: Topic[] = [
   { id: 'y3-mental', title: 'Mental Adding and Subtracting', icon: '➕', subject: 'maths', year: 'year3', nc: 'Y3 A&S: 3-digit number and 1s, 10s, 100s mentally (3M7)', gen: y3Mental },
   { id: 'y3-column', title: 'Column Adding and Subtracting', icon: '✏️', subject: 'maths', year: 'year3', nc: 'Y3 A&S: columnar addition and subtraction to 3 digits (3M8)', sequenceFrom: 1, gen: y3Column },
@@ -54,6 +74,6 @@ export const Y3_CALC: Topic[] = [
   // slot: y3-tables-3
   // slot: y3-tables-4
   // slot: y3-tables-8
-  // slot: y3-multiply
+  { id: 'y3-multiply', title: '2-Digit × 1-Digit', icon: '✖️', subject: 'maths', year: 'year3', nc: 'Y3 M&D: 2-digit × 1-digit, related facts (3M12)', sequenceFrom: 3, gen: y3Multiply },
   // slot: y3-story
 ];
