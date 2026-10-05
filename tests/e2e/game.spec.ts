@@ -5489,7 +5489,7 @@ test.describe('number pad (#1073)', () => {
     await expectFitsViewport(page, 'number pad');
     const [pad, card] = await Promise.all([page.locator('#keypad').boundingBox(), page.locator('#qcard').boundingBox()]);
     expect(card!.y + card!.height, 'the pad sits below the question card, no scrolling').toBeLessThanOrEqual(pad!.y);
-    expect(pad!.y + pad!.height).toBeLessThanOrEqual(664);
+    expect(pad!.y + pad!.height, 'the pad ends inside the viewport (664 on the mobile project)').toBeLessThanOrEqual(page.viewportSize()!.height);
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the 390×664 shot the PR shows
   });
 });
