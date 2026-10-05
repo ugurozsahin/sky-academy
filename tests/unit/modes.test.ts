@@ -246,8 +246,9 @@ describe('a new mode cannot fall through to another mode (#1117)', () => {
     expect(play).toContain("else if (o.mode === 'endless') recordEndless(");
   });
   it('every mode names its medal and its result stars', () => {
-    for (const m of ALL) {
+    for (const m of Object.keys(MODES) as Mode[]) {   // every MODES key, so a new mode cannot be skipped
       expect(typeof resultMedal({ mode: m, won: true, score: 0, stars: 1 }), m).toBe('string');
+      expect(resultMedal({ mode: m, won: true, score: 999, stars: 3, incomplete: true }), m).toBe('💪');
       expect(typeof MODES[m].resultStars, m).toBe('boolean');
     }
   });
