@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildQ } from '../../src/curriculum/build';
+import { buildQ, stepsQ } from '../../src/curriculum/build';
 import { fitLabel } from '../../src/game/arena';
+import { Session } from '../../src/game/session';
+import { topicById, YEARS, type Topic } from '../../src/curriculum';
 
 const MINUS = '−';
 const rng = (seed: number) => { let s = seed; return () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff; };
@@ -128,5 +130,44 @@ describe('buildQ — the shared build-the-answer helper for whole numbers, decim
     expect(fitLabel(MINUS, 26, measure)).toBeCloseTo(26 * 1.05);
     expect(fitLabel('.', 26, measure)).toBeGreaterThanOrEqual(27);
     expect(fitLabel(MINUS, 26, measure)).toBeGreaterThanOrEqual(27);
+  });
+});
+
+describe('stepsQ — two-step combo cards (#1067)', () => {
+  const ok = { prompt: '4 bags of 3, then 5 more', steps: [12, 17] as const, decoys: [7, 20] as const, check: ([a]: readonly [number, number]) => [4 * 3, a + 5] as const };
+
+  it('the sequence is the two steps in order and the answer is the filled template', () => {
+    const q = stepsQ(rng(1), ok);
+    expect(q.sequence).toEqual(['12', '17']);
+    expect(q.build!.template).toBe('_ → _');
+    expect(q.answer).toBe('12 → 17');
+    expect(fillTemplate(q.build!.template, q.sequence!)).toBe(q.answer);
+    expect(q.prompt).toBe(ok.prompt);
+  });
+
+  it('launches 4 bubbles every time, none a decoy equal to a step', () => {
+    for (let s = 1; s < 30; s++) {
+      const q = stepsQ(rng(s), ok);
+      expect(q.options).toHaveLength(4);
+      expect([...q.options!].sort()).toEqual(['12', '17', '20', '7'].sort());
+    }
+  });
+
+  it('throws on equal steps, a decoy equal to a step, non-integers and a failing check', () => {
+    expect(() => stepsQ(rng(1), { ...ok, steps: [12, 12], check: () => [12, 12] })).toThrow(/differ/);
+    expect(() => stepsQ(rng(1), { ...ok, decoys: [12, 20] })).toThrow(/distinct/);
+    expect(() => stepsQ(rng(1), { ...ok, decoys: [7.5, 20] })).toThrow(/whole/);
+    expect(() => stepsQ(rng(1), { ...ok, check: () => [12, 18] })).toThrow(/disagree/);
+  });
+
+  it('a Session needs the first step then the answer, in order', () => {
+    const topic: Topic = { ...topicById('r-build')!, id: 'fx-steps', sequenceFrom: 1, gen: (_d, r) => stepsQ(r, ok) };
+    const ev: any = new Proxy({}, { get: () => () => {} });
+    const s = new Session({ mode: 'mission', year: YEARS[0], topic, rng: rng(8) }, ev);
+    s.start();
+    expect(s.current!.options).toHaveLength(4);
+    expect(s.hit('17')).toBe('wrong');
+    s.advance();
+    expect([s.hit('12'), s.hit('17')]).toEqual(['step', 'correct']);
   });
 });
