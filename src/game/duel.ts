@@ -4,6 +4,7 @@ import type { Difficulty, Question, Topic } from '../curriculum';
 import { starsForAccuracy } from './session';
 import { drawFresh } from './repeat-key';
 import { seededRng } from './rng';
+import { answerableBy } from './pools';
 import type { DojoEvent } from './dojo';
 // Type-only, so it erases at compile time and adds no runtime edge — the same shape `game/parents.ts` and
 // `game/sensei.ts` already use to name a stored type without depending on the store.
@@ -203,7 +204,7 @@ export class Duel {
 export const DUEL_POOL_DRAWS = 8;
 export function duelPool(topics: Topic[], difficulty: Difficulty = 1): Topic[] {
   return topics.filter(t => {
-    if (t.input === 'tracing' || (t.sequenceFrom !== undefined && difficulty >= t.sequenceFrom)) return false;
+    if (!answerableBy(t, 'duel', difficulty)) return false;
     try {
       for (let seed = 1; seed <= DUEL_POOL_DRAWS; seed++) t.gen(difficulty, seededRng(seed));
     } catch (e) {

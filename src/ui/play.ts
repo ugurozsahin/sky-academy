@@ -4,7 +4,7 @@ import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
-import type { Tracer } from '../game/tracing';
+import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools';   // #1065: one pool rule
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
 } from '../storage';
@@ -90,7 +90,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
     mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, resume: o.resume, legend: o.legend, slower: d.settings.slow,
-    pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
+    pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => answerableBy(t, 'mixed')) : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
     arena: () => arena,

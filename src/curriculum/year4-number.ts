@@ -52,7 +52,7 @@ function countRun(d: Difficulty, rng: () => number): Question {
 
 /** "1,000 more/less than n": d1 stays within 1,000–9,999, d2 any 4-digit number, d3 crosses ten thousand (9,450 → 10,450). */
 function moreOrLess(d: Difficulty, rng: () => number): Question {
-  const more = d === 3 && rng() < 0.5 ? true : rng() < 0.5;
+  const more = rng() < 0.5;
   const sign = more ? 1 : -1;
   let base: number;
   if (d === 3 && more) base = ri(rng, 9000, 9999);

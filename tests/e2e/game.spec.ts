@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { TOPICS, shownYears, YEARS, type YearInfo } from '../../src/curriculum';
+import { TOPICS, shownYears, STRANDS, YEARS, type Strand, type Topic, type YearInfo } from '../../src/curriculum';
+import { groupTopics, topicsHTML } from '../../src/ui/topic-groups';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
@@ -5431,4 +5432,22 @@ test.describe('hidden KS2 years (preview)', () => {
     await expect.poll(() => answer(page), { message: 'the hook slices the right bubble once it is launched' }).toBe(true);
     await page.waitForFunction(b => { const s = window.__sna.state(); return s.index !== b.index || s.score !== b.score; }, before);
   });
+});
+
+// #1068: a 30+ topic tab is drawn in headed strand sections. The fixture is injected, since no registry tab is long enough yet.
+test('a 37-topic grouped island tab fits a 390×664 phone, headings legible, cards tappable-size', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card');
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await page.click('.island[data-year="year1"]');
+  await expect(page.locator('.island-screen')).toBeVisible();
+  const strands = Object.keys(STRANDS) as Strand[];
+  const topics = Array.from({ length: 37 }, (_, i): Topic => ({ id: `fx${i}`, title: `Topic ${i}`, icon: '⭐', subject: 'maths', year: 'year3', nc: 'nc', strand: strands[i % strands.length], gen: () => { throw new Error('unused'); } }));
+  const html = topicsHTML(groupTopics(topics), {});
+  await page.evaluate(h => { document.querySelector('#topics')!.innerHTML = h; }, html);
+  await expect(page.locator('#topics .section-title')).toHaveCount(strands.length);
+  for (const fs of await page.locator('#topics .section-title').evaluateAll(els => els.map(e => parseFloat(getComputedStyle(e).fontSize)))) expect(fs).toBeGreaterThanOrEqual(13);
+  for (const h of await page.locator('#topics .topic').evaluateAll(els => els.map(e => e.getBoundingClientRect().height))) expect(h).toBeGreaterThanOrEqual(44);
+  await expectFitsViewport(page, 'grouped 37-topic island tab');
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence (#1068)
 });
