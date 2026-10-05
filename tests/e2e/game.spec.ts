@@ -5498,3 +5498,22 @@ test('a 37-topic grouped island tab fits a 390×664 phone, headings legible, car
   await expectFitsViewport(page, 'grouped 37-topic island tab');
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence (#1068)
 });
+
+// #1076: the y3-charts bar chart sits inside the question card on the shortest phones, and every number and label is readable.
+for (const h of [664, 640]) {
+  test(`a 5-bar, step-10 chart with 7-letter labels fits the question card at 390×${h} (#1076)`, async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'the 390px phone card');
+    await page.setViewportSize({ width: 390, height: h });
+    await seedPlayer(page);
+    await startTopic(page, 'year3', 'y3-charts');
+    const html = renderVisual({ type: 'chart', kind: 'bar', step: 10, max: 50, rows: ['cricket', 'running', 'bananas', 'scooter', 'cherry'].map((label, i) => ({ label, n: 10 * (i + 1) })) });
+    await page.evaluate(h2 => { document.querySelector('#vis')!.innerHTML = h2; }, html);
+    const card = (await page.locator('#qcard').boundingBox())!, chart = (await page.locator('#vis svg').boundingBox())!;
+    expect(chart.x).toBeGreaterThanOrEqual(card.x - 1);
+    expect(chart.x + chart.width).toBeLessThanOrEqual(card.x + card.width + 1);
+    expect(chart.y + chart.height).toBeLessThanOrEqual(card.y + card.height + 1);
+    for (const fs of await page.locator('#vis svg text').evaluateAll(els => els.map(e => e.getBoundingClientRect().height))) expect(fs).toBeGreaterThan(0);
+    await expectFitsViewport(page, `y3-charts bar chart at 390×${h}`);
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT.replace('.png', `-${h}.png`) });   // the PR's 390×664 evidence
+  });
+}

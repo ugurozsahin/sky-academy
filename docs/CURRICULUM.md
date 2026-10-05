@@ -175,6 +175,7 @@ Writing:
 - y3-prefix — the eight Year 3–4 prefixes (dis, mis, re, sub, inter, super, anti, auto): which prefix means under (d1, the six with a distinct meaning), which word means appear again (d2, real-word decoys including the bare root), build the word from its prefix and root (d3)
 - y3-suffix — which spelling is right after adding -ly or -ation: plain -ly (d1), the exceptions happily, gently, basically, truly and -ation (d2), every rule in a gapped sentence (d3); the two wrong options are rule-based non-words
 - y3-conjunctions — time, place and cause words (when, before, after, while, so, because · then, next, soon, therefore · before, after, during, in, because of): the one word that fits the gap (d1 conjunctions, 3 bubbles; d2 all three classes, 4 bubbles); d3 mixes in "what is before in this sentence?" (conjunction, preposition or adverb, read from what follows it)
+- y3-charts — read a scaled bar chart (step 2 or 5, every bar on a gridline, d1); more/fewer questions on a bar chart (step 2, 5 or 10) or a pictogram with a key (each 2, 5 or 10, d2); two-step questions ("more … and … together than …", "altogether"), with bars halfway between gridlines, `slow` (d3). Answers are read from the rows' counts; decoys are the gridline count, a neighbouring bar, the wrong operation and one step off
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.

@@ -21,7 +21,7 @@
     "src/ui/play.ts::playScreen": 26,
     "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,
-    "src/ui/visuals.ts::renderVisual": 27,
+    "src/ui/visuals.ts::renderVisual": 23,
     "tests/unit/curriculum.test.ts::(anonymous)": 28,
     "tests/unit/guardrails.test.ts::(anonymous)": 34
   },

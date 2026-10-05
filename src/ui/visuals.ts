@@ -2,6 +2,7 @@
 import type { Visual } from '../curriculum';
 import { coinLabel, NOTES, isNote } from '../curriculum/util';
 import { esc } from './dom';
+import { barChartSVG } from './vis-axis-chart';
 import { geometrySVG } from './vis-geometry';
 
 /** `n` objects in rows of five; slots past `keep` are crossed out ("take away"); at least one full row of slots is always shown. */
@@ -57,15 +58,17 @@ function fractionHTML(v: Extract<Visual, { type: 'fraction' }>): string {
   }
   return `<div class="vis"><div class="bar">${Array.from({ length: parts }, (_, i) => `<i class="${i < shaded ? 'sh' : ''}"></i>`).join('')}</div></div>`;
 }
+/** Objects in five-frames; two groups with a plus or "or", or a take-away with the last |n2| crossed out. */
+function objectsHTML(v: Extract<Visual, { type: 'objects' }>): string {
+  // Objects sit in five-frames (rows of 5 slots, empty slots drawn faintly) so a child can count in fives (#54).
+  if (v.n2 === undefined) return `<div class="vis objs">${fiveFrames(v.n, v.emoji)}</div>`;
+  if (v.n2 < 0) return `<div class="vis objs">${fiveFrames(v.n, v.emoji, v.n + v.n2)}</div>`;   // take away: cross out |n2| objects
+  return `<div class="vis objs two"><div class="grp">${fiveFrames(v.n, v.emoji)}</div><div class="plus">${v.emoji2 && v.emoji2 !== v.emoji ? 'or' : '+'}</div><div class="grp">${fiveFrames(v.n2, v.emoji2 ?? v.emoji)}</div></div>`;
+}
 export function renderVisual(v: Visual | undefined): string {
   if (!v) return '';
   switch (v.type) {
-    case 'objects': {
-      // Objects sit in five-frames (rows of 5 slots, empty slots drawn faintly) so a child can count in fives (#54).
-      if (v.n2 === undefined) return `<div class="vis objs">${fiveFrames(v.n, v.emoji)}</div>`;
-      if (v.n2 < 0) return `<div class="vis objs">${fiveFrames(v.n, v.emoji, v.n + v.n2)}</div>`;   // take away: cross out |n2| objects
-      return `<div class="vis objs two"><div class="grp">${fiveFrames(v.n, v.emoji)}</div><div class="plus">${v.emoji2 && v.emoji2 !== v.emoji ? 'or' : '+'}</div><div class="grp">${fiveFrames(v.n2, v.emoji2 ?? v.emoji)}</div></div>`;
-    }
+    case 'objects': return objectsHTML(v);
     case 'tenframe': {
       const total = v.n + (v.n2 ?? 0);
       const frames = Math.max(1, Math.ceil(Math.max(total, 1) / 10));
@@ -92,7 +95,7 @@ export function renderVisual(v: Visual | undefined): string {
       const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
       return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
     }
-    case 'chart': return chartHTML(v);
+    case 'chart': return v.kind === 'bar' ? barChartSVG(v) : chartHTML(v);   // the bar chart is its own module (#1076); tally, block and pictogram output is unchanged
     case 'symmetry': return symmetryHtml(v);
     case 'geometry': return geometrySVG(v);
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
@@ -101,8 +104,8 @@ export function renderVisual(v: Visual | undefined): string {
   }
 }
 
-/** A tally, block diagram or pictogram (Y2 statistics): `Visual` is a public type, so the drawing defends itself against a row or key it cannot show truthfully. */
-function chartHTML(v: Extract<Visual, { type: 'chart' }>): string {
+/** Tally, block diagram and pictogram (Y2, #8) — the bar chart is `vis-axis-chart.ts`'s. */
+function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' }>): string {
   // `Visual` is a public type and `each` is an unconstrained number on it, so the drawing defends itself:
   // a key that is zero, negative, fractional or does not divide the row draws one symbol per child rather
   // than rounding to a count the data does not have. A picture that lies is worse here than a plain one,
