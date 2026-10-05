@@ -5429,10 +5429,10 @@ test('a 37-topic grouped island tab fits a 390×664 phone, headings legible, car
   await page.click('.island[data-year="year1"]');
   await expect(page.locator('.island-screen')).toBeVisible();
   const strands = Object.keys(STRANDS) as Strand[];
-  const topics = Array.from({ length: 37 }, (_, i): Topic => ({ id: `fx${i}`, title: `Topic ${i}`, icon: '⭐', subject: 'maths', year: 'year3', nc: 'nc', strand: strands[i % 8], gen: () => { throw new Error('unused'); } }));
+  const topics = Array.from({ length: 37 }, (_, i): Topic => ({ id: `fx${i}`, title: `Topic ${i}`, icon: '⭐', subject: 'maths', year: 'year3', nc: 'nc', strand: strands[i % strands.length], gen: () => { throw new Error('unused'); } }));
   const html = topicsHTML(groupTopics(topics), {});
   await page.evaluate(h => { document.querySelector('#topics')!.innerHTML = h; }, html);
-  await expect(page.locator('#topics .section-title')).toHaveCount(8);
+  await expect(page.locator('#topics .section-title')).toHaveCount(strands.length);
   for (const fs of await page.locator('#topics .section-title').evaluateAll(els => els.map(e => parseFloat(getComputedStyle(e).fontSize)))) expect(fs).toBeGreaterThanOrEqual(13);
   for (const h of await page.locator('#topics .topic').evaluateAll(els => els.map(e => e.getBoundingClientRect().height))) expect(h).toBeGreaterThanOrEqual(44);
   await expectFitsViewport(page, 'grouped 37-topic island tab');

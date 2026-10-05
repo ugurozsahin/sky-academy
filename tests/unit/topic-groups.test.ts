@@ -15,6 +15,9 @@ describe('groupTopics', () => {
     for (const s of sections) expect(s.topics.map(t => +t.id.slice(1))).toEqual([...s.topics.map(t => +t.id.slice(1))].sort((a, b) => a - b));
     expect(sections.flatMap(s => s.topics).length).toBe(37);
   });
+  it('groups at exactly GROUP_AT topics', () => {
+    expect(groupTopics(fixture(GROUP_AT)).every(s => s.strand)).toBe(true);
+  });
   it('gives one unheaded section under the threshold or when any topic lacks a strand', () => {
     const short = fixture(GROUP_AT - 1);
     expect(groupTopics(short)).toEqual([{ topics: short }]);
@@ -36,6 +39,13 @@ describe('topicsHTML', () => {
     const ids = [...html.matchAll(/class="topic" data-id="([^"]+)" data-subject="maths"/g)].map(m => m[1]);
     expect(ids.sort()).toEqual(list.map(t => t.id).sort());
     expect(html.match(/<h3 class="section-title" style="grid-column:1\/-1">/g)?.length).toBe(groupTopics(list).length);
+  });
+  it('draws stars, the crown and the tracing pill from progress', () => {
+    const list = [fake(1), { ...fake(2), input: 'tracing' as const }];
+    const html = topicsHTML([{ topics: list }], { t1: { stars: 2, crown: true } as never });
+    expect(html).toContain('2 of 3 stars');
+    expect(html).toContain('👑');
+    expect(html).toContain('tracing');
   });
   it('never says coming soon, placeholder or temporary', () => {
     expect(topicsHTML(groupTopics(fixture(37)), {})).not.toMatch(/coming soon|placeholder|temporary/i);
