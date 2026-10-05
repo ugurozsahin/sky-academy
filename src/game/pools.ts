@@ -4,9 +4,11 @@ import type { Difficulty, Topic } from '../curriculum';
 
 export type Surface = 'mission' | 'mixed' | 'duel';
 
-/** `d` only matters for `duel`: a build or spelling sequence has no "first correct slice" from `sequenceFrom` up. */
+/** `d` only matters for `duel`: a build or spelling sequence has no "first correct slice" from `sequenceFrom` up,
+ *  and a sequence topic asked about without a difficulty is out (fail closed). `mixed` never reads `sequenceFrom`
+ *  on purpose: a Session can ask sequence questions, only a two-player duel cannot. */
 export function answerableBy(topic: Topic, surface: Surface, d?: Difficulty): boolean {
   if (surface === 'mission') return true;
   if (topic.input === 'tracing' || topic.input === 'keypad') return false;
-  return surface !== 'duel' || topic.sequenceFrom === undefined || d === undefined || d < topic.sequenceFrom;
+  return surface !== 'duel' || topic.sequenceFrom === undefined || (d !== undefined && d < topic.sequenceFrom);
 }
