@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
-import { TABLE_WEIGHTS } from '../../src/curriculum/year4-tables';
 import { leakShares } from './helpers/decoy-leak';
 
 function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
+
+/** STA Multiplication Tables Check, assessment framework §5.2.1 Table 1 (maximum items per table), hard-coded as the oracle. */
+const STA_TABLE_1: Record<number, number> = { 2: 2, 3: 3, 4: 3, 5: 3, 6: 4, 7: 4, 8: 4, 9: 4, 10: 2, 11: 3, 12: 4 };
+const PRODUCTS = new Set(Array.from({ length: 11 }, (_, i) => i + 2).flatMap(a => Array.from({ length: 11 }, (_, j) => a * (j + 2))));
 
 const topic = TOPICS.find(t => t.id === 'y4-tables')!;
 const draws = (d: Difficulty, seed: number, n = 400) => { const r = rng(seed + d); return Array.from({ length: n }, () => topic.gen(d, r)); };
@@ -57,11 +60,11 @@ describe('y4-tables (#1070)', () => {
   });
 
   it('d3 table frequencies sit within ±2 points of the STA Table 1 weights', () => {
-    const total = Object.values(TABLE_WEIGHTS).reduce((a, b) => a + b, 0);
+    const total = Object.values(STA_TABLE_1).reduce((a, b) => a + b, 0);
     const counts: Record<number, number> = {};
     const all = draws(3, 1070_400, 10000);
     for (const c of all) { const { t } = parse(c.prompt); counts[t] = (counts[t] ?? 0) + 1; }
-    for (const [t, w] of Object.entries(TABLE_WEIGHTS)) {
+    for (const [t, w] of Object.entries(STA_TABLE_1)) {
       expect(Math.abs((counts[Number(t)] ?? 0) / all.length - w / total) * 100, `table ${t}`).toBeLessThan(2);
     }
   });
@@ -75,6 +78,29 @@ describe('y4-tables (#1070)', () => {
       const legal = pairs.map(([x, y]) => x * y).filter(v => v !== p.answer);
       expect(c.options.some(o => legal.includes(Number(o))), c.prompt).toBe(true);
     }
+  });
+
+  it('every product option is a real 2–12 table product', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d, 1070_600)) {
+      if (parse(c.prompt).form !== 'mul') continue;
+      for (const o of c.options) expect(PRODUCTS.has(Number(o)), `${c.prompt} → ${o}`).toBe(true);
+    }
+  });
+
+  it('division and missing-factor cards keep every option in 2–12 and offer x±1 and the other factor', () => {
+    let checked = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d, 1070_700, 600)) {
+      const p = parse(c.prompt);
+      if (p.form === 'mul') continue;
+      const other = p.form === 'div' ? p.t : p.n;
+      const wanted = [...new Set([p.answer - 1, p.answer + 1, other])].filter(v => v >= 2 && v <= 12 && v !== p.answer);
+      const opts = c.options.map(Number);
+      for (const o of opts) expect(o >= 2 && o <= 12, `${c.prompt} → ${o}`).toBe(true);
+      // Three decoys: the wanted ones come first, so min(3, wanted) of them must be on offer.
+      expect(wanted.filter(v => opts.includes(v)).length, c.prompt).toBe(wanted.length);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(300);
   });
 
   it('≤30% of product cards of 20 or more have a unique units or leading digit', () => {
