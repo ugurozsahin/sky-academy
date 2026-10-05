@@ -5457,6 +5457,7 @@ test.describe('number pad (#1073)', () => {
     expect(pad!.y + pad!.height).toBeLessThanOrEqual(664);
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the 390×664 shot the PR shows
   });
+});
 
 // #1068: a 30+ topic tab is drawn in headed strand sections. The fixture is injected, since no registry tab is long enough yet.
 test('a 37-topic grouped island tab fits a 390×664 phone, headings legible, cards tappable-size', async ({ page }, info) => {
