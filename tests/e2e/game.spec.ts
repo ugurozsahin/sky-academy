@@ -11,6 +11,7 @@ import { seededRng } from '../../src/game/rng';
 import { renderVisual } from '../../src/ui/visuals';
 import { CARD_TEXT_WIDTH_390, PROMPT_FS_PHONE, PROMPT_FS_SHORT, promptLines } from '../unit/helpers/card-budget';
 import { COMPACT_VARS, islandsHTML, mapLayout } from '../../src/ui/map-layout';
+import { keypadHTML } from '../../src/ui/keypad';
 /** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
 const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
@@ -5430,5 +5431,29 @@ test.describe('hidden KS2 years (preview)', () => {
     const before = await page.evaluate(() => window.__sna.state());
     await expect.poll(() => answer(page), { message: 'the hook slices the right bubble once it is launched' }).toBe(true);
     await page.waitForFunction(b => { const s = window.__sna.state(); return s.index !== b.index || s.score !== b.score; }, before);
+  });
+});
+
+// The on-screen number pad (#1073): the module's own markup, injected into the play screen's input region.
+test.describe('number pad (#1073)', () => {
+  test('every key is a 44 px target, readable, and the pad fits the phone', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', TOPICS.find(t => t.year === 'reception')!.id);
+    await page.evaluate(html => { document.body.insertAdjacentHTML('beforeend', `<div id="keypad" style="position:fixed;left:0;right:0;bottom:0;padding:8px 16px;z-index:50">${html}</div>`); },
+      keypadHTML({ decimal: true, minus: true }));
+    const keys = page.locator('#keypad [data-key]');
+    expect(await keys.count()).toBe(14);
+    for (const k of await keys.all()) {
+      const box = (await k.boundingBox())!;
+      expect(box.width, await k.innerText()).toBeGreaterThanOrEqual(44);
+      expect(box.height, await k.innerText()).toBeGreaterThanOrEqual(44);
+      expect(await k.evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(13);
+    }
+    await expect(page.locator('#keypad .keypad-out')).toBeVisible();
+    await expectFitsViewport(page, 'number pad');
+    const [pad, card] = await Promise.all([page.locator('#keypad').boundingBox(), page.locator('#qcard').boundingBox()]);
+    expect(card!.y + card!.height, 'the pad sits below the question card, no scrolling').toBeLessThanOrEqual(pad!.y);
+    expect(pad!.y + pad!.height).toBeLessThanOrEqual(664);
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the 390×664 shot the PR shows
   });
 });
