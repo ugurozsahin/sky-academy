@@ -6,18 +6,18 @@ import { ri, shuffle } from './util';
 import { equal, type Frac } from './fractions';
 import { ks2Say } from './ks2say';
 
-const lab = (f: Frac) => (f.n === f.d ? '1' : `${f.n}/${f.d}`);
+const lab = (fr: Frac) => (fr.n === fr.d ? '1' : `${fr.n}/${fr.d}`);
 const f = (n: number, d: number): Frac => ({ n, d });
 const say = (n: number, d: number) => ks2Say(`${n}/${d}`);
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
-/** Three decoys: add the bottoms too, the other operation, a top one out, then any fraction on the same bottom, then on another. None is worth the answer or each other. */
+/** Three decoys: add the bottoms too, the other operation, a top one out, then any fraction on the same bottom, then on another. All are proper fractions (n < d, so never a whole or above), and none is worth the answer or each other. */
 function decoys(ans: Frac, d: number, tb: Frac, other: Frac, rng: Rng): string[] {
   const pool: Frac[] = [tb, other, f(ans.n + 1, d), f(ans.n - 1, d)];
   for (let i = 0; i < 8; i++) pool.push(f(ri(rng, 1, d - 1), d));
   for (let i = 0; i < 12; i++) { const e = ri(rng, 3, 10); pool.push(f(ri(rng, 1, e - 1), e)); } // few on a small bottom: borrow another
   const out: Frac[] = [];
-  for (const c of pool) if (c.n >= 1 && c.d >= 2 && !equal(c, ans) && !out.some(o => equal(o, c))) out.push(c);
+  for (const c of pool) if (c.n >= 1 && c.n < c.d && !equal(c, ans) && !out.some(o => equal(o, c))) out.push(c);
   return out.slice(0, 3).map(lab);
 }
 
@@ -42,10 +42,10 @@ function missing(rng: Rng): Question {
   if (rng() < 0.5) {
     const c = ri(rng, 2, d), a = ri(rng, 1, c - 1), ans = f(c - a, d);
     return card(`${a}/${d} + ? = ${lab(f(c, d))}`, `${cap(say(a, d))} plus what equals ${c === d ? 'one whole' : say(c, d)}?`, ans,
-      decoys(ans, d, f(c, d - a), f(a + c > d ? c : a + c, d), rng), rng);
+      decoys(ans, d, f(c, d + a), f(a + c > d ? c : a + c, d), rng), rng);
   }
   const a = ri(rng, 1, d - 2), c = ri(rng, 1, d - a), ans = f(a + c, d);
-  return card(`? − ${a}/${d} = ${c}/${d}`, `What minus ${say(a, d)} equals ${say(c, d)}?`, ans, decoys(ans, d, f(c, d - a), f(Math.abs(c - a) || c + 1, d), rng), rng);
+  return card(`? − ${a}/${d} = ${c}/${d}`, `What minus ${say(a, d)} equals ${say(c, d)}?`, ans, decoys(ans, d, f(c, d + a), f(Math.abs(c - a) || c + 1, d), rng), rng);
 }
 
 /** d3: two parts that make exactly one whole, answer `1`. */

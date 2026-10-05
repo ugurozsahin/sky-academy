@@ -51,10 +51,46 @@ describe('y3-fracadd (#1095)', () => {
     }
   });
 
-  it('every addition card carries the added-bottoms decoy', () => {
+  it('every option is a proper fraction, or the answer 1: n < d, never a whole or above except the answer', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d)) for (const o of c.options) {
+      const v = val(o);
+      if (o === c.answer) expect(v.n, c.prompt).toBeLessThanOrEqual(v.d);
+      else { expect(v.d, `${c.prompt} ${c.options}`).toBeGreaterThan(1); expect(v.n, `${c.prompt} ${c.options}`).toBeLessThan(v.d); }
+    }
+  });
+
+  it('every card carries the added-bottoms decoy', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d)) {
-      const m = c.prompt.match(new RegExp(`^${F} \\+ ${F} = \\?$`));
-      if (m) expect(c.options, c.prompt).toContain(`${Number(m[1]) + Number(m[3])}/${Number(m[2]) * 2}`);
+      const sum = c.prompt.match(new RegExp(`^${F} [+−] ${F} = \\?$`));       // a/d ± b/d: the answer's top over 2d (d over 2d for a whole)
+      const gap = c.prompt.match(new RegExp(`^${F} \\+ \\? = (\\d+)(?:\\/\\d+)?$`)); // a/d + ? = c/d: c over d + a
+      const gap2 = c.prompt.match(new RegExp(`^\\? − ${F} = ${F}$`));          // ? − a/d = c/d: c over d + a
+      let want: string;
+      if (sum) want = `${c.answer === '1' ? sum[2] : val(c.answer).n}/${Number(sum[2]) * 2}`;
+      else if (gap) want = `${c.prompt.endsWith('= 1') ? gap[2] : gap[3]}/${Number(gap[2]) + Number(gap[1])}`;
+      else want = `${gap2![3]}/${Number(gap2![2]) + Number(gap2![1])}`;
+      expect(c.options, c.prompt).toContain(want);
+    }
+  });
+
+  it('all four card kinds appear, d1 stays on bottoms 3–8, d2 adds and subtracts', () => {
+    for (const c of draws(1)) expect(Number(c.prompt.match(/\/(\d+)/)![1]), c.prompt).toBeLessThanOrEqual(8);
+    const kinds = (d: Difficulty) => new Set(draws(d).map(c => /\? −/.test(c.prompt) ? 'minus-missing' : /\+ \?/.test(c.prompt) ? 'plus-missing' : / − /.test(c.prompt) ? 'sub' : 'add'));
+    expect(kinds(2)).toEqual(new Set(['add', 'sub']));
+    expect(kinds(3)).toEqual(new Set(['add', 'sub', 'plus-missing', 'minus-missing']));
+  });
+
+  it('the level bands hold: d2 bottoms 3–10, d3 bottoms 4–10, and a missing-part sum to one whole appears', () => {
+    const bottom = (c: Question) => Number(c.prompt.match(/\/(\d+)/)![1]);
+    for (const c of draws(2)) { expect(bottom(c), c.prompt).toBeGreaterThanOrEqual(3); expect(bottom(c), c.prompt).toBeLessThanOrEqual(10); }
+    for (const c of draws(3)) expect(bottom(c), c.prompt).toBeGreaterThanOrEqual(3);
+    expect(draws(3).some(c => /\+ \? = 1$/.test(c.prompt))).toBe(true);
+  });
+
+  it('the say matches the operator: plus, take away, minus', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d)) {
+      if (/\? −/.test(c.prompt)) expect(c.say, c.prompt).toMatch(/^What minus /);
+      else if (/ − /.test(c.prompt)) expect(c.say, c.prompt).toMatch(/ take away /);
+      else expect(c.say, c.prompt).toMatch(/ plus /);
     }
   });
 
