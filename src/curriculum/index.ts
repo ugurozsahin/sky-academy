@@ -9,6 +9,7 @@ import { YEARS, type Topic, type YearId, type YearInfo } from './types';
 export * from './types';
 export * from './key-stage';
 export * from './shown';
+export * from './strands';
 export const TOPICS: Topic[] = [...RECEPTION_TOPICS, ...YEAR1_TOPICS, ...YEAR2_TOPICS, ...YEAR3_TOPICS];
 /** The registry minus drill topics (#915): what every star total, pool and unlock reads. `TOPICS` stays whole so `topicById` finds a drill. */
 export const CORE_TOPICS: Topic[] = TOPICS.filter(t => !t.drill);
