@@ -5,9 +5,9 @@ import { esc } from './dom';
 
 type BarChart = Extract<Visual, { type: 'chart'; kind: 'bar' }>;
 
-/** The SVG's own coordinates. `w` is the narrowest the chart is drawn (240px), so 1 unit is at least 1px. */
+/** The SVG's own coordinates, drawn 1 unit = 1px at 240px wide: 150px tall keeps it inside Ninja Duel's 160px visual budget (and its 100px one under the sideways zoom of 0.62). */
 export interface AxisFrame { w: number; h: number; left: number; right: number; top: number; bottom: number }
-export const AXIS_FRAME: AxisFrame = { w: 240, h: 166, left: 28, right: 6, top: 10, bottom: 26 };
+export const AXIS_FRAME: AxisFrame = { w: 240, h: 150, left: 28, right: 6, top: 10, bottom: 26 };
 /** Axis numbers and category labels: the bubbles' readable floor (`LABEL_READABLE_FS`, 13px). */
 export const AXIS_FS = 13;
 
@@ -48,5 +48,5 @@ export function barChartSVG(v: BarChart): string {
     return `<rect x="${r2(cx - bw / 2)}" y="${top}" width="${bw}" height="${r2(base - top)}" rx="2" fill="var(--accent-2)"/>`
       + `<text x="${cx}" y="${r2(base + AXIS_FS + 4 + (i % 2 ? drop : 0))}" text-anchor="middle" font-size="${AXIS_FS}" font-weight="700" fill="var(--text)">${esc(r.label)}</text>`;
   }).join('');
-  return `<div class="vis"><svg viewBox="0 0 ${f.w} ${f.h + drop}" role="img" aria-label="Bar chart" style="width:clamp(240px,72vw,320px);height:auto;display:block;overflow:visible">${axisSVG(f, max, step)}${bars}</svg></div>`;
+  return `<div class="vis"><svg viewBox="0 0 ${f.w} ${f.h + drop}" role="img" aria-label="Bar chart" style="width:240px;max-width:100%;height:auto;display:block;overflow:visible">${axisSVG(f, max, step)}${bars}</svg></div>`;
 }

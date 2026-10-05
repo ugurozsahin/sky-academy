@@ -39,7 +39,7 @@ function plan(d: Difficulty, rng: Rng): Plan {
   const cats = shuffle(rng, [...pick(rng, THEMES)]).slice(0, d === 1 ? ri(rng, 3, 4) : ri(rng, 3, 5));
   const pictogram = d >= 2 && rng() < (d === 2 ? 0.4 : 0.25);
   const step = stepFor(d, pictogram, rng), ask = askFor(d, rng);
-  const top = pictogram ? 6 : Math.min(10, Math.floor(80 / step));
+  const top = pictogram ? 6 : Math.min(8, Math.floor(80 / step));
   // d3 bars may sit halfway between two gridlines (an odd count on a step of 2, a multiple of 5 on a step of 10).
   const half = d === 3 && !pictogram;
   const roll = () => cats.map(() => ri(rng, 1, top - 1) * step + (half && rng() < 0.5 ? step / 2 : 0));
