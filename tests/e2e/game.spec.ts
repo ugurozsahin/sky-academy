@@ -2135,6 +2135,28 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'four-bar fraction stack');
   });
 
+  test('y3-angles: a four-line geometry drawing sits inside the question card on a short phone (#1075)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year3', 'y3-angles');
+    // The first card may be a text-only d1 turn fact, so inject the app's own renderVisual output for a fixed d3 fixture.
+    const html = renderVisual({ type: 'geometry', parts: [
+      { kind: 'segment', a: [4, 32], b: [30, 32], label: 'A' }, { kind: 'segment', a: [43, 19], b: [57, 45], label: 'B' },
+      { kind: 'segment', a: [70, 45], b: [70, 19], label: 'C' }, { kind: 'segment', a: [78, 40], b: [96, 24], label: 'D' },
+    ] });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await expect(page.locator('#vis svg.geo')).toBeVisible();
+    for (const height of [664, 640]) {
+      await page.setViewportSize({ width: 390, height });
+      const [card, art] = await Promise.all([page.locator('.qcard').boundingBox(), page.locator('#vis svg.geo').boundingBox()]);
+      expect(art!.y, `drawing top inside the card at 390×${height}`).toBeGreaterThanOrEqual(card!.y - 1);
+      expect(art!.y + art!.height, `drawing bottom inside the card at 390×${height}`).toBeLessThanOrEqual(card!.y + card!.height + 1);
+      expect(art!.x).toBeGreaterThanOrEqual(card!.x - 1);
+      expect(art!.x + art!.width).toBeLessThanOrEqual(card!.x + card!.width + 1);
+      await expectFitsViewport(page, `geometry drawing at 390×${height}`);
+    }
+  });
+
   // #65, one test per topic rather than one walk through all of them: the walk ran to ~60 s on a loaded desktop
   // runner and was reported as "page.goto hangs" — the test budget expiring mid-navigation, not a wedged page.
   test('no voice: Sound Hunt prints its keywords, mid-wave and without a pause, and stays answerable (#65)', async ({ page }) => {

@@ -45,6 +45,7 @@ const VISUAL_QUESTION = {
   coins: (v: Extract<Visual, { type: 'coins' }>) => [...new Set(v.coins)].sort((a, b) => a - b).join('/'),
   numberline: (v: Extract<Visual, { type: 'numberline' }>) => `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}${numberlineText(v)}`,
   fraction: (v: Extract<Visual, { type: 'fraction' }>) => (v.stack ? v.stack.map(b => `${b.parts}:${b.shaded}`).join('/') : ''),
+  geometry: (v: Extract<Visual, { type: 'geometry' }>) => v.parts.map(p => p.kind === 'angle' ? `a${p.dir}:${p.deg}` : `s${p.a}-${p.b}`).join('/'),
   chart: (v: Extract<Visual, { type: 'chart' }>) => `${v.kind}/${v.rows.map(r => r.n).join(',')}`,
 } satisfies Partial<{ [T in Visual['type']]: (v: Extract<Visual, { type: T }>) => string }>;
 const visualKey = (v: Visual): string => {

@@ -5,6 +5,17 @@ export type Rng = () => number; // [0,1)
 /** One category of a chart visual: its label (emoji + name) and the count it stands for. */
 export interface ChartRow { label: string; n: number }
 
+/**
+ * One drawn thing in a `geometry` visual (#1075). Coordinates are in a 100 × 70 viewBox, y down; `dir` is
+ * degrees anticlockwise from the right, as in school maths, so `dir: 90` points up the page.
+ * - `angle`: two rays from `at`, the first at `dir`° and the second at `dir + deg`°; `deg` 90 draws the square mark.
+ * - `segment`: a straight line from `a` to `b`, with `ticks` small cross marks at its middle.
+ * `label` is printed near the part, or at `labelAt` when a pair of parts shares one letter.
+ */
+export type GeoPart =
+  | { kind: 'angle'; at: [number, number]; dir: number; deg: number; label?: string }
+  | { kind: 'segment'; a: [number, number]; b: [number, number]; ticks?: 1 | 2 | 3; label?: string; labelAt?: [number, number] };
+
 export type Visual =
   | { type: 'objects'; emoji: string; n: number; n2?: number; emoji2?: string } // groups of objects
   | { type: 'tenframe'; n: number; n2?: number }         // ten-frame with n filled (n2 = second colour)
@@ -29,6 +40,8 @@ export type Visual =
   // `mirror: false` omits the fold line (area, perimeter, nets); `h` is a half square, `A`–`D` a lettered
   // empty square (at most 7 columns) — #1062.
   | { type: 'symmetry'; grid: string[]; mirror?: false }
+  // Angles and lines drawn exactly to their data (Y3 geometry, #1075): a placeholder look, final art is #1305.
+  | { type: 'geometry'; parts: GeoPart[] }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string }                   // sentence with a blank "_" (writing — English text)
   // a repeating-pattern glyph strip with a blank "_" (y2-patterns): not language, so the drawing keeps it on

@@ -2,6 +2,7 @@
 import type { Visual } from '../curriculum';
 import { coinLabel, NOTES, isNote } from '../curriculum/util';
 import { esc } from './dom';
+import { geometrySVG } from './vis-geometry';
 
 /** `n` objects in rows of five; slots past `keep` are crossed out ("take away"); at least one full row of slots is always shown. */
 export function fiveFrames(n: number, emoji: string, keep = n): string {
@@ -91,54 +92,58 @@ export function renderVisual(v: Visual | undefined): string {
       const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
       return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
     }
-    case 'chart': {
-      // `Visual` is a public type and `each` is an unconstrained number on it, so the drawing defends itself:
-      // a key that is zero, negative, fractional or does not divide the row draws one symbol per child rather
-      // than rounding to a count the data does not have. A picture that lies is worse here than a plain one,
-      // and `each: 0` used to throw `RangeError` out of `renderVisual` — uncaught in `play-session.ts`'s
-      // `show()`, which would abort before `spawnWave` and leave a question card with no bubbles (#8 review).
-      //
-      // #137 item 2: `n` is just as unconstrained on the same public type, reached the same way, and used to
-      // throw (`n: -3`, invalid array/repeat length), hang forever (`n: Infinity`, `Math.floor(Infinity/5)`
-      // never terminates the tally loop) or exhaust the heap (`n: 1e9`). A row outside a sane range renders as
-      // an empty one instead — real generator output never exceeds 30 (a d2 pictogram, 6 icons * each 5), so
-      // the cap below leaves a wide margin without allowing unbounded allocation from a malformed `Visual`.
-      const CHART_ROW_CAP = 200;
-      const rows = v.rows.map(r => {
-        const safe = Number.isInteger(r.n) && r.n >= 0 && r.n <= CHART_ROW_CAP ? r.n : 0;
-        if (safe !== r.n) console.warn(`chart visual: row "${r.label}" had an invalid count (${r.n}) — rendered as 0`);
-        return safe === r.n ? r : { ...r, n: safe };
-      });
-      // Only a pictogram has a key or a symbol (#133): the type says so now, so a tally or a block diagram is
-      // drawn with neither rather than with a placeholder value nothing reads. The defence below stays —
-      // `each` is still an unconstrained `number` on the pictogram variant, and a corrupted blob can miss it.
-      const pict = v.kind === 'pictogram' ? v : undefined;
-      const wanted = pict?.each ?? 1;
-      const usable = Number.isInteger(wanted) && wanted > 0 && rows.every(r => r.n % wanted === 0);
-      // #137 item 5: the demotion below (key silently becomes 1, so a d2 pictogram draws one symbol per
-      // child) is the right call — refusing loudly mid-mission would be worse than a coarser-but-honest
-      // picture — but it used to leave no trace anywhere. Name the rows that forced it.
-      if (pict && wanted !== 1 && !usable) {
-        console.warn(`chart visual: key ${wanted} does not divide every row's count — demoted to 1, no key shown`);
-      }
-      const each = usable ? wanted : 1;
-      // #137 item 4: `icon` reaches this template exactly as `label` does (both are unconstrained strings on
-      // a public `Visual`), but only `label` was escaped — `icon` and `v.kind` (interpolated raw into a class
-      // attribute) were not. `PICTO_SYMBOL` is the only `icon` any producer supplies today, so this was never
-      // a live injection, but the review that found it called it the trap: a test naming the one field that
-      // is escaped reads as proof the row is safe, when its neighbour is not.
-      const icon = esc(pict?.icon ?? '⭐');
-      const kind = esc(v.kind);
-      const body = rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
-      // The key is the whole point of a pictogram — without it the picture is a different number from the data.
-      const key = pict && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
-      return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;
-    }
+    case 'chart': return chartHTML(v);
     case 'symmetry': return symmetryHtml(v);
+    case 'geometry': return geometrySVG(v);
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>').replace(/\n/g, '<br>')}</div>`;
     case 'strip': return `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }
+}
+
+/** A tally, block diagram or pictogram (Y2 statistics): `Visual` is a public type, so the drawing defends itself against a row or key it cannot show truthfully. */
+function chartHTML(v: Extract<Visual, { type: 'chart' }>): string {
+  // `Visual` is a public type and `each` is an unconstrained number on it, so the drawing defends itself:
+  // a key that is zero, negative, fractional or does not divide the row draws one symbol per child rather
+  // than rounding to a count the data does not have. A picture that lies is worse here than a plain one,
+  // and `each: 0` used to throw `RangeError` out of `renderVisual` — uncaught in `play-session.ts`'s
+  // `show()`, which would abort before `spawnWave` and leave a question card with no bubbles (#8 review).
+  //
+  // #137 item 2: `n` is just as unconstrained on the same public type, reached the same way, and used to
+  // throw (`n: -3`, invalid array/repeat length), hang forever (`n: Infinity`, `Math.floor(Infinity/5)`
+  // never terminates the tally loop) or exhaust the heap (`n: 1e9`). A row outside a sane range renders as
+  // an empty one instead — real generator output never exceeds 30 (a d2 pictogram, 6 icons * each 5), so
+  // the cap below leaves a wide margin without allowing unbounded allocation from a malformed `Visual`.
+  const CHART_ROW_CAP = 200;
+  const rows = v.rows.map(r => {
+    const safe = Number.isInteger(r.n) && r.n >= 0 && r.n <= CHART_ROW_CAP ? r.n : 0;
+    if (safe !== r.n) console.warn(`chart visual: row "${r.label}" had an invalid count (${r.n}) — rendered as 0`);
+    return safe === r.n ? r : { ...r, n: safe };
+  });
+  // Only a pictogram has a key or a symbol (#133): the type says so now, so a tally or a block diagram is
+  // drawn with neither rather than with a placeholder value nothing reads. The defence below stays —
+  // `each` is still an unconstrained `number` on the pictogram variant, and a corrupted blob can miss it.
+  const pict = v.kind === 'pictogram' ? v : undefined;
+  const wanted = pict?.each ?? 1;
+  const usable = Number.isInteger(wanted) && wanted > 0 && rows.every(r => r.n % wanted === 0);
+  // #137 item 5: the demotion below (key silently becomes 1, so a d2 pictogram draws one symbol per
+  // child) is the right call — refusing loudly mid-mission would be worse than a coarser-but-honest
+  // picture — but it used to leave no trace anywhere. Name the rows that forced it.
+  if (pict && wanted !== 1 && !usable) {
+    console.warn(`chart visual: key ${wanted} does not divide every row's count — demoted to 1, no key shown`);
+  }
+  const each = usable ? wanted : 1;
+  // #137 item 4: `icon` reaches this template exactly as `label` does (both are unconstrained strings on
+  // a public `Visual`), but only `label` was escaped — `icon` and `v.kind` (interpolated raw into a class
+  // attribute) were not. `PICTO_SYMBOL` is the only `icon` any producer supplies today, so this was never
+  // a live injection, but the review that found it called it the trap: a test naming the one field that
+  // is escaped reads as proof the row is safe, when its neighbour is not.
+  const icon = esc(pict?.icon ?? '⭐');
+  const kind = esc(v.kind);
+  const body = rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
+  // The key is the whole point of a pictogram — without it the picture is a different number from the data.
+  const key = pict && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
+  return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;
 }
 
 /** The squares grid (Y2 symmetry, and area/perimeter/nets variants — #299, #1062). */
