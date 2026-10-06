@@ -78,19 +78,25 @@ export const BANK: ContextRow[] = [
   ['Her hat does not match her coat.', 'match', 2],
 ];
 
-const sensesOf = (word: string) => SENSES.find(s => s[0] === word)![1];
+const sensesOf = (word: string): string[] => {
+  const row = SENSES.find(s => s[0] === word);
+  if (!row) throw new Error(`y4-context: "${word}" is not in SENSES`);
+  return row[1];
+};
+
+/**
+ * d2's one foreign bubble comes from here, never from another word's senses at large (review of #1612: a sense such
+ * as "not dark" or "just" can fit "The bright sun made me squint."). Each is a concrete noun meaning that fits no
+ * sentence in BANK; the test pins that the foreign bubble is one of these and is not one of the word's own senses.
+ */
+export const FOREIGN = ['dog noise', 'funfair', 'cricket stick', 'flying animal', 'tomb', 'eye part', 'sea swell'];
 
 /** d1 and d2 use the two-sense words, d3 the three-sense words (all three bubbles are the word's own). */
 export const y4Context: Generator = (d: Difficulty, rng): Question => {
-  const want = d === 3 ? 3 : 2;
-  const [sentence, word, idx] = pick(rng, BANK.filter(r => sensesOf(r[1]).length === want));
+  const [sentence, word, idx] = pick(rng, BANK.filter(r => sensesOf(r[1]).length === (d === 3 ? 3 : 2)));
   const own = sensesOf(word);
-  const answer = own[idx];
-  const wrong = d === 2
-    ? [pick(rng, SENSES.filter(s => s[0] !== word).flatMap(s => s[1]))]
-    : own.filter(s => s !== answer);
-  const options = d === 1 ? [answer, ...own.filter(s => s !== answer)] : [answer, ...own.filter(s => s !== answer), ...(d === 2 ? wrong : [])];
-  return wordQ(rng, `What does "${word}" mean here?`, answer, options, {
+  const options = d === 2 ? [...own, pick(rng, FOREIGN.filter(f => !own.includes(f)))] : own;
+  return wordQ(rng, `What does "${word}" mean here?`, own[idx], options, {
     visual: { type: 'sentence', text: sentence },
     say: `${sentence} What does ${word} mean here?`,
     hint: 'Read the whole sentence', hintIsData: false,

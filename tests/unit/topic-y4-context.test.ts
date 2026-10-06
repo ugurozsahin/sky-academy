@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import { AVOID } from '../../src/curriculum/util';
-import { BANK, SENSES } from '../../src/curriculum/year4-context';
+import { BANK, FOREIGN, SENSES } from '../../src/curriculum/year4-context';
 import { rLblProblem } from './helpers/r-lbl';
 
 function rng(seed: number) {
@@ -23,8 +23,12 @@ describe('y4-context (#1131)', () => {
     for (const [w, ss] of SENSES) {
       expect(ss.length, w).toBeGreaterThanOrEqual(2);
       expect(ss.length, w).toBeLessThanOrEqual(3);
-      for (const s of ss) expect(s.split(' ').length, s).toBeLessThanOrEqual(3);
+      for (const s of ss) expect(s.split(' ').length, s).toBeLessThanOrEqual(2);
     }
+  });
+  it('every FOREIGN label is a sense in the table; own senses are unique within a word', () => {
+    for (const f of FOREIGN) expect(allSenses.has(f), f).toBe(true);
+    for (const [w, ss] of SENSES) expect(new Set(ss).size, w).toBe(ss.length);
   });
   it('every sense of every word is the answer in at least one sentence', () => {
     for (const [w, ss] of SENSES) ss.forEach((_, i) => expect(BANK.some(r => r[1] === w && r[2] === i), `${w}/${i}`).toBe(true));
@@ -57,7 +61,7 @@ describe('y4-context (#1131)', () => {
         for (const o of q.options) expect(allSenses.has(o), o).toBe(true);
         const foreign = q.options.filter(o => !own(word).includes(o));
         if (d === 1) { expect(q.options).toHaveLength(2); expect(foreign).toHaveLength(0); }
-        if (d === 2) { expect(q.options).toHaveLength(3); expect(foreign).toHaveLength(1); }
+        if (d === 2) { expect(q.options).toHaveLength(3); expect(foreign).toHaveLength(1); expect(FOREIGN).toContain(foreign[0]); }
         if (d === 3) { expect(q.options).toHaveLength(3); expect(foreign).toHaveLength(0); }
         expect(rLblProblem(q), q.prompt).toBeNull();
       }
