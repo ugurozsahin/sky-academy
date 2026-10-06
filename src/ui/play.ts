@@ -14,7 +14,7 @@ import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { createHud, heartCount } from './hud';
 import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './play-input';   // #1064: how a child answers
-import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
+import { BOMB, createPlaySession, type ResultPayout } from './play-session'; import { factsOf } from './play-facts';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
 import { pauseHTML, stageClearHTML } from './overlays';
@@ -202,7 +202,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd({
       mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo,
-      stars: r.stars, score: r.score, training,
+      stars: r.stars, score: r.score, training, ...factsOf(playSession, o, r),   // #1122
       mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'), slips: missSlips(r.misses), topics: Object.keys(session.byTopic),   // #938, #939
     }, r.coins);
     const dojoSaved = !isWriteFailing() && !isReadOnlySave(); const streak = touchStreak();   // #518: read before this write overwrites the flag
