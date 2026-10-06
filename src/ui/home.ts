@@ -135,6 +135,11 @@ export function mapScreen(nav: Nav) {
 /** Tables Check practice (#1118): Year 4 only, through the menu's `years` filter. */
 const mtcRow = (nav: Nav, year: YearInfo): MenuRow => ({ id: 'mtc', mod: 'sprint', vport: '<span class="vport emoji">✖️</span>', title: MODES.mtc.title,
   blurb: '25 questions · 6 seconds each', years: ['year4'], go: () => nav.play({ year, mode: 'mtc', deck: mtcDeck(Math.random) }) });
+/** #1120: the same run, answered by typing on the number pad as the real check does. */
+const mtcPadRow = (nav: Nav, year: YearInfo): MenuRow => ({
+  ...mtcRow(nav, year), id: 'mtcpad', title: 'Tables Check on the number pad', blurb: 'type each answer · 6 seconds each',
+  go: () => nav.play({ year, mode: 'mtc', input: 'keypad', deck: mtcDeck(Math.random) }),
+});
 
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
@@ -173,7 +178,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress), mtcRow(nav, year),
+      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year),
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,

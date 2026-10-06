@@ -45,3 +45,54 @@ test.describe('Tables Check practice (#1118)', () => {
     await expect(page.locator('#endless small')).toContainText('best 0');
   });
 });
+
+test.describe('Tables Check on the number pad (#1120)', () => {
+  const start = async (page: Page) => { await open(page, 'year4'); await page.click('#mtcpad'); await expect(page.locator('#keypad')).toBeVisible(); };
+  const card = (page: Page, n: number) => page.waitForFunction(k => { const s = window.__sna.state(); return s.ended || (window.__sna.session.questionsAsked === k && !s.waiting); }, n, { timeout: 30000 });
+
+  test('the Year 4 menu offers it beside the bubble row', async ({ page }) => {
+    await open(page, 'year3');
+    await expect(page.locator('#mtcpad')).toHaveCount(0);
+    await page.click('#back');
+    await page.click('.island[data-year="year4"]');
+    await expect(page.locator('#mtcpad')).toContainText('Tables Check on the number pad');
+    await expect(page.locator('#mtc')).toContainText('Tables Check practice');
+  });
+
+  test('28 cards typed on the pad end on "25 out of 25", and the pad fits the phone', async ({ page }) => {
+    await start(page);
+    await page.evaluate(() => window.__sna.setSpeed(20));
+    for (let i = 1; i <= 28; i++) {
+      await card(page, i);
+      if (i === 1) await expectFitsViewport(page, 'Tables Check pad card');
+      while (!await page.evaluate(() => window.__sna.answer()) && !await page.evaluate(() => window.__sna.state().ended)) await page.waitForTimeout(50);
+    }
+    const results = page.locator('.results');
+    await expect(results).toContainText('25 out of 25');
+    await expect(results.locator('.stars')).toHaveCount(0);
+    await expect(results).not.toContainText(/official|pass|fail/i);
+    await page.click('#home');
+    await expect(page.locator('#endless small')).toContainText('best 0');
+  });
+
+  test('right digits typed without Enter count as right when the clock runs out', async ({ page }) => {
+    await start(page);
+    await page.evaluate(() => window.__sna.setSpeed(20));
+    for (let i = 1; i <= 3; i++) { await card(page, i); await page.evaluate(() => window.__sna.answer()); }
+    await card(page, 4);
+    const right = await page.evaluate(() => window.__sna.session.correct);
+    await page.keyboard.type(await page.evaluate(() => window.__sna.state().answer as string));
+    await page.waitForFunction(r => window.__sna.session.correct === r + 1, right, { timeout: 10000 });
+  });
+
+  test('the pause overlay freezes the 6 s clock on the pad', async ({ page }) => {
+    test.setTimeout(60000);
+    await start(page);
+    for (let i = 1; i <= 3; i++) { await card(page, i); await page.evaluate(() => window.__sna.answer()); }
+    await card(page, 4);
+    await page.click('#pause');
+    await page.waitForTimeout(7000);
+    await page.click('#resume');
+    expect(await page.evaluate(() => window.__sna.state().questionLeft)).toBeGreaterThan(0);
+  });
+});
