@@ -6,7 +6,7 @@ import { y4FracOf } from './year4-fracof';
 import { y4Decimals } from './year4-decimals';
 // import: y4-div10
 // import: y4-comparedec
-// import: y4-money
+import { y4Money } from './year4-money';
 import type { Topic } from './types';
 
 export const Y4_FRACTIONS: Topic[] = [
@@ -17,5 +17,5 @@ export const Y4_FRACTIONS: Topic[] = [
   { id: 'y4-decimals', title: 'Decimals & Fractions', icon: '📏', subject: 'maths', year: 'year4', nc: 'Y4 Fractions: decimal equivalents of tenths, hundredths, 1/4, 1/2, 3/4', gen: y4Decimals },
   // slot: y4-div10
   // slot: y4-comparedec
-  // slot: y4-money
+  { id: 'y4-money', title: 'Pounds & Pence', icon: '💷', subject: 'maths', year: 'year4', nc: 'Y4 Fractions/Measurement: money in decimals to 2 dp; money problems', gen: y4Money },
 ];
