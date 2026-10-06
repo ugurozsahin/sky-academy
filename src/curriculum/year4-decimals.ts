@@ -13,7 +13,7 @@ interface Opt { readonly label: string; readonly val: Val }
 const same = (a: Val, b: Val) => a[0] * b[1] === b[0] * a[1];
 
 /** A card: the fraction n/den and its decimal v at dp places (v = n × 10^dp ÷ den, always whole). */
-interface Spec { readonly n: number; readonly den: number; readonly dp: number }
+export interface Spec { readonly n: number; readonly den: number; readonly dp: number }
 
 const decOpt = (v: number, dp: number): Opt => ({ label: fmt(dec(v, dp), { fixedDp: dp }), val: [v, 10 ** dp] });
 const fracOpt = (n: number, den: number): Opt => ({ label: `${n}/${den}`, val: [n, den] });
@@ -36,8 +36,9 @@ export function fractionDecoys(rng: Rng, s: Spec): Opt[] {
   if (isSimple(s)) {
     const others = [fracOpt(1, 2), fracOpt(1, 4), fracOpt(3, 4)];
     const digits = String((s.n * 10 ** s.dp) / s.den);
-    const slip = fracOpt(Number(digits[0]), Number(digits.slice(-1)) || 5);
-    return dedupe(answer, [...shuffle(rng, others), slip, fracOpt(1, 5), fracOpt(1, 3)]);
+    // 0.75 → 7/5, 0.25 → 2/5; a one-digit decimal (0.5) has no split, so 1/5 stands in
+    const slip = digits.length > 1 ? [fracOpt(Number(digits[0]), Number(digits.slice(-1)))] : [];
+    return dedupe(answer, [...shuffle(rng, others), ...slip, fracOpt(1, 5), fracOpt(1, 3)]);
   }
   const other = fracOpt(s.n, s.den === 10 ? 100 : 10);
   const near = shuffle(rng, [s.n - 1, s.n + 1, s.n - 2, s.n + 2].filter(x => x > 0)).map(x => fracOpt(x, s.den));
