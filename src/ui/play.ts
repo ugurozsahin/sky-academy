@@ -196,7 +196,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else if (o.mode === 'endless') recordEndless(o.year.id, r.score);   // #1117: no catch-all writer — a new mode records nothing until it names its own
     }
-    for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t);   // every mode teaches Sensei what is hard
+    for (const [id, t] of Object.entries(session.byTopic)) if (topicById(id)) recordAccuracy(id, t);   // Sensei learns from listed topics only (#1124)
     const bySubject = (s: Topic['subject']) =>
       Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicById(id)?.subject === s ? t.hits : 0), 0);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.

@@ -1,10 +1,13 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { mtcDeck } from '../game/mtc';
+import { TRICKY, trickyDeck } from '../game/tricky-facts';
+import { leastSecure } from '../fact-record';
 import { beltFor, totalStarsOf } from '../game/belts';
 import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
+import type { Ks2Fact } from '../save-records';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
 import { needsSchoolYear } from '../school-year';
@@ -141,6 +144,16 @@ const mtcPadRow = (nav: Nav, year: YearInfo): MenuRow => ({
   go: () => nav.play({ year, mode: 'mtc', input: 'keypad', deck: mtcDeck(Math.random) }),
 });
 
+/** Tricky Facts (#1124): Sensei's pick of the child's least secure × facts — KS2 islands only, and only while some fact is insecure. */
+const trickyRow = (nav: Nav, year: YearInfo, facts: Record<string, Ks2Fact>): MenuRow[] => {
+  const n = leastSecure(facts).length;
+  return n ? [{
+    id: 'tricky', mod: 'train', title: 'Tricky Facts', blurb: `Sensei's pick: ${n} ${n === 1 ? 'fact' : 'facts'}`, years: ['year3', 'year4'],
+    vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
+    go: () => nav.play({ year, mode: 'sprint', topic: TRICKY, deck: trickyDeck(facts, Math.random) }),
+  }] : [];
+};
+
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
 export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId): T[] => rows.filter(r => !r.years || r.years.includes(year));
@@ -182,7 +195,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
-      go: () => chooseThenPlay(nav, year, subject, 'sprint', subjectPool(), progress) },
+      go: () => chooseThenPlay(nav, year, subject, 'sprint', subjectPool(), progress) }, ...trickyRow(nav, year, d.ks2.facts),
     { id: 'relaxed', mod: 'relaxed', vport: `<span class="vport emoji">🌱</span>`, title: MODES.relaxed.title, blurb: 'No lives, no clock',   // #937
       go: () => chooseThenPlay(nav, year, subject, 'relaxed', subjectPool(), progress) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,

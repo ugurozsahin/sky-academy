@@ -96,3 +96,53 @@ test.describe('Tables Check on the number pad (#1120)', () => {
     expect(await page.evaluate(() => window.__sna.state().questionLeft)).toBeGreaterThan(0);
   });
 });
+
+test.describe('Tricky Facts (#1124)', () => {
+  const FACTS = { '9×6': { right: 0, wrong: 2, slow: 0, last: 'ww', day: '2026-10-06' } };
+  const openWith = async (page: Page, year: string, ks2: object) => {
+    await page.addInitScript(save => {
+      localStorage.setItem('sna:years', 'all');
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', ks2 }));
+    await page.goto('/');
+    await page.click(`.island[data-year="${year}"]`);
+    await expect(page.locator('.island-screen')).toBeVisible();
+  };
+  const stored = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+
+  test('the row shows on a KS2 island only while a fact is insecure, never on a KS1 island', async ({ page }) => {
+    await openWith(page, 'year4', { facts: FACTS, checks: [], words: {} });
+    await expect(page.locator('#tricky')).toContainText('Tricky Facts');
+    await expect(page.locator('#tricky small')).toContainText("Sensei's pick: 1 fact");
+    await expect(page.locator('#tricky img')).toBeVisible();
+    await expectFitsViewport(page, 'Tricky Facts menu');
+    await page.click('#back');
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expect(page.locator('#tricky')).toHaveCount(0);
+  });
+
+  test('no insecure fact, no row', async ({ page }) => {
+    await openWith(page, 'year4', { facts: { '3×4': { right: 3, wrong: 0, slow: 0, last: 'rrr' } }, checks: [], words: {} });
+    await expect(page.locator('#tricky')).toHaveCount(0);
+  });
+
+  test('the drill asks exactly the deck, leaves every best alone and records the facts', async ({ page }) => {
+    await openWith(page, 'year4', { facts: FACTS, checks: [], words: {} });
+    await page.click('#tricky');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.evaluate(() => window.__sna.setSpeed(20));
+    for (let i = 1; i <= 2; i++) {   // 9×6 and 6×9
+      await page.waitForFunction(n => { const s = window.__sna.state(); return s.ended || (window.__sna.session.questionsAsked === n && !s.waiting && window.__sna.bubbles().length > 0); }, i, { timeout: 30000 });
+      while (!await page.evaluate(() => window.__sna.answer()) && !await page.evaluate(() => window.__sna.state().ended)) await page.waitForTimeout(50);
+    }
+    await expect(page.locator('.results')).toBeVisible();
+    await page.click('#home');
+    const s = await stored(page);
+    expect(s.sprint?.year4 ?? 0).toBe(0);
+    expect(s.endless?.year4 ?? 0).toBe(0);
+    expect(s.progress?.['tables-tricky']).toBeUndefined();
+    expect(s.ks2.facts['9×6'].right).toBeGreaterThan(0);
+    expect(s.ks2.facts['6×9'].right).toBeGreaterThan(0);
+  });
+});

@@ -8,7 +8,7 @@ import { REST_LINE, restDue, type RestClock } from '../game/rest';
 import type { RestSetting } from '../device-settings';
 import { load, recordCrown, recordSprint, recordTopic, recordTopicSprint } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
-import { listedTopics, type YearInfo } from '../curriculum';
+import { listedTopics, topicById, type YearInfo } from '../curriculum';
 import { beltFor, totalStarsOf } from '../game/belts';
 
 /** How a finished run scored — the fields the medal reads. */
@@ -189,6 +189,7 @@ export const spokenLine = (l: ResultCandidate): string => l.spoken ?? l.text;
 export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r: { correct: number; score: number }): { newBest: boolean; candidates: ResultCandidate[] } {
   if (load().settings.timeX !== 1) return { newBest: false, candidates: [] };   // #1121: a best is always a 60-second run
   if (!topic) return { newBest: recordSprint(year.id, r.score), candidates: [] };
+  if (!topicById(topic.id)) return { newBest: false, candidates: [] };   // #1124: a drill built for one run (Tricky Facts) has no row to keep a best on
   const before = load().progress[topic.id]?.sprint ?? 0, newBest = recordTopicSprint(topic.id, r.correct);
   const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null;
   return { newBest, candidates: t ? [t] : [] };

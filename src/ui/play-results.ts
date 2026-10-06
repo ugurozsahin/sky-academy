@@ -3,6 +3,7 @@
 // the screen instance through one deps object rather than living in playScreen()'s own closure.
 import { praiseLine, senseiLine, SENSEI, type Avatar } from '../avatars';
 import type { DeckItem, Miss, Resume, SessionResult } from '../game/session';
+import { trickyOffer } from '../game/tricky-facts';
 import { mtcRowsFor, mtcTally } from './mtc-view';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { say, sfx } from '../audio';
@@ -58,6 +59,12 @@ function nextUnstarredTopic(year: YearInfo, topic: Topic | undefined): Topic | n
   return null;
 }
 
+/** Sensei's Tricky Facts offer (#1124), queued after a finished Tables Check's headline — only while some fact is insecure. */
+function sayTrickyOffer(r: SessionResult) {
+  const offer = r.mode === 'mtc' && !r.incomplete ? trickyOffer(load().ks2.facts) : null;
+  if (offer) say(offer, false, { queue: true });
+}
+
 /**
  * The results overlay (every mode). `candidates` are the belt/island/trophy/new-best/rest announcements
  * #896 makes room for — nothing supplies one yet (each is its own later ticket: #933, #951, #912, #952,
@@ -83,6 +90,7 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     say(scoreLine(r), false, { queue: true });   // #897: how they did, not only a praise line — queued after the headline
+    sayTrickyOffer(r);   // #1124
     const lines = withRestLine(payout.candidates, restClock, restSetting());   // #896: belt > island > trophy > best > rest, at most two (#940)
     for (const l of lines) say(spokenLine(l), false, { queue: true });   // queued so a candidate never cuts the headline off
     // `certSaved` (#470) is read the instant after `fileCertificate`'s own write, inside `commitResult()` —
