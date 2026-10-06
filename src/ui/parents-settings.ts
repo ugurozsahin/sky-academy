@@ -5,11 +5,13 @@ import { sfx } from '../audio';
 import { isWriteFailing, load, save } from '../storage';
 import { $, $$ } from './dom';
 import { shownYears, type YearId } from '../curriculum';
+import type { Settings } from '../save-records';
 import { schoolYearFromBirthDate, yearIdFromLevel } from '../school-year';
 
 export const THREE_LABEL: Readonly<Record<ThreeSetting, string>> = { auto: 'Auto', on: 'On', off: 'Off' };
 export const REST_LABEL: Readonly<Record<RestSetting, string>> = { off: 'Off', '10': '10 min', '20': '20 min', '30': '30 min' };
-const TIMEX_LABEL: Readonly<Record<string, string>> = { '1': 'Normal', '1.5': 'Extra time (×1.5)', '0': 'No time limit' };   // #1121
+export const TIMEX_ORDER = ['1', '1.5', '0'] as const;   // #1121: a grown-up sees Normal first (an object's integer-like keys would sort 0 first)
+export const TIMEX_LABEL: Readonly<Record<`${Settings['timeX']}`, string>> = { '1': 'Normal', '1.5': 'Extra time (×1.5)', '0': 'No time limit' };
 const SLOW_LABEL: Readonly<Record<'off' | 'on', string>> = { off: 'Off', on: 'On' };
 
 /** The Settings section's markup: the 3-D pictures control, then "Slower bubbles" (#905). */
@@ -30,7 +32,7 @@ export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean
     </div>
     <div class="p-three p-time">
       <p class="p-three-say">Some children sit the Tables Check with arrangements from school. <b>Extra time</b> gives every timed question one and a half times as long, and a Ninja Sprint 90 seconds; <b>No time limit</b> never runs a question out (a Sprint gets 90 seconds). Sprint bests are only kept for Normal.</p>
-      <div class="tabs p-time-pick" role="radiogroup" aria-label="Time for timed games">${Object.keys(TIMEX_LABEL).map(v =>
+      <div class="tabs p-time-pick" role="radiogroup" aria-label="Time for timed games">${TIMEX_ORDER.map(v =>
         `<button class="tab${Number(v) === load().settings.timeX ? ' on' : ''}" data-timex="${v}" role="radio" aria-checked="${Number(v) === load().settings.timeX}">${TIMEX_LABEL[v]}</button>`).join('')}</div>
       <p class="p-three-msg" id="timex-msg" role="status" hidden></p>
       <p class="p-three-say">A short beep can warn a child that time is nearly up.</p>

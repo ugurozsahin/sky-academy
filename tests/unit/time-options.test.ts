@@ -48,6 +48,7 @@ describe('beepDue', () => {
     expect(beepDue(2000, 1900)).toBe(false);   // already at the line: it fired on an earlier tick
     expect(beepDue(3000, 2500)).toBe(false);
     expect(beepDue(0, 0)).toBe(false);          // unarmed
+    expect(beepDue(2500, 0)).toBe(false);       // a long tick straight to zero ends the question: no stray beep
   });
   it('never fires with no time limit', () => { expect(beepDue(Infinity, Infinity)).toBe(false); });
 });
@@ -73,6 +74,12 @@ describe('tickWithBeep and the sna:beep key', () => {
     const s = fake(3000); tickWithBeep(s, 1500);
     expect(alert).not.toHaveBeenCalled(); expect(s.questionLeft).toBe(1500);
   });
+  it('beeps again on the next question', async () => {
+    const { alert, tickWithBeep, setBeepSetting } = await load();
+    setBeepSetting(true);
+    const s = fake(3000); tickWithBeep(s, 1500); s.questionLeft = 6000; tickWithBeep(s, 4500);
+    expect(alert).toHaveBeenCalledTimes(2);
+  });
   it('sna:beep round-trips and a throwing localStorage reads as off', async () => {
     const { setBeepSetting, beepSetting } = await load();
     expect(beepSetting()).toBe(false);
@@ -94,7 +101,23 @@ describe('a Sprint at a non-Normal setting never writes a best (#1121)', () => {
     expect(recordSprintOutcome(year, undefined, r).newBest).toBe(false); expect(load().sprint[year.id]).toBeUndefined();
     save({ settings: { ...load().settings, timeX: 0 } });
     expect(recordSprintOutcome(year, undefined, r).newBest).toBe(false); expect(load().sprint[year.id]).toBeUndefined();
+    const topic = YEARS[1] && topicById('y1-add')!;
+    for (const timeX of [1.5, 0] as const) {
+      save({ settings: { ...load().settings, timeX } });
+      expect(recordSprintOutcome(year, topic, r)).toEqual({ newBest: false, candidates: [] });
+      expect(load().progress[topic.id]?.sprint ?? 0).toBe(0);
+    }
     save({ settings: { ...load().settings, timeX: 1 } });
     expect(recordSprintOutcome(year, undefined, r).newBest).toBe(true); expect(load().sprint[year.id]).toBe(900);
+  });
+});
+
+describe('the Settings control (#1121)', () => {
+  it('lists Normal, Extra time, No time limit in that order, and marks the stored choice', async () => {
+    const { settingsHTML, TIMEX_ORDER, TIMEX_LABEL } = await import('../../src/ui/parents-settings');
+    expect(TIMEX_ORDER.map(k => TIMEX_LABEL[k])).toEqual(['Normal', 'Extra time (×1.5)', 'No time limit']);
+    const html = settingsHTML();
+    expect([...html.matchAll(/data-timex="([^"]+)"/g)].map(m => m[1])).toEqual(['1', '1.5', '0']);
+    expect(html).toMatch(/class="tab on" data-timex="1"/);
   });
 });

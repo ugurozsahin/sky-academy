@@ -680,6 +680,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.setViewportSize({ width: 390, height: 664 });
     await seedPlayer(page);
     await openGrownUps(page);
+    expect(await page.locator('button[data-timex]').evaluateAll(b => b.map(x => (x as HTMLElement).dataset.timex))).toEqual(['1', '1.5', '0']);   // Normal first
     await page.click('button[data-timex="1.5"]');
     await page.click('button[data-beep="on"]');
     expect(await page.evaluate(() => localStorage.getItem('sna:beep'))).toBe('on');

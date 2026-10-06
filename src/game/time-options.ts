@@ -14,5 +14,5 @@ export function timeOptsFor(mode: Mode, s: Pick<Settings, 'timeX' | 'slow'>): Pi
   return mode === 'sprint' && s.timeX !== 1 ? { timeScale, seconds: SPRINT_SECONDS * 1.5, slower: s.slow } : { timeScale, slower: s.slow };
 }
 
-/** True only on the tick that takes a question's time left from above the beep line to at or below it. */
-export const beepDue = (beforeMs: number, afterMs: number): boolean => beforeMs > BEEP_AT_MS && afterMs <= BEEP_AT_MS;
+/** True only on the tick that takes a question's time left from above the beep line to at or below it, not on to zero (a long tick from a backgrounded tab ends the question, so a beep would be stray). */
+export const beepDue = (beforeMs: number, afterMs: number): boolean => beforeMs > BEEP_AT_MS && afterMs <= BEEP_AT_MS && afterMs > 0;
