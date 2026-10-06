@@ -4,10 +4,11 @@
 // import: y4-symmetry
 // import: y4-coords
 import type { Topic } from './types';
+import { y4Coords } from './year4-coords';
 
 export const Y4_GEOMETRY: Topic[] = [
   // slot: y4-shapes
   // slot: y4-angles
   // slot: y4-symmetry
-  // slot: y4-coords
+  { id: 'y4-coords', title: 'Coordinates', icon: '🧭', subject: 'maths', year: 'year4', nc: 'Y4 Geometry: describe positions as coordinates in the first quadrant, translate a point, complete a polygon (4M38–40)', gen: y4Coords },
 ];

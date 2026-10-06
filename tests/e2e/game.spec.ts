@@ -5659,3 +5659,30 @@ test('a y3-tenths d2 line card fits a 390×664 phone (#1091)', async ({ page }, 
   }
   expect(lines, 'drew line cards').toBeGreaterThan(0);
 });
+
+// #1129: a y4-coords d3 card (a size-10 grid, three joined corners and three candidates) fits a 390×664 phone.
+// Built from the real generator and renderVisual, put into the live card.
+test('a y4-coords d3 grid card fits a 390×664 phone (#1129)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year4', 'y4-coords');
+  const coords = TOPICS.find(t => t.id === 'y4-coords')!;
+  for (let seed = 1; seed <= 5; seed++) {
+    const q = coords.gen(3, seededRng(seed));
+    expect(q.visual?.type === 'coords' && q.visual.size).toBe(10);
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: renderVisual(q.visual), prompt: q.prompt });
+    const grid = (await page.locator('#vis svg').boundingBox())!, card = (await page.locator('.qcard').boundingBox())!;
+    expect(grid.x, `seed ${seed}: grid inside the card`).toBeGreaterThanOrEqual(card.x);
+    expect(grid.x + grid.width).toBeLessThanOrEqual(card.x + card.width + 1);
+    expect(grid.y + grid.height).toBeLessThanOrEqual(card.y + card.height + 1);
+    expect(await page.locator('#vis svg .pt').count(), `seed ${seed}: six points`).toBe(6);
+    await expectFitsViewport(page, `y4-coords d3 grid, seed ${seed}`);
+    if (seed === 1 && process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
+  }
+});
