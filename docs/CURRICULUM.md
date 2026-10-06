@@ -211,3 +211,4 @@ Maths:
 - y4-tables-11 — 11× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
 - y4-tables-12 — 12× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
 - y4-coords — coordinates in the first quadrant (4M38–40): read a lettered point's (x, y) or find the point at a pair (d1); where does a point land after a move right/left and up/down (d2); which lettered point completes a rectangle (d3); drawn by the `coords` visual, answers computed from its points
+- y4-pv — place value, compare and order beyond 1,000 (4M4–5): the value of a digit in a four-digit number (d1 1,000–1,999; d2 to 9,999) or compare two numbers with < > = (d2); order four numbers sharing a thousands digit, smallest first (d3, `sequenceFrom: 3`)
