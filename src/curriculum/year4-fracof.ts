@@ -23,9 +23,9 @@ const STORIES: readonly Story[] = [
 ];
 
 /** Misconception decoys, whole numbers > 0: the unit-fraction slip (whole ÷ den), the answer ± 10 (it shares the units digit, so the units never give the answer away), a near miss that keeps the leading digit, then the complement, whole ÷ num when exact and a step either side; `own` leads. */
-function decoys(rng: Rng, whole: number, den: number, num_: number, answer: number, own: number[] = []): number[] {
+export function decoys(rng: Rng, whole: number, den: number, num_: number, answer: number, own: number[] = []): number[] {
   const out: number[] = [];
-  const add = (v: number) => { if (Number.isInteger(v) && v > 0 && v !== answer && !out.includes(v)) out.push(v); };
+  const add = (v: number) => { if (Number.isInteger(v) && v > 0 && v < 1000 && v !== answer && !out.includes(v)) out.push(v); };
   own.forEach(add);
   add(whole / den);
   shuffle(rng, [answer + 10, answer - 10]).filter(v => v > 0).slice(0, 1).forEach(add);

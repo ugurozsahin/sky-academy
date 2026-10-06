@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
+import { decoys } from '../../src/curriculum/year4-fracof';
 import { sayIsSafe } from '../../src/curriculum/ks2say';
 
 function rng(seed: number) {
@@ -25,6 +26,10 @@ function expected(prompt: string): number {
 }
 
 describe('y4-fracof (#1144)', () => {
+  it('99/100 of 1,000 (answer 990) never gets a 4-digit decoy', () => {
+    for (let s = 1; s <= 50; s++) { const ds = decoys(rng(s), 1000, 100, 99, 990); expect(ds).toHaveLength(3); ds.forEach(v => { expect(v).toBeLessThan(1000); expect(v).not.toBe(990); }); }
+  });
+
   it('is registered for Year 4', () => { expect(topic.year).toBe('year4'); });
 
   for (const d of [1, 2, 3] as Difficulty[]) {
