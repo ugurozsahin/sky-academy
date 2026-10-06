@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFactLog, mergeFacts, pushCheck } from '../../src/fact-record';
+import { createFactLog, leastSecure, mergeFacts, pushCheck } from '../../src/fact-record';
 import type { Question } from '../../src/curriculum/types';
 
 const card = (fact?: string): Question => ({ prompt: 'x', answer: '1', options: ['1'], fact });
@@ -51,5 +51,33 @@ describe('tagged generators (#1122)', () => {
     const deck = mtcDeck(Math.random);
     expect(deck.slice(0, MTC_PRACTICE).every(d => !d.q.fact)).toBe(true);
     expect(deck.slice(MTC_PRACTICE).every(d => d.q.fact === d.q.prompt.replace(' = ?', '').replace(/ /g, ''))).toBe(true);
+  });
+});
+
+describe('leastSecure (#1123)', () => {
+  const f = (right: number, wrong: number, slow: number, last: string, day = '2026-10-06') => ({ right, wrong, slow, last, day });
+  it('leaves out secure facts and facts with no tries', () => {
+    expect(leastSecure({ '7×8': f(3, 0, 0, 'rrr'), '2×2': f(0, 0, 0, ''), '3×4': f(2, 0, 0, 'rr') })).toEqual([['3×4']]);
+  });
+  it('ranks by (wrong + slow) / tries, highest first', () => {
+    const t = { '2×3': f(3, 1, 0, 'wrr'), '4×5': f(1, 3, 0, 'www'), '6×7': f(2, 1, 1, 'rsw') };
+    expect(leastSecure(t).map(l => l[0])).toEqual(['4×5', '6×7', '2×3']);
+  });
+  it('breaks a tie by the most recent day, then by the fact text', () => {
+    const t = { '3×3': f(0, 1, 0, 'w', '2026-10-05'), '4×4': f(0, 1, 0, 'w', '2026-10-06'), '2×2': f(0, 1, 0, 'w', '2026-10-06') };
+    expect(leastSecure(t).map(l => l[0])).toEqual(['2×2', '4×4', '3×3']);
+  });
+  it('puts a fact and its reversed pair on one line, and a square fact alone', () => {
+    const t = { '9×6': f(0, 2, 0, 'ww'), '6×9': f(1, 1, 0, 'rw'), '7×7': f(0, 1, 0, 'w'), '3×5': f(0, 1, 0, 'w') };
+    expect(leastSecure(t)).toEqual([['3×5'], ['7×7'], ['9×6', '6×9']])   // the line sits where its first-ranked member does; 9×6 ties 3×5 and 7×7 on ratio and day, then loses on text;
+  });
+  it('lists a fact alone when its reversed pair is secure', () => {
+    expect(leastSecure({ '9×6': f(0, 1, 0, 'w'), '6×9': f(3, 0, 0, 'rrr') })).toEqual([['9×6']]);
+  });
+  it('stops at 8 lines (a pair is one line)', () => {
+    const t: Record<string, ReturnType<typeof f>> = {};
+    for (let a = 2; a <= 10; a++) t[`${a}×${a}`] = f(0, 1, 0, 'w');
+    expect(leastSecure(t)).toHaveLength(8);
+    expect(leastSecure(t, 3)).toHaveLength(3);
   });
 });

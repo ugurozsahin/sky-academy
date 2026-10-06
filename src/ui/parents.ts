@@ -3,7 +3,7 @@ import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
-import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
+import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
 import { $, $$, esc, render } from './dom';
 
 /** `launch` is where a grown-up lands after removing the ninja this session was playing (#20 slice 3): the
@@ -189,7 +189,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
     <h3 class="p-h">Where to help ${sm.weakest.length ? '(trickiest topics)' : ''}</h3>
     ${weak}
 
-    ${strong ? `<h3 class="p-h">Going well</h3>${strong}` : ''}${slipsHTML(sm.slips)}${shareHTML()}
+    ${strong ? `<h3 class="p-h">Going well</h3>${strong}` : ''}${factsHTML(sm.facts)}${slipsHTML(sm.slips)}${shareHTML()}
 
     <h3 class="p-h">Game modes — personal bests</h3>
     <div class="p-table-wrap"><table class="p-table">

@@ -3835,6 +3835,23 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'grown-ups This week block');
   });
 
+  test('For grown-ups: "Facts to practise" lists the least secure × facts, and a child with none sees no section (#1123)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { ks2: { facts: { '9×6': { right: 0, wrong: 2, slow: 0, last: 'ww', day: '2026-10-06' }, '7×8': { right: 3, wrong: 0, slow: 0, last: 'rrr', day: '2026-10-06' } }, checks: [], words: {} } });
+    await openGrownUps(page);
+    const sec = page.locator('.parents-dash .p-h', { hasText: 'Facts to practise' });
+    await expect(sec).toBeVisible();
+    await expect(page.locator('.parents-dash')).toContainText('9 × 6');
+    await expect(page.locator('.parents-dash')).not.toContainText('7 × 8');   // secure: never listed
+    await sec.scrollIntoViewIfNeeded();
+    await expectFitsViewport(page, 'grown-ups Facts to practise');
+  });
+
+  test('For grown-ups: no × answers recorded, no "Facts to practise" section (#1123)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await expect(page.locator('.parents-dash .p-h', { hasText: 'Facts to practise' })).toHaveCount(0);
+  });
+
   test('For grown-ups: "Share a progress summary" falls back to the clipboard, with no save code in the text (#942)', async ({ page }) => {
     await page.addInitScript(() => { (navigator as any).share = undefined; (window as any).__copied = ''; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { (window as any).__copied = t; } }, configurable: true }); });
     await seedPlayer(page, 'volt', 'Ada');
