@@ -210,3 +210,6 @@ Maths:
 - y4-tables-9 — 9× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
 - y4-tables-11 — 11× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
 - y4-tables-12 — 12× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
+
+Writing:
+- y4-context — what a word with two or three meanings means in one sentence (NC Y3–4 comprehension, words in context); d1–d2 two-sense words, d3 three-sense words
