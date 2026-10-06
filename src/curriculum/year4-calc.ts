@@ -4,7 +4,7 @@ import { y4Column } from './year4-column';
 // import: y4-story
 // import: y4-whichop
 import { y4Tables, y4TablesQ } from './year4-tables';
-// import: y4-mental
+import { y4Mental } from './year4-mental';
 // import: y4-factorpairs
 // import: y4-shortmult
 // import: y4-story-md
@@ -21,7 +21,7 @@ export const Y4_CALC: Topic[] = [
   { id: 'y4-tables-9', title: '9× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 9 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 9) },
   { id: 'y4-tables-11', title: '11× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 11 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 11) },
   { id: 'y4-tables-12', title: '12× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 12 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 12) },
-  // slot: y4-mental
+  { id: 'y4-mental', title: 'Mental Multiplying', icon: '💡', subject: 'maths', year: 'year4', nc: 'Y4 M&D: × 0, × 1, ÷ 1, derived facts, three numbers', gen: y4Mental },
   // slot: y4-factorpairs
   // slot: y4-shortmult
   // slot: y4-story-md
