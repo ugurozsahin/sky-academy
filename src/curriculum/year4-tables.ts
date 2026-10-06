@@ -46,14 +46,18 @@ function factorDecoys(answer: number, other: number, rng: Rng): number[] {
   return picked.slice(0, 3);
 }
 
-export const y4Tables: Generator = (d: Difficulty, rng): Question => {
-  const t = d === 1 ? pick(rng, [6, 11]) : d === 2 ? pick(rng, [7, 9, 12]) : weightedTable(rng);
+/** y4-tables' cards; `table` fixes the table for the drills (#1126), `? × t = P` then asks for the other factor. */
+export function y4TablesQ(d: Difficulty, rng: Rng, table?: number): Question {
+  const t = table ?? (d === 1 ? pick(rng, [6, 11]) : d === 2 ? pick(rng, [7, 9, 12]) : weightedTable(rng));
   const n = ri(rng, 2, 12);
-  const form: Form = d === 3 ? pick(rng, ['mul', 'div', 'missing'] as const) : pick(rng, ['mul', 'div'] as const);
+  const form: Form = d === 3 ? pick(rng, ['mul', 'div', 'missing'] as const) : pick(rng, table && d === 1 ? ['mul'] as const : ['mul', 'div'] as const);
   const p = t * n;
   const [prompt, answer, decoys] = form === 'mul' ? [`${t} × ${n} = ?`, p, productDecoys(t, n, rng)]
     : form === 'div' ? [`${p} ÷ ${t} = ?`, n, factorDecoys(n, t, rng)]
+    : table ? [`? × ${t} = ${p}`, n, factorDecoys(n, t, rng)]
     : [`? × ${n} = ${p}`, t, factorDecoys(t, n, rng)];
-  const fact = form === 'mul' ? { fact: `${t}×${n}` } : form === 'missing' ? { fact: `${t}×${n}` } : {};   // #1122: division is not tagged
+  const fact = form === 'div' ? {} : { fact: `${t}×${n}` };   // #1122: division is not tagged
   return { ...q(prompt), ...fact, answer: String(answer), options: shuffle(rng, [answer, ...decoys].map(String)) };
-};
+}
+
+export const y4Tables: Generator = (d, rng) => y4TablesQ(d, rng);
