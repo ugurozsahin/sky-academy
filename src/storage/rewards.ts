@@ -1,5 +1,6 @@
 // Paying out coins, stickers and the Daily Dojo when a game ends.
 import { applyEvent, dojoFor, type DojoEvent, type DojoOutcome, type DojoState } from '../game/dojo';
+import { mergeFacts, pushCheck, type FactEntry } from '../fact-record';
 import { logGame, sanitizeSlips, type Slip } from '../save-records';
 import { load, save } from './store';
 import { evaluateStickers } from './stickers';
@@ -45,7 +46,7 @@ export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
  * is unreachable rather than merely unlikely. A refusal still leaves `writeFailed` for the grown-ups screen to
  * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
  */
-export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topics?: string[] }, gameCoins: number, now = new Date()): GameEndOutcome {
+export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topics?: string[]; facts?: readonly FactEntry[]; check?: { score: number; missed: string[] } }, gameCoins: number, now = new Date()): GameEndOutcome {
   if (!Number.isFinite(gameCoins)) console.warn(`recordGameEnd: non-finite gameCoins (${gameCoins}) — ignored`);   // same #797 guard as addCoins()
   const d = load(); const dojo = applyEvent(d.dojo, e, today(now));
   // `gameCoins`, not `coins`: every call site on `main` read `addCoins(paid + dojo.coins)`, so a maintainer
@@ -65,6 +66,7 @@ export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topic
   const fresh = unlocked.filter(id => !d.stickers.includes(id));
   const slips = e.slips?.length ? sanitizeSlips([...e.slips.map(s => ({ ...s, at: today(now) })), ...d.slips]) : d.slips;   // #938: newest first, capped 20
   const asked = e.mode === 'memory' ? { q: 0, ok: 0 } : { q: e.attempts, ok: e.correct };   // #939: Memory's pairs and moves are not questions
-  save({ dojo: dojo.state, coins: total, stickers: unlocked, slips, log: logGame(d.log, today(now), { ...asked, topics: e.topics }) });
+  const ks2 = e.facts?.length || e.check ? { ...d.ks2, facts: mergeFacts(d.ks2.facts, e.facts ?? [], today(now)), checks: e.check ? pushCheck(d.ks2.checks, { date: today(now), ...e.check }) : d.ks2.checks } : d.ks2;   // #1122
+  save({ ks2, dojo: dojo.state, coins: total, stickers: unlocked, slips, log: logGame(d.log, today(now), { ...asked, topics: e.topics }) });
   return { dojo, fresh };
 }

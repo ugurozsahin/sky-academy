@@ -99,6 +99,7 @@ interface QuestionCore {
   peek?: boolean;         // no-voice sequence: show `listen` briefly, then hide it before the bubbles launch (#65)
   peekHint?: string;      // the hint once a no-voice peek hides (default 'Slice the words in order'), for a letter or chunk build (#1102)
   slow?: boolean;         // several mental steps: one speed step slower, like a sequence — in every mode but Sky Storm. Opt-in per generator (`slowAtD3`), not year-wide (#297)
+  fact?: string;          // a times-table fact as shown ('9×6'; '6×9' is another): what the fact record keys on (#1122). Only `a × b = ?` / missing-factor cards, both factors 2–12
   noSayAnswer?: boolean;  // #893/#982: this card's answer must never be spoken as the wrong/miss correction line (a pseudo-word)
 }
 

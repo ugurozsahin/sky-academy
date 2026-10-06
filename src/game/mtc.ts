@@ -84,7 +84,7 @@ const practiceCard = (b: number, rng: Rng): Question => {
 };
 const checkCard = (a: number, b: number, rng: Rng): Question => {
   const options = [a * b, ...productDecoys(a, b, rng)].map(String);
-  return { ...q(`${a} × ${b} = ?`), answer: String(a * b), options: shuffle(rng, options) };
+  return { ...q(`${a} × ${b} = ?`), fact: `${a}×${b}`, answer: String(a * b), options: shuffle(rng, options) };
 };
 
 /** One Tables Check practice run: 3 untimed practice cards, then the 25 of `mtcForm` — `a × b = ?`, four bubbles each. */
@@ -99,6 +99,12 @@ export function mtcScore(deck: readonly DeckItem[], misses: readonly { q: Questi
   const gone = new Set(misses.map(m => m.q.prompt));
   const missed = deck.slice(MTC_PRACTICE).filter(d => gone.has(d.q.prompt)).map(d => ({ prompt: d.q.prompt.replace(' = ?', ''), answer: d.q.answer }));
   return { score: MTC_SIZE - missed.length, missed };
+}
+
+/** The Tables Check result as the save stores it (#1122): the score and the missed facts as `a×b` keys. */
+export function mtcCheck(deck: readonly DeckItem[], misses: readonly { q: Question }[]): { score: number; missed: string[] } {
+  const { score, missed } = mtcScore(deck, misses);
+  return { score, missed: missed.map(m => m.prompt.replace(/ /g, '')) };
 }
 
 /** Ms after the wave starts before the 6 s clock is armed: `null` for the practice cards (no clock), else the last bubble's launch. */

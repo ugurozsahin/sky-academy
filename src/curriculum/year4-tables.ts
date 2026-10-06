@@ -54,5 +54,6 @@ export const y4Tables: Generator = (d: Difficulty, rng): Question => {
   const [prompt, answer, decoys] = form === 'mul' ? [`${t} × ${n} = ?`, p, productDecoys(t, n, rng)]
     : form === 'div' ? [`${p} ÷ ${t} = ?`, n, factorDecoys(n, t, rng)]
     : [`? × ${n} = ${p}`, t, factorDecoys(t, n, rng)];
-  return { ...q(prompt), answer: String(answer), options: shuffle(rng, [answer, ...decoys].map(String)) };
+  const fact = form === 'mul' ? { fact: `${t}×${n}` } : form === 'missing' ? { fact: `${t}×${n}` } : {};   // #1122: division is not tagged
+  return { ...q(prompt), ...fact, answer: String(answer), options: shuffle(rng, [answer, ...decoys].map(String)) };
 };
