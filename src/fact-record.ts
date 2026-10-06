@@ -36,3 +36,30 @@ export function mergeFacts(tally: Record<string, Ks2Fact>, entries: readonly Fac
 export function pushCheck(checks: readonly Ks2Check[], entry: Ks2Check): Ks2Check[] {
   return [{ ...entry, missed: entry.missed.slice(0, MAX_MISSED) }, ...checks].slice(0, MAX_CHECKS);
 }
+
+/** Secure (#1176): the last three tries were all right and none was slow. Fewer than three tries is not yet secure. */
+export const isSecure = (f: Ks2Fact): boolean => f.last === 'rrr';
+
+/**
+ * The child's least secure × facts (#1123), as lines of one or two fact keys: a fact shares its line with its reversed
+ * pair when that is listed too (`9×6`, `6×9`); a square fact stands alone. Facts with no tries or that are secure are
+ * left out; the rest rank by (wrong + slow) ÷ tries, highest first, then the most recent day, then the fact text.
+ */
+export function leastSecure(facts: Record<string, Ks2Fact>, n = 8): string[][] {
+  const tries = (f: Ks2Fact) => f.right + f.wrong + f.slow;
+  const ranked = Object.keys(facts).filter(k => tries(facts[k]) > 0 && !isSecure(facts[k]))
+    .sort((a, b) => {
+      const fa = facts[a], fb = facts[b];
+      return ((fb.wrong + fb.slow) / tries(fb)) - ((fa.wrong + fa.slow) / tries(fa))
+        || (fb.day ?? '').localeCompare(fa.day ?? '') || (a < b ? -1 : a > b ? 1 : 0);
+    });
+  const listed = new Set(ranked), used = new Set<string>(), lines: string[][] = [];
+  for (const k of ranked) {
+    if (used.has(k)) continue;
+    const [a, b] = k.split('×'), rev = `${b}×${a}`;
+    const line = rev !== k && listed.has(rev) && !used.has(rev) ? [k, rev] : [k];
+    line.forEach(x => used.add(x)); lines.push(line);
+    if (lines.length === n) break;
+  }
+  return lines;
+}

@@ -676,6 +676,26 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
   });
 
+  test('Time arrangements: Extra time and the beep persist, and a Sprint then runs 90 seconds (#1121)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    expect(await page.locator('button[data-timex]').evaluateAll(b => b.map(x => (x as HTMLElement).dataset.timex))).toEqual(['1', '1.5', '0']);   // Normal first
+    await page.click('button[data-timex="1.5"]');
+    await page.click('button[data-beep="on"]');
+    expect(await page.evaluate(() => localStorage.getItem('sna:beep'))).toBe('on');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('button[data-timex="1.5"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('button[data-beep="on"]')).toHaveAttribute('aria-checked', 'true');
+    await page.click('#back');
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await page.click('.topic[data-mixed]');
+    await expect(page.locator('#timer')).toContainText(/⏱ (90|89|88)/);
+  });
+
   test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
     await page.clock.install();
     await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));
@@ -3848,6 +3868,23 @@ test.describe('Sky Ninja Academy', () => {
     await expect(week).toContainText('10');          // 4 + 6 questions
     await expect(week).toContainText('80%');         // 8 of 10
     await expectFitsViewport(page, 'grown-ups This week block');
+  });
+
+  test('For grown-ups: "Facts to practise" lists the least secure × facts, and a child with none sees no section (#1123)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { ks2: { facts: { '9×6': { right: 0, wrong: 2, slow: 0, last: 'ww', day: '2026-10-06' }, '7×8': { right: 3, wrong: 0, slow: 0, last: 'rrr', day: '2026-10-06' } }, checks: [], words: {} } });
+    await openGrownUps(page);
+    const sec = page.locator('.parents-dash .p-h', { hasText: 'Facts to practise' });
+    await expect(sec).toBeVisible();
+    await expect(page.locator('.parents-dash')).toContainText('9 × 6');
+    await expect(page.locator('.parents-dash')).not.toContainText('7 × 8');   // secure: never listed
+    await sec.scrollIntoViewIfNeeded();
+    await expectFitsViewport(page, 'grown-ups Facts to practise');
+  });
+
+  test('For grown-ups: no × answers recorded, no "Facts to practise" section (#1123)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await expect(page.locator('.parents-dash .p-h', { hasText: 'Facts to practise' })).toHaveCount(0);
   });
 
   test('For grown-ups: "Share a progress summary" falls back to the clipboard, with no save code in the text (#942)', async ({ page }) => {

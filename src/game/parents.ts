@@ -7,6 +7,7 @@ import { safeRecord, today } from '../storage';
 import type { LogDay } from '../save-records';
 import { accuracy } from './sensei';
 import { beltFor } from './belts';
+import { leastSecure } from '../fact-record';
 
 // ---------- Grown-ups gate ----------
 // A times-table question a Reception/Year-1 child cannot do yet, but any grown-up answers at a glance.
@@ -52,6 +53,8 @@ export interface ParentSummary {
   streakDays: number; coins: number; stickers: number; stickersTotal: number;
   slips: SlipRow[];
   week: WeekSummary;
+  /** The "Facts to practise" lines (#1123); null when no × answer is recorded, so the section stays hidden. */
+  facts: string[] | null;
 }
 /** The last seven local days of play (#939), read from the day log. `accuracy` is null with no questions. */
 export interface WeekSummary { days: number; questions: number; accuracy: number | null; topics: string[] }
@@ -139,7 +142,15 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
     streakDays: data.streak.days, coins: data.coins, stickers: data.stickers.length, stickersTotal,
     slips: recentSlips(data, topics),
     week: weekSummary(data.log, today(now)),
+    facts: factsToPractise(data),
   };
+}
+
+/** The grown-ups "Facts to practise" lines (#1123), e.g. `9 × 6 and 6 × 9`; null when no times-table answer is recorded. */
+export function factsToPractise(data: SaveData): string[] | null {
+  const facts = data.ks2?.facts ?? {};
+  if (!Object.keys(facts).length) return null;
+  return leastSecure(facts).map(l => l.map(f => f.replace('×', ' × ')).join(' and '));
 }
 
 /** Whole-number percent for display (null → em dash handled by the caller). */

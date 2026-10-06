@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { numberWord } from '../../src/curriculum/util';
-import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, type SlipRow } from '../../src/game/parents';
+import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, factsToPractise, type SlipRow } from '../../src/game/parents';
 import { TOPICS, CORE_TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { topicRow, canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { ABOUT_LINES, aboutHTML } from '../../src/ui/about';
 import { settingsHTML } from '../../src/ui/parents-settings';
 import { slipsHTML } from '../../src/ui/parents-slips';
+import { factsHTML } from '../../src/ui/parents-facts';
 import { freshDojo } from '../../src/game/dojo';
 
 // minimal localStorage shim for node, same as tests/unit/storage.test.ts
@@ -427,5 +428,28 @@ describe('About this game (#946)', () => {
     const sources = import.meta.glob('/src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
     const hits = Object.entries(sources).flatMap(([f, src]) => /\bfetch\(|sendBeacon|XMLHttpRequest|new WebSocket/.test(src) ? [f] : []);
     expect(hits).toEqual([]);
+  });
+});
+
+describe('factsToPractise (#1123): the grown-ups "Facts to practise" lines', () => {
+  const fact = (wrong: number, last: string) => ({ right: 0, wrong, slow: 0, last, day: '2026-10-06' });
+  it('writes a pair as "9 × 6 and 6 × 9", with U+00D7 and spaces', () => {
+    const data = { ...base, ks2: { ...base.ks2, facts: { '9×6': fact(2, 'ww'), '6×9': { ...fact(1, 'w'), day: '2026-10-05' }, '7×7': fact(1, 'w') } } };
+    expect(factsToPractise(data)).toEqual(['7 × 7', '9 × 6 and 6 × 9']);
+    expect(parentSummary(data, CORE_TOPICS, YEARS, STICKER_IDS.length).facts).toEqual(['7 × 7', '9 × 6 and 6 × 9']);
+  });
+  it('is null with an empty tally, so the section is hidden', () => {
+    expect(factsToPractise(base)).toBeNull();
+    expect(factsHTML(null)).toBe('');
+  });
+  it('says so kindly when every fact tried is secure', () => {
+    const data = { ...base, ks2: { ...base.ks2, facts: { '7×8': { right: 3, wrong: 0, slow: 0, last: 'rrr' } } } };
+    expect(factsToPractise(data)).toEqual([]);
+    expect(factsHTML([])).toContain('p-empty');
+  });
+  it('renders one existing-class row per line, escaped', () => {
+    const html = factsHTML(['9 × 6 and 6 × 9']);
+    expect(html).toContain('<h3 class="p-h">Facts to practise</h3>');
+    expect(html.match(/class="p-topic"/g)).toHaveLength(1);
   });
 });

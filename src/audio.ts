@@ -86,7 +86,7 @@ export const sfx = {
   wrong: () => { tone(220, 0.25, 'sawtooth', 0.12, 150); },
   miss: () => { tone(300, 0.2, 'sine', 0.1, 200); },
   stage: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, 'triangle', 0.22, undefined, i * 0.12)); },
-  tap: () => tone(500, 0.05, 'square', 0.06),
+  tap: () => tone(500, 0.05, 'square', 0.06), alert: () => tone(1000, 0.2, 'sine', 0.22),   // #1121: the warning beep
   life: () => { tone(180, 0.3, 'sawtooth', 0.15, 90); noise(0.2, 0.1, 400); },
 };
 
