@@ -343,14 +343,14 @@
      judgement for the owner rather than one to settle in a stylesheet. Nothing is CROPPED either way — the budget
      fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
   .duel-q .vis { margin: 0; zoom: 0.62; }
+  .duel-q .symgrid { width: clamp(120px, 34vw, 150px); height: auto; }   /* #1538: 8-row grid left the bar 1.6px over budget at 640x360 */
   /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
      both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
      landscape screen the prompt gives up a few points — the same trade the `max-height: 640px` rule above already
      makes for the hint. Restored at full size on a tall landscape screen below. */
   .duel-q .prompt { font-size: clamp(18px, 3.4vw, 26px); }
-  /* Sideways the divider runs down the middle instead of across it — still drawn, still no layout cost. */
+  /* Sideways the divider runs down the middle (still drawn, no layout cost); both halves are full height, so both name tags sit at the foot, clear of the bar. */
   .duel-half.b::after { inset: 0 auto 0 0; width: 1px; height: auto; }
-  /* Both halves are full height now, so both name tags sit at the foot of their own half, clear of the bar. */
   .duel-half.b .duel-tag, .duel-half.a .duel-tag { top: auto; bottom: 8px; }
   .duel-rotate { display: none; }
 }
