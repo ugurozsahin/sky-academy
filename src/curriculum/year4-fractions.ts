@@ -5,7 +5,7 @@ import { y4FracOf } from './year4-fracof';
 // import: y4-fracadd
 // import: y4-decimals
 // import: y4-div10
-// import: y4-comparedec
+import { y4CompareDec } from './year4-comparedec';
 // import: y4-money
 import type { Topic } from './types';
 
@@ -16,6 +16,6 @@ export const Y4_FRACTIONS: Topic[] = [
   // slot: y4-fracadd
   // slot: y4-decimals
   // slot: y4-div10
-  // slot: y4-comparedec
+  { id: 'y4-comparedec', title: 'Compare & Round Decimals', icon: '📶', subject: 'maths', year: 'year4', nc: 'Y4 Fractions: round 1-dp decimals; compare and order to 2 dp', sequenceFrom: 3, gen: y4CompareDec },
   // slot: y4-money
 ];
