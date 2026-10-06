@@ -5,8 +5,8 @@ import { y4Column } from './year4-column';
 import { y4Tables, y4TablesQ } from './year4-tables';
 import { y4Mental } from './year4-mental';
 import { y4Story } from './year4-story';
-// import: y4-factorpairs
-// import: y4-shortmult
+import { y4FactorPairs } from './year4-factorpairs';
+import { y4ShortMult } from './year4-shortmult';
 // import: y4-story-md
 import type { Topic } from './types';
 
@@ -22,7 +22,7 @@ export const Y4_CALC: Topic[] = [
   { id: 'y4-tables-11', title: '11× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 11 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 11) },
   { id: 'y4-tables-12', title: '12× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 12 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 12) },
   { id: 'y4-mental', title: 'Mental Multiplying', icon: '💡', subject: 'maths', year: 'year4', nc: 'Y4 M&D: × 0, × 1, ÷ 1, derived facts, three numbers', gen: y4Mental },
-  // slot: y4-factorpairs
-  // slot: y4-shortmult
+  { id: 'y4-factorpairs', title: 'Factor Pairs', icon: '🔗', subject: 'maths', year: 'year4', nc: 'Y4 M&D: factor pairs and commutativity in mental calculations (4M15)', gen: y4FactorPairs },
+  { id: 'y4-shortmult', title: 'Short Multiplication', icon: '✏️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 2- and 3-digit × 1-digit, formal written method', sequenceFrom: 2, gen: y4ShortMult },
   // slot: y4-story-md
 ];
