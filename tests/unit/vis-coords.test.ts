@@ -22,6 +22,12 @@ describe('coords visual (#1129)', () => {
     }
   });
 
+  it('pins literal positions, not only the formula', () => {
+    expect(coordsPos(10, 0, 0)).toEqual([14, 112]);
+    expect(coordsPos(10, 10, 10)).toEqual([114, 12]);
+    expect(coordsPos(5, 2, 3)).toEqual([54, 52]);
+  });
+
   it('x grows to the right and y grows up the page', () => {
     expect(coordsPos(10, 5, 0)[0]).toBeGreaterThan(coordsPos(10, 4, 0)[0]);
     expect(coordsPos(10, 0, 5)[1]).toBeLessThan(coordsPos(10, 0, 4)[1]);
@@ -41,7 +47,7 @@ describe('coords visual (#1129)', () => {
 
   it('labels render at 13px or more at the 240px minimum width, and the width is the clamp', () => {
     expect(LABEL_FS * MIN_W / VB).toBeGreaterThanOrEqual(13);
-    expect(coordsSVG(grid(10, []))).toContain(`width:clamp(${MIN_W}px,70vw,300px)`);
+    expect(coordsSVG(grid(10, []))).toContain(`width:min(clamp(${MIN_W}px,70vw,300px),var(--duel-vis,300px))`);
     expect(coordsSVG(grid(10, [{ x: 1, y: 1, label: 'A' }]))).toContain(`font-size:${LABEL_FS}px`);
   });
 

@@ -89,7 +89,7 @@ describe('y4-coords (#1129)', () => {
       const q2 = t.gen(2, r), { dx, dy } = moveOf(q2.prompt.match(MOVE)!);
       move++;
       const a = vis(q2).points[0];
-      if (q2.options.includes(fmt({ x: a.x - dx, y: a.y + dy })) || q2.options.includes(fmt({ x: a.x + dx, y: a.y - dy }))) wrongWay++;
+      if (dx !== 0 && q2.options.includes(fmt({ x: a.x - dx, y: a.y + dy })) || dy !== 0 && q2.options.includes(fmt({ x: a.x + dx, y: a.y - dy }))) wrongWay++;
     }
     expect(swapped / read).toBeGreaterThan(0.5);
     expect(near / read).toBeGreaterThan(0.8);

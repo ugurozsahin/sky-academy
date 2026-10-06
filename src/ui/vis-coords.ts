@@ -4,8 +4,9 @@ import type { Visual } from '../curriculum';
 import { esc } from './dom';
 
 type Coords = Extract<Visual, { type: 'coords' }>;
-/** The viewBox is `VB` units square; the grid is `SPAN` units wide with its origin `PAD_L` in from the left and `PAD_B` up from the bottom. */
-export const VB = 128, SPAN = 100, PAD_L = 14, PAD_T = 12, PAD_B = VB - PAD_T - SPAN, LABEL_FS = 7.5;
+/** The viewBox is `VB` units square; the grid is `SPAN` units wide, `PAD_L` in from the left and `PAD_T` down from the top.
+ *  The drawn width is the clamp, but never above the duel's visual budget `--duel-vis` (#388), so the square grid is not cut off there. */
+export const VB = 128, SPAN = 100, PAD_L = 14, PAD_T = 12, LABEL_FS = 7.5;
 /** The drawn width range in CSS px: the smallest the labels are measured at in the unit test. */
 export const MIN_W = 240;
 const n2 = (n: number) => String(Math.round(n * 100) / 100);
@@ -47,5 +48,5 @@ export function coordsSVG(v: Coords): string {
     return `<circle class="pt" data-x="${p.x}" data-y="${p.y}" cx="${n2(cx)}" cy="${n2(cy)}" r="2.6" style="fill:var(--accent);stroke:var(--text);stroke-width:0.6"/>`
       + text(p.label, cx + 4, cy - 4.5, 'start', 'font-weight:700;fill:var(--text)', 'pl');
   }).join('');
-  return `<div class="vis"><svg viewBox="0 0 ${VB} ${VB}" class="coords" style="width:clamp(${MIN_W}px,70vw,300px);height:auto">${grid.join('')}${nums.join('')}${sides}${dots}</svg></div>`;
+  return `<div class="vis"><svg viewBox="0 0 ${VB} ${VB}" class="coords" style="width:min(clamp(${MIN_W}px,70vw,300px),var(--duel-vis,300px));height:auto">${grid.join('')}${nums.join('')}${sides}${dots}</svg></div>`;
 }
