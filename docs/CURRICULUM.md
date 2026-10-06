@@ -203,6 +203,7 @@ one module per strand (`src/curriculum/year4-*.ts`), a `// slot: <id>` comment p
 0–20,000 and may go down to −50 (negative numbers, NC 4M3).
 
 Maths:
+- y4-column — column addition and subtraction to 4 digits (4M10, 4M11): build the answer from a sum kept on the card with no exchange (d1) or one (d2); d3 has two exchanges, or an inverse check whose answer is the first number
 - y4-count — count in 6s, 7s, 9s, 25s and 1,000s; 1,000 more or less
 - y4-negative — count backwards through 0 to negative numbers (4M3): read a hidden tick on a number line that crosses 0 (d1); count back in 1s, 2s, 5s or 10s to the first negative (d2); count back from a positive start, or find a missing negative term (d3); every minus sign is U+2212, the sign-flip decoy is always offered
 - y4-story — two-step adding and subtracting stories (4M12): three-digit answers (d1), four-digit start with three-digit changes (d2), four-digit changes and measure units (d3); the first step's result is always offered as a decoy
@@ -213,6 +214,7 @@ Maths:
 - y4-tables-11 — 11× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
 - y4-tables-12 — 12× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
 - y4-coords — coordinates in the first quadrant (4M38–40): read a lettered point's (x, y) or find the point at a pair (d1); where does a point land after a move right/left and up/down (d2); which lettered point completes a rectangle (d3); drawn by the `coords` visual, answers computed from its points
+- y4-pv — place value, compare and order beyond 1,000 (4M4–5): the value of a digit in a four-digit number (d1 1,000–1,999; d2 to 9,999) or compare two numbers with < > = (d2); order four numbers sharing a thousands digit, smallest first (d3, `sequenceFrom: 3`)
 
 Writing:
 - y4-context — what a word with two or three meanings means in one sentence (NC Y3–4 comprehension, words in context); d1–d2 two-sense words, d3 three-sense words

@@ -1,5 +1,5 @@
 // Year 4 calculation strand (#1069). One topic so far (y4-tables); each remaining slot below is a future PR's own ticket.
-// import: y4-column
+import { y4Column } from './year4-column';
 // import: y4-mistake
 // import: y4-whichop
 import { y4Tables, y4TablesQ } from './year4-tables';
@@ -11,7 +11,7 @@ import { y4Story } from './year4-story';
 import type { Topic } from './types';
 
 export const Y4_CALC: Topic[] = [
-  // slot: y4-column
+  { id: 'y4-column', title: 'Column Add & Subtract', icon: '🗒️', subject: 'maths', year: 'year4', nc: 'Y4 A&S: column addition and subtraction to 4 digits; inverse to check', sequenceFrom: 1, gen: y4Column },
   // slot: y4-mistake
   { id: 'y4-story', title: 'Two-Step Problems', icon: '📝', subject: 'maths', year: 'year4', nc: 'Y4 A&S: two-step problems in contexts, deciding which operations to use', gen: y4Story },
   // slot: y4-whichop
