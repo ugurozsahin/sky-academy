@@ -1014,7 +1014,7 @@ describe('the repeat key holds the whole question (#412)', () => {
     const visual = v?.type === 'coins' ? [...new Set(v.coins)].sort((a, b) => a - b).join('/')
       : v?.type === 'numberline' ? `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`
       : v?.type === 'chart' ? `${v.kind}/${v.rows.map(r => r.n).join(',')}`
-      : '';
+      : v?.type === 'coords' ? `${v.size}/${v.points.map(c => `${c.x},${c.y}`).sort().join(';')}` : '';   // #1129: where the points are, not their letters
     // #451: the same opt-in the key reads — `options` is a re-shuffled decoy pool everywhere else, so folding
     // it in unconditionally would make this oracle too fine, the B1 direction #412's own review already found.
     const options = q.optionsAreContent ? [...q.options].sort().join('\u0001') : '';

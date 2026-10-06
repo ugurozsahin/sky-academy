@@ -4,6 +4,7 @@ import { coinLabel, NOTES, isNote } from '../curriculum/util';
 import { esc } from './dom';
 import { barChartSVG } from './vis-axis-chart';
 import { geometrySVG } from './vis-geometry';
+import { coordsSVG } from './vis-coords';
 
 /** `n` objects in rows of five; slots past `keep` are crossed out ("take away"); at least one full row of slots is always shown. */
 export function fiveFrames(n: number, emoji: string, keep = n): string {
@@ -95,14 +96,18 @@ export function renderVisual(v: Visual | undefined): string {
       const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
       return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
     }
-    case 'chart': return v.kind === 'bar' ? barChartSVG(v) : chartHTML(v);   // the bar chart is its own module (#1076); tally, block and pictogram output is unchanged
+    case 'chart': return chartOrBar(v);   // the bar chart is its own module (#1076); tally, block and pictogram output is unchanged
     case 'symmetry': return symmetryHtml(v);
     case 'geometry': return geometrySVG(v);
+    case 'coords': return coordsSVG(v);
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>').replace(/\n/g, '<br>')}</div>`;
     case 'strip': return `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }
 }
+
+/** The bar chart is `vis-axis-chart.ts`'s; the other chart kinds are `chartHTML`'s. */
+const chartOrBar = (v: Extract<Visual, { type: 'chart' }>): string => v.kind === 'bar' ? barChartSVG(v) : chartHTML(v);
 
 /** Tally, block diagram and pictogram (Y2, #8) — the bar chart is `vis-axis-chart.ts`'s. */
 function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' }>): string {
