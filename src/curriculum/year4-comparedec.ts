@@ -20,13 +20,12 @@ function round(rng: Rng): Question {
     { say: `${ks2Say(s)} to the nearest whole number?`, hint: 'Look at the tenths digit: halfway or more rounds up', hintIsData: false });
 }
 
-/** d2: "3.45 ? 3.54" — same whole part, same places; one card in five equal, one in three a swapped-digit pair. */
+/** d2: "3.45 ? 3.54" — same whole part, same places; one card in five equal, two in five a swapped-digit pair (2 dp). */
 function compare(rng: Rng): Question {
-  const dp = rng() < 0.5 ? 1 : 2, w = ri(rng, 0, 9), top = 10 ** dp;
+  const r = rng(), swap = r >= 0.2 && r < 0.6, dp = swap || rng() < 0.5 ? 2 : 1, w = ri(rng, 0, 9), top = 10 ** dp;
   let x: number, y: number;
-  const r = rng();
   if (r < 0.2) { x = y = ri(rng, 1, top - 1); }
-  else if (dp === 2 && r < 0.6) { const h = ri(rng, 1, 9), l = ri(rng, 0, 9); x = h * 10 + l; y = l * 10 + h; if (x === y) y = x + 10 > 99 ? x - 10 : x + 10; }
+  else if (swap) { const h = ri(rng, 1, 9), l = ri(rng, 0, 9); x = h * 10 + l; y = l * 10 + h; if (x === y) y = x + 10 > 99 ? x - 10 : x + 10; }
   else { x = ri(rng, 0, top - 1); y = ri(rng, 0, top - 1); }
   const [a, b] = [dec(w * top + x, dp), dec(w * top + y, dp)];
   const c = compareDec(a, b), ans = c < 0 ? '<' : c > 0 ? '>' : '=';
