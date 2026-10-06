@@ -3,12 +3,7 @@
 // import: y4-mistake
 // import: y4-story
 // import: y4-whichop
-import { y4Tables } from './year4-tables';
-// import: y4-tables-6
-// import: y4-tables-7
-// import: y4-tables-9
-// import: y4-tables-11
-// import: y4-tables-12
+import { y4Tables, y4TablesQ } from './year4-tables';
 // import: y4-mental
 // import: y4-factorpairs
 // import: y4-shortmult
@@ -21,11 +16,11 @@ export const Y4_CALC: Topic[] = [
   // slot: y4-story
   // slot: y4-whichop
   { id: 'y4-tables', title: 'Times Tables to 12 × 12', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: multiplication and division facts to 12 × 12', gen: y4Tables },
-  // slot: y4-tables-6
-  // slot: y4-tables-7
-  // slot: y4-tables-9
-  // slot: y4-tables-11
-  // slot: y4-tables-12
+  { id: 'y4-tables-6', title: '6× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 6 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 6) },
+  { id: 'y4-tables-7', title: '7× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 7 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 7) },
+  { id: 'y4-tables-9', title: '9× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 9 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 9) },
+  { id: 'y4-tables-11', title: '11× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 11 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 11) },
+  { id: 'y4-tables-12', title: '12× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 12 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 12) },
   // slot: y4-mental
   // slot: y4-factorpairs
   // slot: y4-shortmult

@@ -3167,6 +3167,21 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
+  test('Ninja Sprint: the 7× table drill asks only the seven times table (#1126)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    await page.click('.island[data-year="year4"]');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y4-tables-7"]');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 5; i++) {
+      const s = await state(page);
+      expect(s.topic).toBe('y4-tables-7');
+      expect(s.prompt).toContain('7');
+      await solveCurrent(page);
+    }
+  });
+
   test('Ninja Sprint: the Bonds to 10 drill asks only totals of 10 (#917)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

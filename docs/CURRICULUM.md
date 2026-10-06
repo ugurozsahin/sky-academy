@@ -205,3 +205,8 @@ one module per strand (`src/curriculum/year4-*.ts`), a `// slot: <id>` comment p
 Maths:
 - y4-count — count in 6s, 7s, 9s, 25s and 1,000s; 1,000 more or less
 - y4-tables — multiplication and division facts to 12 × 12: the 6 and 11 tables (d1), 7, 9 and 12 (d2), every table 2–12 weighted as the STA Tables Check weights them, with `? × n = P` cards (d3)
+- y4-tables-6 — 6× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
+- y4-tables-7 — 7× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
+- y4-tables-9 — 9× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
+- y4-tables-11 — 11× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
+- y4-tables-12 — 12× table drill (4M13): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
