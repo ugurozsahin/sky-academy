@@ -6,7 +6,7 @@ import { y4Tables, y4TablesQ } from './year4-tables';
 import { y4Story } from './year4-story';
 // import: y4-mental
 // import: y4-factorpairs
-// import: y4-shortmult
+import { y4ShortMult } from './year4-shortmult';
 // import: y4-story-md
 import type { Topic } from './types';
 
@@ -23,6 +23,6 @@ export const Y4_CALC: Topic[] = [
   { id: 'y4-tables-12', title: '12× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 12 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 12) },
   // slot: y4-mental
   // slot: y4-factorpairs
-  // slot: y4-shortmult
+  { id: 'y4-shortmult', title: 'Short Multiplication', icon: '✏️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 2- and 3-digit × 1-digit, formal written method', sequenceFrom: 2, gen: y4ShortMult },
   // slot: y4-story-md
 ];
