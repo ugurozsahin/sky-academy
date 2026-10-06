@@ -123,6 +123,7 @@
 👴	0.6	old man
 👾	0.6	alien monster
 💍	0.6	ring
+💡	0.6	light bulb
 💬	0.6	speech balloon
 💯	0.6	hundred points
 💰	0.6	money bag
