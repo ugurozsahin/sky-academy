@@ -1,14 +1,17 @@
 // The grown-ups Settings section (#904): the 3-D pictures control plus the per-ninja "Slower bubbles" row
 // (#905), under one "Settings" heading so #906/#907/#940 each have room to add their own row.
-import { REST_SETTINGS, restSetting, setRestSetting, setThreeSetting, THREE_SETTINGS, threeSetting, type RestSetting, type ThreeSetting } from '../device-settings';
+import { beepSetting, REST_SETTINGS, restSetting, setBeepSetting, setRestSetting, setThreeSetting, THREE_SETTINGS, threeSetting, type RestSetting, type ThreeSetting } from '../device-settings';
 import { sfx } from '../audio';
 import { isWriteFailing, load, save } from '../storage';
 import { $, $$ } from './dom';
 import { shownYears, type YearId } from '../curriculum';
+import type { Settings } from '../save-records';
 import { schoolYearFromBirthDate, yearIdFromLevel } from '../school-year';
 
 export const THREE_LABEL: Readonly<Record<ThreeSetting, string>> = { auto: 'Auto', on: 'On', off: 'Off' };
 export const REST_LABEL: Readonly<Record<RestSetting, string>> = { off: 'Off', '10': '10 min', '20': '20 min', '30': '30 min' };
+export const TIMEX_ORDER = ['1', '1.5', '0'] as const;   // #1121: a grown-up sees Normal first (an object's integer-like keys would sort 0 first)
+export const TIMEX_LABEL: Readonly<Record<`${Settings['timeX']}`, string>> = { '1': 'Normal', '1.5': 'Extra time (×1.5)', '0': 'No time limit' };
 const SLOW_LABEL: Readonly<Record<'off' | 'on', string>> = { off: 'Off', on: 'On' };
 
 /** The Settings section's markup: the 3-D pictures control, then "Slower bubbles" (#905). */
@@ -26,6 +29,16 @@ export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean
       <div class="tabs p-slow-pick" role="radiogroup" aria-label="Slower bubbles">${(['off', 'on'] as const).map(v =>
         `<button class="tab${(v === 'on') === slow ? ' on' : ''}" data-slow="${v}" role="radio" aria-checked="${(v === 'on') === slow}">${SLOW_LABEL[v]}</button>`).join('')}</div>
       <p class="p-three-msg" id="slow-msg" role="status" hidden></p>
+    </div>
+    <div class="p-three p-time">
+      <p class="p-three-say">Some children sit the Tables Check with arrangements from school. <b>Extra time</b> gives every timed question one and a half times as long, and a Ninja Sprint 90 seconds; <b>No time limit</b> never runs a question out (a Sprint gets 90 seconds). Sprint bests are only kept for Normal.</p>
+      <div class="tabs p-time-pick" role="radiogroup" aria-label="Time for timed games">${TIMEX_ORDER.map(v =>
+        `<button class="tab${Number(v) === load().settings.timeX ? ' on' : ''}" data-timex="${v}" role="radio" aria-checked="${Number(v) === load().settings.timeX}">${TIMEX_LABEL[v]}</button>`).join('')}</div>
+      <p class="p-three-msg" id="timex-msg" role="status" hidden></p>
+      <p class="p-three-say">A short beep can warn a child that time is nearly up.</p>
+      <div class="tabs p-beep-pick" role="radiogroup" aria-label="Beep 2 seconds before time runs out">${(['off', 'on'] as const).map(v =>
+        `<button class="tab${(v === 'on') === beepSetting() ? ' on' : ''}" data-beep="${v}" role="radio" aria-checked="${(v === 'on') === beepSetting()}">Beep 2 seconds before time runs out: ${SLOW_LABEL[v]}</button>`).join('')}</div>
+      <p class="p-three-msg" id="beep-msg" role="status" hidden></p>
     </div>
     <div class="p-three p-rest">
       <p class="p-three-say">After this long, the next results screen suggests a little break. Nothing stops or locks; it is only a suggestion.</p>
@@ -86,6 +99,7 @@ export function bindSettings(): void {
     msg.hidden = stored;
     if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays on ${REST_LABEL[now]}.`; }
   }));
+  bindTimeSettings();
   // #1055: stored in `ks2.schoolYear` only. The birthday is read once to fill the select and is never saved.
   const pick = $('#school-year') as HTMLSelectElement;
   pick.addEventListener('change', () => {
@@ -101,4 +115,26 @@ export function bindSettings(): void {
     pick.value = id;
     pick.dispatchEvent(new Event('change'));
   });
+}
+
+/** #1121: the time allowance is per-ninja (the save); the warning beep is device-wide, painted from the store. */
+function bindTimeSettings(): void {
+  $$('button[data-timex]').forEach(b => b.addEventListener('click', () => {
+    sfx.tap();
+    const timeX = Number(b.dataset.timex) as 1 | 1.5 | 0;
+    save({ settings: { ...load().settings, timeX } });
+    $$('button[data-timex]').forEach(o => { const on = Number(o.dataset.timex) === timeX; o.classList.toggle('on', on); o.setAttribute('aria-checked', String(on)); });
+    const msg = $('#timex-msg'), failed = isWriteFailing();
+    msg.hidden = !failed;
+    if (failed) { sfx.wrong(); msg.textContent = `This device is not saving right now, so this choice may be lost when the game closes.`; }
+  }));
+  $$('button[data-beep]').forEach(b => b.addEventListener('click', () => {
+    sfx.tap();
+    const stored = setBeepSetting(b.dataset.beep === 'on'), now = beepSetting();
+    $$('button[data-beep]').forEach(o => { const on = (o.dataset.beep === 'on') === now; o.classList.toggle('on', on); o.setAttribute('aria-checked', String(on)); });
+    const msg = $('#beep-msg');
+    msg.hidden = stored;
+    if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so the beep stays ${now ? 'on' : 'off'}.`; }
+    else if (now) sfx.alert();
+  }));
 }

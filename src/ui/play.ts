@@ -2,13 +2,13 @@ import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatar
 import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
-import { MODES, holdFor } from '../game/modes';
+import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools';   // #1065: one pool rule
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
 } from '../storage';
-import { equippedItem } from '../game/shop';
+import { equippedItem } from '../game/shop'; import { tickWithBeep } from './check-beep';
 import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
@@ -89,7 +89,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
-    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, resume: o.resume, legend: o.legend, slower: d.settings.slow,
+    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, resume: o.resume, legend: o.legend, ...timeOptsFor(o.mode, d.settings),
     pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => answerableBy(t, 'mixed')) : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
@@ -106,7 +106,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     const now = performance.now();
     const dt = lastTick ? now - lastTick : 0;
     lastTick = now;
-    if (!arena?.paused && !paused && !session.ended) session.tick(dt);   // #1119: a no-arena card's clock stops under Pause too
+    if (!arena?.paused && !paused && !session.ended) tickWithBeep(session, dt);   // #1119: a no-arena card's clock stops under Pause too
   }, 100);
 
   if (bubbles) {

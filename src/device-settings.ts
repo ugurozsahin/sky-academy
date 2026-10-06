@@ -41,3 +41,14 @@ export function setRestSetting(v: RestSetting): boolean {
   try { if (v === 'off') localStorage.removeItem(REST_KEY); else localStorage.setItem(REST_KEY, v); } catch { /* fall through to the read */ }
   return restSetting() === v;
 }
+
+/* ─── Warning beep: the grown-ups' "Beep 2 seconds before time runs out" (#1121) ─────────────────────────────
+ * Device-wide like the rest: an access arrangement belongs to the tablet in the grown-up's hands. Off is the
+ * default, stored as absence; on is `'on'`. */
+const BEEP_KEY = 'sna:beep';
+export const beepSetting = (): boolean => readItem(BEEP_KEY) === 'on';
+/** Returns whether the store now holds `on` — a refused write leaves the previous answer, and the control paints that. */
+export function setBeepSetting(on: boolean): boolean {
+  try { if (on) localStorage.setItem(BEEP_KEY, 'on'); else localStorage.removeItem(BEEP_KEY); } catch { /* fall through to the read */ }
+  return beepSetting() === on;
+}
