@@ -161,6 +161,7 @@
 🕷	0.7	spider
 🕸	0.7	spider web
 🖊	0.7	pen
+🗒	0.7	spiral notepad
 🗺	0.7	world map
 🚀	0.6	rocket
 🚂	1.0	locomotive

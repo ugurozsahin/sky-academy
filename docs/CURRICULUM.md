@@ -203,6 +203,7 @@ one module per strand (`src/curriculum/year4-*.ts`), a `// slot: <id>` comment p
 0–20,000 and may go down to −50 (negative numbers, NC 4M3).
 
 Maths:
+- y4-column — column addition and subtraction to 4 digits (4M10, 4M11): build the answer from a sum kept on the card with no exchange (d1) or one (d2); d3 has two exchanges, or an inverse check whose answer is the first number
 - y4-count — count in 6s, 7s, 9s, 25s and 1,000s; 1,000 more or less
 - y4-negative — count backwards through 0 to negative numbers (4M3): read a hidden tick on a number line that crosses 0 (d1); count back in 1s, 2s, 5s or 10s to the first negative (d2); count back from a positive start, or find a missing negative term (d3); every minus sign is U+2212, the sign-flip decoy is always offered
 - y4-tables — multiplication and division facts to 12 × 12: the 6 and 11 tables (d1), 7, 9 and 12 (d2), every table 2–12 weighted as the STA Tables Check weights them, with `? × n = P` cards (d3)
