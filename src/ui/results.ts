@@ -187,6 +187,7 @@ export const spokenLine = (l: ResultCandidate): string => l.spoken ?? l.text;
  * results candidates, so `commitResult()` stays one line for it.
  */
 export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r: { correct: number; score: number }): { newBest: boolean; candidates: ResultCandidate[] } {
+  if (load().settings.timeX !== 1) return { newBest: false, candidates: [] };   // #1121: a best is always a 60-second run
   if (!topic) return { newBest: recordSprint(year.id, r.score), candidates: [] };
   const before = load().progress[topic.id]?.sprint ?? 0, newBest = recordTopicSprint(topic.id, r.correct);
   const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null;

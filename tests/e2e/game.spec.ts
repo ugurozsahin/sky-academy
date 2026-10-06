@@ -676,6 +676,25 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
   });
 
+  test('Time arrangements: Extra time and the beep persist, and a Sprint then runs 90 seconds (#1121)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await page.click('button[data-timex="1.5"]');
+    await page.click('button[data-beep="on"]');
+    expect(await page.evaluate(() => localStorage.getItem('sna:beep'))).toBe('on');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('button[data-timex="1.5"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('button[data-beep="on"]')).toHaveAttribute('aria-checked', 'true');
+    await page.click('#back');
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await page.click('.topic[data-mixed]');
+    await expect(page.locator('#timer')).toContainText(/⏱ (90|89|88)/);
+  });
+
   test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
     await page.clock.install();
     await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));
