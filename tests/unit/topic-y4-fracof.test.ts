@@ -30,6 +30,23 @@ describe('y4-fracof (#1144)', () => {
     for (let s = 1; s <= 50; s++) { const ds = decoys(rng(s), 1000, 100, 99, 990); expect(ds).toHaveLength(3); ds.forEach(v => { expect(v).toBeLessThan(1000); expect(v).not.toBe(990); }); }
   });
 
+  it('story speech reads the fraction and units in words, starts each sentence in capitals and ends in a question mark', () => {
+    let stories = 0;
+    for (const q of draw(3, 800)) {
+      if (PLAIN.test(q.prompt)) { expect(q.say).toMatch(/ equals what\?$/); continue; }
+      stories++;
+      expect(q.say).toMatch(/\?$/); expect(q.say).not.toMatch(/ what\??$/);
+      expect(q.say).not.toMatch(/\. [a-z]/); expect(q.say).not.toContain('FRAC');
+    }
+    expect(stories).toBeGreaterThan(200);
+  });
+
+  it('d2 and story fractions are in lowest terms', () => {
+    const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+    for (const q of draw(2, 400)) { const m = q.prompt.match(PLAIN)!; expect(gcd(Number(m[1]), Number(m[2]))).toBe(1); }
+    for (const q of draw(3, 800)) { const m = q.prompt.match(STORY); if (m) expect(gcd(Number(m[3]), Number(m[4]))).toBe(1); }
+  });
+
   it('is registered for Year 4', () => { expect(topic.year).toBe('year4'); });
 
   for (const d of [1, 2, 3] as Difficulty[]) {

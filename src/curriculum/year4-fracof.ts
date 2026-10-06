@@ -37,6 +37,12 @@ export function decoys(rng: Rng, whole: number, den: number, num_: number, answe
   return out.slice(0, 3);
 }
 
+/** A story spoken aloud: units and the fraction in words, the closing question mark left alone (`ks2Say` would turn a trailing "?" into " what"). */
+function speakStory(text: string, frac: string): string {
+  const spoken = ks2Say(text.replace(/\?$/, '')).replace('FRAC', ks2Say(frac));
+  return spoken.replace(/(^|\. )([a-z])/g, (_, a: string, b: string) => a + b.toUpperCase()) + '?';
+}
+
 function card(rng: Rng, whole: number, n: number, den: number, opts: { story?: Story; part: number }): Question {
   const w = num(whole), f = `${n}/${den}`;
   const left = opts.story?.ask === 'left';
@@ -45,7 +51,7 @@ function card(rng: Rng, whole: number, n: number, den: number, opts: { story?: S
   const ds = decoys(rng, whole, den, n, answer, left ? [opts.part] : []);
   const lab = (v: number) => (opts.story ? `${num(v)} ${opts.story.unit}` : num(v));
   const prompt = opts.story ? opts.story.text(w, f) : `${f} of ${w} = ?`;
-  const say = opts.story ? ks2Say(opts.story.text(w, f)) : `${ks2Say(f)} of ${w} equals what?`;
+  const say = opts.story ? speakStory(opts.story.text(w, 'FRAC'), f) : `${ks2Say(f)} of ${w} equals what?`;
   return wordQ(rng, prompt, lab(answer), ds.map(lab),
     { say, hint: opts.story?.hint ?? (n === 1 ? 'Divide by the bottom number' : 'Divide by the bottom number, then multiply by the top'), hintIsData: false });
 }
