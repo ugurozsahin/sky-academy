@@ -126,3 +126,9 @@ describe('y3-tables (#1087)', () => {
     expect(s.units).toBeLessThanOrEqual(0.3); expect(s.leading).toBeLessThanOrEqual(0.3);
   });
 });
+
+describe('y3-tables is untouched by the drills (#1125)', () => {
+  it('draws exactly what the shared factory draws with no table, for the same seed', () => {
+    for (const d of DIFFS) for (let s = 1; s <= 200; s++) expect(topic.gen(d, rng(s))).toEqual(y3TablesQ(d, rng(s)));
+  });
+});

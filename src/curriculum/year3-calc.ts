@@ -4,9 +4,6 @@
 // import: y3-missing
 // import: y3-story-as
 // import: y3-tables
-// import: y3-tables-3
-// import: y3-tables-4
-// import: y3-tables-8
 // import: y3-multiply
 // import: y3-story
 import { y3Mental } from './year3-mental';
@@ -27,7 +24,9 @@ export function y3TablesQ(d: Difficulty, rng: () => number, table?: 3 | 4 | 8): 
     // #1058: one place slip (±10, shares the units digit), then the neighbouring facts, those sharing the leading digit first
     const lead = (v: number) => String(v)[0];
     const slip = [ans + 10, ans - 10].filter(v => v >= 0 && v <= max), near = shuffle(rng, slips).filter(v => v >= 0 && v <= max);
-    const cands = [...slip.slice(0, 1), ...near.filter(v => lead(v) === lead(ans)), ...near, ...slip.slice(1)];
+    // the drills (#1125): on a fixed table the neighbours often miss the answer's leading digit (8 × 8 = 64), so offer a close number that shares it
+    const close = table && ans >= 20 && !near.some(v => lead(v) === lead(ans)) ? shuffle(rng, [ans + 1, ans - 1, ans + 2, ans - 2]).filter(v => lead(v) === lead(ans) && v <= max) : [];
+    const cands = [...slip.slice(0, 1), ...near.filter(v => lead(v) === lead(ans)), ...close.slice(0, 1), ...near, ...slip.slice(1)];
     return numQ(rng, prompt, ans, { min: 0, max, distractors: cands, ...q(prompt), ...extra });
   };
   const fact = (a: number, b: number): Pick<Question, 'fact'> => a >= 2 && b >= 2 ? { fact: `${a}×${b}` } : {};   // #1122
@@ -110,9 +109,9 @@ export const Y3_CALC: Topic[] = [
   { id: 'y3-missing', title: 'Missing Numbers to 1,000', icon: '❓', subject: 'maths', year: 'year3', nc: 'Y3 A&S: missing number problems (3M10)', gen: y3Missing },
   { id: 'y3-story-as', title: 'Adding and Subtracting Problems', icon: '📚', subject: 'maths', year: 'year3', nc: 'Y3 A&S: one- and two-step problems within 1,000 (3M10)', gen: y3StoryAs },
   { id: 'y3-tables', title: '3, 4 and 8 Times Tables', icon: '✖️', subject: 'maths', year: 'year3', nc: 'Y3 M&D: 3, 4 and 8 tables, × and ÷ (3M11)', gen: y3Tables },
-  // slot: y3-tables-3
-  // slot: y3-tables-4
-  // slot: y3-tables-8
+  { id: 'y3-tables-3', title: '3× table', icon: '✖️', subject: 'maths', year: 'year3', nc: 'Y3 M&D: 3 times table (3M11)', drill: true, gen: (d, rng) => y3TablesQ(d, rng, 3) },
+  { id: 'y3-tables-4', title: '4× table', icon: '✖️', subject: 'maths', year: 'year3', nc: 'Y3 M&D: 4 times table (3M11)', drill: true, gen: (d, rng) => y3TablesQ(d, rng, 4) },
+  { id: 'y3-tables-8', title: '8× table', icon: '✖️', subject: 'maths', year: 'year3', nc: 'Y3 M&D: 8 times table (3M11)', drill: true, gen: (d, rng) => y3TablesQ(d, rng, 8) },
   { id: 'y3-multiply', title: '2-Digit × 1-Digit', icon: '✖️', subject: 'maths', year: 'year3', nc: 'Y3 M&D: 2-digit × 1-digit, related facts (3M12)', sequenceFrom: 3, gen: y3Multiply },
   { id: 'y3-story', title: 'Times-as-Many Problems', icon: '📖', subject: 'maths', year: 'year3', nc: 'Y3 M&D: scaling and correspondence problems (3M13)', gen: y3Story },
 ];

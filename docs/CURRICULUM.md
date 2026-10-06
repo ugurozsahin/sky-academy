@@ -163,6 +163,9 @@ Maths:
 - y3-missing — the gap in `a + ? = c` or `a − ? = c`, a multiple of 10 or 100 (d1), the gap in any position with a 2-digit number (d2), 3-digit numbers with exchanges and the equals sign on the left half the time, with `slow` (d3)
 - y3-story-as — one-step story problems within 1,000, in one unit: ones, tens or hundreds (d1), a 2- or 3-digit amount with an exchange (d2), two-step stories with the first-step decoy and `slow` (d3)
 - y3-tables — the 4 and 8 times tables built by doubling, with the known 2×/4× fact shown (d1); the 3, 4 and 8 facts as × both ways and ÷ (d2); the missing factor (d3). `y3TablesQ(d, rng, table)` fixes the table for the drills
+- y3-tables-3 — 3× table drill (3M11): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
+- y3-tables-4 — 4× table drill (3M11): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
+- y3-tables-8 — 8× table drill (3M11): Sprint chooser only; × at d1, adds ÷ at d2, adds the missing factor at d3
 - y3-multiply — related facts such as 30 × 4 from the shown 3 × 4 = 12, and 120 ÷ 4 (d1); 2-digit × 1-digit with 11–49 × 2, 3, 4, 5 or 8 (d2); the same products built digit by digit with the sum kept on the card (d3, `sequenceFrom: 3`)
 - y3-story — spoken story problems: scaling ("4 times as tall", ×2–×5 and ×10, d1), correspondence and fair sharing ("3 hats and 4 coats, how many outfits?", d2), ×8 and the inverse ("12 outfits from 3 hats, how many coats?", d3); the adding slip is always a decoy
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
