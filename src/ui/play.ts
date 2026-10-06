@@ -13,7 +13,7 @@ import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { createHud, heartCount } from './hud';
-import { inputFor, inputMarkup, mountPad, mountTracer } from './play-input';   // #1064: how a child answers
+import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './play-input';   // #1064: how a child answers
 import { BOMB, createPlaySession, type ResultPayout } from './play-session'; import { factsOf } from './play-facts';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
@@ -21,7 +21,7 @@ import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'>;   // pool = Sensei training; resume = #931
+export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'> & { input?: PlayInput };   // #1120
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
   const d = load(); const av = avatarById(d.avatar);

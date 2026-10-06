@@ -50,7 +50,7 @@ export function mountTracer(q: Question, deps: TracerDeps): Tracer {
 }
 
 /** The number pad driving one play screen (#1119); `answer()`/`wrong()` are the `window.__sna` hooks' way of typing on it. */
-export interface PadInput { on: boolean; next?(q: Question): void; answer(): boolean; wrong(): boolean; destroy(): void }
+export interface PadInput { on: boolean; next?(q: Question): void; value(): string; answer(): boolean; wrong(): boolean; destroy(): void }
 
 /**
  * Mount the keypad branch (#1064) on its `#keypad` element, or an inert one (`on: false`) on any other screen, so the screen never branches on it. ✓ sends the typed number to
@@ -58,7 +58,7 @@ export interface PadInput { on: boolean; next?(q: Question): void; answer(): boo
  * `session` is a thunk because the pad is built before the Session is.
  */
 export function mountPad(kind: PlayInput, session: () => Session, scale: (ms: number) => number): PadInput {
-  if (kind !== 'keypad') return { on: false, answer: () => false, wrong: () => false, destroy() {} };
+  if (kind !== 'keypad') return { on: false, value: () => '', answer: () => false, wrong: () => false, destroy() {} };
   const live = () => { const s = session(); return !!s.current && !s.waiting && !s.ended; };
   const pad = mountKeypad($('#keypad'), { maxLen: 8, enabled: live }, v => {
     const s = session(); const q = s.current;
@@ -72,7 +72,8 @@ export function mountPad(kind: PlayInput, session: () => Session, scale: (ms: nu
   };
   return {
     on: true,
-    next: () => { pad.clear(); session().armQuestionClock(scale); },   // the clock starts as the card does; a mode without one ignores it
+    value: () => pad.value(),
+    next: () => { pad.clear(); const s = session(); s.pending = () => pad.value(); s.armQuestionClock(scale, true); },   // the clock starts as the card does; a mode without one ignores it
     answer: () => type(session().current?.answer ?? ''),
     wrong: () => type(differentNumber(session().current?.answer ?? '')),
     destroy: () => pad.destroy(),

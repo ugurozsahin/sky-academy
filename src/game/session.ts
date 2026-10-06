@@ -6,6 +6,7 @@ import type { AnswerTally } from '../storage';
 import type { Slip } from '../save-records';
 export { repeatKey } from './repeat-key';
 import { repeatKey } from './repeat-key';
+import { sameNumber } from './typed';
 import { weightedPick } from './sensei';
 
 // mission = 5 staged waves with lives · endless = Sky Storm, ramps until lives run out · sprint = 60-second time attack, no lives
@@ -106,6 +107,8 @@ export class Session {
   timeLeft: number;                                     // ms, sprint only (0 otherwise)
   /** Per-question clock (#1063), ms left on the armed question — 0 when there is none. */
   questionLeft = 0;
+  /** The digits showing on a number pad right now (#1120); the UI sets it. At expiry they are submitted as the answer. */
+  pending: () => string = () => '';
   /** How long the last decided question took, ms (the full budget for an expiry) — #1122 reads it. */
   lastAnswerMs = 0;
   private qArmed = false; private qDelay = 0; private qElapsed = 0; private qBudget = 0;
@@ -149,10 +152,10 @@ export class Session {
    * `questionMs`, passed through `scale` (the UI's #32 test-speed `scaled`), times `timeScale` (`Infinity` = no limit). A mode without `questionMs`
    * has no clock, so this is a no-op there.
    */
-  armQuestionClock(scale: (ms: number) => number = ms => ms) {
+  armQuestionClock(scale: (ms: number) => number = ms => ms, waveless = false) {
     const base = this.spec.questionMs;
     if (base === undefined || this.qArmed || !this.current || this.waiting || this.ended) return;   // a second arm (a sequence relaunch) never refills the budget
-    const wait = this.spec.armDelay ? this.spec.armDelay(this.questionsAsked - 1, ((this.current.options?.length ?? 1) - 1) * 500) : 0;   // #1118: the 6 s starts at the last bubble's launch (speed 0: 500 ms apart); no clock for practice cards
+    const wait = this.spec.armDelay ? this.spec.armDelay(this.questionsAsked - 1, waveless ? 0 : ((this.current.options?.length ?? 1) - 1) * 500) : 0;   // #1118: the 6 s starts at the last bubble's launch (speed 0: 500 ms apart); no clock for practice cards
     if (wait === null) return;
     this.qDelay = scale(wait);
     this.qBudget = scale(base) * (this.o.timeScale ?? 1); this.questionLeft = this.qBudget; this.qElapsed = 0; this.qArmed = true;
@@ -162,7 +165,7 @@ export class Session {
     if (!this.qArmed || this.waiting) return;
     if (this.qDelay > 0) { this.qDelay -= ms; return; }
     this.qElapsed += ms; this.questionLeft = Math.max(0, this.questionLeft - ms);
-    if (this.questionLeft === 0) this.expire();
+    if (this.questionLeft === 0) { const typed = this.pending(); if (typed && this.current) this.hit(sameNumber(typed, this.current.answer) ? this.current.answer : typed); else this.expire(); }   // #1120: what is on a number pad counts
   }
   /** The question was decided (or replaced): stop the clock and keep how long it took. */
   private stopClock(expired = false) {
