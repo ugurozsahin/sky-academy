@@ -51,7 +51,7 @@ your first finding and the only one you can report.
    (check 6, retired 2026-09-17, is why quota is no longer the first guess). Past 60 minutes it is a finding. Check its `head_sha` against main's tip: after a
    docs-only merge the newest run belongs to an older commit, which is correct and not a finding, but it does
    mean the green you are reading is not about the current tip. Say which commit it covers.
-2. **Did the nightly run, and did it pass?** `/actions/runs?branch=main&event=schedule&per_page=1`. The push
+2. **Did the nightly run, and did it pass?** `/actions/workflows/ci.yml/runs?branch=main&event=schedule&per_page=1` (the CI workflow only: `Unblock` also runs on a schedule, #1648). The push
    job skips e2e, so this nightly is the only full e2e check a *merged* tree ever gets. **No run in the last
    26 hours is a finding**, equal in weight to a failed one: GitHub disables cron on repo inactivity, and a
    mistyped cron or a renamed workflow looks identical from here. When the cause is visibly benign and
