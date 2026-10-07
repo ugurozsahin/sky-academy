@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
 // CI's `test` job died with `[vitest-worker]: Timeout calling "onTaskUpdate"` after every test
-// passed (#1645). Several files spawn child processes synchronously, so on the 4-core runner three
-// workers plus those children left the main process too starved to answer a worker's RPC within
-// vitest's fixed 60 s. Two workers leave headroom for it.
-export default defineConfig({ test: { include: ['tests/unit/**/*.test.ts'], maxWorkers: 2 } });
+// passed (#1645): a file of synchronous tests that runs longer than 60 s never lets the worker read
+// the main process's RPC reply — `tests/unit/setup.ts` has the mechanism and the fix. `maxWorkers: 2`
+// (PR #1649) predates that finding; it only makes each file faster on a loaded runner.
+export default defineConfig({
+  test: { include: ['tests/unit/**/*.test.ts'], setupFiles: ['tests/unit/setup.ts'], maxWorkers: 2 },
+});
