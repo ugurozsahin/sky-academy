@@ -203,6 +203,7 @@ one module per strand (`src/curriculum/year4-*.ts`), a `// slot: <id>` comment p
 0–20,000 and may go down to −50 (negative numbers, NC 4M3).
 
 Maths:
+- y4-area — area by counting squares, and perimeter (4M29, 4M30): d1 the area of a rectangle of up to 24 squares; d2 L, T and U shapes on a squares grid (one piece, no holes, no mirror line), area and perimeter by turns; d3 a rectangle's or square's perimeter from its sides in cm or m, no grid. Area is answered in squares (never cm², a Year 5 unit); decoys are the other measure, the half-perimeter, the squares round the edge, and a ±10 decoy where the units digit would leak the answer
 - y4-column — column addition and subtraction to 4 digits (4M10, 4M11): build the answer from a sum kept on the card with no exchange (d1) or one (d2); d3 has two exchanges, or an inverse check whose answer is the first number
 - y4-count — count in 6s, 7s, 9s, 25s and 1,000s; 1,000 more or less
 - y4-decimals — tenths, hundredths, ¼, ½ and ¾ as decimals, both directions (4M22, 4M23): d1 tenths (7/10 = 0.7); d2 hundredths (7/100 = 0.07); d3 ¼ ½ ¾ and tenths beyond one (13/10 = 1.3); plain cards, no visual. A card fixes its decimal places (1 on tenths and ½, 2 on hundredths, ¼ and ¾); the place-value shift (0.70) and the whole-number slip (1.07) are always decoys
