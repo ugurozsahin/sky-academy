@@ -1,7 +1,7 @@
 // Year 4 spelling strand (#1069). No topic lands here yet — each slot below is a future PR's own ticket.
 // import: y4-sure-ture
 // import: y4-ous
-// import: y4-shun
+import { y4Shun } from './year4-shun';
 // import: y4-origins
 // import: y4-proofread
 // import: y4-homophones
@@ -14,7 +14,7 @@ export const Y4_SPELLING: Topic[] = [
   { id: 'y4-prefix-not', title: 'Prefixes in- il- im- ir-', icon: '🔤', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: prefixes in-, il-, im-, ir-', strand: 'spelling', gen: y4PrefixNot },
   // slot: y4-sure-ture
   // slot: y4-ous
-  // slot: y4-shun
+  { id: 'y4-shun', title: 'Endings -tion -sion -ssion -cian', icon: '✂️', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: /ʃən/ spelt -tion, -sion, -ssion, -cian', strand: 'spelling', gen: y4Shun },
   // slot: y4-origins
   // slot: y4-proofread
   // slot: y4-homophones
