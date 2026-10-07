@@ -31,11 +31,14 @@ test.describe('Tables Check practice (#1118)', () => {
     for (let i = 1; i <= 28; i++) {
       await page.waitForFunction(n => { const s = window.__sna.state(); return s.ended || (window.__sna.session.questionsAsked === n && !s.waiting && window.__sna.bubbles().length > 0); }, i, { timeout: 30000 });
       if (i === 1) await expectFitsViewport(page, 'Tables Check card');
+      await page.waitForTimeout(150);   // #1174: an answer takes measurable time, as a child's does
       while (!await page.evaluate(() => window.__sna.answer()) && !await page.evaluate(() => window.__sna.state().ended)) await page.waitForTimeout(50);
     }
     const results = page.locator('.results');
     await expect(results).toBeVisible();
     await expect(results).toContainText('Tables Check practice');
+    await expect(results.locator('.best-pill')).toContainText(/seconds per answer · your first tables speed/);   // #1174
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).ks2.bestSpeed)).toBeGreaterThan(0);
     await expect(results).toContainText('25 out of 25');
     await expect(results).toContainText('25/25');
     await expect(results.locator('.stars')).toHaveCount(0);
