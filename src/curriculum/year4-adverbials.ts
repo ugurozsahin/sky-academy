@@ -22,7 +22,7 @@ export const WORD_ADV: readonly AdvRow[] = [
 export const PHRASE_ADV: readonly AdvRow[] = [
   ['Later that day', 'I heard the bad news.', 1], ['Without a sound', 'the fox crept away.', 2], ['After lunch', 'we played in the garden.', 1],
   ['In the morning', 'the birds began to sing.', 2], ['At the weekend', 'we visited the farm.', 1], ['Before school', 'Tom fed the rabbit.', 1],
-  ['In the dark forest', 'the owls hooted.', 1], ['On Monday', 'our class went swimming.', 2], ['After the storm', 'the sky turned blue.', 2],
+  ['In the dark forest', 'the owls hooted.', 2], ['On Monday', 'our class went swimming.', 2], ['After the storm', 'the sky turned blue.', 2],
   ['Under the bed', 'I found my sock.', 1], ['During the night', 'snow covered the hills.', 1], ['Across the river', 'a heron stood still.', 2],
   ['With a big smile', 'Mia opened her gift.', 1], ['At noon', 'the bell rang loudly.', 2], ['In the summer', 'we swim in the lake.', 1],
   ['Near the gate', 'a robin sang.', 2], ['Early one morning', 'the baker lit his oven.', 2], ['Every night', 'Dad reads us a story.', 1],

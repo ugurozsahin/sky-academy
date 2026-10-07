@@ -16,6 +16,9 @@ const isFit = (q: { prompt: string }) => q.prompt === 'Which fits the gap?';
 // `AVOID` is a gap-spelling denylist and lists no crude whole words (G13): a short local set too.
 const EXCLUDE = ['gay', 'queer', 'bitch', 'butt'];
 const TIME_PLACE = ['day', 'morning', 'afternoon', 'evening', 'night', 'week', 'month', 'year', 'time', 'today', 'tomorrow', 'yesterday', 'home', 'here', 'there', 'outside'];
+// The word each bank row's `verbAt` must point at (the first verb of the clause, `will` for the future), listed by the test itself.
+const VERBS = new Set(['opened', 'crept', 'went', 'will', 'ran', 'stopped', 'reached', 'fell', 'planted', 'crossed', 'found', 'knocked', 'glided', 'ate', 'cooks', 'fed', 'shine', 'played', 'stroked',
+  'heard', 'began', 'visited', 'turned', 'covered', 'stood', 'rang', 'swim', 'sang', 'lit', 'reads', 'built', 'hooted', 'went']);
 const IRREGULAR_PAST = ['ate', 'ran', 'sang', 'swam', 'drew', 'fell', 'flew', 'took', 'rang', 'grew', 'hid', 'sat'];
 
 describe('y4-adverbials (#1166)', () => {
@@ -33,7 +36,7 @@ describe('y4-adverbials (#1166)', () => {
       expect(before(q.answer), t).toBe(row[0]);
       for (const o of q.options.filter(x => x !== q.answer)) expect(before(o), t).not.toBe(row[0]);
       expect(q.prompt).toBe('Where does the comma go?');
-      expect(q.options.sort()).toEqual((t.match(/\([A-D]\)/g) ?? []).map(m => m[1]).sort());
+      expect([...q.options].sort()).toEqual((t.match(/\([A-D]\)/g) ?? []).map(m => m[1]).sort());
     }
   });
 
@@ -79,7 +82,10 @@ describe('y4-adverbials (#1166)', () => {
   });
 
   it('fit decoys: the noun phrase has no time or place word, the verb is an irregular simple past', () => {
-    for (const [, , noun, verb] of FIT_BANK) {
+    for (const [rest, adv, noun, verb] of FIT_BANK) {
+      expect(rest.endsWith('.'), rest).toBe(true);
+      expect(new Set([adv, noun, verb]).size, rest).toBe(3);
+      expect(IRREGULAR_PAST, adv).not.toContain(adv.toLowerCase());
       const ws = noun.toLowerCase().split(' ');
       for (const t of TIME_PLACE) expect(ws, noun).not.toContain(t);
       expect(IRREGULAR_PAST, verb).toContain(verb.toLowerCase());
@@ -100,6 +106,7 @@ describe('y4-adverbials (#1166)', () => {
       expect(`${a} ${r}`.length + 4 * 4, a).toBeLessThanOrEqual(60);
       expect(r.split(' ').length, a).toBeGreaterThan(v);
       expect(r.endsWith('.'), a).toBe(true);
+      expect(VERBS.has(r.replace('.', '').split(' ')[v]), `${a}: word ${v} of "${r}" is not a verb`).toBe(true);
     }
     for (const r of WORD_ADV) expect(r[0].includes(' '), r[0]).toBe(false);
     for (const r of PHRASE_ADV) expect(r[0].includes(' '), r[0]).toBe(true);
