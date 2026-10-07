@@ -266,7 +266,7 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     // Not a vacuous pass by accident: #1050 landed the first KS2 topic (`y3-count`), so this loop now runs
     // for real rather than being proven only against `fmt()` above.
     expect(ks2Topics.length, 'the KS2 registry sweep must have at least one real topic to check').toBeGreaterThan(0);
-  });
+  }, 30_000);   // the sweep grows with every KS2 topic; the 5 s default timed out on a loaded CI runner (#1641)
 
   it.each([
     ['0.30000000000000004', 1],
