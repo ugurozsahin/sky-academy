@@ -44,7 +44,7 @@ function sound(g: Grid): boolean {
   return reach(g, -1, -1, (y, x) => !at(g, y, x)) === all - cells(g);
 }
 
-/** A rectangle with one or two rectangular notches cut from a corner or a side: L, T, U and Z-less shapes only. */
+/** A rectangle with one or two rectangular notches cut from a corner or a side: L, T and U shapes only. */
 function rectilinear(rng: Rng): Grid {
   for (;;) {
     const w = ri(rng, 3, 6), h = ri(rng, 3, 5), g = fill(w, h);
