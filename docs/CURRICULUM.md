@@ -231,4 +231,5 @@ Maths:
 
 Writing:
 - y4-wordlist — hear a word from Appendix 1's Year 3–4 words 51–100 and build it, with the same cards as y3-wordlist: the word alone letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
+- y4-prefix-not — which prefix makes the opposite of a word: in- (inactive), il- before l, im- before m or p, ir- before r; d1 in-/im- roots (3 bubbles), d2 all four (4 bubbles), d3 the whole word spelt right, the decoys the other prefixes (non-words)
 - y4-context — what a word with two or three meanings means in one sentence (NC Y3–4 comprehension, words in context); d1–d2 two-sense words, d3 three-sense words
