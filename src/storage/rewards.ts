@@ -1,6 +1,7 @@
 // Paying out coins, stickers and the Daily Dojo when a game ends.
 import { applyEvent, dojoFor, type DojoEvent, type DojoOutcome, type DojoState } from '../game/dojo';
 import { mergeFacts, pushCheck, type FactEntry } from '../fact-record';
+import { keepBest } from '../speed-record';
 import { logGame, sanitizeSlips, type Slip } from '../save-records';
 import { load, save } from './store';
 import { evaluateStickers } from './stickers';
@@ -29,7 +30,7 @@ export function recordDojo(e: DojoEvent, now = new Date()): DojoOutcome {
   save({ dojo: out.state }); return out;
 }
 /** What a finished game settled: the dojo's own outcome, and the stickers the payout unlocked. */
-export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
+export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[]; /** The best tables speed stored before this save (#1174). */ prevSpeed?: number }
 /**
  * Settle a finished game in **one** write: the Daily Dojo state, the coins it pays (the game's plus the
  * dojo's bonus) and the stickers that unlocks (#365).
@@ -46,7 +47,7 @@ export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
  * is unreachable rather than merely unlikely. A refusal still leaves `writeFailed` for the grown-ups screen to
  * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
  */
-export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topics?: string[]; facts?: readonly FactEntry[]; check?: { score: number; missed: string[] } }, gameCoins: number, now = new Date()): GameEndOutcome {
+export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topics?: string[]; facts?: readonly FactEntry[]; check?: { score: number; missed: string[] }; speed?: number | null }, gameCoins: number, now = new Date()): GameEndOutcome {
   if (!Number.isFinite(gameCoins)) console.warn(`recordGameEnd: non-finite gameCoins (${gameCoins}) — ignored`);   // same #797 guard as addCoins()
   const d = load(); const dojo = applyEvent(d.dojo, e, today(now));
   // `gameCoins`, not `coins`: every call site on `main` read `addCoins(paid + dojo.coins)`, so a maintainer
@@ -66,7 +67,9 @@ export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topic
   const fresh = unlocked.filter(id => !d.stickers.includes(id));
   const slips = e.slips?.length ? sanitizeSlips([...e.slips.map(s => ({ ...s, at: today(now) })), ...d.slips]) : d.slips;   // #938: newest first, capped 20
   const asked = e.mode === 'memory' ? { q: 0, ok: 0 } : { q: e.attempts, ok: e.correct };   // #939: Memory's pairs and moves are not questions
-  const ks2 = e.facts?.length || e.check ? { ...d.ks2, facts: mergeFacts(d.ks2.facts, e.facts ?? [], today(now)), checks: e.check ? pushCheck(d.ks2.checks, { date: today(now), ...e.check }) : d.ks2.checks } : d.ks2;   // #1122
+  const ks2Base = e.facts?.length || e.check ? { ...d.ks2, facts: mergeFacts(d.ks2.facts, e.facts ?? [], today(now)), checks: e.check ? pushCheck(d.ks2.checks, { date: today(now), ...e.check }) : d.ks2.checks } : d.ks2;   // #1122
+  const best = keepBest(e.speed ?? null, d.ks2.bestSpeed);   // #1174: the lower of the stored and this run's tables speed, in the same one save
+  const ks2 = best === d.ks2.bestSpeed ? ks2Base : { ...ks2Base, bestSpeed: best };
   save({ ks2, dojo: dojo.state, coins: total, stickers: unlocked, slips, log: logGame(d.log, today(now), { ...asked, topics: e.topics }) });
-  return { dojo, fresh };
+  return { dojo, fresh, prevSpeed: d.ks2.bestSpeed };
 }

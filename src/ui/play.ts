@@ -14,7 +14,7 @@ import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { createHud, heartCount } from './hud';
 import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './play-input';   // #1064: how a child answers
-import { BOMB, createPlaySession, type ResultPayout } from './play-session'; import { factsOf } from './play-facts';   // #36: the Session callbacks live in play-session.ts
+import { BOMB, createPlaySession, type ResultPayout } from './play-session'; import { factsOf, speedCandidates } from './play-facts';   // #36
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
 import { pauseHTML, stageClearHTML } from './overlays';
@@ -200,7 +200,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     const bySubject = (s: Topic['subject']) =>
       Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicById(id)?.subject === s ? t.hits : 0), 0);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
-    const { dojo, fresh } = recordGameEnd({
+    const { dojo, fresh, prevSpeed } = recordGameEnd({
       mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo,
       stars: r.stars, score: r.score, training, ...factsOf(playSession, o, r),   // #1122
       mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'), slips: missSlips(r.misses), topics: Object.keys(session.byTopic),   // #938, #939
@@ -212,7 +212,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     // is not offered to the child as a keepsake the album does not actually hold. `cert` itself stays what
     // was earned regardless: the `certificate()` hook below still answers that, same as before #470.
     const certSaved = cert ? fileCertificate(cert) : false;
-    return { newBest, dojo, fresh, streak, cert, certSaved, dojoSaved, candidates };
+    return { newBest, dojo, fresh, streak, cert, certSaved, dojoSaved, candidates: [...candidates, ...speedCandidates(playSession, o, r, prevSpeed)] };
   }
   /**
    * Keep the certificate this mission earned (#205), and report whether the write actually landed (#470).
