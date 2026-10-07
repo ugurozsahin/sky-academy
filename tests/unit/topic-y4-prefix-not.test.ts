@@ -31,7 +31,9 @@ describe('y4-prefix-not (#1158)', () => {
   });
 
   it('d1: in- and im- roots only, 3 prefix bubbles, answer by the rule, root shown on a word visual', () => {
+    const answers = new Set<string>();
     for (const c of draws(1)) {
+      answers.add(c.answer);
       const root = rootOf(c.prompt);
       expect(c.answer).toBe(rule(root));
       expect(['in', 'im']).toContain(c.answer);
@@ -40,6 +42,7 @@ describe('y4-prefix-not (#1158)', () => {
       expect(c.say).toBe(c.prompt);
       if (c.answer === 'im') expect(c.options).toContain('in');
     }
+    expect([...answers].sort()).toEqual(['im', 'in']);
   });
 
   it('d2: all four rules appear, 4 bubbles, and every il/im/ir card offers in', () => {
@@ -58,6 +61,7 @@ describe('y4-prefix-not (#1158)', () => {
       const root = /not (\w+)\?$/.exec(c.prompt)![1];
       expect(c.answer).toBe(rule(root) + root);
       expect(c.wide).toBe(true);
+      expect(c.say).toBe(c.prompt);
       expect(c.options).toHaveLength(4);
       for (const o of c.options) { expect(o.length, o).toBeLessThanOrEqual(9); expect(o.endsWith(root), o).toBe(true); }
     }
