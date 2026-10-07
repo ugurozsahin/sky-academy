@@ -80,7 +80,8 @@ function card(rng: Rng, [sentence, target, wrong, listWord]: ProofreadRow, d: Di
   const at = words.indexOf(target);
   const shown = tokens.map((t, i) => (i === at ? t.replace(target, wrong) : t)).join(' ');
   const minLen = d === 3 ? 5 : 3;
-  const pool = [...new Set(words.filter((w, i) => i !== at && w.length >= minLen && w.length <= MAX_LETTERS))];
+  const seen = new Set<string>(); // "The" and "the" would be two identical-looking bubbles
+  const pool = words.filter((w, i) => i !== at && w.length >= minLen && w.length <= MAX_LETTERS && !seen.has(w.toLowerCase()) && seen.add(w.toLowerCase()));
   const bubbles = d === 1 ? 3 : d === 2 ? 4 : 5;
   // d2–d3: one decoy is another list word, and one is at least as long as the misspelling, so neither "the long
   // word" nor "the odd one out by length" finds the answer.

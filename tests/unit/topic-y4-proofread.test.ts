@@ -49,7 +49,7 @@ describe('y4-proofread (#1170)', () => {
         const off = c.options.filter(o => !correctWords.has(o));
         expect(off).toEqual([wrong]);
         expect(correctOf(text, wrong, target)).toBe(sentence);
-        expect(new Set(c.options).size).toBe(c.options.length);
+        expect(new Set(c.options.map(o => o.toLowerCase())).size).toBe(c.options.length);
         expect(c.options).not.toContain(target);
         expect(c.wide).toBe(true);
       }
@@ -70,7 +70,7 @@ describe('y4-proofread (#1170)', () => {
     const all = [...D1_BANK, ...D2_BANK, ...D3_BANK];
     for (const [sentence, target, wrong] of all) {
       expect(sentence.length, sentence).toBeLessThanOrEqual(60);
-      expect(sentence.includes(target), sentence).toBe(true);
+      expect(sentence.split(' ').map(bare), sentence).toContain(target);
       expect(wrong.toLowerCase(), wrong).not.toBe(target.toLowerCase());
       expect(wrong.length, wrong).toBeLessThanOrEqual(9);
       const w = wrong.toLowerCase();
@@ -116,6 +116,14 @@ describe('y4-proofread (#1170)', () => {
           expect(text.split(' ').length).toBeLessThanOrEqual(9);
           for (const o of c.options.filter(o => o !== c.answer)) expect(o.length, o).toBeGreaterThanOrEqual(5);
         }
+      }
+  });
+
+  it('every row can fill its bubbles from distinct sentence words', () => {
+    for (const [d, n] of [[1, 3], [2, 4], [3, 5]] as [Difficulty, number][])
+      for (const [sentence, target] of bank(d)) {
+        const pool = new Set(sentence.split(' ').map(bare).filter(w => w !== target && w.length >= (d === 3 ? 5 : 3) && w.length <= 9).map(w => w.toLowerCase()));
+        expect(pool.size, sentence).toBeGreaterThanOrEqual(n - 1);
       }
   });
 
