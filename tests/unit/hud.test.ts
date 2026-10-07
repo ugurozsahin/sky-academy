@@ -289,7 +289,7 @@ describe('correctionLine (#893 — the spoken line after a wrong slice or a miss
   // `<`/`>`/`=`, `y2-patterns` a pattern glyph/emoji, `y2-punct` a bare punctuation mark, `r-read` (#967) the
   // CVC picture's own emoji, never the word itself, `r-initial` (#928) the same CVC picture's emoji, `r-rhyme` (#972) a rhyming picture's emoji, `r-measure` (#971) one of the two compared emoji, and `r-numeral` (#973) a string of dots. Found by running the sweep once and reading which topics
   // came back with zero non-null lines.
-  const ALWAYS_SYMBOLIC = new Set(['y2-compare', 'y2-patterns', 'y2-punct', 'y4-speech', 'r-read', 'r-initial', 'r-rhyme', 'r-measure', 'r-numeral']);
+  const ALWAYS_SYMBOLIC = new Set(['y2-compare', 'y2-patterns', 'y2-punct', 'y4-speech', 'r-read', 'r-initial', 'r-rhyme', 'r-measure', 'r-numeral', 'y4-whichop']);
 
   it('every non-null correction line across the whole registry is "It\'s …", ends in one full stop, and fits the hold', () => {
     let checked = 0, nonNull = 0;
