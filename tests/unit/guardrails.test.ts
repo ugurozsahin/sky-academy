@@ -2318,7 +2318,7 @@ describe('the symmetry visual\'s CSS structure cannot go missing without a red t
     expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
     const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
-    const box = bare.match(/\.symgrid\s*\{([^}]*)\}/)?.[1];
+    const box = bare.match(/(?:^|\})\s*\.symgrid\s*\{([^}]*)\}/)?.[1];
     expect(box, 'a .symgrid rule must exist (#299)').toBeTruthy();
     expect(box, '.symgrid is sized by a clamp() on the width, so a 6-wide picture still fits a phone (design-language §2)')
       .toMatch(/width:\s*clamp\(/);

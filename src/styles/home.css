@@ -298,7 +298,7 @@
    portrait, for `y2-fractions`, whose prompt is `1/4 of 12 = ?` and whose hint is "count the stars". Count what
    was drawn and you get 10. That is the wrong-count failure this budget exists to prevent, introduced by the
    budget itself. */
-.duel-q .vis-wrap { max-height: var(--duel-vis); overflow-y: clip; }
+.duel-q .vis-wrap { max-height: var(--duel-vis); overflow-y: clip; } .duel-q .symgrid { max-height: calc(var(--duel-vis) - 4px); }   /* #1642 */
 /* #388: side by side, question across the top. `--arena-w` now caps the PAIR, not each half: with the cap on
    the half, a screen wider than two arenas leaves both of them at the outer edges and the card stranded over
    the gap between them. Capping the grid keeps the divider under the centre of the card at every width. */
@@ -343,7 +343,7 @@
      judgement for the owner rather than one to settle in a stylesheet. Nothing is CROPPED either way — the budget
      fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
   .duel-q .vis { margin: 0; zoom: 0.62; }
-  .duel-q .symgrid { width: clamp(120px, 34vw, 150px); height: auto; }   /* #1538: 8-row grid left the bar 1.6px over budget at 640x360 */
+  .duel-q .symgrid { width: clamp(120px, 34vw, 150px); height: auto; max-height: calc((var(--duel-vis) - 4px) / 0.62); }   /* #1538, #1642: the zoom shrinks the budget */
   /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
      both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
      landscape screen the prompt gives up a few points — the same trade the `max-height: 640px` rule above already
@@ -362,7 +362,7 @@
      rules on a tall landscape screen and the later one wins. Nothing is scaled here: a clock question is one
      where reading the face IS the question, and a tablet has the height to show it whole. */
   .duel-q { --duel-vis: 160px; }
-  .duel-q .vis { zoom: 1; }
+  .duel-q .vis { zoom: 1; } .duel-q .symgrid { max-height: calc(var(--duel-vis) - 4px); }
   .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); }
 }
 .duel-final { grid-template-columns: repeat(3, 1fr); }
