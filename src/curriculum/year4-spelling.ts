@@ -2,7 +2,7 @@
 // import: y4-ous
 import { y4Shun } from './year4-shun';
 // import: y4-origins
-// import: y4-proofread
+import { y4Proofread } from './year4-proofread';
 // import: y4-homophones
 import type { Topic } from './types';
 import { y4PrefixNot } from './year4-prefix-not';
@@ -16,6 +16,6 @@ export const Y4_SPELLING: Topic[] = [
   // slot: y4-ous
   { id: 'y4-shun', title: 'Endings -tion -sion -ssion -cian', icon: '✂️', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: /ʃən/ spelt -tion, -sion, -ssion, -cian', strand: 'spelling', gen: y4Shun },
   // slot: y4-origins
-  // slot: y4-proofread
+  { id: 'y4-proofread', title: 'Proofreading', icon: '🔎', subject: 'writing', year: 'year4', nc: 'Y3–4 Writing: proofread for spelling', strand: 'spelling', gen: y4Proofread },
   // slot: y4-homophones
 ];
