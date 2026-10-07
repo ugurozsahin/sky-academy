@@ -81,4 +81,18 @@ describe('y4-speech (#1167)', () => {
     expect(hit(3)).toBe(true);
     expect(hit(2)).toBe(false);
   });
+
+  it('no capital follows the closing inverted comma unless it starts a name (d3, 600 draws)', () => {
+    for (let s = 1; s <= 600; s++) {
+      const t = textOf(topic.gen(3, rng(s * 19)));
+      const after = t.split('”')[1] ?? '';
+      if (/^_?$/.test(t.split('”')[0].slice(-1)) || t.startsWith('“')) expect(after, t).not.toMatch(/\b(The)\b/);
+    }
+  });
+
+  it('d3 reaches the clause-second question, whose answer is a question mark', () => {
+    let hit = false;
+    for (let s = 1; s <= 600; s++) { const q = topic.gen(3, rng(s * 23)); if (textOf(q).startsWith('“') && q.answer === '?') hit = true; }
+    expect(hit).toBe(true);
+  });
 });

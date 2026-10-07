@@ -35,5 +35,7 @@ export const y4Speech: Generator = (d, rng) => {
   const [who, verb, words, end] = pick(rng, [...STATEMENTS, ...QUESTIONS]);
   const marks = [',', '.', '?'];
   if (form === 1) return make(`${who} ${verb}, “${words}_”`, end, marks, 'What ends the words that are spoken?');
-  return make(`“${words}_” ${verb} ${who}.`, end === '?' ? '?' : ',', marks, 'The speech is followed by who said it.');
+  // Mid-sentence, "The teacher" loses its capital; a name keeps its own.
+  const subject = who.replace(/^The /, 'the ');
+  return make(`“${words}_” ${verb} ${subject}.`, end === '?' ? '?' : ',', marks, end === '?' ? 'Does the speech ask something?' : 'The speech is followed by who said it.');
 };
