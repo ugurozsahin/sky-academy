@@ -17,7 +17,8 @@ const MARK = 'fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:rou
 
 /** The two ray end points of an angle part — what the unit test measures the angle between. */
 export function rayEnds(p: Extract<GeoPart, { kind: 'angle' }>): [Pt, Pt] {
-  return [at(p.at, p.dir, RAY), at(p.at, p.dir + p.deg, RAY)];
+  const r = p.len ?? RAY;
+  return [at(p.at, p.dir, r), at(p.at, p.dir + p.deg, r)];
 }
 const finite = (...n: number[]) => n.every(Number.isFinite);
 const text = (label: string, p: Pt) =>
@@ -35,7 +36,7 @@ function angleSVG(p: Extract<GeoPart, { kind: 'angle' }>): string {
   } else if (p.deg > 0) {
     mark = `<path class="arc" d="M${xy(at(p.at, p.dir, ARC))}A${ARC} ${ARC} 0 ${p.deg > 180 ? 1 : 0} 0 ${xy(at(p.at, p.dir + p.deg, ARC))}" style="${MARK}"/>`;
   }
-  return rays + mark + (p.label ? text(p.label, clamp(at(p.at, p.dir + p.deg / 2, RAY + 7))) : '');
+  return rays + mark + (p.label ? text(p.label, clamp(at(p.at, p.dir + p.deg / 2, (p.len ?? RAY) + 7))) : '');
 }
 
 function segmentSVG(p: Extract<GeoPart, { kind: 'segment' }>): string {
@@ -55,7 +56,7 @@ function segmentSVG(p: Extract<GeoPart, { kind: 'segment' }>): string {
 /** The drawing for a `geometry` visual; a part with a non-finite number is skipped, as `chart` and `symmetry` do (#137). */
 export function geometrySVG(v: Extract<Visual, { type: 'geometry' }>): string {
   const body = v.parts.map(p => {
-    const ok = p.kind === 'angle' ? finite(...p.at, p.dir, p.deg) : finite(...p.a, ...p.b, ...(p.labelAt ?? [0, 0]));
+    const ok = p.kind === 'angle' ? finite(...p.at, p.dir, p.deg, p.len ?? 1) : finite(...p.a, ...p.b, ...(p.labelAt ?? [0, 0]));
     if (!ok) { console.warn('geometry visual: a part has a non-finite number — skipped'); return ''; }
     return p.kind === 'angle' ? angleSVG(p) : segmentSVG(p);
   }).join('');

@@ -8,12 +8,12 @@ export interface ChartRow { label: string; n: number }
 /**
  * One drawn thing in a `geometry` visual (#1075). Coordinates are in a 100 × 70 viewBox, y down; `dir` is
  * degrees anticlockwise from the right, as in school maths, so `dir: 90` points up the page.
- * - `angle`: two rays from `at`, the first at `dir`° and the second at `dir + deg`°; `deg` 90 draws the square mark.
+ * - `angle`: two rays from `at`, the first at `dir`° and the second at `dir + deg`°; `deg` 90 draws the square mark; `len` is the arm length (default 16, #1153).
  * - `segment`: a straight line from `a` to `b`, with `ticks` small cross marks at its middle.
  * `label` is printed near the part, or at `labelAt` when a pair of parts shares one letter.
  */
 export type GeoPart =
-  | { kind: 'angle'; at: [number, number]; dir: number; deg: number; label?: string }
+  | { kind: 'angle'; at: [number, number]; dir: number; deg: number; label?: string; len?: number }
   | { kind: 'segment'; a: [number, number]; b: [number, number]; ticks?: 1 | 2 | 3; label?: string; labelAt?: [number, number] };
 
 export type Visual =
