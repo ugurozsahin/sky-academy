@@ -229,4 +229,5 @@ Maths:
 - y4-pv — place value, compare and order beyond 1,000 (4M4–5): the value of a digit in a four-digit number (d1 1,000–1,999; d2 to 9,999) or compare two numbers with < > = (d2); order four numbers sharing a thousands digit, smallest first (d3, `sequenceFrom: 3`)
 
 Writing:
+- y4-wordlist — hear a word from Appendix 1's Year 3–4 words 51–100 and build it, with the same cards as y3-wordlist: the word alone letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
 - y4-context — what a word with two or three meanings means in one sentence (NC Y3–4 comprehension, words in context); d1–d2 two-sense words, d3 three-sense words
