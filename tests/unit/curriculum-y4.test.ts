@@ -18,8 +18,8 @@ describe('Year 4 registry (#1069)', () => {
     expect(y.maxAnswer).toBe(20000);
   });
 
-  it('Year 4 is hidden from the map while it has one topic', () => {
-    expect(shownYears().some(y => y.id === 'year4')).toBe(false);
+  it('Year 4 is on the map once it has 12 maths and 6 writing topics (#1164)', () => {
+    expect(shownYears().some(y => y.id === 'year4')).toBe(true);
   });
 
   it('no topic runs the generic suite twice: Year 4 topics are not in the EYFS/KS1 sweep', () => {
