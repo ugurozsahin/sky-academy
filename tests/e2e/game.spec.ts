@@ -5515,6 +5515,26 @@ test('a y3-speech d3 card fits a 390×664 phone, one version per line (#1110)', 
   }
 });
 
+test('a y4-area card shows the whole grid and fits a 390×664 phone (#1151)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year4', 'y4-area');
+  const area = TOPICS.find(t => t.id === 'y4-area')!;
+  for (let seed = 1; seed <= 6; seed++) {
+    const q = area.gen(2, seededRng(seed));
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: renderVisual(q.visual!), prompt: q.prompt });
+    expect(await page.locator('#vis .symgrid .mirror').count(), `seed ${seed}: no mirror line`).toBe(0);
+    await expectFitsViewport(page, `y4-area d2 card, seed ${seed}`);
+    if (process.env.SHOT && seed === 1) await page.screenshot({ path: process.env.SHOT });
+  }
+});
+
 // #1052: a hidden KS2 year is off the map, so only the preview key reaches it. One smoke test per KS2 shell plays
 // its first topic through the real map, island and play screen, so a topic that breaks in the browser shows at once.
 test.describe('hidden KS2 years (preview)', () => {
