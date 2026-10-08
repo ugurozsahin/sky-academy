@@ -3,7 +3,7 @@ import { topicById, type Topic, type YearId } from '../curriculum';
 import { answerableBy } from './pools';
 
 /** Grammar and punctuation topics in year order. An id with no generator yet is skipped by `grammarPool`. */
-export const GRAMMAR: string[] = [
+export const GRAMMAR: readonly string[] = [
   'y3-wordfamily', 'y3-perfect', 'y3-speech',
   'y4-plural-poss', 'y4-standard', 'y4-nounphrase', 'y4-speech', 'y4-pronouns', 'y4-determiners',
   'y5-verbs', 'y5-verbprefix', 'y5-relative', 'y5-modal', 'y5-parenthesis', 'y5-commas', 'y5-cohesion', 'y5-perfect',
@@ -23,3 +23,6 @@ export function grammarPool(year: YearId): Topic[] {
 /** The play screen's heading: a fix round, Sensei, the topic, a titled pool (Grammar mix), else the mode's own. */
 export const playTitle = (o: { practice?: unknown; topic?: Topic; title?: string }, staged: boolean, training: boolean, modeTitle: string): string =>
   o.practice ? 'Fix my mistakes' : staged ? (training ? 'Sensei Training' : o.topic!.title) : o.title ?? modeTitle;
+
+/** The pool the island offers as a row: `pool` itself once it holds `GRAMMAR_MIN` topics, else nothing (no row). */
+export const offeredPool = (pool: Topic[]): Topic[] => pool.length >= GRAMMAR_MIN ? pool : [];

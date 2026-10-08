@@ -1,5 +1,5 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
-import { GRAMMAR_MIN, grammarPool } from '../game/sprint-pools';
+import { grammarPool, offeredPool } from '../game/sprint-pools';
 import { mtcDeck } from '../game/mtc';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
 import { leastSecure } from '../fact-record';
@@ -157,8 +157,8 @@ const trickyRow = (nav: Nav, year: YearInfo, facts: Record<string, Ks2Fact>): Me
 
 /** Grammar mix (#1234): a 60-second Sprint over the KS2 grammar topics up to this island; Years 5–6 only (the pool is empty elsewhere), once the pool is big enough. */
 const grammarRow = (nav: Nav, year: YearInfo): MenuRow[] => {
-  const pool = grammarPool(year.id);
-  return pool.length < GRAMMAR_MIN ? [] : [{ id: 'grammar', mod: 'sprint', vport: '<span class="vport emoji">✏️</span>', title: 'Grammar mix',
+  const pool = offeredPool(grammarPool(year.id));
+  return !pool.length ? [] : [{ id: 'grammar', mod: 'sprint', vport: '<span class="vport emoji">✏️</span>', title: 'Grammar mix',
     blurb: '60 seconds of grammar and punctuation', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Grammar mix' }) }];
 };
 
