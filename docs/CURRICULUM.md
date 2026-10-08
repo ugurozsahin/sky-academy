@@ -237,6 +237,7 @@ Writing:
 - y4-sure-ture — hear a word and slice the ending that completes it in a gap sentence: -sure versus -ture (d1), adds -sion (d2), adds the teacher-type -cher words (d3); every wrong ending makes a non-word
 - y4-standard — Standard English verb forms (English Appendix 2, Year 4): d1 was/were with pronoun subjects, d2 adds did/done, saw/seen, came/come, went/gone, gave/given, wrote/written (each pair right once as the past form and once as the participle after has, have or had), d3 shows a whole sentence with one local spoken form in it and the child slices that word; copy names "Standard English", never "wrong"
 - y4-adverbials — fronted adverbials and the comma after them (English Appendix 2, Year 4): d1 one-word adverbials and d2 phrases show the sentence with three lettered gaps and the child slices the letter where the comma goes (decoys: the comma before the verb and, at d2, a gap inside the adverbial; letters shuffled so the answer letter is not fixed), d3 uses four gaps or picks the adverbial that fits a gap (decoys: a noun phrase and a verb)
+- y4-speech — punctuating direct speech (English Appendix 2, Year 4): d1 the comma after a reporting clause that comes first, d2 the end mark inside the inverted commas (full stop or question mark), d3 adds the reporting clause second, where a statement takes a comma and a question keeps its question mark; exclamations appear only at d1
 - y4-shun — the /ʃən/ endings by the root word's last letters (Appendix 1, Y3–4): hear a word and slice -tion, -ssion, -sion or -cian in a gap sentence; d1 -tion v -cian (2 bubbles), d2 adds the root word as the clue (all four endings), d3 adds the exceptions attention and intention
 - y4-proofread — find the one misspelt word in a sentence (Y3–4 "proofread for spelling"): slice the invented misspelling among words from the same sentence; d1 Year 2 exception words (3 bubbles), d2 Year 3–4 list words (4), d3 list and -ous/-tion/-sure/-ture words in longer sentences (5, every decoy 5+ letters); `say` speaks the correct sentence
 - y4-plural-poss — plural or possessive -s (English Appendix 2, Year 4): a card says whose things they are ("the bikes of one boy") and the child slices girl's, girls' or children's; every ASCII apostrophe, no plural equal to its singular; d1 regular owners, d2 adds irregular plurals (children's, men's, mice's), d3 adds the plain-plural sentence form where a verb follows the gap
@@ -247,3 +248,10 @@ The third KS2 shell (#1177): hidden behind `meetsShowGate` like Years 3 and 4, n
 
 Maths:
 - y5-round — round numbers up to 1,000,000 to the nearest 10, 100, 1,000, 10,000 and 100,000
+
+## Year 6 — 7 q/stage, 3 lives
+The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. One module per strand (`src/curriculum/year6-*.ts`, eleven of them — Year 6 adds ratio and algebra), a `// slot: <id>` comment per planned topic. Answers run −1,000 to 10,000,000, the largest labels the game will put in a bubble.
+
+Maths:
+- y6-round — round any whole number to a required accuracy, including in context
+- y6-coords — coordinates in all four quadrants (6M46, −5…5 grid): read a lettered point's (x, y) (d1); which lettered point is at a pair, the others at its swapped and sign-slip places (d2); the fourth corner of a rectangle that crosses an axis (d3); drawn by the `coords` visual with `min` −5, answers computed from its points

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, it, expect, vi } from 'vitest';
 import { coordsSVG, coordsPos, LABEL_FS, VB, MIN_W } from '../../src/ui/vis-coords';
 import { renderVisual } from '../../src/ui/visuals';
@@ -84,5 +85,57 @@ describe('coords visual (#1129)', () => {
     expect(repeatKey(q(base))).not.toBe(repeatKey(q([{ x: 1, y: 3, label: 'A' }, base[1]])));
     expect(repeatKey(q(base))).toBe(repeatKey(q([{ ...base[0], label: 'C' }, { ...base[1], label: 'D' }])));
     expect(repeatKey({ ...q(base), visual: grid(6, base) })).not.toBe(repeatKey(q(base)));
+  });
+
+  // #1213: `min` extends the grid below zero; without it the drawing is exactly what #1129 shipped.
+  describe('four quadrants (#1213)', () => {
+    const first = grid(8, [{ x: 1, y: 2, label: 'A' }, { x: 6, y: 5, label: 'B' }, { x: 0, y: 8, label: 'C' }], ['A', 'B', 'C']);
+
+    it('a first-quadrant card renders byte-identically to #1129, with or without min: 0', () => {
+      const sha = (v: Coords) => createHash('sha256').update(coordsSVG(v)).digest('hex');
+      expect(sha(first)).toBe('1b0ec273e063adc26fc2185126c376d6398e4a77bd56661e15b5d5983e880c56');
+      expect(coordsSVG({ ...first, min: 0 })).toBe(coordsSVG(first));
+    });
+
+    it('the axes are numbered −5…5 with the real minus sign, and the heavy axes cross at the origin', () => {
+      const html = coordsSVG({ ...grid(5, []), min: -5 });
+      const nums = (cls: string) => [...html.matchAll(new RegExp(`<text class="${cls}"[^>]*>([^<]+)</text>`, 'g'))].map(m => m[1]);
+      const want = ['−5', '−4', '−3', '−2', '−1', '0', '1', '2', '3', '4', '5'];
+      expect(nums('ax')).toEqual(want);
+      expect(nums('ay')).toEqual(want);
+      expect(html).not.toMatch(/>-\d/);
+      expect((html.match(/class="gx"/g) ?? []).length).toBe(11);
+      const heavy = (cls: string) => [...html.matchAll(new RegExp(`<line class="${cls}"[^>]*stroke:var\\(--text\\)`, 'g'))];
+      expect(heavy('gx')).toHaveLength(1);
+      expect(heavy('gy')).toHaveLength(1);
+      expect(html).toContain('x1="64" y1="12" x2="64" y2="112"');   // x = 0 is the middle column
+      expect(html).toContain('x1="14" y1="62" x2="114" y2="62"');   // y = 0 is the middle row
+    });
+
+    it('every dot in all four quadrants sits exactly on its (x, y)', () => {
+      const points = [];
+      for (let x = -5; x <= 5; x++) for (let y = -5; y <= 5; y++) points.push({ x, y, label: 'A' });
+      const dots = [...coordsSVG({ ...grid(5, points), min: -5 }).matchAll(/<circle class="pt" data-x="(-?\d+)" data-y="(-?\d+)" cx="([\d.-]+)" cy="([\d.-]+)"/g)];
+      expect(dots).toHaveLength(121);
+      for (const [, x, y, cx, cy] of dots) {
+        const [ex, ey] = coordsPos(5, +x, +y, -5);
+        expect(Math.abs(+cx - ex)).toBeLessThan(0.006);
+        expect(Math.abs(+cy - ey)).toBeLessThan(0.006);
+      }
+      expect(coordsPos(5, 0, 0, -5)).toEqual([64, 62]);
+      expect(coordsPos(5, -5, -5, -5)).toEqual([14, 112]);
+      expect(coordsPos(5, 5, 5, -5)).toEqual([114, 12]);
+    });
+
+    it('a point below min is skipped, a min outside −10…0 draws an empty card, and the repeat key reads min', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect((coordsSVG({ ...grid(5, [{ x: -6, y: 0, label: 'A' }, { x: -5, y: 0, label: 'B' }]), min: -5 }).match(/class="pt"/g) ?? []).length).toBe(1);
+      expect(coordsSVG({ ...grid(5, []), min: 1 })).not.toContain('<svg');
+      warn.mockRestore();
+      const q = (v: Coords) => ({ prompt: 'p', answer: 'a', options: ['a'], visual: v });
+      const pts = [{ x: 1, y: 2, label: 'A' }];
+      expect(repeatKey(q({ ...grid(5, pts), min: -5 }))).not.toBe(repeatKey(q(grid(5, pts))));
+      expect(repeatKey(q({ ...grid(5, pts), min: 0 }))).toBe(repeatKey(q(grid(5, pts))));
+    });
   });
 });

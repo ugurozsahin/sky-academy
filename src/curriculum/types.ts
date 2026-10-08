@@ -45,8 +45,8 @@ export type Visual =
   // Angles and lines drawn exactly to their data (Y3 geometry, #1075): a placeholder look, final art is #1305.
   | { type: 'geometry'; parts: GeoPart[] }
   // A first-quadrant grid with numbered axes and lettered points (Y4 coordinates, #1129): a placeholder look, final art is #1306.
-  // The grid runs 0–`size` on both axes (`size` at most 10); `join` lists point labels to draw as a polyline.
-  | { type: 'coords'; size: number; points: { x: number; y: number; label: string }[]; join?: string[] }
+  // The grid runs `min` (default 0, at most 0; −5 for Y6's four quadrants, #1213) to `size` on both axes (`size` at most 10); `join` lists point labels to draw as a polyline.
+  | { type: 'coords'; size: number; min?: number; points: { x: number; y: number; label: string }[]; join?: string[] }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string }                   // sentence with a blank "_" (writing — English text)
   // a repeating-pattern glyph strip with a blank "_" (y2-patterns): not language, so the drawing keeps it on
@@ -134,7 +134,7 @@ export type Generator = (d: Difficulty, rng: Rng) => Question;
 
 // One string source of truth for every year group. Adding a year (Y3–Y6) means one
 // new YearId member + one YEARS entry — no unions or per-year assets to retype elsewhere.
-export type YearId = 'reception' | 'year1' | 'year2' | 'year3' | 'year4' | 'year5';
+export type YearId = 'reception' | 'year1' | 'year2' | 'year3' | 'year4' | 'year5' | 'year6';
 
 export interface Topic {
   id: string;             // "y1-bonds"
@@ -199,4 +199,5 @@ export const YEARS: YearInfo[] = [
   { id: 'year3', title: 'Year 3', short: 'Y3', age: 'Ages 7–8', blurb: 'Hundreds, 3, 4 & 8 tables, fractions & Roman numerals', tint: '#ffb02055', maxAnswer: 2000, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
   { id: 'year4', title: 'Year 4', short: 'Y4', age: 'Ages 8–9', blurb: 'Tables to 12 × 12, decimals, area & coordinates', tint: '#3ec9ff55', maxAnswer: 20000, minAnswer: -50, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
   { id: 'year5', title: 'Year 5', short: 'Y5', age: 'Ages 9–10', blurb: 'Millions, primes, percentages & angles', tint: '#66e07d55', maxAnswer: 1000000, minAnswer: -100, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
+  { id: 'year6', title: 'Year 6', short: 'Y6', age: 'Ages 10–11', blurb: 'Long division, ratio, algebra & SATs practice', tint: '#9aa5cf55', maxAnswer: 10000000, minAnswer: -1000, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
 ];
