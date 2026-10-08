@@ -243,6 +243,12 @@ Writing:
 - y4-plural-poss — plural or possessive -s (English Appendix 2, Year 4): a card says whose things they are ("the bikes of one boy") and the child slices girl's, girls' or children's; every ASCII apostrophe, no plural equal to its singular; d1 regular owners, d2 adds irregular plurals (children's, men's, mice's), d3 adds the plain-plural sentence form where a verb follows the gap
 - y4-context — what a word with two or three meanings means in one sentence (NC Y3–4 comprehension, words in context); d1–d2 two-sense words, d3 three-sense words
 
+## Year 5 — 7 q/stage, 3 lives
+The third KS2 shell (#1177): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. Built the same way — one module per strand (`src/curriculum/year5-*.ts`), a `// slot: <id>` comment per planned topic. Answers run 0–1,000,000 and may go down to −100.
+
+Maths:
+- y5-round — round numbers up to 1,000,000 to the nearest 10, 100, 1,000, 10,000 and 100,000
+
 ## Year 6 — 7 q/stage, 3 lives
 The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. One module per strand (`src/curriculum/year6-*.ts`, eleven of them — Year 6 adds ratio and algebra), a `// slot: <id>` comment per planned topic. Answers run −1,000 to 10,000,000, the largest labels the game will put in a bubble.
 
