@@ -10,5 +10,6 @@ export const EXPECTED_SHOWN: Record<YearId, boolean> = {
   year2: true,
   year3: true,
   year4: true,
+  year5: false,
   year6: false,
 };
