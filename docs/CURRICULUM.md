@@ -249,6 +249,7 @@ The third KS2 shell (#1177): hidden behind `meetsShowGate` like Years 3 and 4, n
 Maths:
 - y5-pv — place value to 1,000,000 (NC Y5 5M1–2): d1 five-digit digit value, or 10/100/1,000 more or less; d2 six-digit digit value, 10,000/100,000 more or less, or a number written in words; d3 the second largest of four numbers, or which is greater than 999,990
 - y5-round — round numbers up to 1,000,000 to the nearest 10, 100, 1,000, 10,000 and 100,000
+- y5-column — column adding and subtracting with more than 4 digits, and rounding to check (NC 5M7, 5M9): d1 a Year 4 recap (4 digits, pick-one), d2 5- and 6-digit sums and differences (pick-one, decoys are the column slips: a dropped or doubled carry, smaller digit from larger), d3 half build a 4-digit answer from two 5-digit numbers (`_,___`), half round both numbers to the nearest 1,000 or 10,000 to estimate; every answer of 5 or more digits is pick-one
 
 Writing:
 - y5-factopinion — fact or opinion? (Y5–6 reading comprehension): d1 one sentence with an obvious opinion word (best, favourite, boring, delicious) or a plain fact; d2 any opinion word, and facts that compare by a measure (longer, heavier, older); d3 three lettered sentences, slice every opinion (or every fact) in any order. Closed clue-word lists check the bank
