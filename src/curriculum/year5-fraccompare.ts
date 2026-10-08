@@ -38,7 +38,7 @@ function pair(rng: Rng): Frac[] {
 
 /** Three or four fractions on one base, the unique biggest bottom among them — and never the answer. */
 function crowd(rng: Rng, big: boolean): Frac[] {
-  const base = pick(rng, BASES.filter(b => b * 2 <= 12));
+  const base = pick(rng, BASES);
   return unique(() => Array.from({ length: ri(rng, 3, 4) }, () => onBase(rng, base)), fs => {
     if (!distinct(fs)) return false;
     const top = Math.max(...fs.map(f => f.d)), widest = fs.filter(f => f.d === top);
@@ -57,7 +57,7 @@ function order(rng: Rng): Question {
 
 export const y5FracCompare: Generator = (level: Difficulty, rng) => {
   if (level === 3) return order(rng);
-  if (level === 1) return ask(pair(rng), rng() < 0.5, rng, 'Same bottom? The bigger top is bigger');
+  if (level === 1) return ask(pair(rng), rng() < 0.5, rng, 'Same bottom: bigger top wins. Same top: bigger bottom is smaller');
   const big = rng() < 0.5;
   return ask(crowd(rng, big), big, rng, 'Do not trust the biggest bottom number');
 };

@@ -29,6 +29,14 @@ describe('y5-fraccompare (#1194)', () => {
     }
   });
 
+  it('asks for both the larger and the smaller, and for both the largest and the smallest', () => {
+    for (const d of [1, 2] as Difficulty[]) {
+      const prompts = draw(d, 400).map(c => c.prompt);
+      expect(prompts.some(p => /larger|largest/.test(p))).toBe(true);
+      expect(prompts.some(p => /smaller|smallest/.test(p))).toBe(true);
+    }
+  });
+
   it('d1: two fractions on one bottom or one top', () => {
     for (const c of draw(1, 500)) {
       const [a, b] = c.options.map(fr);
@@ -53,11 +61,15 @@ describe('y5-fraccompare (#1194)', () => {
       expect(seq).toHaveLength(3);
       for (let i = 1; i < 3; i++) expect(compare(seq[i - 1], seq[i])).toBe(-1);
       expect(related(seq)).toBe(true);
+      expect(new Set(seq.map(f => f.d)).size).toBeGreaterThanOrEqual(2);
       expect(c.answer).toBe(c.sequence!.join(' '));
     }
   });
 
-  it('no spoken line carries a raw fraction', () => {
-    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 500)) expect(c.say ?? '').not.toMatch(/\d\/\d/);
+  it('every card has a spoken line, and none carries a raw fraction', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 500)) {
+      expect(c.say).toBeTruthy();
+      expect(c.say).not.toMatch(/\d\/\d/);
+    }
   });
 });
