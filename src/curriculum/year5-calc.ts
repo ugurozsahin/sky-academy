@@ -1,7 +1,7 @@
 // Year 5 calculation strand (#1177). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
 import { y5Mental } from './year5-mental';
-// import: y5-story
+import { y5Story } from './year5-story';
 import { y5Factors } from './year5-factors';
 // import: y5-primes
 // import: y5-longmult
@@ -20,7 +20,7 @@ export const Y5_CALC: Topic[] = [
 
   { id: 'y5-mental', title: 'Mental Adding and Subtracting', icon: '💭', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 A&S: mental, increasingly large numbers (5M8)', gen: y5Mental },
 
-  // slot: y5-story
+  { id: 'y5-story', title: 'Adding and Subtracting Problems', icon: '📰', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 A&S: multi-step problems in context (5M10)', gen: y5Story },
 
   { id: 'y5-factors', title: 'Factors and Multiples', icon: '✖️', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: multiples, factor pairs, common factors (5M11)', sequenceFrom: 2, gen: y5Factors },
 
