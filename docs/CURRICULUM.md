@@ -247,6 +247,7 @@ Writing:
 The third KS2 shell (#1177): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. Built the same way — one module per strand (`src/curriculum/year5-*.ts`), a `// slot: <id>` comment per planned topic. Answers run 0–1,000,000 and may go down to −100.
 
 Maths:
+- y5-pv — place value to 1,000,000 (NC Y5 5M1–2): d1 five-digit digit value, or 10/100/1,000 more or less; d2 six-digit digit value, 10,000/100,000 more or less, or a number written in words; d3 the second largest of four numbers, or which is greater than 999,990
 - y5-round — round numbers up to 1,000,000 to the nearest 10, 100, 1,000, 10,000 and 100,000
 
 Writing:

@@ -3,6 +3,8 @@
 // `10^dp` (3.75 is `{ v: 375, dp: 2 }`), and every operation stays on integers: aligning two `dp`s
 // or scaling by a power of ten only ever multiplies (exact), never divides a float. `fmt`/`parseNum`
 // read and write the integer digits directly rather than going through a JS number division.
+import { numberWord } from './util';
+
 export interface Dec { readonly v: number; readonly dp: number }
 
 /** Build a Dec directly from its scaled integer, e.g. `dec(375, 2)` is 3.75. */
@@ -127,4 +129,24 @@ export function digitAt(n: Dec | number, place: Place): number {
 /** `digitAt(n, place) * place` — e.g. `digitValue(345672, 1000)` is 5,000. */
 export function digitValue(n: Dec | number, place: Place): number {
   return digitAt(n, place) * place;
+}
+
+/**
+ * British words for a whole number from 1 to 1,000,000 ("four hundred and three thousand and fifty", #1179).
+ * `numberWord` stops at 100, so hundreds and thousands are composed here; "and" goes before a final one- or
+ * two-digit group, never before a hundreds group ("two thousand, one hundred" reads "two thousand one hundred").
+ */
+export function wordsFor(n: number): string {
+  if (!Number.isInteger(n) || n < 1 || n > 1000000) throw new Error(`wordsFor: ${n} is outside 1 to 1,000,000`);
+  if (n === 1000000) return 'one million';
+  const below1000 = (m: number): string => {
+    const h = Math.floor(m / 100), r = m % 100;
+    if (!h) return numberWord(r);
+    return r ? `${numberWord(h)} hundred and ${numberWord(r)}` : `${numberWord(h)} hundred`;
+  };
+  const th = Math.floor(n / 1000), rem = n % 1000;
+  if (!th) return below1000(rem);
+  const head = `${below1000(th)} thousand`;
+  if (!rem) return head;
+  return rem < 100 ? `${head} and ${numberWord(rem)}` : `${head} ${below1000(rem)}`;
 }
