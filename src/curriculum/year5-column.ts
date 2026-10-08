@@ -25,10 +25,10 @@ function smallerFromLarger(a: number, b: number): number {
   return Number([...x].map((c, i) => Math.abs(Number(c) - Number(y[i]))).join(''));
 }
 
-const twins = (ds: number[], answer: number) => ds.some(v => lastOf(v) === lastOf(answer)) && ds.some(v => leadOf(v) === leadOf(answer));
+export const twins = (ds: number[], answer: number) => ds.some(v => lastOf(v) === lastOf(answer)) && ds.some(v => leadOf(v) === leadOf(answer));
 
 /** Keep the answer from standing out by its units or leading digit: swap a slip (never the first `keep`, the named ones) for a fill. */
-function keepTwins(out: number[], fills: number[], answer: number, keep: number): void {
+export function keepTwins(out: number[], fills: number[], answer: number, keep: number): void {
   for (let i = keep; i < out.length && !twins(out, answer); i++) {
     const swap = fills.find(v => !out.includes(v) && twins(out.map((x, j) => j === i ? v : x), answer));
     if (swap !== undefined) out[i] = swap;

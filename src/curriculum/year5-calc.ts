@@ -4,7 +4,7 @@ import { y5Mental } from './year5-mental';
 import { y5Story } from './year5-story';
 import { y5Factors } from './year5-factors';
 import { y5Primes } from './year5-primes';
-// import: y5-longmult
+import { y5LongMult } from './year5-longmult';
 // import: y5-mentalmd
 // import: y5-shortdiv
 // import: y5-x10
@@ -26,7 +26,7 @@ export const Y5_CALC: Topic[] = [
 
   { id: 'y5-primes', title: 'Prime Numbers', icon: '🔑', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: primes to 100, prime factors, composite; recall primes to 19 (5M12–13)', sequenceFrom: 2, gen: y5Primes },
 
-  // slot: y5-longmult
+  { id: 'y5-longmult', title: 'Long Multiplication', icon: '✖️', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: up to 4 digits × 1 or 2 digits, formal methods (5M14)', sequenceFrom: 3, gen: y5LongMult },
 
   // slot: y5-mentalmd
 
