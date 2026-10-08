@@ -28,6 +28,7 @@ declare global {
   interface Window { __spoken?: string[] }                          // #380 review B2: every line the engine was handed, in order
   interface Window { __seedMiss?: boolean }                         // #518: true when a dojo seed keyed by date missed the page's own day
   interface Window { __cancelled?: number }                         // #884: how many times the engine's cancel() ran — hush() reaches it
+  interface Window { __tutShown?: boolean }                         // #1648: the tutorial hand was rendered visible at least once
 }
 
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
@@ -466,9 +467,18 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#intro-go');
     // #1055: a child with no school year yet is asked on the map first; that tap starts the mission.
     await expect(page.locator('.home .section-title')).toHaveText('Tap your school year');
+    // The hand shows for ~1.1 s at 8× speed (play.ts: scaled(9000)); a loaded runner can poll past that window
+    // (nightly 2026-10-08), so record that it was shown rather than racing to catch it live.
+    await page.evaluate(() => {
+      window.__tutShown = false;
+      new MutationObserver(() => {
+        const t = document.querySelector<HTMLElement>('#tutorial');
+        if (t && !t.hidden && t.checkVisibility()) window.__tutShown = true;
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
+    });
     await page.click('.island[data-year="reception"]');
     await expect(page.locator('.play')).toBeVisible();
-    await expect(page.locator('#tutorial')).toBeVisible();
+    await page.waitForFunction(() => window.__tutShown);
     await page.waitForFunction(() => window.__sna?.state().prompt);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).onboarded)).toBe(true);
     await page.goBack();   // #887: the first back pauses a live mission, the second leaves it
