@@ -247,6 +247,7 @@ Writing:
 The third KS2 shell (#1177): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. Built the same way — one module per strand (`src/curriculum/year5-*.ts`), a `// slot: <id>` comment per planned topic. Answers run 0–1,000,000 and may go down to −100.
 
 Maths:
+- y5-pv — place value to 1,000,000 (NC Y5 5M1–2): d1 five-digit digit value, or 10/100/1,000 more or less; d2 six-digit digit value, 10,000/100,000 more or less, or a number written in words; d3 the second largest of four numbers, or which is greater than 999,990
 - y5-negative — negative numbers in context and counting through zero (5M3): d1 a number line of 5–6 ticks crossing zero with a lettered marker A, and counting back or on through zero; d2 a temperature that gets warmer or colder, and "how many degrees warmer"; d3 a sequence counted through zero in 2s, 5s, 10s or 25s, and "which is the coldest?". Answers run −30 to 30 with a real minus sign; decoys are the sign flipped, zero counted or skipped, the wrong direction and the magnitudes subtracted, with answer ± 10 where a big answer's last digit would leak
 - y5-round — round numbers up to 1,000,000 to the nearest 10, 100, 1,000, 10,000 and 100,000
 
