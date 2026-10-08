@@ -257,7 +257,8 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
           // a blanket years flag can't tell the real year from a coincidental in-range number sharing the
           // same label), best-effort until a real topic lands and fixes its actual answer shape.
           const years = isYearTopic && /^\d+$/.test(q.answer) ? [Number(q.answer)] : undefined;
-          for (const label of [q.prompt, q.answer, ...q.options]) {
+          // An any-order card's `answer` is its targets joined by a comma (any-order.ts), which the grouping check would read as one number: check each target instead.
+          for (const label of [q.prompt, ...(q.anyOrder ? q.sequence! : [q.answer]), ...q.options]) {
             expect(labelProblems(label, { years }), `${t.id} d${d}: "${label}"`).toEqual([]);
           }
         }
