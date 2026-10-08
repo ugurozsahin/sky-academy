@@ -6,7 +6,7 @@ import { y5Factors } from './year5-factors';
 import { y5Primes } from './year5-primes';
 import { y5LongMult } from './year5-longmult';
 // import: y5-mentalmd
-// import: y5-shortdiv
+import { y5ShortDiv } from './year5-shortdiv';
 // import: y5-x10
 // import: y5-squares
 // import: y5-equals
@@ -30,7 +30,7 @@ export const Y5_CALC: Topic[] = [
 
   // slot: y5-mentalmd
 
-  // slot: y5-shortdiv
+  { id: 'y5-shortdiv', title: 'Short Division', icon: '➗', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: short division up to 4 digits ÷ 1 digit; remainders in context (5M16)', sequenceFrom: 2, gen: y5ShortDiv },
 
   // slot: y5-x10
 

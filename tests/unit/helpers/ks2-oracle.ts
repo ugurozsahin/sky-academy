@@ -257,6 +257,9 @@ export function sameValue(answer: string, value: Frac): boolean {
  * `ks2Solve` oracle first; an EYFS/KS1 topic, or a KS2 card `ks2Solve` does not recognise, falls back to
  * `solve`'s bare-number check. `null` when neither has an opinion on `prompt` at all (nothing to assert). */
 export function arithmeticCheck(isKs2Year: boolean, prompt: string, answer: string): boolean | null {
+  // A short-division answer "246 r 4" (#1188): check q × d + r = n with 0 ≤ r < d against the prompt's own numbers.
+  const rem = answer.match(/^(\d+) r (\d+)$/), div = prompt.match(/^([\d,]+) ÷ (\d+) = \?$/);
+  if (rem && div) { const n = Number(div[1].replace(/,/g, '')), d = Number(div[2]); return Number(rem[1]) * d + Number(rem[2]) === n && Number(rem[2]) < d; }
   const value = isKs2Year ? ks2Solve(prompt) : null;
   if (value !== null) return sameValue(answer, value);
   const s = solve(prompt);
