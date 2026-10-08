@@ -5,6 +5,7 @@ import { praiseLine, senseiLine, SENSEI, type Avatar } from '../avatars';
 import type { DeckItem, Miss, Resume, SessionResult } from '../game/session';
 import { trickyOffer } from '../game/tricky-facts';
 import { mtcRowsFor, mtcTally } from './mtc-view';
+import { paperRowsFor } from './paper-view';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { say, sfx } from '../audio';
 import { topicsFor, type Topic, type YearInfo } from '../curriculum';
@@ -105,7 +106,7 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
       headline, medal, heading, starCount: r.stars, score: r.score, ...mtcTally(r, deck),
-      bestCombo: r.bestCombo, coins: practice ? 0 : r.coins, newBest, streak, dojoRows: mtcRowsFor(r, deck) + (dojoSaved ? dojoRowsHTML(dojo!) : ''), stickerHTML, cert: !!earned,
+      bestCombo: r.bestCombo, coins: practice ? 0 : r.coins, newBest, streak, dojoRows: mtcRowsFor(r, deck) + paperRowsFor(r, deck) + (dojoSaved ? dojoRowsHTML(dojo!) : ''), stickerHTML, cert: !!earned,
       resultLines: resultPillsHTML(lines),
       action: actionButton(action),
     });

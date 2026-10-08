@@ -1,5 +1,6 @@
 import './style.css';
 import { mtcDeck } from './game/mtc';
+import { paperDeck } from './game/arithmetic-paper';
 import { chooseNinjaScreen, changeAvatarScreen, introScreen, nameScreen } from './ui/avatar';
 import { mapScreen, islandScreen, rewardsScreen, type StartPlay } from './ui/home';
 import { playScreen, type PlayOpts } from './ui/play';
@@ -72,7 +73,7 @@ const nav = {
   },
   map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
-  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend })); }) as StartPlay,
+  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : o.mode === 'paper' ? paperDeck(Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
   duel: (y: YearInfo, topic?: string) => { leave(); year = y; enter('duel'); dispose = duelScreen({ year: y, topic }, up, () => nav.duel(y, topic)); },   // #16
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },

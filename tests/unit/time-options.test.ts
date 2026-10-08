@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Session } from '../../src/game/session';
 import { MODES } from '../../src/game/modes';
 import { timeOptsFor, beepDue } from '../../src/game/time-options';
+import { PAPER_SECONDS } from '../../src/game/arithmetic-paper';
 import { YEARS, topicById } from '../../src/curriculum';
 
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -21,6 +22,11 @@ describe('timeOptsFor', () => {
     expect(timeOptsFor('sprint', { timeX: 1.5, slow: true })).toMatchObject({ seconds: 90, slower: true });
     expect(timeOptsFor('sprint', { timeX: 0, slow: false })).toMatchObject({ seconds: 90, timeScale: Infinity });
     expect(timeOptsFor('sprint', { timeX: 1, slow: false }).seconds).toBeUndefined();
+  });
+  it('an Arithmetic practice paper gets its clock ×1.5 at extra time and at no limit, and nothing extra at Normal', () => {
+    expect(timeOptsFor('paper', { timeX: 1.5, slow: false })).toMatchObject({ seconds: PAPER_SECONDS * 1.5, timeScale: 1.5 });
+    expect(timeOptsFor('paper', { timeX: 0, slow: true })).toMatchObject({ seconds: PAPER_SECONDS * 1.5, timeScale: Infinity, slower: true });
+    expect(timeOptsFor('paper', { timeX: 1, slow: false }).seconds).toBeUndefined();
   });
   it('other modes never get extra seconds', () => {
     for (const m of ['mission', 'endless', 'boss', 'relaxed', 'mtc'] as const) expect(timeOptsFor(m, { timeX: 1.5, slow: false }).seconds).toBeUndefined();
