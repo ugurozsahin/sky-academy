@@ -146,6 +146,7 @@
 🔋	0.6	battery
 🔍	0.6	magnifying glass tilted left
 🔎	0.6	magnifying glass tilted right
+🔑	0.6	key
 🔒	0.6	locked
 🔔	0.6	bell
 🔗	0.6	link
