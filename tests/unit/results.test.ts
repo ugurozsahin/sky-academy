@@ -8,6 +8,13 @@ import type { Question, Topic } from '../../src/curriculum';
 // #36: these were dense ternaries buried in play.ts's showResults, reached only by the e2e results screen.
 // Now they are pure functions, so every mode/win/star combination is checked here directly.
 
+describe('resultMedal for paper (#1233)', () => {
+  it('is graded on stars, as Sprint is', () => {
+    expect([3, 2, 1, 0].map(stars => resultMedal({ mode: 'paper', won: true, score: 0, stars }))).toEqual(['🥇', '🥈', '🥉', '💪']);
+    expect(resultHeading('paper', { won: true, training: false })).toBe('Practice paper done!');
+  });
+});
+
 describe('resultMedal', () => {
   it('grades Sky Storm (endless) on score, ignoring stars and win', () => {
     expect(resultMedal({ mode: 'endless', won: true, score: 300, stars: 0 })).toBe('🥇');
@@ -464,8 +471,8 @@ describe('medal and result stars per mode (#1117)', () => {
   it.each(medals)('%s won=%s stars=%i score=%i → %s', (mode, won, stars, score, medal) => {
     expect(resultMedal({ mode, won, stars, score })).toBe(medal);
   });
-  it('shows result stars for mission, sprint and boss only', () => {
+  it('shows result stars for mission, sprint, boss and paper only', () => {
     expect(Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, v.resultStars]))).toEqual(
-      { mission: true, endless: false, sprint: true, boss: true, relaxed: false, mtc: false });
+      { mission: true, endless: false, sprint: true, boss: true, relaxed: false, mtc: false, paper: true });
   });
 });

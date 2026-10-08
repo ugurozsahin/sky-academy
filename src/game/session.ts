@@ -47,7 +47,7 @@ export interface Miss { topic: string; q: Question; picked: string | null }
  *  reverses it, so what `recordGameEnd` prepends is newest-first, matching every other reader of `Slip`. */
 export const missSlips = (misses: readonly Miss[]): Omit<Slip, 'at'>[] =>
   [...misses].reverse().map(m => ({ topic: m.topic, prompt: m.q.listen ?? m.q.prompt, answer: m.q.answer, picked: m.picked ?? '' }));
-export interface SessionResult { mode: Mode; stage: number; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[] }
+export interface SessionResult { mode: Mode; stage: number; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[]; elapsedMs?: number }
 
 /**
  * The three-star bar, from an accuracy in 0..1 — the **one** definition (#397 review round 2, B2).
@@ -105,6 +105,7 @@ export class Session {
   private misses: Miss[] = [];                          // every wrong slice / miss, de-duplicated by repeatKey (#878)
   private slicedTargets = new Set<string>();            // q.anyOrder only: targets sliced so far this question (#918)
   timeLeft: number;                                     // ms, sprint only (0 otherwise)
+  private totalMs: number;                              // the clock's full length, ms — `elapsedMs` on the result is this minus timeLeft
   /** Per-question clock (#1063), ms left on the armed question — 0 when there is none. */
   questionLeft = 0;
   /** The digits showing on a number pad right now (#1120); the UI sets it. At expiry they are submitted as the answer. */
@@ -117,7 +118,7 @@ export class Session {
   constructor(public o: SessionOpts, private ev: SessionEvents) {
     this.lives = o.year.lives; this.rng = o.rng ?? Math.random; this.stages = o.stages ?? o.year.speeds.length;
     if (o.resume) { this.stage = o.resume.stage; this.stageStars = [...o.resume.stageStars]; }
-    this.timeLeft = this.spec.timed ? (o.seconds ?? SPRINT_SECONDS) * 1000 : 0;
+    this.totalMs = this.spec.timed ? (o.seconds ?? this.spec.seconds ?? SPRINT_SECONDS) * 1000 : 0; this.timeLeft = this.totalMs;
     this.bossMax = this.spec.boss ? (o.bossHp ?? BOSS_HP) : 0; this.bossHp = this.bossMax;
   }
   /** The behaviour table entry for this run's mode (#26). */
@@ -366,7 +367,7 @@ export class Session {
     const stars = this.spec.stars(end);
     const paid = (this.o.resume?.stageStars ?? []).reduce((s, x) => s + x, 0);   // #931: a retry's carried stars were paid already
     const coins = this.spec.coins({ ...end, stars, stageStarsTotal: total - paid });
-    return { mode: this.o.mode, stage: this.stage, won: safeWon, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins, incomplete, misses: [...this.misses] };
+    return { mode: this.o.mode, stage: this.stage, won: safeWon, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins, incomplete, misses: [...this.misses], ...(this.spec.timed ? { elapsedMs: this.totalMs - this.timeLeft } : {}) };
   }
   /**
    * #484: the moment a staged mission's last question is decided — inside `markCorrect()`/`markWrong()`/
