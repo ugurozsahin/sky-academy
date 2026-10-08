@@ -2,7 +2,7 @@
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
 // import: y5-fraccompare
 // import: y5-fracequiv
-// import: y5-mixed
+import { y5Mixed } from './year5-mixed';
 // import: y5-fracadd
 // import: y5-fracmult
 // import: y5-decfrac
@@ -16,7 +16,7 @@ export const Y5_FRACTIONS: Topic[] = [
 
   // slot: y5-fracequiv
 
-  // slot: y5-mixed
+  { id: 'y5-mixed', title: 'Mixed Numbers', icon: '🔀', subject: 'maths', year: 'year5', nc: 'Y5 Fractions: mixed numbers and improper fractions (5M24)', gen: y5Mixed },
 
   // slot: y5-fracadd
 
