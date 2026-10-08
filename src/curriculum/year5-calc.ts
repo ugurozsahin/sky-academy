@@ -1,6 +1,5 @@
 // Year 5 calculation strand (#1177). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
-// import: y5-column
 import { y5Mental } from './year5-mental';
 // import: y5-story
 // import: y5-factors
@@ -14,9 +13,10 @@ import { y5Mental } from './year5-mental';
 // import: y5-story-md
 // import: y5-truefalse
 import type { Topic } from './types';
+import { y5Column } from './year5-column';
 
 export const Y5_CALC: Topic[] = [
-  // slot: y5-column
+  { id: 'y5-column', title: 'Column Adding and Subtracting', icon: '➕', subject: 'maths', year: 'year5', nc: 'Y5 A&S: more than 4 digits, columnar; round to check (5M7, 5M9)', sequenceFrom: 3, gen: y5Column },
 
   { id: 'y5-mental', title: 'Mental Adding and Subtracting', icon: '💭', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 A&S: mental, increasingly large numbers (5M8)', gen: y5Mental },
 

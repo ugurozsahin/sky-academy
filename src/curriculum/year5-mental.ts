@@ -70,7 +70,7 @@ function options(c: Card, rng: Rng): number[] {
   if (!out.some(v => share(v, first))) {
     const step = 10 ** Math.max(1, String(c.answer).length - 2);
     const v = shuffle(rng, [c.answer + step, c.answer - step, c.answer + 2 * step, c.answer - 2 * step]).find(x => ok(x, out) && share(x, first));
-    if (v !== undefined) out[out.length < 3 ? out.length : out.findIndex(o => !share(o, last))] = v;
+    if (v !== undefined) { const i = out.length < 3 ? out.length : out.findIndex(o => !share(o, last)); out[i < 0 ? 2 : i] = v; }
   }
   for (let k = 1; out.length < 3; k++) for (const v of [c.answer + k * 10, c.answer - k * 10, c.answer + k * 100, c.answer - k * 100]) if (out.length < 3 && ok(v, out)) out.push(v);
   return out;
