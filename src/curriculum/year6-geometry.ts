@@ -6,6 +6,7 @@
 // import: y6-coords
 // import: y6-transform
 import type { Topic } from './types';
+import { y6Coords } from './year6-coords';
 
 export const Y6_GEOMETRY: Topic[] = [
   // slot: y6-nets
@@ -15,6 +16,7 @@ export const Y6_GEOMETRY: Topic[] = [
   // slot: y6-circles
 
   // slot: y6-coords
+  { id: 'y6-coords', title: 'Four-Quadrant Coordinates', icon: '🧭', subject: 'maths', year: 'year6', nc: 'Y6 Geometry: describe positions on the full coordinate grid, all four quadrants (6M46)', gen: y6Coords },
 
   // slot: y6-transform
 ];

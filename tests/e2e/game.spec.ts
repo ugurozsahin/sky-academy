@@ -5706,3 +5706,26 @@ test('a y4-coords d3 grid card fits a 390×664 phone (#1129)', async ({ page }, 
     if (seed === 1 && process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
   }
 });
+
+// #1213: a −5…5 four-quadrant grid with one lettered point per quadrant fits a 390×664 phone. Built from renderVisual, put into the live card.
+test('a y6-coords four-quadrant grid fits a 390×664 phone (#1213)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await seedPreview(page);
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year6', 'y6-coords');
+  const points = [{ x: 3, y: 4, label: 'A' }, { x: -3, y: 4, label: 'B' }, { x: -2, y: -5, label: 'C' }, { x: 5, y: -1, label: 'D' }];
+  await page.evaluate(({ html, prompt }) => {
+    document.querySelector('#vis')!.innerHTML = html;
+    document.querySelector('#prompt')!.textContent = prompt;
+  }, { html: renderVisual({ type: 'coords', size: 5, min: -5, points }), prompt: 'Which point is at (−2, −5)?' });
+  const grid = (await page.locator('#vis svg').boundingBox())!, card = (await page.locator('.qcard').boundingBox())!;
+  expect(grid.x).toBeGreaterThanOrEqual(card.x);
+  expect(grid.x + grid.width).toBeLessThanOrEqual(card.x + card.width + 1);
+  expect(grid.y + grid.height).toBeLessThanOrEqual(card.y + card.height + 1);
+  expect(await page.locator('#vis svg .pt').count()).toBe(4);
+  expect(await page.locator('#vis svg .ax').allTextContents()).toEqual(['−5', '−4', '−3', '−2', '−1', '0', '1', '2', '3', '4', '5']);
+  await expectFitsViewport(page, 'y6-coords four-quadrant grid');
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
+});
