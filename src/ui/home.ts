@@ -1,5 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { mtcDeck } from '../game/mtc';
+import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
 import { leastSecure } from '../fact-record';
 import { beltFor, totalStarsOf } from '../game/belts';
@@ -144,6 +145,10 @@ const mtcPadRow = (nav: Nav, year: YearInfo): MenuRow => ({
   go: () => nav.play({ year, mode: 'mtc', input: 'keypad', deck: mtcDeck(Math.random) }),
 });
 
+/** Arithmetic practice (#1233): Year 6 only, through the menu's `years` filter. */
+const paperRow = (nav: Nav, year: YearInfo): MenuRow => ({ id: 'paper', mod: 'sprint', vport: '<span class="vport emoji">📝</span>', title: MODES.paper.title,
+  blurb: '10 questions in the style of Paper 1 · 7½ minutes', years: ['year6'], go: () => nav.play({ year, mode: 'paper', deck: paperDeck(Math.random) }) });
+
 /** Tricky Facts (#1124): Sensei's pick of the child's least secure × facts — KS2 islands only, and only while some fact is insecure. */
 const trickyRow = (nav: Nav, year: YearInfo, facts: Record<string, Ks2Fact>): MenuRow[] => {
   const n = leastSecure(facts).length;
@@ -191,7 +196,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year),
+      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year),
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,

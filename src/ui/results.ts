@@ -35,6 +35,7 @@ export function resultMedal(r: RunOutcome): string {
     case 'endless': return r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉';
     case 'relaxed': return '💪';   // #937: effort, never stars
     case 'mtc': return '';           // #1118: practice, no medal
+    case 'paper': return r.stars >= 1 ? tier(r.stars) : '💪';   // #1233: graded on stars, as Sprint is
     case 'sprint': return r.stars >= 1 ? tier(r.stars) : '💪';
     case 'mission': case 'boss': return r.won ? tier(r.stars) : '💪';
     default: { const never: never = r.mode; return never; }

@@ -3,8 +3,9 @@
 // Session reads the behaviour (difficulty/speed/points/stars/coins/lives); the UI reads the labels.
 import type { Difficulty, YearInfo } from '../curriculum';
 import { MTC_PRACTICE, MTC_SIZE, mtcArmDelay } from './mtc';
+import { PAPER_SECONDS, PAPER_SIZE } from './arithmetic-paper';
 
-export type Mode = 'mission' | 'endless' | 'sprint' | 'boss' | 'relaxed' | 'mtc';
+export type Mode = 'mission' | 'endless' | 'sprint' | 'boss' | 'relaxed' | 'mtc' | 'paper';
 
 /** Live state a mode needs while a question is on screen. */
 export interface ModeCtx {
@@ -37,6 +38,7 @@ export interface ModeSpec {
   hasLives: boolean;        // false = a slip costs no life (Ninja Sprint)
   staged: boolean;          // true = five staged waves (mission); false = one continuous run
   timed: boolean;           // Ninja Sprint clock
+  seconds?: number;         // the clock's length when `timed`; unset = Ninja Sprint's SPRINT_SECONDS (#1233)
   questionMs?: number;      // a per-question time limit (#1063); unset = no per-question clock. No mode sets it yet
   hold?: { correct: number; wrong: number; miss: number };   // outcome holds (ms), unscaled — unset = `holdFor`'s defaults (#1118)
   missesCap?: number;       // misses kept on the result; unset = MISSES_CAP (#1118: Tables Check keeps all 25 check misses)
@@ -138,6 +140,16 @@ export const MODES: Record<Mode, ModeSpec> = {
     basePoints: () => 10,
     stars: () => 0,
     coins: baseCoins,
+  },
+  // #1233: Arithmetic practice — a ten-card deck on the paper's 45 s a mark. Stars are the #397 bar on correct ÷ 10.
+  paper: {
+    id: 'paper', title: 'Arithmetic practice', overHeadingWon: 'Practice paper done!', overHeadingLost: 'Practice paper done!',
+    hasLives: false, staged: false, timed: true, seconds: PAPER_SECONDS, resultStars: true, boss: false, villain: false,
+    difficulty: c => c.questionsAsked < 4 ? 1 : c.questionsAsked < 8 ? 2 : 3,
+    speed: c => eased(c, c.year.speeds[1] ?? 2),
+    basePoints: () => 10,
+    stars: c => { const a = c.correct / PAPER_SIZE; return a >= 0.95 ? 3 : a >= 0.7 ? 2 : c.correct >= 1 ? 1 : 0; },
+    coins: c => baseCoins(c) + c.stars * 5,
   },
 };
 
