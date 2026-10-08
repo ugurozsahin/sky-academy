@@ -48,6 +48,10 @@ describe('Grammar mix pool (#1234)', () => {
     expect(src).toContain('recordSprintOutcome(o.year, o.topic, r, !!o.title)');
     expect(src).toContain('playTitle(o, spec.staged, training, spec.title)');
   });
+  it('main.ts keeps the pool title on Play again and on the fix-it deck, so a replay never writes the Ninja Sprint best', () => {
+    const line = readFileSync('src/main.ts', 'utf8').split('\n').find(l => l.includes('play: ((o: PlayOpts)')) ?? '';
+    expect(line.match(/pool: o\.pool, title: o\.title/g)).toHaveLength(2);
+  });
   it('home.ts offers the row through offeredPool and starts it as a titled sprint pool', () => {
     const src = readFileSync('src/ui/home.ts', 'utf8');
     expect(src).toContain('offeredPool(grammarPool(year.id))');
