@@ -62,7 +62,7 @@ describe('y5-primes (#1186)', () => {
     expect(cards).toBeGreaterThan(300);
   });
 
-  it('d3 prime-factor cards: targets are exactly the prime factors shown, with a composite factor and a non-factor prime as decoys', () => {
+  it('d3 prime-factor cards: targets are every prime factor of n, exactly the prime factors shown, with a composite factor and a non-factor prime as decoys', () => {
     for (const q of draw(3)) {
       const n = Number(q.prompt.match(/^Slice every prime factor of (\d+)$/)![1]);
       expect(n).toBeLessThanOrEqual(100);
@@ -70,8 +70,10 @@ describe('y5-primes (#1186)', () => {
       const targets = q.sequence!;
       expect(targets.length).toBeGreaterThanOrEqual(2); expect(targets.length).toBeLessThanOrEqual(3);
       for (const o of q.options) expect(isPrime(Number(o)) && n % Number(o) === 0, `${q.prompt} ${o}`).toBe(targets.includes(o));
+      const everyPrimeFactor = PRIMES_TO_100.filter(p => n % p === 0).map(String);
+      expect([...targets].sort(), q.prompt).toEqual(everyPrimeFactor.sort());
       const decoys = q.options.filter(o => !targets.includes(o)).map(Number);
-      expect(decoys.some(x => isComposite(x)), q.prompt).toBe(true);
+      expect(decoys.some(x => isComposite(x) && n % x === 0 && x < n), q.prompt).toBe(true);
       expect(decoys.some(x => isPrime(x)), q.prompt).toBe(true);
     }
   });

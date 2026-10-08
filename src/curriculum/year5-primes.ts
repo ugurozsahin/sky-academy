@@ -42,7 +42,7 @@ function composite(rng: Rng): Question {
 function primeFactors(rng: Rng): Question {
   let n: number, pf: number[];
   do { n = ri(rng, 12, 100); pf = PRIMES.filter(p => n % p === 0); } while (pf.length < 2 || pf.length > 3 || !COMPOSITES.some(x => n % x === 0 && x < n));
-  const k = Math.min(ri(rng, 2, 4), pf.length), targets = shuffle(rng, pf).slice(0, k);
+  const k = pf.length, targets = shuffle(rng, pf);
   const compFactors = shuffle(rng, COMPOSITES.filter(x => n % x === 0 && x < n));
   const others = shuffle(rng, PRIMES.filter(p => n % p !== 0 && p < 30));
   const decoys = [...compFactors.slice(0, 3), ...others].slice(0, 6 - k);
