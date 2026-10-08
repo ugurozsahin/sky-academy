@@ -242,3 +242,9 @@ Writing:
 - y4-proofread — find the one misspelt word in a sentence (Y3–4 "proofread for spelling"): slice the invented misspelling among words from the same sentence; d1 Year 2 exception words (3 bubbles), d2 Year 3–4 list words (4), d3 list and -ous/-tion/-sure/-ture words in longer sentences (5, every decoy 5+ letters); `say` speaks the correct sentence
 - y4-plural-poss — plural or possessive -s (English Appendix 2, Year 4): a card says whose things they are ("the bikes of one boy") and the child slices girl's, girls' or children's; every ASCII apostrophe, no plural equal to its singular; d1 regular owners, d2 adds irregular plurals (children's, men's, mice's), d3 adds the plain-plural sentence form where a verb follows the gap
 - y4-context — what a word with two or three meanings means in one sentence (NC Y3–4 comprehension, words in context); d1–d2 two-sense words, d3 three-sense words
+
+## Year 6 — 7 q/stage, 3 lives
+The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. One module per strand (`src/curriculum/year6-*.ts`, eleven of them — Year 6 adds ratio and algebra), a `// slot: <id>` comment per planned topic. Answers run −1,000 to 10,000,000, the largest labels the game will put in a bubble.
+
+Maths:
+- y6-round — round any whole number to a required accuracy, including in context

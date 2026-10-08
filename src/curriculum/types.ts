@@ -134,7 +134,7 @@ export type Generator = (d: Difficulty, rng: Rng) => Question;
 
 // One string source of truth for every year group. Adding a year (Y3–Y6) means one
 // new YearId member + one YEARS entry — no unions or per-year assets to retype elsewhere.
-export type YearId = 'reception' | 'year1' | 'year2' | 'year3' | 'year4';
+export type YearId = 'reception' | 'year1' | 'year2' | 'year3' | 'year4' | 'year6';
 
 export interface Topic {
   id: string;             // "y1-bonds"
@@ -198,4 +198,5 @@ export const YEARS: YearInfo[] = [
   // until it has 12 maths + 6 writing topics, so this row exists with no map presence today.
   { id: 'year3', title: 'Year 3', short: 'Y3', age: 'Ages 7–8', blurb: 'Hundreds, 3, 4 & 8 tables, fractions & Roman numerals', tint: '#ffb02055', maxAnswer: 2000, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
   { id: 'year4', title: 'Year 4', short: 'Y4', age: 'Ages 8–9', blurb: 'Tables to 12 × 12, decimals, area & coordinates', tint: '#3ec9ff55', maxAnswer: 20000, minAnswer: -50, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
+  { id: 'year6', title: 'Year 6', short: 'Y6', age: 'Ages 10–11', blurb: 'Long division, ratio, algebra & SATs practice', tint: '#9aa5cf55', maxAnswer: 10000000, minAnswer: -1000, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
 ];
