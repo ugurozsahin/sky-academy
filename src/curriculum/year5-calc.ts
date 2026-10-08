@@ -8,7 +8,7 @@ import { y5LongMult } from './year5-longmult';
 import { y5MentalMd } from './year5-mentalmd';
 import { y5ShortDiv } from './year5-shortdiv';
 import { y5X10 } from './year5-x10';
-// import: y5-squares
+import { y5Squares } from './year5-squares';
 // import: y5-equals
 // import: y5-story-md
 // import: y5-truefalse
@@ -34,7 +34,7 @@ export const Y5_CALC: Topic[] = [
 
   { id: 'y5-x10', title: 'Times and Divide by 10, 100, 1,000', icon: '🔟', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: × and ÷ by 10, 100, 1,000 incl. decimals (5M17)', sequenceFrom: 2, gen: y5X10 },
 
-  // slot: y5-squares
+  { id: 'y5-squares', title: 'Square and Cube Numbers', icon: '🟦', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: square and cube numbers, ² and ³ (5M18–19)', gen: y5Squares },
 
   // slot: y5-equals
 
