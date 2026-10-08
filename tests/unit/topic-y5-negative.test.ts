@@ -65,28 +65,14 @@ describe('y5-negative (#1180)', () => {
   });
 
   it('the named decoys are present, not back-filled: each card shape offers its own slips', () => {
-    const ok = (v: number, a: number) => v !== a && v >= -30 && v <= 30;
-    const has = (q: Question, v: number) => expect(q.options, q.prompt).toContain(f(v));
-    const seen: Record<string, number> = { line: 0, back: 0, on: 0, change: 0, gap: 0, seq: 0 };
+    const seen: Record<string, number> = {};
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d, 1500)) {
-      const a = num(q.answer); let m: RegExpMatchArray | null;
-      if (q.visual?.type === 'numberline') {
-        seen.line++; const step = q.visual.step!;
-        for (const v of [-a, a + step, a - step]) if (ok(v, a)) has(q, v);
-      } else if ((m = q.prompt.match(/^Start at (\S+) and count back (\d+)/))) {
-        seen.back++; for (const v of [-a, a - 1, num(m[1]) + Number(m[2])]) if (ok(v, a)) has(q, v);
-      } else if ((m = q.prompt.match(/^Start at (\S+) and count on (\d+)/))) {
-        seen.on++; for (const v of [-a, a + 1, num(m[1]) - Number(m[2])]) if (ok(v, a)) has(q, v);
-      } else if ((m = q.prompt.match(/^It is (\S+) °C\. It gets (\d+) degrees (warmer|colder)/))) {
-        seen.change++; const wrong = num(m[1]) + (m[3] === 'warmer' ? -1 : 1) * Number(m[2]);
-        for (const v of [-a, wrong]) if (ok(v, a)) has(q, v);
-      } else if ((m = q.prompt.match(/^How many degrees warmer is (\S+) °C than (\S+) °C/))) {
-        seen.gap++; for (const v of [num(m[1]) - Math.abs(num(m[2])), -a]) if (ok(v, a)) has(q, v);
-      } else if (/what comes next\?$/.test(q.prompt)) {
-        seen.seq++; const t = nums(q.prompt.replace(/, … what comes next\?$/, '')), dir = Math.sign(t[2] - t[1]);
-        for (const v of [-a, a + dir]) if (ok(v, a)) has(q, v);   // zero skipped: one further along the count
-      }
+      const a = num(q.answer), found = namedSlips(q, a);
+      if (!found) continue;
+      seen[found.shape] = (seen[found.shape] ?? 0) + 1;
+      for (const v of found.slips) if (v !== a && v >= -30 && v <= 30) expect(q.options, q.prompt).toContain(f(v));
     }
+    expect(Object.keys(seen).sort()).toEqual(['back', 'change', 'gap', 'line', 'on', 'seq']);
     for (const k of Object.keys(seen)) expect(seen[k], k).toBeGreaterThan(100);
   });
 
@@ -107,5 +93,20 @@ describe('y5-negative (#1180)', () => {
     }
   });
 });
+
+/** The slips a card's generator names first (the ones its fill rule must never replace), read back from the card alone. */
+function namedSlips(q: Question, a: number): { shape: string; slips: number[] } | null {
+  const vis = q.visual, p = q.prompt;
+  if (vis?.type === 'numberline') return { shape: 'line', slips: [-a, a + vis.step!, a - vis.step!] };
+  const move = p.match(/^Start at (\S+) and count (back|on) (\d+)/);
+  if (move) { const start = num(move[1]), n = Number(move[3]); return move[2] === 'back' ? { shape: 'back', slips: [-a, a - 1, start + n] } : { shape: 'on', slips: [-a, a + 1, start - n] }; }
+  const change = p.match(/^It is (\S+) °C\. It gets (\d+) degrees (warmer|colder)/);
+  if (change) return { shape: 'change', slips: [-a, num(change[1]) + (change[3] === 'warmer' ? -1 : 1) * Number(change[2])] };
+  const gap = p.match(/^How many degrees warmer is (\S+) °C than (\S+) °C/);
+  if (gap) return { shape: 'gap', slips: [num(gap[1]) - Math.abs(num(gap[2])), -a] };
+  if (!/what comes next\?$/.test(p)) return null;
+  const t = nums(p.replace(/, … what comes next\?$/, ''));
+  return { shape: 'seq', slips: [-a, a + Math.sign(t[2] - t[1])] };   // zero skipped: one further along the count
+}
 
 function f(n: number): string { return n < 0 ? `−${-n}` : String(n); }
