@@ -42,7 +42,7 @@ describe('y5-story (#1184)', () => {
     for (const q of draw(1, 300)) { expect(templateOf(q.prompt)[0]).toHaveLength(2); for (const n of nums(q.prompt)) expect(n, q.prompt).toBeLessThanOrEqual(10000); }
     for (const q of draw(2, 300)) { expect(templateOf(q.prompt)[0]).toHaveLength(2); expect(nums(q.prompt)[0], q.prompt).toBeGreaterThanOrEqual(10000); }
     const d3 = draw(3, 400);
-    expect(d3.some(q => templateOf(q.prompt)[0].length === 3)).toBe(true);
+    for (const q of d3) expect(templateOf(q.prompt)[0], q.prompt).toHaveLength(3);
     for (const q of d3) expect(q.slow, q.prompt).toBe(true);
   });
 
@@ -61,6 +61,19 @@ describe('y5-story (#1184)', () => {
 
   it('only d3 is slow', () => {
     for (const d of [1, 2] as Difficulty[]) for (const q of draw(d, 100)) expect(q.slow, q.prompt).toBeFalsy();
+  });
+
+  it('each template\'s operations match its wording (hand-written, so the oracle cannot agree with a mistake)', () => {
+    const WORDING: Record<string, string> = {
+      'A hall holds #. # sit, # more.': '--', 'A shelf has #. # added, # taken.': '+-', 'A school had #, then got # and #.': '++',
+      'A shop had #. # sold, # added.': '-+', 'A lorry held #. # then # left.': '--', 'A choir sold #, then # and #.': '++',
+      'A park had #. # came, # left.': '+-', 'A bakery made #. # sold, # baked.': '-+', 'A club has #. # join, # leave.': '+-',
+      'A bin has #. # in, # out, # out.': '+--', 'A van had #. # out, # in, # out.': '-+-', 'A hall has #. # in, # in, # out.': '++-',
+      'A depot has #. # out, # in, # in.': '-++', 'A dock had #. # out, # out, # in.': '--+', 'A band sold #, #, # and #.': '+++',
+      'A zoo has #. # go, # and # come.': '-++',
+    };
+    expect(BANK.map(t => t[1]).sort()).toEqual(Object.keys(WORDING).sort());
+    for (const [ops, text] of BANK) expect(ops.join(''), text).toBe(WORDING[text]);
   });
 
   it('every operation pair is drawn at d1 and d2', () => {

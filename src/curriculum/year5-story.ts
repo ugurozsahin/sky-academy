@@ -24,7 +24,7 @@ export const BANK: [Op[], string, string][] = [
   [['-', '+', '+'], 'A depot has #. # out, # in, # in.', 'Now?'],
   [['-', '-', '+'], 'A dock had #. # out, # out, # in.', 'Now?'],
   [['+', '+', '+'], 'A band sold #, #, # and #.', 'Total?'],
-  [['+', '-', '+'], 'A zoo has #. # go, # and # come.', 'Now?'],
+  [['-', '+', '+'], 'A zoo has #. # go, # and # come.', 'Now?'],
 ];
 /** The two-step stories (three numbers); d3 is the three-step ones. */
 const TWO = BANK.slice(0, 9);
@@ -44,12 +44,13 @@ const LADDER: Record<Difficulty, [[number, number], [number, number], number]> =
 /** The start, the changes and every running result, all 1 to the ceiling. */
 function numbers(d: Difficulty, ops: Op[], rng: Rng): { vals: number[]; runs: number[] } {
   const [[s0, s1], [c0, c1], max] = LADDER[d];
-  for (;;) {
+  for (let tries = 0; tries < 10000; tries++) {
     const vals = [ri(rng, s0, s1), ...ops.map(() => ri(rng, c0, c1))];
     const runs = [vals[0]];
     ops.forEach((op, i) => runs.push(apply(runs[i], op, vals[i + 1])));
     if (runs.every(v => v >= 1 && v <= max)) return { vals, runs };
   }
+  throw new Error(`y5-story: no numbers fit at d${d}`);
 }
 
 const sharesDigits = (ds: number[], answer: number) => ds.some(v => v % 10 === answer % 10) && ds.some(v => String(v)[0] === String(answer)[0]);
