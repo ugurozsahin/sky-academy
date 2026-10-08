@@ -44,8 +44,19 @@ describe('y5-mixed (#1196)', () => {
     }
   });
 
-  it('d3 offers the sum shape as well as conversions', () => {
-    expect(draw(3, 300).some(c => c.prompt.includes('+'))).toBe(true);
+  it('d3 offers the sum shape as well as both conversions', () => {
+    const cards = draw(3, 300);
+    expect(cards.some(c => c.prompt.includes('+'))).toBe(true);
+    expect(cards.some(c => /^\d+\/\d+ = \?$/.test(c.prompt))).toBe(true);
+    expect(cards.some(c => /^\d+ \d+\/\d+ = \?$/.test(c.prompt))).toBe(true);
+  });
+
+  it('every mixed answer and decoy is well formed (whole ≥ 1, 1 ≤ top < bottom) and d1 keeps the card\'s denominator', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 1000)) for (const o of c.options) {
+      const m = /^(\d+) (\d+)\/(\d+)$/.exec(o);
+      if (m) { expect(Number(m[1]), o).toBeGreaterThanOrEqual(1); expect(Number(m[2]), o).toBeGreaterThanOrEqual(1); expect(Number(m[2]), o).toBeLessThan(Number(m[3])); }
+    }
+    for (const c of draw(1, 500)) expect(c.answer.split('/')[1], c.prompt).toBe(c.prompt.split('/')[1].split(' ')[0]);
   });
 
   it('labels stay short enough for a bubble (at most 7 characters)', () => {
@@ -53,6 +64,6 @@ describe('y5-mixed (#1196)', () => {
   });
 
   it('no spoken form contains a raw fraction', () => {
-    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 500)) expect(c.say ?? '', c.prompt).not.toMatch(/\d\/\d/);
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 500)) { expect(c.say, c.prompt).toBeTruthy(); expect(c.say, c.prompt).not.toMatch(/\d\/\d/); }
   });
 });
