@@ -2,7 +2,7 @@ import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatar
 import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
-import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options';
+import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options'; import { playTitle } from '../game/sprint-pools';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools';   // #1065: one pool rule
 import {
@@ -21,7 +21,7 @@ import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'> & { input?: PlayInput };   // #1120
+export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'> & { input?: PlayInput; title?: string };
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -32,7 +32,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   const spec = MODES[o.mode];
   const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool && !o.practice;
   const villainMode = spec.villain;                     // Hammer Man on screen, TNT bubbles in the mix
-  const title = o.practice ? 'Fix my mistakes' : spec.staged ? (training ? 'Sensei Training' : o.topic!.title) : spec.title;
+  const title = playTitle(o, spec.staged, training, spec.title);
   render(`
   <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
     ${bubbles ? inputMarkup(input) : ''}
@@ -192,7 +192,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     if (!r.incomplete) {
       if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r, !!o.legend));   // #933, #932
       else if (training) { if (r.won) recordTraining(o.year.id); }
-      else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r));   // #911/#912
+      else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r, !!o.title));   // #911/#912
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else if (o.mode === 'endless') recordEndless(o.year.id, r.score);   // #1117: no catch-all writer — a new mode records nothing until it names its own
     }
