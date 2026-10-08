@@ -249,6 +249,9 @@ The third KS2 shell (#1177): hidden behind `meetsShowGate` like Years 3 and 4, n
 Maths:
 - y5-round — round numbers up to 1,000,000 to the nearest 10, 100, 1,000, 10,000 and 100,000
 
+Writing:
+- y5-factopinion — fact or opinion? (Y5–6 reading comprehension): d1 one sentence with an obvious opinion word (best, favourite, boring, delicious) or a plain fact; d2 any opinion word, and facts that compare by a measure (longer, heavier, older); d3 three lettered sentences, slice every opinion (or every fact) in any order. Closed clue-word lists check the bank
+
 ## Year 6 — 7 q/stage, 3 lives
 The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. One module per strand (`src/curriculum/year6-*.ts`, eleven of them — Year 6 adds ratio and algebra), a `// slot: <id>` comment per planned topic. Answers run −1,000 to 10,000,000, the largest labels the game will put in a bubble.
 
