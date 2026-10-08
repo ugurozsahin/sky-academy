@@ -69,6 +69,22 @@ describe('y5-factopinion cards (#1178)', () => {
       }
     }
   });
+  it('every difficulty reaches both answers; d2 reaches comparison facts and non-obvious opinions; d3 both prompts', () => {
+    const texts = (d: 1 | 2) => Array.from({ length: 200 }, (_, i) => y5FactOpinion(d, seededRng(i + 1)));
+    for (const d of [1, 2] as const) expect(new Set(texts(d).map(q => q.answer))).toEqual(new Set(['fact', 'opinion']));
+    const d2 = texts(2).map(q => (q.visual as { text: string }).text);
+    expect(d2.some(t => wordsOf(t).includes('than') && FACTS.includes(t))).toBe(true);
+    expect(d2.some(t => OPINIONS.includes(t) && !hasMarker(t, OBVIOUS_MARKERS))).toBe(true);
+    const prompts = new Set(Array.from({ length: 100 }, (_, i) => y5FactOpinion(3, seededRng(i + 1)).prompt));
+    expect(prompts).toEqual(new Set(['Slice every opinion', 'Slice every fact']));
+  });
+  it('d3 lines are distinct sentences lettered A to C', () => {
+    for (let s = 1; s <= 80; s++) {
+      const lines = (y5FactOpinion(3, seededRng(s)).visual as { text: string }).text.split('\n');
+      expect(lines.map(l => l.slice(0, 3))).toEqual(['A  ', 'B  ', 'C  ']);
+      expect(new Set(lines).size).toBe(3);
+    }
+  });
   it('the row is wired: writing, year 5, sequenceFrom 3', () => {
     expect(row.subject).toBe('writing');
     expect(row.year).toBe('year5');
