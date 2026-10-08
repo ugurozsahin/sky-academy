@@ -248,3 +248,4 @@ The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no
 
 Maths:
 - y6-round — round any whole number to a required accuracy, including in context
+- y6-coords — coordinates in all four quadrants (6M46, −5…5 grid): read a lettered point's (x, y) (d1); which lettered point is at a pair, the others at its swapped and sign-slip places (d2); the fourth corner of a rectangle that crosses an axis (d3); drawn by the `coords` visual with `min` −5, answers computed from its points

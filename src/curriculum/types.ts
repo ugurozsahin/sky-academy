@@ -45,8 +45,8 @@ export type Visual =
   // Angles and lines drawn exactly to their data (Y3 geometry, #1075): a placeholder look, final art is #1305.
   | { type: 'geometry'; parts: GeoPart[] }
   // A first-quadrant grid with numbered axes and lettered points (Y4 coordinates, #1129): a placeholder look, final art is #1306.
-  // The grid runs 0–`size` on both axes (`size` at most 10); `join` lists point labels to draw as a polyline.
-  | { type: 'coords'; size: number; points: { x: number; y: number; label: string }[]; join?: string[] }
+  // The grid runs `min` (default 0, at most 0; −5 for Y6's four quadrants, #1213) to `size` on both axes (`size` at most 10); `join` lists point labels to draw as a polyline.
+  | { type: 'coords'; size: number; min?: number; points: { x: number; y: number; label: string }[]; join?: string[] }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string }                   // sentence with a blank "_" (writing — English text)
   // a repeating-pattern glyph strip with a blank "_" (y2-patterns): not language, so the drawing keeps it on
