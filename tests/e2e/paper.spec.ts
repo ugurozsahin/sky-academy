@@ -51,4 +51,20 @@ test.describe('Arithmetic practice (#1233)', () => {
     await page.click('#home');
     await expect(page.locator('#endless small')).toContainText('best 0');
   });
+
+  test('Play again deals a fresh paper of ten questions (#1233 review)', async ({ page }) => {
+    await open(page, 'year6');
+    await page.click('#paper');
+    await page.evaluate(() => window.__sna.setSpeed(20));
+    for (let i = 1; i <= 10; i++) {
+      await page.waitForFunction(n => { const s = window.__sna.state(); return s.ended || (window.__sna.session.questionsAsked === n && !s.waiting && window.__sna.bubbles().length > 0); }, i, { timeout: 30000 });
+      while (!await page.evaluate(() => window.__sna.answer()) && !await page.evaluate(() => window.__sna.state().ended)) await page.waitForTimeout(50);
+    }
+    await expect(page.locator('.results')).toBeVisible();
+    await page.click('#again');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna.session.current !== null);
+    expect(await page.evaluate(() => window.__sna.session.o.deck?.length)).toBe(10);
+    expect(await page.evaluate(() => window.__sna.session.o.mode)).toBe('paper');
+  });
 });
