@@ -1,4 +1,5 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
+import { grammarPool, offeredPool } from '../game/sprint-pools';
 import { mtcDeck } from '../game/mtc';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
 import { leastSecure } from '../fact-record';
@@ -154,6 +155,13 @@ const trickyRow = (nav: Nav, year: YearInfo, facts: Record<string, Ks2Fact>): Me
   }] : [];
 };
 
+/** Grammar mix (#1234): a 60-second Sprint over the KS2 grammar topics up to this island; Years 5–6 only (the pool is empty elsewhere), once the pool is big enough. */
+const grammarRow = (nav: Nav, year: YearInfo): MenuRow[] => {
+  const pool = offeredPool(grammarPool(year.id));
+  return !pool.length ? [] : [{ id: 'grammar', mod: 'sprint', vport: '<span class="vport emoji">✏️</span>', title: 'Grammar mix',
+    blurb: '60 seconds of grammar and punctuation', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Grammar mix' }) }];
+};
+
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
 export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId): T[] => rows.filter(r => !r.years || r.years.includes(year));
@@ -191,7 +199,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year),
+      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), ...grammarRow(nav, year),
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
