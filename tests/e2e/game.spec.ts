@@ -5535,6 +5535,25 @@ test('a y4-area card shows the whole grid and fits a 390×664 phone (#1151)', as
   }
 });
 
+test('a y5-factopinion d3 card shows three lettered lines and fits a 390×664 phone (#1178)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year5', 'y5-factopinion');
+  const topic = TOPICS.find(t => t.id === 'y5-factopinion')!;
+  for (let seed = 1; seed <= 6; seed++) {
+    const q = topic.gen(3, seededRng(seed));
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: renderVisual(q.visual!), prompt: q.prompt });
+    expect(await page.locator('#vis .sentence br').count(), `seed ${seed}: A, B and C on separate lines`).toBe(2);
+    await expectFitsViewport(page, `y5-factopinion d3 card, seed ${seed}`);
+  }
+});
+
 // #1052: a hidden KS2 year is off the map, so only the preview key reaches it. One smoke test per KS2 shell plays
 // its first topic through the real map, island and play screen, so a topic that breaks in the browser shows at once.
 test.describe('hidden KS2 years (preview)', () => {

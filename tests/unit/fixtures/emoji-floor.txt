@@ -210,6 +210,7 @@
 🦵	11.0	leg
 🧁	11.0	cupcake
 🧊	12.0	ice
+🧐	5.0	face with monocle
 🧠	5.0	brain
 🧢	5.0	billed cap
 🧣	5.0	scarf
