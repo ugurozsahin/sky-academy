@@ -9,26 +9,29 @@ import { decoysFor } from './mistakes';
 type Op = '+' | '-';
 /** [ops, text, question]. The text holds one `#` per number; the first is the start, each `op` then applies in turn. */
 export const BANK: [Op[], string, string][] = [
-  [['-', '-'], 'A hall holds #. # sit, # more sit.', 'Seats left?'],
+  [['-', '-'], 'A hall holds #. # sit, # more.', 'Seats left?'],
   [['+', '-'], 'A shelf has #. # added, # taken.', 'Books now?'],
-  [['+', '+'], 'A school had # stickers, then # and #.', 'In all?'],
-  [['-', '+'], 'A shop had # tins. # sold, # added.', 'Tins now?'],
-  [['-', '-'], 'A lorry held # boxes. # then # left.', 'Boxes left?'],
-  [['+', '+'], 'A choir sold # tickets, then # and #.', 'In all?'],
+  [['+', '+'], 'A school had #, then got # and #.', 'Stickers?'],
+  [['-', '+'], 'A shop had #. # sold, # added.', 'Tins now?'],
+  [['-', '-'], 'A lorry held #. # then # left.', 'Boxes left?'],
+  [['+', '+'], 'A choir sold #, then # and #.', 'Tickets?'],
   [['+', '-'], 'A park had #. # came, # left.', 'People now?'],
-  [['-', '+'], 'A bakery made #. # sold, # more baked.', 'Buns now?'],
+  [['-', '+'], 'A bakery made #. # sold, # baked.', 'Buns now?'],
   [['+', '-'], 'A club has #. # join, # leave.', 'Members now?'],
-  [['+', '-', '-'], 'A shelf has #. # added, # and # taken.', 'Books left?'],
-  [['-', '+', '-'], 'A shop had #. # sold, # added, # sold.', 'Left?'],
+  [['+', '-', '-'], 'A bin has #. # in, # out, # out.', 'Left?'],
+  [['-', '+', '-'], 'A van had #. # out, # in, # out.', 'Left?'],
   [['+', '+', '-'], 'A hall has #. # in, # in, # out.', 'Now?'],
-  [['-', '+', '+'], 'A depot has #. # go, # and # arrive.', 'Now?'],
-  [['-', '-', '+'], 'A depot had #. # went, # went, # came.', 'Now?'],
-  [['+', '+', '+'], 'A band sold #, #, # and # tickets.', 'In all?'],
+  [['-', '+', '+'], 'A depot has #. # out, # in, # in.', 'Now?'],
+  [['-', '-', '+'], 'A dock had #. # out, # out, # in.', 'Now?'],
+  [['+', '+', '+'], 'A band sold #, #, # and #.', 'Total?'],
+  [['+', '-', '+'], 'A zoo has #. # go, # and # come.', 'Now?'],
 ];
 /** The two-step stories (three numbers); d3 is the three-step ones. */
 const TWO = BANK.slice(0, 9);
 const THREE = BANK.slice(9);
 
+/** The card holds three lines at 390 px (#1051); a test checks every template fits at its largest numbers. */
+export const MAX = 60;
 const f = (n: number) => fmt(dec(n, 0));
 const apply = (v: number, op: Op, n: number) => op === '+' ? v + n : v - n;
 /** [start range, change range, ceiling] */
@@ -70,15 +73,16 @@ function decoys(d: Difficulty, ops: Op[], n: { vals: number[]; runs: number[] },
 }
 
 export const y5Story: Generator = (d, rng): Question => {
-  for (;;) {
+  for (let tries = 0; tries < 1000; tries++) {
     const [ops, text, ask] = pick(rng, d < 3 ? TWO : THREE);
     const n = numbers(d, ops, rng);
     let i = 0;
     const prompt = text.replace(/#/g, () => f(n.vals[i++])) + ' ' + ask;
-    if (prompt.length > 60) continue; // three lines at 390 px (#1051; the test measures it)
+    if (prompt.length > MAX) continue; // three lines at 390 px (#1051; the test measures it)
     const ds = decoys(d, ops, n, rng);
     if (!ds) continue;
     const card = wordQ(rng, prompt, f(n.runs[n.runs.length - 1]), ds.map(f), { say: prompt });
     return d === 3 ? { ...card, slow: true } : card;
   }
+  throw new Error(`y5-story: no card fits at d${d}`);
 };

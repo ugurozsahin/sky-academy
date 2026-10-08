@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
-import { BANK } from '../../src/curriculum/year5-story';
+import { BANK, MAX } from '../../src/curriculum/year5-story';
 import { sayIsSafe } from '../../src/curriculum/ks2say';
 import { cardBudgetProblem } from './helpers/card-budget';
 import { leakShares } from './helpers/decoy-leak';
@@ -46,6 +46,23 @@ describe('y5-story (#1184)', () => {
     for (const q of d3) expect(q.slow, q.prompt).toBe(true);
   });
 
+  it('no template is dead: each fits the card at its largest numbers, and several are dealt at every difficulty', () => {
+    const widest: Record<number, number[]> = { 1: [5, 5], 2: [6, 6], 3: [7, 6] }; // [start, change] characters, commas included
+    for (const [ops, text, ask] of BANK) {
+      const d = ops.length === 3 ? 3 : 2;
+      const [s0, c0] = widest[d], len = text.replace(/#/g, '').length + 1 + ask.length + s0 + ops.length * c0;
+      expect(len, text).toBeLessThanOrEqual(MAX);
+    }
+    const kinds = (d: Difficulty) => new Set(draw(d, 400).map(q => templateOf(q.prompt)[1]));
+    expect(kinds(1).size).toBeGreaterThanOrEqual(7);
+    expect(kinds(2).size).toBeGreaterThanOrEqual(7);
+    expect(kinds(3).size).toBeGreaterThanOrEqual(5);
+  });
+
+  it('only d3 is slow', () => {
+    for (const d of [1, 2] as Difficulty[]) for (const q of draw(d, 100)) expect(q.slow, q.prompt).toBeFalsy();
+  });
+
   it('every operation pair is drawn at d1 and d2', () => {
     for (const d of [1, 2] as Difficulty[]) expect(new Set(draw(d, 800).map(q => templateOf(q.prompt)[0].join(''))), `d${d}`).toEqual(new Set(['++', '+-', '-+', '--']));
   });
@@ -63,7 +80,7 @@ describe('y5-story (#1184)', () => {
 
   it('every prompt is ≤ 60 characters and fits the card (#1051); every card has its own safe `say`', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d, 300)) {
-      expect(q.prompt.length, q.prompt).toBeLessThanOrEqual(60);
+      expect(q.prompt.length, q.prompt).toBeLessThanOrEqual(MAX);
       expect(q.say, q.prompt).toBeTruthy();
       expect(sayIsSafe(q.say!), q.say).toBe(true);
       expect(cardBudgetProblem(q), q.prompt).toBeNull();
