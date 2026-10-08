@@ -47,6 +47,9 @@ describe('y5-negative (#1180)', () => {
       v.labels!.forEach(l => expect(l).not.toMatch(/-/));
       const at = v.marks![0].at; expect(at).toBeGreaterThan(v.from); expect(at).toBeLessThan(v.to);
       expect((at - v.from) % step).toBe(0);
+      // Every printed label is its tick's own value, and the marker sits on the tick whose value is the keyed answer.
+      v.labels!.forEach((l, i) => expect(l).toBe(f(v.from + i * step)));
+      expect(v.labels![(at - v.from) / step]).toBe(q.answer);
     }
     expect(lines).toBeGreaterThan(800);
   });
@@ -61,11 +64,36 @@ describe('y5-negative (#1180)', () => {
     expect(crossing).toBeGreaterThan(200);
   });
 
-  it('d2 and d3 name the sign-flip slip', () => {
-    for (const d of [2, 3] as Difficulty[]) for (const q of draw(d, 400)) {
-      if (q.prompt === 'Which temperature is the coldest?') continue;
-      const a = num(q.answer); if (a !== 0 && Math.abs(a) <= 30 && Math.abs(-a) <= 30) expect(q.options).toContain(f(-a));
+  it('the named decoys are present, not back-filled: each card shape offers its own slips', () => {
+    const ok = (v: number, a: number) => v !== a && v >= -30 && v <= 30;
+    const has = (q: Question, v: number) => expect(q.options, q.prompt).toContain(f(v));
+    const seen: Record<string, number> = { line: 0, back: 0, on: 0, change: 0, gap: 0, seq: 0 };
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d, 1500)) {
+      const a = num(q.answer); let m: RegExpMatchArray | null;
+      if (q.visual?.type === 'numberline') {
+        seen.line++; const step = q.visual.step!;
+        for (const v of [-a, a + step, a - step]) if (ok(v, a)) has(q, v);
+      } else if ((m = q.prompt.match(/^Start at (\S+) and count back (\d+)/))) {
+        seen.back++; for (const v of [-a, a - 1, num(m[1]) + Number(m[2])]) if (ok(v, a)) has(q, v);
+      } else if ((m = q.prompt.match(/^Start at (\S+) and count on (\d+)/))) {
+        seen.on++; for (const v of [-a, a + 1, num(m[1]) - Number(m[2])]) if (ok(v, a)) has(q, v);
+      } else if ((m = q.prompt.match(/^It is (\S+) °C\. It gets (\d+) degrees (warmer|colder)/))) {
+        seen.change++; const wrong = num(m[1]) + (m[3] === 'warmer' ? -1 : 1) * Number(m[2]);
+        for (const v of [-a, wrong]) if (ok(v, a)) has(q, v);
+      } else if ((m = q.prompt.match(/^How many degrees warmer is (\S+) °C than (\S+) °C/))) {
+        seen.gap++; for (const v of [num(m[1]) - Math.abs(num(m[2])), -a]) if (ok(v, a)) has(q, v);
+      } else if (/what comes next\?$/.test(q.prompt)) {
+        seen.seq++; const t = nums(q.prompt.replace(/, … what comes next\?$/, '')), dir = Math.sign(t[2] - t[1]);
+        for (const v of [-a, a + dir]) if (ok(v, a)) has(q, v);   // zero skipped: one further along the count
+      }
     }
+    for (const k of Object.keys(seen)) expect(seen[k], k).toBeGreaterThan(100);
+  });
+
+  it('"which is the coldest?" always offers at least two negative temperatures', () => {
+    let cards = 0;
+    for (const q of draw(3)) if (q.prompt === 'Which temperature is the coldest?') { cards++; expect(q.options.filter(o => o.startsWith('\u2212')).length).toBeGreaterThanOrEqual(2); }
+    expect(cards).toBeGreaterThan(300);
   });
 
   it('say never carries a raw minus, degree sign or digit-less symbol', () => {
