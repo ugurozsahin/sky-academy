@@ -2,7 +2,7 @@
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
 // import: y5-column
 // import: y5-mental
-// import: y5-story
+import { y5Story } from './year5-story';
 // import: y5-factors
 // import: y5-primes
 // import: y5-longmult
@@ -20,7 +20,7 @@ export const Y5_CALC: Topic[] = [
 
   // slot: y5-mental
 
-  // slot: y5-story
+  { id: 'y5-story', title: 'Adding and Subtracting Problems', icon: '📰', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 A&S: multi-step problems in context (5M10)', gen: y5Story },
 
   // slot: y5-factors
 
