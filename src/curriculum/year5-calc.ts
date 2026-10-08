@@ -5,7 +5,7 @@ import { y5Story } from './year5-story';
 import { y5Factors } from './year5-factors';
 import { y5Primes } from './year5-primes';
 import { y5LongMult } from './year5-longmult';
-// import: y5-mentalmd
+import { y5MentalMd } from './year5-mentalmd';
 import { y5ShortDiv } from './year5-shortdiv';
 import { y5X10 } from './year5-x10';
 // import: y5-squares
@@ -28,7 +28,7 @@ export const Y5_CALC: Topic[] = [
 
   { id: 'y5-longmult', title: 'Long Multiplication', icon: '✖️', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: up to 4 digits × 1 or 2 digits, formal methods (5M14)', sequenceFrom: 3, gen: y5LongMult },
 
-  // slot: y5-mentalmd
+  { id: 'y5-mentalmd', title: 'Mental Multiplying and Dividing', icon: '💡', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: mental × and ÷ from known facts (5M15)', gen: y5MentalMd },
 
   { id: 'y5-shortdiv', title: 'Short Division', icon: '➗', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: short division up to 4 digits ÷ 1 digit; remainders in context (5M16)', sequenceFrom: 2, gen: y5ShortDiv },
 
