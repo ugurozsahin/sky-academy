@@ -25,6 +25,7 @@ describe('y5-fracadd (#1197)', () => {
       expect(ans.d).toBe(Math.max(sides(q).a.d, sides(q).b.d));
       expect(q.options.filter(o => equal(fr(o), v)), q.prompt).toEqual([q.answer]);
       expect(new Set(q.options).size).toBe(4);
+      expect(q.options.filter(o => o !== q.answer).some((o, i, all) => all.some((p, j) => j < i && equal(fr(o), fr(p)))), q.prompt).toBe(false);
     }
   });
 

@@ -1,7 +1,7 @@
 // y5-fracadd (#1197): Year 5 adding and subtracting fractions, same and related denominators (5M25). d1 the same bottom
 // (3/7 + 2/7); d2 one bottom a multiple of the other (3/8 + 1/4, answer under 1); d3 a sum between 1 and 2 written as a
 // mixed number (3/4 + 5/8 = 1 3/8) or 1 1/5 − 3/5. The answer keeps the larger bottom and is never simplified, so no option
-// equals it by value. The main slip is adding the tops and the bottoms (3/8 + 1/4 = 4/12), and it is always a bubble.
+// equals it by value. The main slip is adding the tops and the bottoms (3/8 + 1/4 = 4/12), a bubble whenever it is a fraction worth a different value.
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
 import { equal, type Frac } from './fractions';
@@ -12,12 +12,12 @@ const f = (n: number, d: number): Frac => ({ n, d });
 const lab = ({ n, d }: Frac) => (n < d ? `${n}/${d}` : n % d === 0 ? String(n / d) : `${Math.floor(n / d)} ${n % d}/${d}`);
 type Op = '+' | '−';
 
-/** Candidates in the order a child is most likely to slip, the tops-and-bottoms one first; value-equal and malformed ones dropped. */
+/** Candidates in the order a child is most likely to slip, the tops-and-bottoms one first; value-equal, whole-number and malformed ones dropped, and no two decoys share a value. */
 function pickDecoys(rng: Rng, answer: Frac, first: Frac[], rest: Frac[]): string[] {
   const ok = (c: Frac) => c.n >= 1 && c.d >= 2 && c.d <= 24 && c.n % c.d !== 0 && !equal(c, answer);
-  const labels = (cs: Frac[]) => [...new Set(cs.filter(ok).map(lab))];
-  const head = labels(first).slice(0, 1), tail = labels(shuffle(rng, rest)).filter(l => !head.includes(l));
-  return [...head, ...tail].slice(0, 3);
+  const chosen: Frac[] = [];
+  for (const c of [...first.slice(0, 1), ...shuffle(rng, [...first.slice(1), ...rest])]) if (ok(c) && !chosen.some(o => equal(o, c))) chosen.push(c);
+  return chosen.slice(0, 3).map(lab);
 }
 
 function card(rng: Rng, op: Op, a: Frac, b: Frac, answer: Frac, extra: Frac[], hint: string, prefix = ''): Question {
@@ -56,7 +56,7 @@ function simple(rng: Rng, level: 1 | 2): Question {
 
 /** d3 sum: related bottoms, the answer a mixed number; the wrong-whole slip is `2 r/D`. */
 function sumOverOne(rng: Rng): Question {
-  const [a, b, ans] = pair(rng, relatedBottoms(rng), (t, D) => betweenOneAndTwo(t, D) && t !== 2 * D, '+');
+  const [a, b, ans] = pair(rng, relatedBottoms(rng), (t, D) => betweenOneAndTwo(t, D), '+');
   return card(rng, '+', a, b, ans, [f(ans.n + ans.d, ans.d)], 'Make the bottoms the same, add, then write the whole ones');
 }
 

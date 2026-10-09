@@ -141,6 +141,7 @@
 📦	0.6	package
 📰	0.6	newspaper
 📶	0.6	antenna bars
+🔀	1.0	twisted rightwards arrows
 🔁	1.0	repeat button
 🔊	0.6	speaker high volume
 🔋	0.6	battery
