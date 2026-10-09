@@ -271,6 +271,7 @@ Maths:
 - y5-area — area and perimeter (NC 5M36, 5M37): d1 a rectangle's area (cm²) from the grid or from its sides, d2 the perimeter of an L, T or U on the grid, or a rectangle in metres (area m² or perimeter m), d3 an estimate from whole and half squares ("count half squares as ½"), or a rectangle with a corner cut off. Grids use the `symmetry` visual with `mirror: false`. Every card offers the area/perimeter swap as a decoy
 
 Writing:
+- y5-wordlist — hear a word from Appendix 1's Year 5–6 words 1–50 (`accommodate` … `hindrance`) and build it, with the same cards as y3-wordlist: the word alone letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letters built from chunks (d3); a no-voice device peeks the word, then hides it
 - y5-factopinion — fact or opinion? (Y5–6 reading comprehension): d1 one sentence with an obvious opinion word (best, favourite, boring, delicious) or a plain fact; d2 any opinion word, and facts that compare by a measure (longer, heavier, older); d3 three lettered sentences, slice every opinion (or every fact) in any order. Closed clue-word lists check the bank
 
 ## Year 6 — 7 q/stage, 3 lives
