@@ -1,18 +1,18 @@
 // Year 5 fractions, decimals and percentages strand (#1177). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
-// import: y5-fraccompare
 import { y5FracMult } from './year5-fracmult';
 import { y5DecFrac } from './year5-decfrac';
 // import: y5-rounddec
-// import: y5-decimals
+import { y5Decimals } from './year5-decimals';
 // import: y5-percent
 import type { Topic } from './types';
+import { y5FracCompare } from './year5-fraccompare';
 import { y5FracEquiv } from './year5-fracequiv';
 import { y5Mixed } from './year5-mixed';
 import { y5FracAdd } from './year5-fracadd';
 
 export const Y5_FRACTIONS: Topic[] = [
-  // slot: y5-fraccompare
+  { id: 'y5-fraccompare', title: 'Compare Fractions', icon: '📶', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: compare and order, related denominators (5M22)', sequenceFrom: 3, gen: y5FracCompare },
 
   { id: 'y5-fracequiv', title: 'Equivalent Fractions', icon: '🔁', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: equivalent fractions incl. tenths and hundredths (5M23)', gen: y5FracEquiv },
 
@@ -26,7 +26,7 @@ export const Y5_FRACTIONS: Topic[] = [
 
   // slot: y5-rounddec
 
-  // slot: y5-decimals
+  { id: 'y5-decimals', title: 'Thousandths and Decimal Order', icon: '🔍', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: thousandths; order and compare to 3 dp (5M28, 5M30)', gen: y5Decimals },
 
   // slot: y5-percent
 ];
