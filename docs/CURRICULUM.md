@@ -274,6 +274,7 @@ Maths:
 
 Writing:
 - y5-wordlist — hear a word from Appendix 1's Year 5–6 words 1–50 (`accommodate` … `hindrance`) and build it, with the same cards as y3-wordlist: the word alone letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letters built from chunks (d3); a no-voice device peeks the word, then hides it
+- y5-able — endings -able/-ible and -ably/-ibly (English Appendix 1, Years 5–6): the child hears the whole word and slices the right ending for a gapped stem in a sentence; d1 adjectives (able/ible, 2 bubbles), d2 adverbs (ably/ibly, 2 bubbles), d3 all of them plus the -ce/-ge cards that keep the e (`changeable`, `noticeable`, `legible`), 3 bubbles. Real-word traps (forcible, collectable/collectible) are left out
 - y5-factopinion — fact or opinion? (Y5–6 reading comprehension): d1 one sentence with an obvious opinion word (best, favourite, boring, delicious) or a plain fact; d2 any opinion word, and facts that compare by a measure (longer, heavier, older); d3 three lettered sentences, slice every opinion (or every fact) in any order. Closed clue-word lists check the bank
 
 ## Year 6 — 7 q/stage, 3 lives
