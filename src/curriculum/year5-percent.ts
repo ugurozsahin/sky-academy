@@ -29,8 +29,8 @@ function squareCard(rng: Rng): Question {
   const ans = pc(k);
   const rows = full * 10;
   const cands = [k + 10 <= 99 ? k + 10 : k - 10, 100 - k, rows, k - 10, k + 10].filter(v => v >= 1 && v <= 99).map(pc);
-  return wordQ(rng, 'What percentage of the hundred square is shaded?', ans, three(ans, cands, ['25%', '50%', '75%', '10%'], [pc(k + 10), pc(k - 10)]),
-    { visual: { type: 'symmetry', grid, mirror: false }, say: 'What percentage of the hundred square is shaded?', hint: 'Count the shaded squares: each one is one per cent', hintIsData: false });
+  return wordQ(rng, 'What percentage is shaded?', ans, three(ans, cands, ['25%', '50%', '75%', '10%'], [pc(k + 10), pc(k - 10)]),
+    { visual: { type: 'symmetry', grid, mirror: false }, say: 'What percentage is shaded?', hint: 'Count the shaded squares', hintIsData: false });
 }
 
 /** d2: three kinds of card, picked by the caller. */
