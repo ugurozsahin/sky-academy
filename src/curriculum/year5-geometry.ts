@@ -6,11 +6,12 @@
 // import: y5-polygons
 // import: y5-transform
 import type { Topic } from './types';
+import { y5Angles } from './year5-angles';
 
 export const Y5_GEOMETRY: Topic[] = [
   // slot: y5-3d
 
-  // slot: y5-angles
+  { id: 'y5-angles', title: 'Angles in Degrees', icon: '📐', subject: 'maths', year: 'year5', nc: 'Y5 Geometry: estimate and compare acute, obtuse and reflex angles (5M42)', gen: y5Angles },
 
   // slot: y5-anglefacts
 
