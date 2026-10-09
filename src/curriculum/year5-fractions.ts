@@ -3,7 +3,7 @@
 // import: y5-fraccompare
 // import: y5-fracadd
 import { y5FracMult } from './year5-fracmult';
-// import: y5-decfrac
+import { y5DecFrac } from './year5-decfrac';
 // import: y5-rounddec
 // import: y5-decimals
 // import: y5-percent
@@ -22,7 +22,7 @@ export const Y5_FRACTIONS: Topic[] = [
 
   { id: 'y5-fracmult', title: 'Fractions Times Whole Numbers', icon: '✖️', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: proper fractions and mixed numbers × whole numbers (5M26)', gen: y5FracMult },
 
-  // slot: y5-decfrac
+  { id: 'y5-decfrac', title: 'Decimals and Fractions', icon: '🔢', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: decimals as fractions, e.g. 0.71 = 71/100 (5M27)', gen: y5DecFrac },
 
   // slot: y5-rounddec
 
