@@ -4,7 +4,7 @@
 import { y5FracMult } from './year5-fracmult';
 import { y5DecFrac } from './year5-decfrac';
 // import: y5-rounddec
-// import: y5-decimals
+import { y5Decimals } from './year5-decimals';
 // import: y5-percent
 import type { Topic } from './types';
 import { y5FracCompare } from './year5-fraccompare';
@@ -26,7 +26,7 @@ export const Y5_FRACTIONS: Topic[] = [
 
   // slot: y5-rounddec
 
-  // slot: y5-decimals
+  { id: 'y5-decimals', title: 'Thousandths and Decimal Order', icon: '🔍', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: thousandths; order and compare to 3 dp (5M28, 5M30)', gen: y5Decimals },
 
   // slot: y5-percent
 ];
