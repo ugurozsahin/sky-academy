@@ -6,13 +6,14 @@
 // import: y5-polygons
 // import: y5-transform
 import type { Topic } from './types';
+import { y5AngleFacts } from './year5-anglefacts';
 
 export const Y5_GEOMETRY: Topic[] = [
   // slot: y5-3d
 
   // slot: y5-angles
 
-  // slot: y5-anglefacts
+  { id: 'y5-anglefacts', title: 'Angle Facts', icon: '📐', subject: 'maths', year: 'year5', nc: 'Y5 Geometry: angles at a point, on a line, and rectangle facts (5M44–45)', strand: 'geometry', gen: y5AngleFacts },
 
   // slot: y5-polygons
 
