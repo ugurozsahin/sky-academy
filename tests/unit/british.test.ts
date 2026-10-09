@@ -16,8 +16,9 @@ const AMERICAN: Record<string, string> = {
   labeled: 'labelled', modeling: 'modelling', theater: 'theatre', catalog: 'catalogue', dialog: 'dialogue', lowercase: 'lower-case', uppercase: 'upper-case',
 };
 const wordsIn = (s: string) => s.toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) ?? [];
-function offenders(text: string): string[] {
+function offenders(raw: string): string[] {
   const out: string[] = [];
+  const text = raw.replace(/\bper cent\b/gi, ' ');   // British usage; "cent" alone is the American coin (#1202)
   for (const w of wordsIn(text)) if (Object.hasOwn(AMERICAN, w)) out.push(w);
   for (const phrase of Object.keys(AMERICAN)) if (phrase.includes(' ') && text.toLowerCase().includes(phrase)) out.push(phrase);
   return out;
