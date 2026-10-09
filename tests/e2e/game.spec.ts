@@ -5,6 +5,7 @@ import { groupTopics, topicsHTML } from '../../src/ui/topic-groups';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
+import { GRAMMAR } from '../../src/game/sprint-pools';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport, gateProduct } from './viewport';
@@ -3225,6 +3226,23 @@ test.describe('Sky Ninja Academy', () => {
     // A real regression, not a hypothetical: `commitResult()`'s mode chain fell through to the catch-all
     // `else recordEndless(...)` for `sprint && o.topic` until this line existed to catch it.
     await expect(page.locator('#endless small')).toContainText('best 0');
+  });
+
+  test('Grammar mix: a pooled Sprint draws from the grammar list and never writes the year best (#1234)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    const read = () => page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('sna:v1')!).sprint ?? {}));
+    const before = await read();
+    await page.click('.island[data-year="year6"]');
+    await page.click('#grammar');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 5; i++) {
+      expect(GRAMMAR, `question ${i}`).toContain((await state(page)).topic);
+      await solveCurrent(page);
+    }
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    expect(await read(), 'the save\'s sprint map is unchanged').toBe(before);
   });
 
   test('Ninja Sprint: a one-topic run stores that topic\'s own best and leaves the year\'s untouched (#911)', async ({ page }) => {
