@@ -17,7 +17,7 @@
  *       print(ch, round(hmtx[glyph][0] / upm, 4))
  *   "
  *
- * Covers printable ASCII plus the maths/currency/fraction glyphs a KS2 label can carry: U+2212 (minus, never
+ * Covers printable ASCII plus the maths/currency/fraction glyphs a KS2 label can carry: U+2013 (en dash, #1226), U+2212 (minus, never
  * ASCII "-", per `ks2num.ts`'s `fmt`), ×, ÷, £, ², ³, ½, ¼, ¾, ° and … (#1180, regenerated the same way). `labelEm` (`r-lbl.ts`) throws on any character
  * missing here, so a new glyph in a label forces this table to be regenerated rather than silently costing
  * nothing towards the label's measured width.
@@ -122,6 +122,7 @@ export const FREDOKA_700_ADVANCES: Readonly<Record<string, number>> = {
   '×': 0.485,
   '°': 0.379,
   '…': 0.803,
+  '–': 0.542,
   '÷': 0.468,
   '£': 0.628,
   '²': 0.423,

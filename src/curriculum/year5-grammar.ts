@@ -8,6 +8,7 @@
 // import: y5-commas
 // import: y5-cohesion
 // import: y5-perfect
+import { y5Parenthesis } from './year5-parenthesis';
 import type { Topic } from './types';
 
 export const Y5_GRAMMAR: Topic[] = [
@@ -19,7 +20,7 @@ export const Y5_GRAMMAR: Topic[] = [
 
   // slot: y5-modal
 
-  // slot: y5-parenthesis
+  { id: 'y5-parenthesis', title: 'Parenthesis: brackets, dashes, commas', icon: '📝', subject: 'writing', year: 'year5', nc: 'Y5–6 punctuation: brackets, dashes or commas to indicate parenthesis', strand: 'grammar', gen: y5Parenthesis },
 
   // slot: y5-commas
 
