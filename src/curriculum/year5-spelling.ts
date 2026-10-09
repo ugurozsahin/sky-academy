@@ -5,7 +5,7 @@ import { y5Wordlist } from './year5-wordlist';
 // import: y5-ant
 import { y5Able } from './year5-able';
 // import: y5-fer
-// import: y5-silent
+import { y5Silent } from './year5-silent';
 import type { Topic } from './types';
 
 export const Y5_SPELLING: Topic[] = [
@@ -19,5 +19,5 @@ export const Y5_SPELLING: Topic[] = [
 
   // slot: y5-fer
 
-  // slot: y5-silent
+  { id: 'y5-silent', title: 'Silent Letters', icon: '🤫', subject: 'writing', year: 'year5', nc: 'Y5–6 spelling: words with silent letters (doubt, island, solemn)', sequenceFrom: 3, strand: 'spelling', gen: y5Silent },
 ];
