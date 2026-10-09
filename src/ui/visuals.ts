@@ -57,7 +57,9 @@ function fractionHTML(v: Extract<Visual, { type: 'fraction' }>): string {
     }
     return `<div class="vis"><svg viewBox="0 0 100 100" class="frac">${paths}</svg></div>`;
   }
-  return `<div class="vis"><div class="bar">${Array.from({ length: parts }, (_, i) => `<i class="${i < shaded ? 'sh' : ''}"></i>`).join('')}</div></div>`;
+  // Cells are 34 px up to 9 parts; from 10 they shrink so the bar is 300 px, which fits a 390 px phone card (#1195).
+  const w = (300 - 3 * (parts - 1)) / parts, style = parts > 9 ? ` style="width:${w}px"` : '';
+  return `<div class="vis"><div class="bar">${Array.from({ length: parts }, (_, i) => `<i class="${i < shaded ? 'sh' : ''}"${style}></i>`).join('')}</div></div>`;
 }
 /** Objects in five-frames; two groups with a plus or "or", or a take-away with the last |n2| crossed out. */
 function objectsHTML(v: Extract<Visual, { type: 'objects' }>): string {
