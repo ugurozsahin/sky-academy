@@ -275,6 +275,7 @@ Maths:
 
 Writing:
 - y5-wordlist — hear a word from Appendix 1's Year 5–6 words 1–50 (`accommodate` … `hindrance`) and build it, with the same cards as y3-wordlist: the word alone letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letters built from chunks (d3); a no-voice device peeks the word, then hides it
+- y5-cious — spell the /ʃəs/ and /ʃəl/ endings (Appendix 1 p.18): the word is on the card with its ending gapped and the bubbles hold only the ending; d1 -cious/-tious with a root clue (vice → vicious), d2 -cial/-tial (vowel letter → -cial, consonant letter → -tial), d3 every word plus the exceptions (anxious, initial, financial, commercial, provincial) with 3 bubbles
 - y5-able — endings -able/-ible and -ably/-ibly (English Appendix 1, Years 5–6): the child hears the whole word and slices the right ending for a gapped stem in a sentence; d1 adjectives (able/ible, 2 bubbles), d2 adverbs (ably/ibly, 2 bubbles), d3 all of them plus the -ce/-ge cards that keep the e (`changeable`, `noticeable`, `legible`), 3 bubbles. Real-word traps (forcible, collectable/collectible) are left out
 - y5-silent — words with silent letters (English Appendix 1, Years 5–6): d1 find the silent letter in a word shown on the card (`doubt`, `island`, `solemn`; one silent letter heard nowhere else), d2 put it back into the word gapped in a sentence (curated decoys never make a real word; adds `thistle`, `castle`, `condemn`, `psalm`), d3 hear the word and build it letter by letter (a no-voice device peeks, then hides it). kn/gn/wr and the Year 5–6 list words are left to their own topics
 - y5-factopinion — fact or opinion? (Y5–6 reading comprehension): d1 one sentence with an obvious opinion word (best, favourite, boring, delicious) or a plain fact; d2 any opinion word, and facts that compare by a measure (longer, heavier, older); d3 three lettered sentences, slice every opinion (or every fact) in any order. Closed clue-word lists check the bank
@@ -287,6 +288,7 @@ The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no
 
 Maths:
 - y6-round — round any whole number to a required accuracy, including in context
+- y6-convert — convert units to 3 dp, and miles to kilometres (NC 6M34–36): d1 larger to smaller with up to 3 decimal places (1.255 kg = ? g), d2 both directions across length, mass, volume and time (45 m = ? km, 90 min = ? h), d3 5 miles ≈ 8 km both ways, "2.4 km + 650 m = ? m" and four-digit 3 dp conversions. Scaled integers, so "1.255" stays exact. Decoys are the decimal point a place out, the inverse ratio and decimal time (1.5 h as 150 min).
 - y6-coords — coordinates in all four quadrants (6M46, −5…5 grid): read a lettered point's (x, y) (d1); which lettered point is at a pair, the others at its swapped and sign-slip places (d2); the fourth corner of a rectangle that crosses an axis (d3); drawn by the `coords` visual with `min` −5, answers computed from its points
 
 Writing:

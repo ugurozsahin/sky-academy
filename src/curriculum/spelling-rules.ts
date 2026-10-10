@@ -10,6 +10,8 @@ import { shuffle, wordQ } from './util';
  */
 export const REAL_LOOKALIKES: ReadonlySet<string> = new Set([
   'nock', 'nee', 'nome', 'nat', 'wrung', 'wist', 'ren', 'rap', 'ring', 'rite', 'right', 'no', 'new', 'night', 'not', 'nit', 'nose', 'nor', 'rote', 'doge', 'cadge',
+  // real words met curating y5-cious (#1218): officious (meddling), specious (misleadingly plausible)
+  'officious', 'specious',
 ]);
 
 /** One bank row: the answer, its sentence with a `___` gap, and the invented non-words that are wrong spellings. */

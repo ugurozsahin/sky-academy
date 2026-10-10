@@ -4,13 +4,11 @@
 // (`ks2num.ts`), never floats. The slips are a power-of-ten shift (the wrong factor, or × for ÷) and, for time, decimal time:
 // 1.5 hours read as 150 minutes, 2 h 15 min as 215, and a 100-minute hour.
 import type { Difficulty, Generator, Question, Rng } from './types';
-import { ri, pick, wordQ } from './util';
-import { addDec, subDec, dec, fmt, mulPow10, divPow10, type Dec } from './ks2num';
-import { ks2Say } from './ks2say';
+import { ri, pick } from './util';
+import { dec, fmt, mulPow10, divPow10, type Dec } from './ks2num';
+import { u, show, say, finish, type Unit } from './unitcard';
 
-interface Unit { sym: string; one: string; many: string }
 interface Pair { big: Unit; small: Unit; f: number; pow: 1 | 2 | 3 | 0; time: boolean }
-const u = (sym: string, one: string, many = one + 's'): Unit => ({ sym, one, many });
 const KM = u('km', 'kilometre'), M = u('m', 'metre'), CM = u('cm', 'centimetre'), MM = u('mm', 'millimetre'), KG = u('kg', 'kilogram'), G = u('g', 'gram');
 const L = u('l', 'litre'), ML = u('ml', 'millilitre'), H = u('h', 'hour'), MIN = u('min', 'minute'), S = u('s', 'second');
 const DAY = u('days', 'day'), WEEK = u('weeks', 'week'), YEAR = u('years', 'year'), MONTH = u('months', 'month');
@@ -23,30 +21,6 @@ const MIXED = [METRIC[0], METRIC[1], METRIC[3], METRIC[4]];
 const HINT_METRIC = 'Going to a smaller unit, multiply. Going to a bigger unit, divide';
 const HINT_TIME = 'Check how many of the small unit make one of the big unit';
 const HINT_MIXED = 'Change the bigger unit first, then add the rest';
-
-/** The symbol for display; time words that are not symbols (days, weeks…) agree with the number. */
-const sym = (un: Unit, n: Dec) => (un.sym.length > 3 && un.sym.endsWith('s') && fmt(n) === '1' ? un.sym.slice(0, -1) : un.sym);
-const word = (un: Unit, n: Dec) => (fmt(n) === '1' ? un.one : un.many);
-const show = (n: Dec, un: Unit) => `${fmt(n)} ${sym(un, n)}`;
-const say = (n: Dec, un: Unit) => `${fmt(n)} ${word(un, n)}`;
-
-/** Last printed digit of a label. */
-const last = (s: string) => s.slice(-1);
-
-/** Three distinct decoys from `named` then `fill`; a 20+ or decimal answer whose last digit no decoy shares swaps its last decoy for answer ± 10 units (#1058). */
-function finish(rng: Rng, prompt: string, spoken: string, answer: Dec, named: Dec[], hint: string): Question {
-  const label = fmt(answer), out: string[] = [];
-  const fill = [dec(answer.v + 10, answer.dp), dec(answer.v - 10, answer.dp), dec(answer.v + 100, answer.dp), dec(answer.v + 1, answer.dp)];
-  for (const c of [...named, ...fill]) {
-    const s = fmt(c);
-    if (out.length < 3 && c.v > 0 && s !== label && !out.includes(s)) out.push(s);
-  }
-  if (!out.some(s => last(s) === last(label))) {
-    const cand = [addDec(answer, dec(10, answer.dp)), subDec(answer, dec(10, answer.dp))].filter(c => c.v > 0).map(c => fmt(c)).filter(s => s !== label && !out.includes(s));
-    if (cand.length) out[2] = pick(rng, cand);
-  }
-  return wordQ(rng, prompt, label, out, { say: ks2Say(spoken), hint, hintIsData: false });
-}
 
 /** Both directions of one pair. `big` is the larger-unit amount and `small` the same amount in the smaller unit. */
 function card(rng: Rng, p: Pair, big: Dec, small: Dec, hint: string, extra: Dec[] = []): Question {
