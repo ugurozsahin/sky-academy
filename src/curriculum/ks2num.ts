@@ -132,21 +132,29 @@ export function digitValue(n: Dec | number, place: Place): number {
 }
 
 /**
- * British words for a whole number from 1 to 1,000,000 ("four hundred and three thousand and fifty", #1179).
- * `numberWord` stops at 100, so hundreds and thousands are composed here; "and" goes before a final one- or
- * two-digit group, never before a hundreds group ("two thousand, one hundred" reads "two thousand one hundred").
+ * British words for a whole number from 1 to 10,000,000 ("four hundred and three thousand and fifty", #1179;
+ * "two million, forty thousand and seven", #1252). `numberWord` stops at 100, so hundreds and thousands are
+ * composed here; "and" goes before a final one- or two-digit group, never before a hundreds group ("two thousand,
+ * one hundred" reads "two thousand one hundred"). A comma follows "million" when a group of hundreds or more
+ * comes after it; below a million nothing has a comma.
  */
 export function wordsFor(n: number): string {
-  if (!Number.isInteger(n) || n < 1 || n > 1000000) throw new Error(`wordsFor: ${n} is outside 1 to 1,000,000`);
-  if (n === 1000000) return 'one million';
+  if (!Number.isInteger(n) || n < 1 || n > 10000000) throw new Error(`wordsFor: ${n} is outside 1 to 10,000,000`);
   const below1000 = (m: number): string => {
     const h = Math.floor(m / 100), r = m % 100;
     if (!h) return numberWord(r);
     return r ? `${numberWord(h)} hundred and ${numberWord(r)}` : `${numberWord(h)} hundred`;
   };
-  const th = Math.floor(n / 1000), rem = n % 1000;
-  if (!th) return below1000(rem);
-  const head = `${below1000(th)} thousand`;
-  if (!rem) return head;
-  return rem < 100 ? `${head} and ${numberWord(rem)}` : `${head} ${below1000(rem)}`;
+  const belowMillion = (m: number): string => {
+    const th = Math.floor(m / 1000), rem = m % 1000;
+    if (!th) return below1000(rem);
+    const head = `${below1000(th)} thousand`;
+    if (!rem) return head;
+    return rem < 100 ? `${head} and ${numberWord(rem)}` : `${head} ${below1000(rem)}`;
+  };
+  const millions = Math.floor(n / 1000000), rest = n % 1000000;
+  if (!millions) return belowMillion(rest);
+  const head = `${numberWord(millions)} million`;
+  if (!rest) return head;
+  return rest < 100 ? `${head} and ${numberWord(rest)}` : `${head}, ${belowMillion(rest)}`;
 }

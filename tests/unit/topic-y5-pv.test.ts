@@ -42,7 +42,7 @@ describe('wordsFor (#1179)', () => {
     [340000, 'three hundred and forty thousand'], [999999, 'nine hundred and ninety-nine thousand nine hundred and ninety-nine'], [1000000, 'one million'],
   ];
   it.each(table)('%i reads %s', (n, words) => { expect(wordsFor(n)).toBe(words); });
-  it('refuses a number outside 1 to 1,000,000', () => { expect(() => wordsFor(0)).toThrow(); expect(() => wordsFor(1000001)).toThrow(); });
+  it('refuses a number outside 1 to 10,000,000', () => { expect(() => wordsFor(0)).toThrow(); expect(() => wordsFor(10000001)).toThrow(); });
 });
 
 describe('y5-pv (#1179)', () => {
