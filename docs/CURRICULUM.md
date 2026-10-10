@@ -287,6 +287,7 @@ Writing:
 The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. One module per strand (`src/curriculum/year6-*.ts`, eleven of them — Year 6 adds ratio and algebra), a `// slot: <id>` comment per planned topic. Answers run −1,000 to 10,000,000, the largest labels the game will put in a bubble.
 
 Maths:
+- y6-longmult — long multiplication (NC 6M5): d1 a 2-digit × 2-digit number, d2 a 3-digit × 2-digit number (both pick-one), d3 a 4-digit × 2-digit number built digit by digit (five or six slots, the sum stays on the card, `slow`). Decoys are the long-multiplication slips: the missing placeholder zero, one partial product, a dropped carry, a place shift
 - y6-round — round any whole number to a required accuracy, including in context
 - y6-convert — convert units to 3 dp, and miles to kilometres (NC 6M34–36): d1 larger to smaller with up to 3 decimal places (1.255 kg = ? g), d2 both directions across length, mass, volume and time (45 m = ? km, 90 min = ? h), d3 5 miles ≈ 8 km both ways, "2.4 km + 650 m = ? m" and four-digit 3 dp conversions. Scaled integers, so "1.255" stays exact. Decoys are the decimal point a place out, the inverse ratio and decimal time (1.5 h as 150 min).
 - y6-coords — coordinates in all four quadrants (6M46, −5…5 grid): read a lettered point's (x, y) (d1); which lettered point is at a pair, the others at its swapped and sign-slip places (d2); the fourth corner of a rectangle that crosses an axis (d3); drawn by the `coords` visual with `min` −5, answers computed from its points
