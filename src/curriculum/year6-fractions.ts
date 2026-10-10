@@ -9,6 +9,7 @@
 // import: y6-decdiv
 import { y6Simplify } from './year6-simplify';
 import { y6FracMult } from './year6-fracmult';
+import { y6Fdp } from './year6-fdp';
 import type { Topic } from './types';
 
 export const Y6_FRACTIONS: Topic[] = [
@@ -21,7 +22,7 @@ export const Y6_FRACTIONS: Topic[] = [
 
   // slot: y6-fracdiv
 
-  // slot: y6-fdp
+  { id: 'y6-fdp', title: 'Fractions, decimals and percentages', icon: '💯', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: fraction as division; FDP equivalences', gen: y6Fdp },
 
   // slot: y6-decimals
 
