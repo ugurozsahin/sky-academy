@@ -57,6 +57,13 @@ describe('y6-spellgap (#1237)', () => {
 
   it('rises: d1 holds short list words, d2 stops at 9 letters, d3 reaches the long chunk-built ones', () => {
     for (const c of draws(1)) expect(c.answer.length, c.answer).toBeLessThanOrEqual(7);
+    const pattern = new Set(GAP_PATTERN.map(x => x.w));
+    for (const c of draws(1, 600)) expect(pattern.has(c.answer), `d1 list words only: ${c.answer}`).toBe(false);
+    const d1 = new Set(draws(1, 1500).map(c => c.answer)), d2 = new Set(draws(2, 1500).map(c => c.answer)), d3 = new Set(draws(3, 3000).map(c => c.answer));
+    expect(GAP_BANK.filter(x => !pattern.has(x.w) && x.w.length <= 7).map(x => x.w).every(w => d1.has(w))).toBe(true);
+    expect([...d2].some(w => !pattern.has(w) && w.length >= 8), 'd2 includes longer list words').toBe(true);
+    expect([...d1].every(w => d2.has(w)), 'd2 covers d1').toBe(true);
+    expect([...d2].every(w => d3.has(w)), 'd3 covers d2').toBe(true);
     for (const c of draws(2)) expect(c.answer.length, c.answer).toBeLessThanOrEqual(9);
     expect(draws(2).some(c => GAP_PATTERN.some(p => p.w === c.answer))).toBe(true);
     expect(draws(3).some(c => c.answer.length >= 10)).toBe(true);
@@ -74,6 +81,7 @@ describe('y6-spellgap (#1237)', () => {
     for (const c of hits) {
       const x = swapped.find(s => s.w === c.answer)!;
       expect(c.options, c.answer).toContain(x.swap);
+      expect(new Set(c.options).size, c.answer).toBe(c.options.length);
       expect(c.options.length, c.answer).toBe(Math.min(c.answer.length + 3, 10));
     }
   });

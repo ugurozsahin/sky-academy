@@ -4,10 +4,11 @@
 import type { Difficulty, Generator, Question } from './types';
 import { pick, shuffle, spellQ } from './util';
 import { chunkQ } from './spelling-ks2';
+import type { WordForm } from './spelling-ks2';
 import { Y6_WORDLIST } from './wordlist-y6';
 
-/** One gap word: its sentence, chunks for a long word, and `swap` = the confusable letter or chunk of its usual misspelling. */
-export interface GapWord { w: string; s: string; chunks?: string[]; decoys?: string[]; swap?: string }
+/** One gap word: a list form (sentence, chunks for a long word) plus `swap`, the confusable letter of its usual misspelling. */
+export type GapWord = WordForm & { swap?: string };
 
 const g = (w: string, s: string, swap?: string, chunks?: string[], decoys?: string[]): GapWord => ({ w, s, swap, chunks, decoys });
 
