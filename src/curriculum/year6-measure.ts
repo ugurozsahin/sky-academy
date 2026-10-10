@@ -3,6 +3,7 @@
 // import: y6-convert
 // import: y6-areaperim
 // import: y6-area
+import { y6Area } from './year6-area';
 // import: y6-volume
 import type { Topic } from './types';
 
@@ -11,7 +12,7 @@ export const Y6_MEASURE: Topic[] = [
 
   // slot: y6-areaperim
 
-  // slot: y6-area
+  { id: 'y6-area', title: 'Area of Triangles and Parallelograms', icon: '🔺', subject: 'maths', year: 'year6', nc: 'Y6 Measurement: area of parallelograms and triangles (6M39)', strand: 'measure', gen: y6Area },
 
   // slot: y6-volume
 ];
