@@ -2578,6 +2578,9 @@ test.describe('Sky Ninja Academy', () => {
     // bubble already on its way out of the bottom is legitimately below the line, and scaling keeps it there.
     // Running this on desktop is what taught me that — the first version of this check called such a bubble
     // stray and went red on a viewport CI would not have run until tonight.
+    // A wave can be entirely on its way down for a moment (the nightly of 2026-10-10 caught exactly that), so
+    // wait for a rising bubble rather than sampling once.
+    await page.waitForFunction(() => window.__sna.bubbles().some(b => b.vy < 0));
     const inBox = await page.evaluate(() => {
       const a = window.__sna.arena!, bs = window.__sna.bubbles();
       return {
