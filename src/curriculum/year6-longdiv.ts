@@ -7,7 +7,7 @@ import { buildQ } from './build';
 import { dec, fmt } from './ks2num';
 import { simplify } from './fractions';
 
-const f = (n: number) => fmt(dec(n, 0));
+export const f = (n: number) => fmt(dec(n, 0));
 const digits = (s: string) => s.replace(/\D/g, '');
 const twins = (ds: string[], a: string) => ds.some(v => digits(v).slice(-1) === digits(a).slice(-1)) && ds.some(v => digits(v)[0] === digits(a)[0]);
 
@@ -20,7 +20,7 @@ function keepTwins(out: string[], fills: string[], answer: string, keep: number)
 }
 
 /** Three distinct decoys: `named` first, then `fills`, with twins of the answer's last and leading digit kept. */
-function decoys(named: string[], fills: string[], answer: string): string[] {
+export function decoys(named: string[], fills: string[], answer: string): string[] {
   const out: string[] = [];
   for (const v of [...named, ...fills]) if (out.length < 3 && v !== answer && !out.includes(v)) out.push(v);
   keepTwins(out, fills, answer, 1);

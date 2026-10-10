@@ -7,6 +7,7 @@
 // import: y6-order-ops
 // import: y6-story
 import { y6LongDiv } from './year6-longdiv';
+import { y6Story } from './year6-story';
 import type { Topic } from './types';
 
 export const Y6_CALC: Topic[] = [
@@ -21,5 +22,5 @@ export const Y6_CALC: Topic[] = [
 
   // slot: y6-order-ops
 
-  // slot: y6-story
+  { id: 'y6-story', title: 'Multi-step Problems', icon: '📖', subject: 'maths', year: 'year6', strand: 'calc', nc: 'Y6 ASMD: multi-step problems, estimating to check (6M11–13)', gen: y6Story },
 ];
