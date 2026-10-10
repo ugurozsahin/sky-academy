@@ -15,7 +15,7 @@ export const Y6_CALC: Topic[] = [
   // slot: y6-longdiv
 
   // slot: y6-mental
-  { id: 'y6-mental', title: 'Mental calculation', icon: '⚡', subject: 'maths', year: 'year6', nc: 'Y6 ASMD: mental, mixed operations, large numbers', gen: y6Mental },
+  { id: 'y6-mental', title: 'Mental calculation', icon: '🧮', subject: 'maths', year: 'year6', nc: 'Y6 ASMD: mental, mixed operations, large numbers', gen: y6Mental },
 
   // slot: y6-factors
 
