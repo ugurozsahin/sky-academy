@@ -7,11 +7,13 @@
 // import: y6-transform
 import type { Topic } from './types';
 import { y6Coords } from './year6-coords';
+import { y6MissingAngles } from './year6-missingangles';
 
 export const Y6_GEOMETRY: Topic[] = [
   // slot: y6-nets
 
   // slot: y6-missingangles
+  { id: 'y6-missingangles', title: 'Missing Angles', icon: '📐', subject: 'maths', year: 'year6', nc: 'Y6 Geometry: missing angles in shapes, on lines, vertically opposite (6M43, 6M45)', strand: 'geometry', gen: y6MissingAngles },
 
   // slot: y6-circles
 
