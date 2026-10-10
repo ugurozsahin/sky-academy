@@ -1,5 +1,5 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
-import { grammarPool, offeredPool } from '../game/sprint-pools';
+import { arithmeticPool, grammarPool, offeredPool } from '../game/sprint-pools';
 import { mtcDeck } from '../game/mtc';
 import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
@@ -167,9 +167,16 @@ const grammarRow = (nav: Nav, year: YearInfo): MenuRow[] => {
     blurb: '60 seconds of grammar and punctuation', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Grammar mix' }) }];
 };
 
-/** The island menu's rows that come between Sky Storm and Ninja Sprint: Legend, Tables Check (twice), Arithmetic practice, Grammar mix. */
+/** Arithmetic Sprint (#1235): a 60-second Sprint over the island's context-free calculation topics; Years 5–6, once at least four exist. */
+const arithmeticRow = (nav: Nav, year: YearInfo): MenuRow[] => {
+  const pool = arithmeticPool(year.id);
+  return !pool.length ? [] : [{ id: 'arith', mod: 'sprint', vport: '<span class="vport emoji">⏱️</span>', title: 'Arithmetic Sprint',
+    blurb: '60 seconds of Paper 1-style sums', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Arithmetic Sprint' }) }];
+};
+
+/** The island menu's rows that come between Sky Storm and Ninja Sprint: Legend, Tables Check (twice), Arithmetic practice, Arithmetic Sprint, Grammar mix. */
 const deckRows = (nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>): MenuRow[] =>
-  [...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year), ...grammarRow(nav, year)];
+  [...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year), ...arithmeticRow(nav, year), ...grammarRow(nav, year)];
 
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
