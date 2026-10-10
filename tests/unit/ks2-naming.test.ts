@@ -29,7 +29,8 @@ describe('KS2 naming rule (#1041): plain titles, functional icons, no emoji-coun
     const ks2 = TOPICS.filter(t => isKs2(t.year));
     expect(ks2.length, 'the KS2 registry sweep must have at least one real topic to check').toBeGreaterThan(0);
     for (const t of ks2) expect(namingProblems(t, 150), t.id).toEqual([]);
-  });
+    // The sweep grows with every KS2 topic: under CI's parallel load it passed the 5 s default only while the registry was small.
+  }, 60_000);
 
   it.each([
     ['🐾', 'U+1F400–1F43F'], ['🦘', 'U+1F980–1F9AE'], ['🍕', 'U+1F32D–1F37F'], ['🧁', 'the named literal list'],
