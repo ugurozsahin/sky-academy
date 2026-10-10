@@ -30,4 +30,42 @@ describe("review-pr §6's Merge paragraph makes the run read the review it merge
     expect(merge).toContain('never leave a behind PR to the owner');
     expect(merge).toContain('The merge is its own call, never joined to the reads in one shell line');
   });
+  it('puts the review comment before the merge, not after it (#1717)', () => {
+    expect(merge).toContain('squash into `main` only after your review comment is posted and read back');
+    expect(merge).not.toContain('squash into `main`, tick Review/QA/Done on the issue, and comment with the test results');
+  });
+});
+
+// #1717: the skill said all of the above since #1486/#1577, and three consecutive merges ignored it, because the
+// run merges from `docs/REVIEWER-PROMPT.md` STEP 2, which ordered "squash-merge, tick, comment" — comment last.
+// With no comment on the PR yet, the refused command printed `0` comments and then merged, in one shell line.
+// The order has to be in the file the run reads at the moment it merges.
+describe("REVIEWER-PROMPT.md STEP 2 orders the merge comment-first, each step its own call (#1717)", () => {
+  const prompt = readFileSync('docs/REVIEWER-PROMPT.md', 'utf8');
+  const step2 = prompt.slice(prompt.indexOf('STEP 2 — REVIEW & QA'), prompt.indexOf('Four things make a PR unmergeable'));
+  const seq = step2.slice(step2.indexOf('**A merge is five calls in this order, never one shell line (#1717):**'));
+
+  it('finds STEP 2 and the merge sequence inside it', () => {
+    expect(step2.length).toBeGreaterThan(1500);
+    expect(seq.length, 'the sequence must sit in STEP 2, the step that merges').toBeGreaterThan(400);
+  });
+  it('no longer orders squash-merge, tick, comment', () => {
+    expect(step2).not.toContain('squash-merge into main, tick Review/QA/Done in the issue, comment with the test results');
+    expect(step2).toContain('Then either (a) merge, in the order below, or (b) request changes');
+  });
+  it('comment, read-back, update-branch, merge, tick — in that order, by index', () => {
+    const at = (s: string) => { const i = seq.indexOf(s); expect(i, s).toBeGreaterThan(-1); return i; };
+    const post = at('1. post your review comment');
+    const read = at('2. read that comment back **by its body**');
+    const behind = at('3. `mergeable_state` `behind` → `PUT …/update-branch` with `expected_head_sha`');
+    const squash = at('4. squash-merge');
+    const tick = at('5. tick Review/QA/Done in the issue and add the commit hash to the comment');
+    expect([post, read, behind, squash, tick]).toEqual([post, read, behind, squash, tick].slice().sort((a, b) => a - b));
+  });
+  it('names what is not a read, who updates a behind branch, and what a refused merge does', () => {
+    expect(seq).toContain('a count of comments, a draft flag, or your memory of writing it is not a read');
+    expect(seq).toContain('never hand it to the owner or a developer run');
+    expect(seq).toContain('`[Merge Without Review]`');
+    expect(seq).toContain('a refused merge waits for the owner or the next run');
+  });
 });
