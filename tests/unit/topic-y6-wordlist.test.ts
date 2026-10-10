@@ -129,7 +129,33 @@ describe('y6-wordlist (#1236)', () => {
     expect(where(/^\s*peekHint\?:/m)).toEqual([join('src', 'curriculum', 'types.ts')]);
   });
 
-  it('cuts its banks exactly as y3-wordlist does, and leaves y3-wordlist\'s bank alone', () => {
+  it('cuts its banks by length then printed order: d1 never yields a word over 8 letters, and the 11 chunk words sit in banks 4–5', () => {
+    expect(WORDLIST_BANKS.map(b => b.map(e => e.forms[0].w.length)).map(l => Math.max(...l))).toEqual([7, 8, 9, 10, 13]);
+    expect(WORDLIST_BANKS.slice(3).flat().filter(e => e.forms[0].w.length >= 10)).toHaveLength(11);
+    expect(WORDLIST_BANKS.slice(0, 3).flat().every(e => e.forms[0].w.length <= 9)).toBe(true);
+  });
+
+  it('every one of the 50 words is reachable over many draws', () => {
+    const seen = new Set<string>();
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d, 1500)) seen.add(c.answer);
+    expect(forms.map(f => f.w).filter(x => !seen.has(x))).toEqual([]);
+  });
+
+  it('pins the curated chunks and decoy chunks of the 11 chunk words (the option inventory, #418 method)', () => {
+    const table = Object.fromEntries(forms.filter(f => f.chunks).map(f => [f.w, [f.chunks!.join('·'), [...f.decoys!].sort().join(',')]]));
+    expect(table).toEqual({
+      immediately: ['im·me·di·ate·ly', 'ime,tly'], individual: ['in·di·vid·u·al', 'de,dule'], marvellous: ['mar·vel·lous', 'lus,ous'],
+      mischievous: ['mis·chie·vous', 'chi,ious'], opportunity: ['op·por·tu·ni·ty', 'o,per'], parliament: ['par·lia·ment', 'la,le'],
+      profession: ['pro·fes·sion', 'fe,prof'], pronunciation: ['pro·nun·ci·a·tion', 'noun,si'], restaurant: ['res·tau·rant', 'rent,tor'],
+      sufficient: ['suf·fi·ci·ent', 'shen,su'], temperature: ['tem·per·a·ture', 'pra,tur'],
+    });
+    for (const f of forms.filter(x => x.chunks)) {
+      const c = chunkQ(rng(3), f.w, f.chunks!, f.decoys!);
+      expect([...c.options].sort(), f.w).toEqual([...new Set([...f.chunks!, ...f.decoys!])].sort());
+    }
+  });
+
+  it('leaves y3-wordlist\'s bank and ladder alone', () => {
     expect(Y3_BANKS.map(b => b.length)).toEqual([10, 10, 10, 10, 10]);
     expect(Y3_WORDLIST).toHaveLength(50);
     expect(WORDLIST_LADDER).toEqual({ 1: [1, 2], 2: [2, 3, 4], 3: [4, 5] });
