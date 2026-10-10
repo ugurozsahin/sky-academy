@@ -8,10 +8,12 @@
 // import: y6-decimals
 // import: y6-decmult
 // import: y6-decdiv
+import { y6Simplify } from './year6-simplify';
 import type { Topic } from './types';
 
 export const Y6_FRACTIONS: Topic[] = [
   // slot: y6-simplify
+  { id: 'y6-simplify', title: 'Simplify and compare fractions', icon: '✂️', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: simplify, common denominators, compare >1', gen: y6Simplify },
 
   // slot: y6-fracadd
 
