@@ -72,6 +72,7 @@ export const y6Mental: Generator = (d: Difficulty, rng: Rng): Question => {
   const card: Question = {
     prompt, say: ks2Say(prompt.replace('=', 'equals').replace('?', 'what')), answer: show(ans),
     options: shuffle(rng, [ans, ...decoys(rng, ans, named)].map(show)),
+    wide: true,
   };
   return d === 3 ? { ...card, slow: true } : card;
 };
