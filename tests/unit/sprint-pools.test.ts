@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { GRAMMAR, GRAMMAR_MIN, grammarPool, offeredPool, playTitle } from '../../src/game/sprint-pools';
+import { ARITHMETIC, ARITHMETIC_MIN, arithmeticPool, poolFor, GRAMMAR, GRAMMAR_MIN, grammarPool, offeredPool, playTitle } from '../../src/game/sprint-pools';
 import { topicById, YEARS } from '../../src/curriculum';
 import { recordSprintOutcome } from '../../src/ui/results';
 import { load } from '../../src/storage';
@@ -56,5 +56,22 @@ describe('Grammar mix pool (#1234)', () => {
     const src = readFileSync('src/ui/home.ts', 'utf8');
     expect(src).toContain('offeredPool(grammarPool(year.id))');
     expect(src).toContain("mode: 'sprint', pool, title: 'Grammar mix'");
+  });
+});
+
+describe('Arithmetic Sprint pool (#1235)', () => {
+  it('every listed id is absent or a core maths topic of its own year', () => {
+    for (const [year, ids] of Object.entries(ARITHMETIC)) for (const id of ids) {
+      const t = topicById(id); if (t) { expect(t.subject, id).toBe('maths'); expect(t.drill, id).toBeFalsy(); expect(t.year, id).toBe(year); }
+    }
+  });
+  it('poolFor drops absent ids and drills, and other years', () => {
+    const ids = poolFor({ year5: ['y5-column', 'y5-nope'] }, 'year5').map(t => t.id);
+    expect(ids).toEqual(['y5-column']);
+    expect(poolFor({ year5: ['y5-column'] }, 'year6')).toEqual([]);
+  });
+  it('Year 5 offers the row; the KS1 and lower KS2 islands do not', () => {
+    expect(arithmeticPool('year5').length).toBeGreaterThanOrEqual(ARITHMETIC_MIN);
+    for (const y of ['reception', 'year1', 'year2', 'year3', 'year4'] as const) expect(arithmeticPool(y)).toEqual([]);
   });
 });
