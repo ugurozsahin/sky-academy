@@ -74,7 +74,7 @@ describe('previewAllYears: the sna:years device key (#1032)', () => {
 describe('shownYears (#1032)', () => {
   beforeEach(() => localStorage.clear());
 
-  it('shows every row, year3, year4 and year5 included once each reaches 12 maths + 6 writing (#1050, #1109, #1164)', () => {
+  it('shows every row, year3, year4 and year5 included once each reaches 12 maths + 6 writing (#1050, #1109, #1164, #1224)', () => {
     expect(shownYears().map(y => y.id)).toEqual(['reception', 'year1', 'year2', 'year3', 'year4', 'year5']);
   });
 

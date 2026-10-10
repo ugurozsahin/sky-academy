@@ -19,7 +19,7 @@ describe('Year 5 registry (#1177)', () => {
     expect([y.perStage, y.lives]).toEqual([7, 3]);
   });
 
-  it('Year 5 is on the map once it has 12 maths and 6 writing topics (#1226)', () => {
+  it('Year 5 reaches the map once it has 12 maths and 6 writing topics (#1224 is the sixth writing topic)', () => {
     expect(shownYears().some(y => y.id === 'year5')).toBe(true);
   });
 
