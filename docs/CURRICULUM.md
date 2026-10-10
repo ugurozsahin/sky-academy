@@ -292,3 +292,4 @@ Maths:
 
 Writing:
 - y6-wordlist — hear a word from Appendix 1's Year 5–6 words 51–100 (`identity` … `yacht`) and build it, with the same cards as y5-wordlist: the word alone letter by letter (d1), in a dictated sentence with the word gapped (d2), the 11 words of 10+ letters built from chunks (d3); a no-voice device peeks the word, then hides it
+- y6-spellgap — Spell the missing word in a sentence (E56-25, App. 1 Y5–6)
