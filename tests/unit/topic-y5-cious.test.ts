@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { AVOID, GAP_WORDS } from '../../src/curriculum/util';
-import { CIOUS_BANK, REAL_LOOKALIKES } from '../../src/curriculum/year5-cious';
+import { CIOUS_BANK, ciousQ } from '../../src/curriculum/year5-cious';
+import { REAL_LOOKALIKES } from '../../src/curriculum/spelling-rules';
 
 function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -12,6 +13,24 @@ const EXCLUDE = ['gay', 'queer', 'bitch', 'butt'];
 const draws = (d: Difficulty, n = 300) => { const r = rng(1218 + d); return Array.from({ length: n }, () => topic.gen(d, r)); };
 const WORDS = ['vicious', 'precious', 'conscious', 'delicious', 'malicious', 'suspicious', 'ambitious', 'cautious', 'fictitious', 'infectious', 'nutritious',
   'official', 'special', 'artificial', 'partial', 'confidential', 'essential', 'gracious', 'spacious', 'anxious', 'initial', 'financial', 'commercial', 'provincial'];
+
+/** Every stem + ending a card can show, answers and decoys, sorted. Hand-read once: each decoy is a non-word (#418 method). */
+const INVENTORY = [
+  'ambicious', 'ambitious', 'ambixious', 'ancious', 'antious', 'anxious',
+  'artificial', 'artifitial', 'artifitious', 'artifixious', 'caucious', 'cautious',
+  'cauxious', 'commercial', 'commertial', 'commertious', 'commerxious', 'confidencial',
+  'confidencious', 'confidential', 'confidentious', 'conscious', 'constious', 'consxious',
+  'delicious', 'delitious', 'delixious', 'essencial', 'essencious', 'essential',
+  'essentious', 'ficticious', 'fictitious', 'fictixious', 'financial', 'finantial',
+  'finantious', 'finanxious', 'gracious', 'gratious', 'graxious', 'infeccious',
+  'infectious', 'infecxious', 'inicial', 'inicious', 'initial', 'initious',
+  'malicious', 'malitious', 'malixious', 'nutricious', 'nutritious', 'nutrixious',
+  'official', 'offitial', 'offitious', 'offixious', 'parcial', 'parcious',
+  'partial', 'partious', 'precious', 'pretious', 'prexious', 'provincial',
+  'provintial', 'provintious', 'provinxious', 'spacious', 'spatious', 'spaxious',
+  'special', 'spetial', 'spetious', 'spexious', 'suspicious', 'suspitious',
+  'suspixious', 'vicious', 'vitious', 'vixious',
+];
 
 describe('y5-cious (#1218)', () => {
   it('is registered once in Year 5 writing, as spelling', () => {
@@ -43,13 +62,14 @@ describe('y5-cious (#1218)', () => {
 
   it('ladder: d1 -cious/-tious with a clue, d2 -cial/-tial, d3 mixed with 3 bubbles', () => {
     for (const c of draws(1)) {
-      expect(c.prompt).toMatch(/^Clue: \w+\. Which ending\?$/);
+      const row = CIOUS_BANK.find(r => r[1] === c.answer && c.visual?.type === 'sentence' && r[3] === c.visual.text)!;
+      expect(c.prompt).toBe(`Clue: ${row[4]}. Which ending?`);
       expect(['cious', 'tious']).toContain(c.answer);
-      expect(c.options).toHaveLength(2);
+      expect(new Set(c.options)).toEqual(new Set(['cious', 'tious']));
     }
     for (const c of draws(2)) {
       expect(['cial', 'tial']).toContain(c.answer);
-      expect(c.options).toHaveLength(2);
+      expect(new Set(c.options)).toEqual(new Set(['cial', 'tial']));
       expect(c.prompt).toBe('Which ending is right?');
     }
     const d3 = draws(3, 600);
@@ -68,18 +88,19 @@ describe('y5-cious (#1218)', () => {
       for (const o of c.options) expect(o.length).toBeLessThanOrEqual(5);
       expect(c.visual?.type).toBe('sentence');
       expect(c.say).toContain('Which ending spells');
-      expect(WORDS.some(w => c.say!.includes(w))).toBe(true);
+      const row = CIOUS_BANK.find(r => c.visual?.type === 'sentence' && r[3] === c.visual.text)!;
+      expect(c.say).toContain(`Which ending spells ${row[0] + row[1]}?`);
     }
     for (const [s, e, ds, sen] of CIOUS_BANK) for (const x of [s + e, sen, ...ds.map(d => s + d)])
       for (const a of [...AVOID, ...EXCLUDE]) expect(x.toLowerCase(), x).not.toContain(a);
   });
 
-  it('pins the whole option inventory', () => {
+  it('pins the whole option inventory as a literal sorted list', () => {
     const inv = [...new Set(CIOUS_BANK.flatMap(([s, e, ds]) => [e, ...ds].map(o => s + o)))].sort();
-    expect(inv).toHaveLength(new Set(inv).size);
-    expect(inv).toContain('vicious');
-    expect(inv).toContain('vitious');
-    expect(inv).not.toContain('officious');
-    expect(inv).not.toContain('specious');
+    expect(inv).toEqual(INVENTORY);
+  });
+
+  it('refuses a card with too few decoys rather than returning a one-option card', () => {
+    expect(() => ciousQ(rng(1), ['vi', 'cious', [], 'x vi___.'], 2, false)).toThrow(/too few decoys/);
   });
 });

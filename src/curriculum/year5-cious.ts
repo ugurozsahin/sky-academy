@@ -2,15 +2,10 @@
 // The word stays on the card with its ending gapped; the bubbles hold only the ending (13 px floor, `bubbles.ts`).
 import type { Generator, Question, Rng, Difficulty } from './types';
 import { pick, shuffle, wordQ } from './util';
+// Real look-alikes (officious, specious) live in the shared `REAL_LOOKALIKES` of `spelling-rules.ts`.
 
 /** `[stem, ending, allowed decoy endings, sentence with the word's ending gapped, root clue]`. */
 export type CiousRow = readonly [stem: string, ending: string, decoys: readonly string[], sentence: string, clue?: string];
-
-/**
- * Real words met while curating: stem + ending is a word, so no card may offer it as a wrong spelling.
- * **Not** `AVOID` — that set means "crude" (`tests/unit/curriculum.test.ts`).
- */
-export const REAL_LOOKALIKES: ReadonlySet<string> = new Set(['officious', 'specious']);
 
 const CT = ['cious', 'tious', 'xious'];
 /** d1: -cious/-tious words with a root the child can read (vice → vicious; caution → cautious). */
@@ -48,15 +43,17 @@ const REST: CiousRow[] = [
 ];
 
 /** The decoy lists above may name the answer's own ending (`CT` is shared); the bank drops it from each. */
-export const CIOUS_BANK: CiousRow[] = [...CLUED, ...SOUND_L, ...REST].map(([s, e, ds, ...r]) => [s, e, ds.filter(d => d !== e), ...r]);
-const WORDS: Record<Difficulty, CiousRow[]> = { 1: CIOUS_BANK.slice(0, CLUED.length), 2: CIOUS_BANK.slice(CLUED.length, CLUED.length + SOUND_L.length), 3: CIOUS_BANK };
+export const CIOUS_BANK: readonly CiousRow[] = [...CLUED, ...SOUND_L, ...REST].map(([s, e, ds, ...r]) => [s, e, ds.filter(d => d !== e), ...r]);
+const WORDS: Record<Difficulty, readonly CiousRow[]> = { 1: CIOUS_BANK.slice(0, CLUED.length), 2: CIOUS_BANK.slice(CLUED.length, CLUED.length + SOUND_L.length), 3: CIOUS_BANK };
 
 export const ciousQ = (rng: Rng, row: CiousRow, bubbles: number, showClue: boolean): Question => {
   const [stem, ending, decoys, sentence, clue] = row;
   const word = stem + ending;
   // Two-bubble cards stay inside the ending's own pair (-cious/-tious or -cial/-tial); only d3 mixes in the rest.
   const pair = decoys.filter(d => bubbles > 2 || d !== 'xious' && d.slice(-3) === ending.slice(-3));
-  return wordQ(rng, showClue && clue ? `Clue: ${clue}. Which ending?` : 'Which ending is right?', ending, shuffle(rng, pair).slice(0, bubbles - 1), {
+  const decoyPool = shuffle(rng, pair).slice(0, bubbles - 1);
+  if (decoyPool.length < bubbles - 1) throw new Error(`y5-cious: ${word} has too few decoys for ${bubbles} bubbles`);
+  return wordQ(rng, showClue && clue ? `Clue: ${clue}. Which ending?` : 'Which ending is right?', ending, decoyPool, {
     visual: { type: 'sentence', text: sentence },
     say: `${sentence.replace('___', ending)} Which ending spells ${word}?`,
     hint: 'Slice the right ending', hintIsData: false,
