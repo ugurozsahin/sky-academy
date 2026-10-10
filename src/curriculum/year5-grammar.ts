@@ -2,8 +2,8 @@
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
 // import: y5-verbs
 // import: y5-verbprefix
-// import: y5-relative
-// import: y5-modal
+import { y5Relative } from './year5-relative';
+import { y5Modal } from './year5-modal';
 // import: y5-parenthesis
 // import: y5-commas
 // import: y5-cohesion
@@ -15,9 +15,9 @@ export const Y5_GRAMMAR: Topic[] = [
 
   // slot: y5-verbprefix
 
-  // slot: y5-relative
+  { id: 'y5-relative', title: 'Relative Clauses', icon: '🔗', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: relative clauses with who, which, where, when, whose, that or an omitted pronoun', gen: y5Relative },
 
-  // slot: y5-modal
+  { id: 'y5-modal', title: 'Modal Verbs', icon: '💭', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: degrees of possibility with modal verbs and adverbs', gen: y5Modal },
 
   // slot: y5-parenthesis
 

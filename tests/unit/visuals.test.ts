@@ -518,3 +518,23 @@ describe('number line labels, markers and exact decimal ticks (#1061)', () => {
     expect(ticks(renderVisual({ type: 'numberline', from: 0, to: 5, labels: ['a', 'b', 'c', 'd', 'e', 'f'] }))).toHaveLength(6);
   });
 });
+
+describe('single fraction bar fits a phone card (#1195)', () => {
+  const widths = (html: string) => [...html.matchAll(/style="width:([\d.]+)px"/g)].map(m => +m[1]);
+  it('keeps the 34 px cells, with no inline width, up to 9 parts', () => {
+    const html = renderVisual({ type: 'fraction', parts: 9, shaded: 3, shape: 'bar' });
+    expect(count(html, /<i /g)).toBe(9);
+    expect(widths(html)).toEqual([]);
+  });
+  it('shrinks 10–12 part bars so cells and gaps total 300 px', () => {
+    for (const parts of [10, 11, 12]) {
+      const w = widths(renderVisual({ type: 'fraction', parts, shaded: 2, shape: 'bar' }));
+      expect(w).toHaveLength(parts);
+      expect(w[0] * parts + 3 * (parts - 1)).toBeCloseTo(300, 5);
+    }
+  });
+  it('leaves stacked rows at 240 px', () => {
+    const w = widths(renderVisual({ type: 'fraction', parts: 12, shaded: 2, shape: 'bar', stack: [{ parts: 12, shaded: 2 }, { parts: 6, shaded: 1 }] }));
+    expect(w[0] * 12 + 33).toBeCloseTo(240, 5);
+  });
+});
