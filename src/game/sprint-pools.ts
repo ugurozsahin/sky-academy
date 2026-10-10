@@ -1,5 +1,5 @@
-// Pooled Sprints (#1234): a fixed list of our own topics, never a copy of a paper. Pure; #1235 adds its arithmetic lists here.
-import { topicById, type Topic, type YearId } from '../curriculum';
+// Pooled Sprints (#1234): a fixed list of our own topics, never a copy of a paper. Pure.
+import { topicById, topicsFor, type Topic, type YearId } from '../curriculum';
 import { answerableBy } from './pools';
 
 /** Grammar and punctuation topics in year order. An id with no generator yet is skipped by `grammarPool`. */
@@ -26,3 +26,17 @@ export const playTitle = (o: { practice?: unknown; topic?: Topic; title?: string
 
 /** The pool the island offers as a row: `pool` itself once it holds `GRAMMAR_MIN` topics, else nothing (no row). */
 export const offeredPool = (pool: Topic[]): Topic[] => pool.length >= GRAMMAR_MIN ? pool : [];
+
+/** Context-free calculation topics per island (#1235). An id with no generator yet is skipped by `poolFor`, so later topics join by themselves. */
+export const ARITHMETIC: Record<string, string[]> = {
+  year5: ['y5-column', 'y5-mental', 'y5-longmult', 'y5-shortdiv', 'y5-mentalmd', 'y5-x10', 'y5-squares', 'y5-fracadd', 'y5-fracmult'],
+  year6: ['y6-longmult', 'y6-longdiv', 'y6-mental', 'y6-order-ops', 'y6-fracadd', 'y6-fracmult', 'y6-fracdiv', 'y6-decimals', 'y6-decmult', 'y6-decdiv', 'y6-percentof'],
+};
+export const ARITHMETIC_MIN = 4;
+
+/** The listed ids that exist as core Sprint-answerable topics of `year`. Empty for a year with no list. */
+export const poolFor = (list: Record<string, string[]>, year: YearId): Topic[] =>
+  topicsFor(year).filter(t => (list[year] ?? []).includes(t.id) && answerableBy(t, 'mixed'));
+
+/** The Arithmetic Sprint's pool, or nothing (no row) below `ARITHMETIC_MIN` topics. */
+export const arithmeticPool = (year: YearId): Topic[] => { const p = poolFor(ARITHMETIC, year); return p.length >= ARITHMETIC_MIN ? p : []; };

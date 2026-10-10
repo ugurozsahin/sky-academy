@@ -5,7 +5,7 @@ import { groupTopics, topicsHTML } from '../../src/ui/topic-groups';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
-import { GRAMMAR } from '../../src/game/sprint-pools';
+import { ARITHMETIC, GRAMMAR } from '../../src/game/sprint-pools';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport, gateProduct } from './viewport';
@@ -3243,6 +3243,24 @@ test.describe('Sky Ninja Academy', () => {
     await page.evaluate(() => window.__sna.session.tick(60_000));
     await expect(page.locator('.results')).toBeVisible();
     expect(await read(), 'the save\'s sprint map is unchanged').toBe(before);
+  });
+
+  test('Arithmetic Sprint: draws only from the calculation list and writes no record (#1235)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    const read = () => page.evaluate(() => { const s = JSON.parse(localStorage.getItem('sna:v1')!); return JSON.stringify([s.sprint ?? {}, s.endless ?? {}, s.boss ?? {}]); });
+    const before = await read();
+    await page.click('.island[data-year="year5"]');
+    await page.click('#arith');
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('.play .ttl')).toHaveText('Arithmetic Sprint');
+    for (let i = 0; i < 5; i++) {
+      expect(ARITHMETIC.year5, `question ${i}`).toContain((await state(page)).topic);
+      await solveCurrent(page);
+    }
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    expect(await read(), 'sprint, endless and boss maps are unchanged').toBe(before);
   });
 
   test('Ninja Sprint: a one-topic run stores that topic\'s own best and leaves the year\'s untouched (#911)', async ({ page }) => {
