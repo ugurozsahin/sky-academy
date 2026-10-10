@@ -60,4 +60,21 @@ describe('y6-mean (#1251)', () => {
   it('#1058 leak limit: no digit of the answer is unshared more than 30% of the time', () => {
     for (const d of [1, 2, 3] as Difficulty[]) { const s = leakShares(topic.gen, d); expect(s.units, `d${d} units`).toBeLessThanOrEqual(0.3); expect(s.leading, `d${d} leading`).toBeLessThanOrEqual(0.3); }
   });
+  it('the hint values stay out of the prompt, and say speaks exactly the hint numbers (plus the stated mean and count)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
+      for (const n of q.hint!.match(/\d+/g)!) expect(q.prompt, q.hint).not.toMatch(new RegExp(`(?<!\\d)${n}(?!\\d)`));
+      const spoken = (q.say!.match(/\d+/g) ?? []).sort().join(' '), hinted = (q.hint!.match(/\d+/g) ?? []).sort().join(' ');
+      expect(spoken, q.say).toBe(hinted);
+    }
+  });
+
+  it('d3 missing value: the other numbers number n − 1, and the answer differs from the mean', () => {
+    const cards = draw(3).filter(isMissing);
+    for (const q of cards) {
+      const m = /^Mean (\d+) of (\d+) numbers\. Known: (.*)$/.exec(q.hint!)!;
+      expect(m[3].split(', ')).toHaveLength(Number(m[2]) - 1);
+      expect(Number(q.answer)).toBeGreaterThanOrEqual(1); expect(q.answer).not.toBe(m[1]);
+      expect(q.say).toContain(['', '', 'two', 'three', 'four'][Number(m[2]) - 1] + ' of them');
+    }
+  });
 });

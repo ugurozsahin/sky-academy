@@ -26,10 +26,17 @@ function card(rng: Rng, dp: number, ans: number, named: number[], extra: Pick<Qu
   const ok = (v: number) => Number.isInteger(v) && v >= 1 && v !== ans;
   const ds = [...new Set([named[0], ...shuffle(rng, named.slice(1))].filter(ok))].slice(0, 3);
   if (ans >= 20 * 10 ** dp || dp > 0) {
-    const al = label(ans), swap = (i: number, v: number) => { if (ok(v) && !ds.includes(v)) ds.splice(Math.min(i, ds.length), ds.length > i ? 1 : 0, v); };
-    if (!ds.some(v => last(label(v)) === last(al))) swap(2, [ans + 10, ans - 10].filter(v => ok(v) && !ds.includes(v))[rng() < 0.5 ? 0 : 1] ?? ans + 10);
-    if (!ds.some(v => lead(label(v)) === lead(al)))
-      swap(1, [1, -1, 2, -2, 3, -3, 4, -4].map(s => ans + s).find(v => ok(v) && !ds.includes(v) && lead(label(v)) === lead(al) && last(label(v)) !== last(al)) ?? 0);
+    const al = label(ans), shares = (v: number, f: (s: string) => string) => f(label(v)) === f(al);
+    // Replace a slot other than the total's, and never the only decoy sharing the other digit.
+    const swap = (v: number | undefined, other: (s: string) => string) => {
+      if (v === undefined || !ok(v) || ds.includes(v)) return;
+      const need = ds.some(d => shares(d, other));
+      const at = [1, 2].find(k => k < ds.length && (!need || ds.some((d, m) => m !== k && shares(d, other))));
+      if (at !== undefined) ds[at] = v; else if (ds.length < 3) ds.push(v);
+    };
+    if (!ds.some(v => shares(v, last))) swap([ans + 10, ans - 10].filter(v => ok(v) && !ds.includes(v))[rng() < 0.5 ? 0 : 1] ?? ans + 10, lead);
+    if (!ds.some(v => shares(v, lead)))
+      swap([1, -1, 2, -2, 3, -3, 4, -4].map(t => ans + t).find(v => ok(v) && !ds.includes(v) && lead(label(v)) === lead(al) && last(label(v)) !== last(al)), last);
   }
   for (let s = 2; ds.length < 3; s++) for (const v of [ans + s, ans - s]) if (ok(v) && !ds.includes(v) && ds.length < 3) ds.push(v);
   return wordQ(rng, extra.prompt, label(ans), ds.map(label), { say: extra.say, hint: extra.hint, hintIsData: true });
