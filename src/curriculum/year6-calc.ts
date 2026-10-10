@@ -4,6 +4,7 @@
 // import: y6-longdiv
 // import: y6-mental
 // import: y6-factors
+import { y6Factors } from './year6-factors';
 // import: y6-order-ops
 // import: y6-story
 import type { Topic } from './types';
@@ -16,6 +17,7 @@ export const Y6_CALC: Topic[] = [
   // slot: y6-mental
 
   // slot: y6-factors
+  { id: 'y6-factors', title: 'Factors, multiples and primes', icon: '🔍', subject: 'maths', year: 'year6', strand: 'calc', nc: 'Y6 MD: common factors, common multiples, primes (6M9)', sequenceFrom: 1, gen: y6Factors },
 
   // slot: y6-order-ops
 
