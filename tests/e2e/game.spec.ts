@@ -5772,6 +5772,30 @@ test('a y4-coords d3 grid card fits a 390×664 phone (#1129)', async ({ page }, 
   }
 });
 
+// #1247: a y6-missingangles d1 drawing (crossing lines, or angles at a point) fits a 390×664 phone. Built from the real generator and renderVisual.
+test('a y6-missingangles d1 drawing fits a 390×664 phone (#1247)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await seedPreview(page);
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year6', 'y6-missingangles');
+  const topic = TOPICS.find(t => t.id === 'y6-missingangles')!;
+  for (let seed = 1; seed <= 6; seed++) {
+    const q = topic.gen(1, seededRng(seed));
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: renderVisual(q.visual), prompt: q.prompt });
+    const fig = (await page.locator('#vis svg').boundingBox())!, card = (await page.locator('.qcard').boundingBox())!;
+    expect(fig.x, `seed ${seed}: drawing inside the card`).toBeGreaterThanOrEqual(card.x);
+    expect(fig.x + fig.width).toBeLessThanOrEqual(card.x + card.width + 1);
+    expect(fig.y + fig.height).toBeLessThanOrEqual(card.y + card.height + 1);
+    await expectFitsViewport(page, `y6-missingangles d1 drawing, seed ${seed}`);
+    if (seed === 1 && process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
+  }
+});
+
 // #1213: a −5…5 four-quadrant grid with one lettered point per quadrant fits a 390×664 phone. Built from renderVisual, put into the live card.
 test('a y6-coords four-quadrant grid fits a 390×664 phone (#1213)', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
