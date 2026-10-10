@@ -30,7 +30,7 @@ describe('wordsFor to 10,000,000 (#1252)', () => {
     [7, 'seven'], [403050, 'four hundred and three thousand and fifty'], [1000000, 'one million'], [2000007, 'two million and seven'],
     [2040007, 'two million, forty thousand and seven'], [2400000, 'two million, four hundred thousand'], [3500100, 'three million, five hundred thousand one hundred'],
     [9999999, 'nine million, nine hundred and ninety-nine thousand nine hundred and ninety-nine'], [10000000, 'ten million'],
-    [5060000, 'five million, sixty thousand'], [1000100, 'one million, one hundred'],
+    [5060000, 'five million, sixty thousand'], [1000111, 'one million, one hundred and eleven'], [2000050, 'two million and fifty'], [2100050, 'two million, one hundred thousand and fifty'], [999999, 'nine hundred and ninety-nine thousand nine hundred and ninety-nine'], [1000100, 'one million, one hundred'],
   ];
   it.each(table)('%i reads %s', (n, words) => { expect(wordsFor(n)).toBe(words); });
   it('refuses a number outside 1 to 10,000,000', () => { expect(() => wordsFor(0)).toThrow(); expect(() => wordsFor(10000001)).toThrow(); });
@@ -88,7 +88,8 @@ describe('y6-pv (#1252)', () => {
   it('d2 shows the zero slips: one decoy drops a zero and one adds a zero', () => {
     for (const q of draw(2, 300)) {
       const a = q.answer.replace(/,/g, ''), ds = q.options.filter(o => o !== q.answer).map(o => o.replace(/,/g, ''));
-      expect(ds.some(o => o.length === a.length - 1) || !a.slice(1).includes('0')).toBe(true);
+      const dropped = [...a.slice(1)].map((ch, i) => (ch === '0' ? a.slice(0, i + 1) + a.slice(i + 2) : '')).filter(Boolean);
+      expect(ds.some(o => dropped.includes(o))).toBe(true);
       expect(ds.some(o => o.length === a.length + 1)).toBe(true);
     }
   });
