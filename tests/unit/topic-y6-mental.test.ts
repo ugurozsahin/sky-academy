@@ -51,7 +51,7 @@ describe('y6-mental (#1256)', () => {
       expect(Number.isInteger(p.answer), q.prompt).toBe(true);
       expect(base(x)).toBeGreaterThanOrEqual(1); expect(base(x)).toBeLessThanOrEqual(12);
       expect(base(y)).toBeGreaterThanOrEqual(1); expect(base(y)).toBeLessThanOrEqual(12);
-      expect(prod).toBe(x * y); expect(prod).toBeLessThanOrEqual(MAX);
+      expect(prod).toBe(x * y); expect(prod % 10, q.prompt).toBe(0); expect(prod).toBeLessThanOrEqual(MAX);
     }
   });
 

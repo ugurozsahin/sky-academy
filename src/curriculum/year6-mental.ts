@@ -8,13 +8,15 @@ import { ks2Say } from './ks2say';
 
 const MINUS = '−', MAX = 10_000_000;
 const show = (n: number) => fmt(dec(n, 0));
+/** One card before options: `named` are the plausible wrong answers (wrong operation, first step alone). */
+type Item = { prompt: string; ans: number; named: number[] };
 const lead = (n: number) => String(n)[0];
 
 /** d1: add or subtract multiples of 10,000 (sometimes 50,000); the answer is 100,000 to 10,000,000. */
-function round(rng: Rng): { prompt: string; ans: number; named: number[] } {
+function round(rng: Rng): Item {
   const step = pick(rng, [10_000, 50_000]), add = rng() < 0.5;
   for (;;) {
-    const a = step * ri(rng, 2, MAX / step - 1), b = step * ri(rng, 1, 40_000 / (step / 10_000) / 4);
+    const a = step * ri(rng, 2, MAX / step - 1), b = step * ri(rng, 1, 1_000_000 / step);
     const ans = add ? a + b : a - b;
     if (ans < 100_000 || ans > MAX || b < 10_000) continue;
     return { prompt: `${show(a)} ${add ? '+' : MINUS} ${show(b)} = ?`, ans, named: [add ? a - b : a + b] };
@@ -31,7 +33,7 @@ function fact(rng: Rng): { x: number; y: number; prod: number } {
 }
 
 /** d2: `x × y`, or the inverse `prod ÷ y` with a whole quotient. */
-function scaled(rng: Rng): { prompt: string; ans: number; named: number[] } {
+function scaled(rng: Rng): Item {
   const { x, y, prod } = fact(rng);
   return rng() < 0.5
     ? { prompt: `${show(x)} × ${show(y)} = ?`, ans: prod, named: [x + y] }
@@ -39,7 +41,7 @@ function scaled(rng: Rng): { prompt: string; ans: number; named: number[] } {
 }
 
 /** d3: a × or ÷ first, then a + or − of a near-round number. Answers stay 1 to 10,000,000. */
-function twoStep(rng: Rng): { prompt: string; ans: number; named: number[] } {
+function twoStep(rng: Rng): Item {
   for (;;) {
     const { x, y, prod } = fact(rng), times = rng() < 0.5, first = times ? prod : x;
     const c = pick(rng, [99, 999, 9_999, 250, 1_250, 750, 2_500, 5_000, 125]), add = rng() < 0.5;
