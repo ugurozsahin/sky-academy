@@ -287,6 +287,7 @@ Writing:
 The next KS2 shell (#1212): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. One module per strand (`src/curriculum/year6-*.ts`, eleven of them — Year 6 adds ratio and algebra), a `// slot: <id>` comment per planned topic. Answers run −1,000 to 10,000,000, the largest labels the game will put in a bubble.
 
 Maths:
+- y6-longmult — long multiplication (NC 6M5): d1 a 2-digit × 2-digit number, d2 a 3-digit × 2-digit number (both pick-one), d3 a 4-digit × 2-digit number built digit by digit (five or six slots, the sum stays on the card, `slow`). Decoys are the long-multiplication slips: the missing placeholder zero, one partial product, a dropped carry, a place shift
 - y6-pv — place value to 10,000,000 (NC Y6 6M1): d1 the value of a digit in a seven-digit number; d2 a number written in words, read into digits; d3 the greatest or smallest of four close numbers
 - y6-round — round any whole number to a required accuracy, including in context
 - y6-negative — negative numbers in context and intervals across zero (6M3): d1 how many degrees from a temperature below 0 °C to one above; d2 a sum that crosses zero (4 − 9, −6 + 10, −3 − 5); d3 a short story (temperature, lift, submarine, freezer). Answers run −30 to 30 with a real minus sign; decoys are the sign flipped, the operation applied to the magnitudes, the ends subtracted ignoring the sign, and one out; `say` reads a sign as "negative" and the operation as "minus"
