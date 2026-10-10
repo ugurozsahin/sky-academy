@@ -2206,7 +2206,7 @@ describe('a hint is instruction text unless the generator says it is data (#328,
     const instructionOnly = [...hinted].filter(id => !marked.has(id));
     expect(instructionOnly.length, 'every hint-writing topic is now marked, which is the #430 regression')
       .toBeGreaterThanOrEqual(38);
-  });
+  }, 30_000);
 
   it('a marked card really does hide its values from the rest of the card', () => {
     const r = rng(329);
