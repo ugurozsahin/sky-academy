@@ -8,6 +8,7 @@ import { y6Factors } from './year6-factors';
 // import: y6-story
 import { y6LongDiv } from './year6-longdiv';
 import { y6Mental } from './year6-mental';
+import { y6Story } from './year6-story';
 import type { Topic } from './types';
 import { y6LongMult } from './year6-longmult';
 
@@ -25,5 +26,5 @@ export const Y6_CALC: Topic[] = [
 
   // slot: y6-order-ops
 
-  // slot: y6-story
+  { id: 'y6-story', title: 'Multi-step Problems', icon: '📖', subject: 'maths', year: 'year6', strand: 'calc', nc: 'Y6 ASMD: multi-step problems, estimating to check (6M11–13)', gen: y6Story },
 ];
