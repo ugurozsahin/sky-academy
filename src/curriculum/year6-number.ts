@@ -6,6 +6,7 @@
 import type { Topic } from './types';
 import { y6Round } from './year6-round';
 import { y6Pv } from './year6-pv';
+import { y6Negative } from './year6-negative';
 
 export const Y6_NUMBER: Topic[] = [
   // slot: y6-pv
@@ -14,5 +15,5 @@ export const Y6_NUMBER: Topic[] = [
   // slot: y6-round
   { id: 'y6-round', title: 'Round to a required accuracy', icon: '🎯', subject: 'maths', year: 'year6', nc: 'Y6 NPV: round to a required degree of accuracy', gen: y6Round },
 
-  // slot: y6-negative
+  { id: 'y6-negative', title: 'Negative numbers', icon: '🌡️', subject: 'maths', year: 'year6', nc: 'Y6 NPV: negative numbers, intervals across 0', gen: y6Negative },
 ];
