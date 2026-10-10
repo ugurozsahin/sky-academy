@@ -257,8 +257,9 @@ they close the three ways a summarised context gets a mark wrong — the wrong p
 finding whose evidence has evaporated. `docs/REVIEWER-PROMPT.md` STEP 2 already asks the first half of this
 ("still waiting?"); this is the other half (#326).
 
-**Merge** — squash into `main`, tick Review/QA/Done on the issue, and comment with the test results, which
-projects you ran, and the commit hash — ending, like every comment you post here, with your session URL (#199).
+**Merge** — squash into `main` only after your review comment is posted and read back: the comment first, with
+the test results and which projects you ran — ending, like every comment you post here, with your session URL
+(#199) — then the merge, then tick Review/QA/Done on the issue and add the commit hash to that comment (#1717).
 **Immediately before the merge call, in this session, read the review you are merging on** (#1485): the PR's
 `REVIEW: CLEARED` comment (or the one you just posted), its `Head judged:` SHA against the live head, and the
 checks it names against the live ones; then write one line, `Merging <sha>: reviewed in <comment url>, CI and
