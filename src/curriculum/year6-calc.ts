@@ -7,6 +7,7 @@
 // import: y6-order-ops
 // import: y6-story
 import { y6LongDiv } from './year6-longdiv';
+import { y6OrderOps } from './year6-order-ops';
 import type { Topic } from './types';
 
 export const Y6_CALC: Topic[] = [
@@ -20,6 +21,7 @@ export const Y6_CALC: Topic[] = [
   // slot: y6-factors
 
   // slot: y6-order-ops
+  { id: 'y6-order-ops', title: 'Order of Operations', icon: '🔀', subject: 'maths', year: 'year6', strand: 'calc', nc: 'Y6 M&D: order of operations and brackets (6M10)', gen: y6OrderOps },
 
   // slot: y6-story
 ];
