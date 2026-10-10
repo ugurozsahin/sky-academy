@@ -2,7 +2,7 @@
 // d2 a times-table fact scaled by powers of ten (× or its inverse ÷), d3 two operations with × or ÷ written first so left-to-right
 // and the order of operations agree. All integer maths. The place-value-shift decoy (×10, ÷10) comes first, as #1058 asks.
 import type { Difficulty, Generator, Question, Rng } from './types';
-import { ri, pick, shuffle } from './util';
+import { ri, pick, shuffle, wideFor } from './util';
 import { dec, fmt } from './ks2num';
 import { ks2Say } from './ks2say';
 
@@ -71,10 +71,10 @@ function decoys(rng: Rng, ans: number, named: number[]): number[] {
 
 export const y6Mental: Generator = (d: Difficulty, rng: Rng): Question => {
   const { prompt, ans, named } = d === 1 ? round(rng) : d === 2 ? scaled(rng) : twoStep(rng);
+  const options = shuffle(rng, [ans, ...decoys(rng, ans, named)].map(show));
   const card: Question = {
     prompt, say: ks2Say(prompt.replace('=', 'equals').replace('?', 'what')), answer: show(ans),
-    options: shuffle(rng, [ans, ...decoys(rng, ans, named)].map(show)),
-    wide: true,
+    options, wide: wideFor(options),
   };
   return d === 3 ? { ...card, slow: true } : card;
 };
