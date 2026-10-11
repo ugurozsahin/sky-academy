@@ -20,6 +20,7 @@ import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, 
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
 import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, trophyBadge, trophyCount } from './chooser';
+import { subjectPool } from '../game/pools';
 import { $, $$, capDigits, render } from './dom';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
@@ -205,8 +206,9 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const training = safeRecord<number>(d.training), endless = safeRecord<number>(d.endless);
   const sprint = safeRecord<number>(d.sprint), boss = safeRecord<number>(d.boss), memory = safeRecord<number>(d.memory);
   // #908: Sky Storm, Ninja Sprint and Boss Battle draw only from the open tab's topics — read at tap time via
-  // `subject` so a tab switch is honoured without rebuilding the menu.
-  const subjectPool = () => topicsFor(year.id, subject).filter(chooserEligible);
+  // `subject` so a tab switch is honoured without rebuilding the menu. `subjectPool` (#1325) is the one spelling of
+  // that pool: `curriculum.test.ts` pins it non-empty, and it degrades to the whole year rather than hand `[]` on.
+  const mixedPool = () => subjectPool(topicsFor(year.id), subject);
   // The island menu in one table (#26): a mode button is one entry. The battle modes take their title from MODES;
   // Sensei-training, Memory-Match and the Legend run (#932) are separate flows, so they live here too.
   const menu = menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands
@@ -215,16 +217,16 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...deckRows(nav, year, progress),
+      go: () => playMixed(nav, year, 'endless', mixedPool(), progress) }, ...deckRows(nav, year, progress),
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
-      go: () => chooseThenPlay(nav, year, subject, 'sprint', subjectPool(), progress) }, ...trickyRow(nav, year, d.ks2.facts),
+      go: () => chooseThenPlay(nav, year, subject, 'sprint', mixedPool(), progress) }, ...trickyRow(nav, year, d.ks2.facts),
     { id: 'relaxed', mod: 'relaxed', vport: `<span class="vport emoji">🌱</span>`, title: MODES.relaxed.title, blurb: 'No lives, no clock',   // #937
-      go: () => chooseThenPlay(nav, year, subject, 'relaxed', subjectPool(), progress) },
+      go: () => chooseThenPlay(nav, year, subject, 'relaxed', mixedPool(), progress) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'boss', subjectPool(), progress) },
+      go: () => playMixed(nav, year, 'boss', mixedPool(), progress) },
     // #1049: Memory Match used to fall back to Reception's decks for a year with none of its own — hidden
     // instead, since `pickTheme` now throws rather than hand a KS2 child a Reception board.
     ...(hasMemoryDecks(year.id) ? [{ id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,

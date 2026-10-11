@@ -4,13 +4,14 @@
 // import: y6-fracadd
 // import: y6-fdp
 // import: y6-decimals
-// import: y6-decmult
 // import: y6-decdiv
 import { y6Simplify } from './year6-simplify';
 import { y6FracAdd } from './year6-fracadd';
 import { y6FracMult } from './year6-fracmult';
+import { y6Fdp } from './year6-fdp';
 import { y6Decimals } from './year6-decimals';
 import { y6FracDiv } from './year6-fracdiv';
+import { y6DecMult } from './year6-decmult';
 import type { Topic } from './types';
 
 export const Y6_FRACTIONS: Topic[] = [
@@ -23,11 +24,11 @@ export const Y6_FRACTIONS: Topic[] = [
 
   { id: 'y6-fracdiv', title: 'Dividing fractions', icon: '➗', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: proper fraction ÷ whole number', gen: y6FracDiv },
 
-  // slot: y6-fdp
+  { id: 'y6-fdp', title: 'Fractions, decimals and percentages', icon: '💯', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: fraction as division; FDP equivalences', gen: y6Fdp },
 
   { id: 'y6-decimals', title: 'Decimals to 3 places', icon: '🔟', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: 3 dp place value; ×÷ 10, 100, 1,000', gen: y6Decimals },
 
-  // slot: y6-decmult
+  { id: 'y6-decmult', title: 'Multiplying decimals', icon: '💷', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: decimals (≤2 dp) × whole numbers', sequenceFrom: 3, gen: y6DecMult },
 
   // slot: y6-decdiv
 ];
