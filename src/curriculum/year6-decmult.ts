@@ -58,12 +58,12 @@ function randDec(rng: Rng, dp: 1 | 2): Dec {
 }
 
 const stories: ((a: string, k: number) => string)[] = [
-  (a, k) => `A ribbon is ${a} m long. How long are ${k} ribbons, in metres?`,
-  (a, k) => `A bag of flour weighs ${a} kg. How heavy are ${k} bags, in kilograms?`,
-  (a, k) => `A bottle holds ${a} litres. How much do ${k} bottles hold, in litres?`,
-  (a, k) => `A rope is ${a} m long. How long are ${k} ropes, in metres?`,
-  (a, k) => `One plank is ${a} m long. How long are ${k} planks laid end to end, in metres?`,
-  (a, k) => `A box of apples weighs ${a} kg. How heavy are ${k} boxes, in kilograms?`,
+  (a, k) => `A ribbon is ${a} m long. How long are ${k} ribbons, in m?`,
+  (a, k) => `A bag of flour weighs ${a} kg. What do ${k} bags weigh, in kg?`,
+  (a, k) => `A bottle holds ${a} litres. How many litres in ${k} bottles?`,
+  (a, k) => `A rope is ${a} m long. How long are ${k} ropes, in m?`,
+  (a, k) => `A plank is ${a} m long. How long are ${k} planks, in m?`,
+  (a, k) => `A box of apples weighs ${a} kg. What do ${k} boxes weigh, in kg?`,
 ];
 
 /** d3: a 1–2 dp number × 11–25 in a measures story; the product is never whole, so the point is always fixed on the card. */
@@ -72,7 +72,7 @@ function built(rng: Rng): Question {
     const a = randDec(rng, rng() < 0.5 ? 1 : 2), k = ri(rng, 11, 25), ans = canon(mulDecByInt(a, k));
     if (ans.dp === 0) continue;
     const answer = lab(ans), slots = digits(answer).length, prompt = pick(rng, stories)(lab(a), k);
-    return { ...buildQ(rng, { prompt, say: `${ks2Say(prompt.slice(0, -1))}. Build the answer.`, answer, total: Math.min(10, slots + 3), hint: 'Slice the digits in order' }), slow: true };
+    return { ...buildQ(rng, { prompt, say: `${ks2Say(prompt.slice(0, -1)).replace(/in m$/, 'in metres')}. Build the answer.`, answer, total: Math.min(10, slots + 3), hint: 'Slice the digits in order' }), slow: true };
   }
 }
 
