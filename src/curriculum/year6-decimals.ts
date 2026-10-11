@@ -37,7 +37,6 @@ function pickDecoys(ans: Dec, cands: Dec[]): string[] {
 /** The answer's place-value shifts: one place each way first, then two. */
 const shifts = (a: Dec): Dec[] => [mulPow10(a, 1), divPow10(a, 1), mulPow10(a, 2), divPow10(a, 2), mulPow10(a, 3), divPow10(a, 3)];
 
-
 /** d1: the value of one digit in `w.xyz` (1–2 whole digits). */
 function digitValue(rng: Rng): Question {
   const whole = ri(rng, 1, 2), len = whole + 3, at = ri(rng, 0, len - 1);
@@ -87,8 +86,8 @@ function missing(rng: Rng): Question {
     return wordQ(rng, prompt, lab(right), powers.filter(p => p.v !== right.v).map(lab), { say: ks2Say(prompt), hint: `Count the places the digits moved`, hintIsData: false });
   }
   const prompt = `? ${op} ${lab(dec(10 ** n, 0))} = ${lab(ans)}`;
-  const wrongWay = op === '×' ? divPow10(ans, n) : mulPow10(ans, n);
-  const ds = pickDecoys(start, [...shifts(start).slice(0, 2), ...shifts(start).slice(2, 4), wrongWay]);
+  const sameOp = op === '×' ? mulPow10(ans, n) : divPow10(ans, n); // applies the sum's operation to the answer, not its inverse
+  const ds = pickDecoys(start, [...shifts(start).slice(0, 2), sameOp, ...shifts(start).slice(2)]);
   return wordQ(rng, prompt, lab(start), ds, { say: ks2Say(prompt), hint: 'Work backwards: do the opposite', hintIsData: false });
 }
 

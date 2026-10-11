@@ -38,6 +38,14 @@ describe('y6-decimals (#1265)', () => {
     expect(solve('? ÷ 100 = 0.045')).toBe(scaled('4.5'));
   });
 
+  it('d2 and d3 cover both operations, all three powers and both d3 forms', () => {
+    const seen = new Set<string>();
+    for (const c of draw(2)) seen.add(`d2 ${c.prompt.match(/[×÷] ([\d,]+)/)![0]}`);
+    for (const c of draw(3)) seen.add(c.prompt.startsWith('?') ? `start ${c.prompt.match(/[×÷] ([\d,]+)/)![0]}` : `power ${c.prompt.match(/[×÷]/)![0]}`);
+    for (const op of ['×', '÷']) for (const p of ['10', '100', '1,000']) { expect(seen, `d2 ${op} ${p}`).toContain(`d2 ${op} ${p}`); expect(seen, `start ${op} ${p}`).toContain(`start ${op} ${p}`); }
+    expect(seen).toContain('power ×'); expect(seen).toContain('power ÷');
+  });
+
   it('d1: the answer is digit × place value, and the asked digit appears once', () => {
     for (const c of draw(1)) {
       const m = c.prompt.match(/^What is the value of the (\d) in ([\d.]+)\?$/)!;
