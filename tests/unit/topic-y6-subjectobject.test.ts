@@ -43,7 +43,7 @@ describe('y6-subjectobject (#1283)', () => {
       const w = wordsOf(s); const at = (x: string) => w.indexOf(x.toLowerCase());
       if (kind === 'statement' || kind === 'pronoun') { expect(at(subj), s).toBeLessThan(at(verb)); expect(at(obj!), s).toBeGreaterThan(at(verb)); }
       if (kind === 'question') { expect(AUX.some(a => at(a) >= 0 && at(a) < at(subj)), s).toBe(true); expect(at(subj), s).toBeLessThan(at(verb)); }
-      if (kind === 'passive') { expect(at(subj), s).toBeLessThan(Math.max(at('was'), at('were'))); expect(w[w.indexOf('by') + 1] === byNoun(s).toLowerCase() || w.at(-1) === byNoun(s).toLowerCase(), s).toBe(true); }
+      if (kind === 'passive') { expect(at(subj), s).toBeLessThan(Math.max(at('was'), at('were'))); expect(w[w.indexOf('by') + 1] === byNoun(s).toLowerCase() || w[w.indexOf('by') + 2] === byNoun(s).toLowerCase(), s).toBe(true); }
     }
   });
 
