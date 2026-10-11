@@ -38,14 +38,14 @@ export const AGREE_TRAP: AgreeRow[] = [
 /** [sentence with "_", answer, the three other forms of the same verb]. Every sentence holds a time word or a past/future verb. */
 export type TenseRow = [sentence: string, answer: string, others: string[]];
 
-/** d2: the time word comes first or alone. */
+/** d2: the time word comes first or alone. A future row never offers the present simple, which also names a plan ("Tomorrow my aunt visits"): its decoys are the past, the base form after a third-person subject and "would". */
 export const TENSE_PLAIN: TenseRow[] = [
   ['Yesterday we went to the park and _ football.', 'played', ['play', 'plays', 'will play']],
   ['Last night my sister _ the dishes.', 'washed', ['wash', 'washes', 'will wash']],
-  ['Tomorrow my aunt _ the museum.', 'will visit', ['visited', 'visit', 'visits']],
+  ['Tomorrow my aunt _ the museum.', 'will visit', ['visited', 'visit', 'would visit']],
   ['Every day I _ to school.', 'walk', ['walked', 'walks', 'will walk']],
-  ['Next week Dad _ the car.', 'will clean', ['cleaned', 'clean', 'cleans']],
-  ['Soon we _ you with the bags.', 'will help', ['helped', 'help', 'helps']],
+  ['Next week Dad _ the car.', 'will clean', ['cleaned', 'clean', 'would clean']],
+  ['Soon Gran _ you with the bags.', 'will help', ['helped', 'help', 'would help']],
   ['Usually my brother _ the dinner.', 'cooks', ['cooked', 'cook', 'will cook']],
   ['Two days ago we _ a film.', 'watched', ['watch', 'watches', 'will watch']],
   ['She always _ her teeth before bed.', 'cleans', ['cleaned', 'clean', 'will clean']],

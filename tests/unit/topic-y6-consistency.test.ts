@@ -23,17 +23,18 @@ const TIME_ANCHORS: Record<string, 'past' | 'future' | 'present'> = {
   'every day': 'present', usually: 'present', always: 'present',
 };
 const ANCHOR_VERBS: Record<string, 'past' | 'future'> = { went: 'past', came: 'past', was: 'past', were: 'past', arrived: 'past', will: 'future' };
-const FORMS: Record<string, { past: string; present: string[]; future: string }> = {
-  play: { past: 'played', present: ['play', 'plays'], future: 'will play' },
-  wash: { past: 'washed', present: ['wash', 'washes'], future: 'will wash' },
-  walk: { past: 'walked', present: ['walk', 'walks'], future: 'will walk' },
-  visit: { past: 'visited', present: ['visit', 'visits'], future: 'will visit' },
-  clean: { past: 'cleaned', present: ['clean', 'cleans'], future: 'will clean' },
-  help: { past: 'helped', present: ['help', 'helps'], future: 'will help' },
-  cook: { past: 'cooked', present: ['cook', 'cooks'], future: 'will cook' },
-  watch: { past: 'watched', present: ['watch', 'watches'], future: 'will watch' },
+const FORMS: Record<string, { past: string; present: string[]; future: string; would: string }> = {
+  play: { past: 'played', present: ['play', 'plays'], future: 'will play', would: 'would play' },
+  wash: { past: 'washed', present: ['wash', 'washes'], future: 'will wash', would: 'would wash' },
+  walk: { past: 'walked', present: ['walk', 'walks'], future: 'will walk', would: 'would walk' },
+  visit: { past: 'visited', present: ['visit', 'visits'], future: 'will visit', would: 'would visit' },
+  clean: { past: 'cleaned', present: ['clean', 'cleans'], future: 'will clean', would: 'would clean' },
+  help: { past: 'helped', present: ['help', 'helps'], future: 'will help', would: 'would help' },
+  cook: { past: 'cooked', present: ['cook', 'cooks'], future: 'will cook', would: 'would cook' },
+  watch: { past: 'watched', present: ['watch', 'watches'], future: 'will watch', would: 'would watch' },
 };
 
+const FIRST_PERSON = ['i', 'we', 'you', 'they'];
 const wordsOf = (s: string) => s.toLowerCase().match(/[a-z]+/g)!;
 const numberOf = (noun: string): 'singular' | 'plural' => IRREGULAR_PLURALS.includes(noun) || noun.endsWith('s') ? 'plural' : 'singular';
 const head = (s: string): 'singular' | 'plural' => {
@@ -76,6 +77,15 @@ describe('y6-consistency (#1285)', () => {
     }
   });
 
+  it('the number rules can fail: they tell a plural from a singular, and the bank holds both kinds of head', () => {
+    expect([numberOf('children'), numberOf('feet'), numberOf('dogs'), numberOf('dog'), numberOf('box')]).toEqual(['plural', 'plural', 'plural', 'singular', 'singular']);
+    const heads = [...AGREE_PLAIN, ...AGREE_TRAP].map(r => head(r[0]));
+    expect(heads.filter(h => h === 'plural').length).toBeGreaterThanOrEqual(4);
+    expect(heads.filter(h => h === 'singular').length).toBeGreaterThanOrEqual(4);
+    expect([...AGREE_PLAIN, ...AGREE_TRAP].filter(r => wordsOf(r[0])[0] === 'each').length).toBeGreaterThanOrEqual(3);
+    expect([...AGREE_PLAIN, ...AGREE_TRAP].some(r => IRREGULAR_PLURALS.includes(wordsOf(r[0])[1]))).toBe(true);
+  });
+
   it('AGREE: no singular head noun ends in -s, and "Each of" rows are singular', () => {
     for (const [s] of [...AGREE_PLAIN, ...AGREE_TRAP]) {
       const w = wordsOf(s);
@@ -101,8 +111,14 @@ describe('y6-consistency (#1285)', () => {
       const f = verbOf(answer);
       const right = tenses[0] === 'present' ? f.present : [f[tenses[0] as 'past' | 'future']];
       expect(right, s).toContain(answer);
-      // the other forms are the rest of the verb's forms
-      expect([answer, ...others].sort(), s).toEqual([f.past, ...f.present, f.future].sort());
+      if (tenses[0] === 'future') {
+        // the present simple also names a plan, so a future row never offers it as a decoy (#1285 review)
+        expect(wordsOf(s.split('_')[0]).filter(w => FIRST_PERSON.includes(w)), s).toEqual([]);
+        expect([answer, ...others].sort(), s).toEqual([f.past, f.present[0], f.future, f.would].sort());
+        f.present.slice(1).forEach(p => expect(others, s).not.toContain(p));
+      } else {
+        expect([answer, ...others].sort(), s).toEqual([f.past, ...f.present, f.future].sort());
+      }
     }
   });
 
@@ -123,6 +139,9 @@ describe('y6-consistency (#1285)', () => {
   it('d1: the plain verb forms, the answer agrees, "am" joins only the be cards', () => {
     for (const q of draws(1)) {
       const s = (q.visual as { text: string }).text;
+      const row = AGREE_PLAIN.find(r => r[0] === s)!;
+      expect(row, s).toBeDefined();
+      expect(q.answer).toBe(row[1]); expect(q.options).toContain(row[2]);
       expect(VERB_NUMBER[q.answer], s).toBe(head(s));
       const be = ['is', 'are'].includes(q.answer);
       expect(q.options.length).toBe(be ? 3 : 2);
@@ -133,8 +152,11 @@ describe('y6-consistency (#1285)', () => {
   it('d2: four options, all forms of one verb, the answer is the anchored tense', () => {
     for (const q of draws(2)) {
       expect(q.options).toHaveLength(4);
-      const f = verbOf(q.answer);
-      expect([...q.options].sort()).toEqual([f.past, ...f.present, f.future].sort());
+      const s = (q.visual as { text: string }).text;
+      const row = TENSE_PLAIN.find(r => r[0] === s)!;
+      expect(row, s).toBeDefined();
+      expect(q.answer).toBe(row[1]);
+      expect([...q.options].sort()).toEqual([row[1], ...row[2]].sort());
     }
   });
 
@@ -142,9 +164,17 @@ describe('y6-consistency (#1285)', () => {
     const qs = draws(3);
     const tense = qs.filter(q => q.prompt.includes('tense')).length / qs.length;
     expect(tense).toBeGreaterThan(0.35); expect(tense).toBeLessThan(0.65);
+    for (const q of qs.filter(q => q.prompt.includes('tense'))) {
+      const s = (q.visual as { text: string }).text;
+      const row = TENSE_LATE.find(r => r[0] === s)!;
+      expect(row, s).toBeDefined();
+      expect(q.answer).toBe(row[1]); expect([...q.options].sort()).toEqual([row[1], ...row[2]].sort());
+    }
     for (const q of qs.filter(q => !q.prompt.includes('tense'))) {
       const s = (q.visual as { text: string }).text;
-      expect(AGREE_TRAP.some(r => r[0] === s), s).toBe(true);
+      const row = AGREE_TRAP.find(r => r[0] === s)!;
+      expect(row, s).toBeDefined();
+      expect(q.answer).toBe(row[1]);
       expect(q.options.length).toBe(2);
       expect(q.options.some(o => VERB_NUMBER[o] === nearest(s))).toBe(true);
     }
