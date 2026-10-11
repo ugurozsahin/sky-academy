@@ -22,8 +22,7 @@
     "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,
     "src/ui/visuals.ts::renderVisual": 23,
-    "tests/unit/curriculum.test.ts::(anonymous)": 28,
-    "tests/unit/guardrails.test.ts::(anonymous)": 34
+    "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
     "src/three/sketchbook/view.ts::createView": 81,
@@ -42,7 +41,7 @@
     "tests/unit/curriculum.test.ts": 2566,
     "tests/unit/duel.test.ts": 970,
     "tests/unit/governance.test.ts": 5764,
-    "tests/unit/guardrails.test.ts": 3632,
+    "tests/unit/guardrails.test.ts": 3504,
     "tests/unit/hooks.test.ts": 1200,
     "tests/unit/play-session.test.ts": 629,
     "tests/unit/session.test.ts": 1284,

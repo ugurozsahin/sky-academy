@@ -6,7 +6,7 @@
 // import: y6-cohesion
 // import: y6-clauses
 // import: y6-lists
-// import: y6-hyphen
+import { y6Hyphen } from './year6-hyphen';
 // import: y6-subjectobject
 // import: y6-consistency
 import type { Topic } from './types';
@@ -28,7 +28,7 @@ export const Y6_GRAMMAR: Topic[] = [
 
   // slot: y6-lists
 
-  // slot: y6-hyphen
+  { id: 'y6-hyphen', title: 'Hyphens', icon: '➖', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y6 Punctuation: hyphens to avoid ambiguity (Appendix 1, Appendix 2)', gen: y6Hyphen },
 
   // slot: y6-subjectobject
 
