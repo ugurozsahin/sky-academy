@@ -20,7 +20,7 @@ const DETERMINERS = ['the', 'my', 'these', 'this', 'our'];
 const TIME_ANCHORS: Record<string, 'past' | 'future' | 'present'> = {
   yesterday: 'past', 'last week': 'past', 'last night': 'past', ago: 'past',
   tomorrow: 'future', 'next week': 'future', soon: 'future',
-  'every day': 'present', usually: 'present', always: 'present',
+  nowadays: 'present',
 };
 const ANCHOR_VERBS: Record<string, 'past' | 'future'> = { went: 'past', came: 'past', was: 'past', were: 'past', arrived: 'past', will: 'future' };
 const FORMS: Record<string, { past: string; present: string[]; future: string; would: string }> = {
@@ -118,6 +118,11 @@ describe('y6-consistency (#1285)', () => {
         f.present.slice(1).forEach(p => expect(others, s).not.toContain(p));
       } else {
         expect([answer, ...others].sort(), s).toEqual([f.past, ...f.present, f.future].sort());
+        if (tenses[0] === 'present') {
+          // the subject pins the present form: I / we / you / they take the base, anyone else the -s form (#1285 review)
+          const subject = wordsOf(s.split('_')[0]).pop()!;
+          expect(answer, s).toBe(FIRST_PERSON.includes(subject) ? f.present[0] : f.present[1]);
+        }
       }
     }
   });
