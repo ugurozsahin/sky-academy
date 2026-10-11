@@ -2948,7 +2948,7 @@ describe('save format v5 (#903)', () => {
     expect((m.log[0] as unknown as Record<string, unknown>).evil).toBeUndefined();
   });
 
-  // Round 3 review: sanitizeStreakRest/sanitizeProgressExtras still spread their input, so the same
+  // Round 3 review: sanitizeStreakRest (now sanitizeStreak, #1375)/sanitizeProgressExtras spread their input, so the same
   // unknown-key vector round 2 closed for slips/log/settings survived on these two siblings.
   it('streak: an unknown extra key is stripped, not carried through unbounded', () => {
     const evil = 'x'.repeat(10000);
