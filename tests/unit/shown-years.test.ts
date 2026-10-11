@@ -156,7 +156,7 @@ describe('islandArt escapes its two interpolations (#1327)', () => {
 
   // guard rail — the data-source half: fail where the row is written, as the tint rail does. The set is what
   // every row uses today (`R`, `Y1`–`Y6`); a future value outside it needs this line widened on purpose.
-  it('every YEARS row’s short is 1–4 of [A-Za-z0-9], which svg() prints raw inside <text>', () => {
+  it('every YEARS row’s short is 1–4 of [A-Za-z0-9], so escapeXml() is the identity on every real row', () => {
     for (const y of YEARS) expect(y.short, y.id).toMatch(/^[A-Za-z0-9]{1,4}$/);
   });
 

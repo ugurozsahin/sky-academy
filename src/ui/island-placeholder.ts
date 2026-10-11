@@ -7,10 +7,11 @@ import type { YearInfo } from '../curriculum';
 const INK = '#0d1226';
 const TEXT = '#f4f6ff';
 
-// #1327: the five XML-significant characters, so a `short` or `tint` can never leave the SVG malformed —
-// `encodeURIComponent` on the whole string below makes a valid *URI*, not valid *XML*, and a browser renders
-// a malformed data-URI SVG as nothing, silently. Identity on `[A-Za-z0-9#]`, which is all today's rows use
-// (`tests/unit/shown-years.test.ts` pins the output byte-for-byte for them).
+// #1327: the five XML-significant characters — `encodeURIComponent` on the whole string below makes a valid
+// *URI*, not valid *XML*, and a browser renders a malformed data-URI SVG as nothing, silently. Not `dom.ts`'s
+// `esc()`, which leaves `'` raw while every attribute here is single-quoted. Identity on `[A-Za-z0-9#]`, which
+// is all today's rows use (`tests/unit/shown-years.test.ts` pins the output byte-for-byte for them); anything
+// else a `short` could carry — a control character, say — is the data-source rail's to refuse, not this line's.
 const XML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&apos;', '"': '&quot;' };
 export const escapeXml = (s: string) => s.replace(/[&<>'"]/g, c => XML_ESCAPES[c]);
 
