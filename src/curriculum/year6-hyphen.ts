@@ -8,7 +8,7 @@ import { pick, shuffle, wordQ } from './util';
 export const RE_PAIRS: readonly (readonly [string, string, string, string])[] = [
   ['recover', 're-cover', 'I hope Gran will _ from her cold soon.', 'The sofa is torn, so we will _ it with new cloth.'],
   ['resign', 're-sign', 'Dad will _ from his job today.', 'The pen leaked, so please _ the card.'],
-  ['reform', 're-form', 'The mayor wants to _ the old rules.', 'After the break, please _ your line.'],
+  ['reform', 're-form', 'The mayor wants to _ the old rules.', 'The band split up, but they will _ next year.'],
   ['remark', 're-mark', 'She did not _ on the weather.', 'The teacher had to _ the wrong test.'],
   ['resent', 're-sent', 'Do not _ your brother for winning.', 'The email failed, so Mum _ it again.'],
   ['reserve', 're-serve', 'We _ a table for six at the cafe.', 'The player fell, so she had to _ the ball.'],
@@ -26,15 +26,14 @@ export const SOLID_ROOTS: readonly (readonly [string, string])[] = [
 /** [hyphened, open, meaning only the hyphened phrase has, meaning the open phrase could have]. */
 export const COMPOUNDS: readonly (readonly [string, string, string, string])[] = [
   ['a man-eating shark', 'a man eating shark', 'a shark that eats people', 'a man who is eating shark'],
-  ['twenty-odd children', 'twenty odd children', 'about twenty children', 'twenty strange children'],
-  ['a light-blue coat', 'a light blue coat', 'a coat of pale blue', 'a blue coat that is not heavy'],
+  ['a little-used car', 'a little used car', 'a car that is rarely driven', 'a small car that has had an owner'],
   ['a small-animal vet', 'a small animal vet', 'a vet for little pets', 'a little vet who treats animals'],
   ['an old-car dealer', 'an old car dealer', 'someone who sells old cars', 'an elderly person who sells cars'],
 ];
 
 const isVowel = (c: string): boolean => 'aeiou'.includes(c);
 /** The d2 oracle, computed from the pair, not stored. */
-export const needsHyphen = ([prefix, root]: readonly [string, string] | readonly string[]): boolean => isVowel(prefix.at(-1)!) && isVowel(root[0]);
+export const needsHyphen = ([prefix, root]: readonly [string, string]): boolean => isVowel(prefix.at(-1)!) && isVowel(root[0]);
 const solid = ([prefix, root]: readonly string[]): string => prefix + root;
 
 function meaning(rng: () => number): Question {
@@ -51,9 +50,9 @@ function meaning(rng: () => number): Question {
 function vowelRule(rng: () => number): Question {
   const yes = pick(rng, HYPHEN_ROOTS);
   const no = shuffle(rng, SOLID_ROOTS).slice(0, 2);
-  return wordQ(rng, 'Which word should have a hyphen?', solid(yes), no.map(solid), {
-    hint: 'A prefix ending in a vowel, before a word starting with one', hintIsData: false,
-    say: 'Which word should have a hyphen?',
+  return wordQ(rng, 'Which word takes a hyphen under the vowel rule?', solid(yes), no.map(solid), {
+    hint: 'A prefix ending in a vowel, before a word starting with one.', hintIsData: false,
+    say: 'Which word takes a hyphen under the vowel rule?',
   });
 }
 
@@ -65,7 +64,7 @@ function compound(rng: () => number): Question {
   const letterOf = (isHyphened: boolean): string => (isHyphened === hyphenedIsA ? 'A' : 'B');
   const prompt = onlyHyphened ? `Which one can only mean ${mH}?` : `Which one could mean ${mO}?`;
   return wordQ(rng, prompt, letterOf(onlyHyphened), [letterOf(!onlyHyphened)], {
-    visual: { type: 'sentence', text: `A: ${a} / B: ${b}` }, say: prompt, hint: 'The hyphen joins the words so they work as one.', hintIsData: false,
+    visual: { type: 'sentence', text: `A: ${a} / B: ${b}` }, say: `${prompt} A: ${a}. B: ${b}.`, hint: 'The hyphen joins the words so they work as one.', hintIsData: false,
   });
 }
 

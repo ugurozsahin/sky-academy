@@ -16,7 +16,7 @@ const text = (q: { visual?: unknown }) => (q.visual as { text: string }).text;
 const CUES: Record<string, string> = {
   'I hope Gran will _ from her cold soon.': 'from her cold', 'The sofa is torn, so we will _ it with new cloth.': 'new cloth',
   'Dad will _ from his job today.': 'from his job', 'The pen leaked, so please _ the card.': 'the card',
-  'The mayor wants to _ the old rules.': 'old rules', 'After the break, please _ your line.': 'your line',
+  'The mayor wants to _ the old rules.': 'old rules', 'The band split up, but they will _ next year.': 'band split',
   'She did not _ on the weather.': 'on the weather', 'The teacher had to _ the wrong test.': 'wrong test',
   'Do not _ your brother for winning.': 'for winning', 'The email failed, so Mum _ it again.': 'again',
   'We _ a table for six at the cafe.': 'a table', 'The player fell, so she had to _ the ball.': 'the ball',
@@ -76,7 +76,7 @@ describe('y6-hyphen (#1275)', () => {
       expect(q.prompt).toContain(only ? row[2] : row[3]);
       expect(q.answer).toBe((only ? row[0] : row[1]) === a ? 'A' : 'B');
       stems.add(only ? 'only' : 'could'); letters.add(q.answer);
-      expect(q.say).not.toMatch(/^[AB]$/);
+      expect(q.say).toContain(a); expect(q.say).toContain(b);
     }
     expect(stems.size).toBe(2); expect(letters.size).toBe(2);
   });
