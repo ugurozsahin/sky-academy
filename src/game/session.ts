@@ -188,7 +188,7 @@ export class Session {
   }
   private pickTopic(): Topic {
     if (this.o.topic) return this.o.topic;
-    return weightedPick(this.o.pool!, this.o.weights, this.rng);
+    return weightedPick(this.o.pool ?? [], this.o.weights, this.rng);   // #1325: an empty or missing pool throws there, never `undefined` as a Topic; `nextQuestion()`'s try ends the run as incomplete (#444)
   }
   start() { this.nextQuestion(); }
 
@@ -214,9 +214,9 @@ export class Session {
   nextQuestion() {
     if (this.ended) return;
     if (this.o.deck) { this.nextDeckQuestion(); return; }
-    const topic = this.pickTopic(); this.currentTopic = topic;
-    let q: Question;
+    let topic: Topic | undefined; let q: Question;
     try {
+      topic = this.pickTopic(); this.currentTopic = topic;   // #1325: inside the try — an empty pool throws here
       q = topic.gen(this.difficulty, this.rng);
       // avoid immediate repeats — of the whole card, not merely of its answer (#390)
       const prev = this.current && repeatKey(this.current);
@@ -227,7 +227,7 @@ export class Session {
       // edit) must not leave the screen frozen mid-question — nothing else ever calls `nextQuestion()`
       // again, so `waiting` would stay stuck while the arena's rAF loop keeps it looking alive. Ending
       // through the normal path pays what was already earned; `won: false` because nothing was completed.
-      console.error(`Sky Ninja Academy: "${topic.id}" question generator threw`, e);
+      console.error(topic ? `Sky Ninja Academy: "${topic.id}" question generator threw` : `Sky Ninja Academy: ${this.o.mode} run for ${this.o.year.id} has no topic to draw from (${this.o.pool ? 'empty pool' : 'no pool given'})`, e);   // #1325: `topic` is unset when `pickTopic()` threw — naming it here would be a second, uncaught throw
       this.end(false, true);
       return;
     }
