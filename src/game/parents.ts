@@ -8,6 +8,8 @@ import type { LogDay } from '../save-records';
 import { accuracy } from './sensei';
 import { beltFor } from './belts';
 import { leastSecure } from '../fact-record';
+import { STATUTORY_LISTS } from '../curriculum/statutory-lists';
+import { listProgress, type WordProgress } from '../word-record';
 
 // ---------- Grown-ups gate ----------
 // A times-table question a Reception/Year-1 child cannot do yet, but any grown-up answers at a glance.
@@ -55,7 +57,10 @@ export interface ParentSummary {
   week: WeekSummary;
   /** The "Facts to practise" lines (#1123); null when no × answer is recorded, so the section stays hidden. */
   facts: string[] | null;
+  /** The "Spelling word lists" rows (#1289): one per statutory list with a tried word; empty hides the section. */
+  words: WordListRow[];
 }
+export interface WordListRow extends WordProgress { title: string }
 /** The last seven local days of play (#939), read from the day log. `accuracy` is null with no questions. */
 export interface WeekSummary { days: number; questions: number; accuracy: number | null; topics: string[] }
 /** Seven local days ending `day` (`YYYY-MM-DD`): days played, questions, accuracy and the distinct topic ids. */
@@ -143,8 +148,13 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
     slips: recentSlips(data, topics),
     week: weekSummary(data.log, today(now)),
     facts: factsToPractise(data),
+    words: wordListRows(data),
   };
 }
+
+/** One row per statutory list the child has tried a word of (#1289). */
+export const wordListRows = (data: SaveData): WordListRow[] =>
+  STATUTORY_LISTS.map(l => ({ title: l.title, ...listProgress(l.words, data.ks2?.words ?? {}) })).filter(r => r.tried > 0);
 
 /** The grown-ups "Facts to practise" lines (#1123), e.g. `9 × 6 and 6 × 9`; null when no times-table answer is recorded. */
 export function factsToPractise(data: SaveData): string[] | null {

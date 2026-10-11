@@ -29,6 +29,7 @@ export function chunkQ(rng: Rng, word: string, chunks: string[], decoyChunks: st
 export function wordListQ(rng: Rng, entry: WordEntry, d: Difficulty): Question {
   const f = pick(rng, entry.forms);
   const dictation = d === 1 ? {} : { say: `The word is ${f.w}. ${f.s} The word is ${f.w}.`, visual: { type: 'sentence' as const, text: f.s.replace(f.w, '___') } };
-  if (f.chunks) return chunkQ(rng, f.w, f.chunks, f.decoys ?? [], { ...dictation, peek: true, peekHint: 'Slice the parts in order' });
-  return { ...spellQ(rng, f.w), ...dictation, peek: true, peekHint: 'Slice the letters in order' };
+  const listWord = entry.forms[0].w;   // #1289: one record per list entry, whichever form the card drew
+  if (f.chunks) return chunkQ(rng, f.w, f.chunks, f.decoys ?? [], { ...dictation, listWord, peek: true, peekHint: 'Slice the parts in order' });
+  return { ...spellQ(rng, f.w), ...dictation, listWord, peek: true, peekHint: 'Slice the letters in order' };
 }

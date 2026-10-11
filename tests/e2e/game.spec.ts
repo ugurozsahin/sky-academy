@@ -705,6 +705,19 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
   });
 
+  // #1289: the grown-ups page reads the word record out of `ks2.words`; nothing of it is shown to the child.
+  test('Spelling word lists: the grown-ups page shows "of 100 secure" and the words not yet secure, on a 390×664 phone (#1289)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page, 'volt', 'Ada', { ks2: { facts: {}, checks: [], words: { accident: 'rrr', address: 'rw', answer: 'w' } } });
+    await openGrownUps(page);
+    const section = page.locator('.parents-dash');
+    await expect(section).toContainText('Year 3–4 words: 1 of 100 secure · 2 not yet secure · 97 not tried yet');
+    await expect(section).toContainText('address, answer');
+    await expect(section).not.toContainText('Year 5–6 words');
+    await expect(page.locator('button[data-words="0"]')).toHaveText('Copy these words');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+
   test('Time arrangements: Extra time and the beep persist, and a Sprint then runs 90 seconds (#1121)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });
     await seedPlayer(page);
