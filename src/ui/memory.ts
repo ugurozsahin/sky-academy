@@ -1,5 +1,5 @@
 // Memory Match screen: a calm, non-slice card-flip mode. Cards are DOM buttons (no canvas).
-import { avatarById, cheerLine, praiseLine } from '../avatars';
+import { avatarById, cheerLine, praiseLine, voiced } from '../avatars';
 import type { YearInfo } from '../curriculum';
 import { gridFor, Memory, pickTheme, spokenOnFlip, type Face } from '../game/memory';
 import { isReadOnlySave, isWriteFailing, load, recordGameEnd, recordMemory, touchStreak } from '../storage';
@@ -20,7 +20,7 @@ export function dojoRowsHTML(d: DojoOutcome): string {
 export interface MemoryOpts { year: YearInfo; theme?: string }
 
 export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => void) {
-  const d = load(); const av = avatarById(d.avatar);
+  const d = load(); const av = voiced(avatarById(d.avatar), d, o.year.id);
   const theme = pickTheme(o.year.id, Math.random, o.theme);
   const game = new Memory(theme.pairs(Math.random));
   // Was `const cols = 4` with a comment enumerating 8 / 12 / 16 cards; `gridFor` is that decision made from

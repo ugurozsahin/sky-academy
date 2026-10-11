@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ALL_AVATARS, AVATARS, avatarById, MASTER, nameElementCollide, praiseLine, SENSEI, SENSEI_LINES, senseiLine, welcomeLine } from '../../src/avatars';
+import { ALL_AVATARS, AVATARS, avatarById, cheerFor, MASTER, nameElementCollide, praiseFor, praiseLine, SENSEI, SENSEI_LINES, senseiLine, tutorialLine, voiced, welcomeLine } from '../../src/avatars';
 import { masterProgress } from '../../src/game/sensei';
 import { TOPICS, YEARS, isKs2, topicsFor, type Topic } from '../../src/curriculum';
 import { STICKER_IDS, type TopicProgress } from '../../src/storage';
@@ -116,5 +116,46 @@ describe('Master Ninja', () => {
     const hiddenIsland: Topic[] = [{ ...TOPICS[0], id: 'fixture-ks2-topic', year: 'year3' as Topic['year'] }];
     expect(masterProgress([...islands, hiddenIsland], allStars)).toEqual({ done: 3, total: 3, unlocked: true });
     expect(masterProgress([islands[0]], starred(topicsFor('reception').map(t => t.id)))).toEqual({ done: 1, total: 3, unlocked: false });
+  });
+});
+
+/** #1287 — a drier voice for Years 3–6. The voice year is the save's `ks2.schoolYear` when set, else the island played. */
+describe('KS2 voice (#1287)', () => {
+  const ks1 = 'year1' as const, ks2 = 'year4' as const;
+  const save = (schoolYear?: 'year1' | 'year4' | 'year3') => ({ ks2: { schoolYear } });
+  it('every playable ninja has 3 KS2 praise and 3 KS2 cheer lines, none with "!"', () => {
+    for (const a of AVATARS) {
+      expect(a.praiseKs2, a.id).toHaveLength(3); expect(a.cheerKs2, a.id).toHaveLength(3);
+      for (const l of [...a.praiseKs2!, ...a.cheerKs2!]) { expect(l, a.id).not.toContain('!'); expect(l, a.id).toMatch(/\.$/); }
+      for (const l of a.praiseKs2!) expect(l, a.id).toContain('{name}');
+    }
+  });
+  it('a KS2 voice year never returns a KS1 line, and a KS1 year never a KS2 line', () => {
+    for (const a of AVATARS) {
+      expect(praiseFor(a, ks2)).toEqual(a.praiseKs2); expect(cheerFor(a, ks2)).toEqual(a.cheerKs2);
+      expect(praiseFor(a, ks1)).toEqual(a.praise); expect(cheerFor(a, ks1)).toEqual(a.cheer);
+      expect(praiseFor(a)).toEqual(a.praise);
+      for (const l of praiseFor(a, ks2)) expect(a.praise).not.toContain(l);
+    }
+  });
+  it('Master Ninja keeps his lines in both voices', () => {
+    expect(praiseFor(MASTER, ks2)).toEqual(MASTER.praise); expect(voiced(MASTER, save('year4'))).toBe(MASTER);
+  });
+  it('a set schoolYear wins over the island year', () => {
+    const a = AVATARS[0];
+    expect(voiced(a, save('year4'), ks1).praise).toEqual(a.praiseKs2);
+    expect(voiced(a, save('year1'), 'year3').praise).toEqual(a.praise);
+    expect(voiced(a, save(), 'year3').praise).toEqual(a.praiseKs2);   // unset: the island decides
+    expect(voiced(a, save(), ks1)).toBe(a);
+  });
+  it('tutorial and welcome follow the voice year only', () => {
+    expect(tutorialLine(save('year4'), ks1)).toBe(SENSEI_LINES.tutorialKs2);
+    expect(tutorialLine(save(), ks1)).toBe(SENSEI_LINES.tutorial);
+    expect(welcomeLine('Ada', save('year3'))).toBe(SENSEI_LINES.welcomeKs2.replace('{name}', 'Ada'));
+    expect(welcomeLine('Ada', save())).toBe(SENSEI_LINES.welcome.replace('{name}', 'Ada'));
+    expect(SENSEI_LINES.welcomeKs2).not.toContain('!');
+  });
+  it('praiseLine on a voiced ninja substitutes the name', () => {
+    expect(praiseLine(voiced(AVATARS[0], save('year4')), 'Ada', () => 0)).toBe('Quick and precise, Ada.');
   });
 });
