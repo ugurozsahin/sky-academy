@@ -121,6 +121,36 @@ describe('promptHTML — build cards (#1059)', () => {
     expect(plain(promptHTML(twoQ, 0))).toBe('5 ? 8, so 5 + 4 = _');
     expect(promptHTML(twoQ, 0)).toContain('5 ? 8, so 5 + 4 = <span class="seq">');
   });
+
+  // #1337: `types.ts` says the template's `_` count equals `sequence.length`, and the generic per-topic loop
+  // pins it for every registered generator — but a hand-built card outside the registry used to reach
+  // `esc(undefined)` (more slots than digits: a TypeError from deep inside `esc`) or drop the surplus digits
+  // with no error at all (fewer slots), so the card under-counted progress for the rest of the question.
+  // Both now fail at the function that owns the invariant, naming the card.
+  it('more slots than sequence entries throws, naming the prompt, template and sequence (#1337)', () => {
+    const wide: Question = { prompt: '45 + 44 = ?', answer: '89', options: ['8', '9', '1'], sequence: ['8', '9'], build: { template: '___' } };
+    for (const done of [0, 1, 2, 3]) expect(() => promptHTML(wide, done), `done=${done}`).toThrow(/buildPromptHTML: 3 slots for 2 sequence entries.*45 \+ 44 = \?.*___.*8,9/);
+  });
+
+  it('fewer slots than sequence entries throws the same way — never silently dropping a digit (#1337)', () => {
+    const narrow: Question = { prompt: '45 + 44 = ?', answer: '89', options: ['8', '9', '1'], sequence: ['8', '9'], build: { template: '_' } };
+    for (const done of [0, 1, 2]) expect(() => promptHTML(narrow, done), `done=${done}`).toThrow(/buildPromptHTML: 1 slot for 2 sequence entries.*45 \+ 44 = \?.*_.*8,9/);
+  });
+
+  // #1337: `promptHTML` reads `!q.sequence` before `q.build`, so `build` with no `sequence` is a plain card —
+  // the prompt escaped, no `.seq`, no slot. A tolerated fallback, not a loud failure like the two above, and
+  // deliberately so: `Session` gates on `sequence` as well, so card and engine agree it is a pick-one card
+  // (`buildPromptHTML`'s doc has the line). The generic loop forbids a registered generator from shipping one
+  // (`if (q.build) expect(q.sequence).toBeDefined()`); this pins the fallback at the function responsible for
+  // it, so reordering the two branches (which would hand `undefined` to `buildPromptHTML`) fails here.
+  it('build set without sequence falls back to the plain prompt, with no slot markup (#1337)', () => {
+    const noSeq: Question = { prompt: '45 + 44 = ?', answer: '89', options: ['89', '90'], build: { template: '__' }, listen: 'forty-five add forty-four' };
+    expect(promptHTML(noSeq, 0)).toBe('45 + 44 = ?');
+    expect(promptHTML(noSeq, 1)).toBe('45 + 44 = ?');
+    expect(promptHTML(noSeq, 0, true)).toBe('forty-five add forty-four');   // the plain branch's reveal rule, unchanged
+    expect(promptHTML(noSeq, 0)).not.toContain('class="seq"');
+    expect(promptHTML(noSeq, 0)).not.toContain('todo');
+  });
 });
 
 // #919: "Slice Them All" (#918's engine) has no position to be `done` past — a target can be found in any

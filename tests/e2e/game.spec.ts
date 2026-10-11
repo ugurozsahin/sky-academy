@@ -2597,16 +2597,18 @@ test.describe('Sky Ninja Academy', () => {
     // Running this on desktop is what taught me that — the first version of this check called such a bubble
     // stray and went red on a viewport CI would not have run until tonight.
     // A wave can be entirely on its way down for a moment (the nightly of 2026-10-10 caught exactly that), so
-    // wait for a rising bubble rather than sampling once.
-    await page.waitForFunction(() => window.__sna.bubbles().some(b => b.vy < 0));
-    const inBox = await page.evaluate(() => {
+    // wait for a rising bubble rather than sampling once — and take the sample inside the same poll that sees
+    // one: a separate wait then evaluate let the last rising bubble turn over in between (the nightly of
+    // 2026-10-11, #1724), so the sample is the poll's own return value.
+    const inBox = await (await page.waitForFunction(() => {
       const a = window.__sna.arena!, bs = window.__sna.bubbles();
-      return {
-        rising: bs.filter(b => b.vy < 0).length,
+      const rising = bs.filter(b => b.vy < 0).length;
+      return rising > 0 && {
+        rising,
         risingOutside: bs.filter(b => b.vy < 0 && (b.y - b.r > a.H || b.y + b.r < 0)).length,
         offSide: bs.filter(b => b.x < 0 || b.x > a.W).length,
       };
-    });
+    })).jsonValue();
     expect(inBox.rising, 'no bubble was rising, so the check below proved nothing').toBeGreaterThan(0);
     expect(inBox, 'a bubble was left outside the resized arena').toMatchObject({ risingOutside: 0, offSide: 0 });
   });

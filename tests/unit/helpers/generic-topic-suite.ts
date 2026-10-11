@@ -86,8 +86,13 @@ for (const topic of topics) {
           // solve()'s bare-number check when it does not recognise the form (#1045)
           const arith = arithmeticCheck(isKs2(topic.year), q.prompt, q.answer);
           if (arith !== null) expect(arith, q.prompt).toBe(true);
-          // numeric answers stay within the year's range — never absurd, never below its floor (0 for KS1)
-          if (!q.sequence) {
+          // numeric answers stay within the year's range — never absurd, never below its floor (0 for KS1).
+          // A build card's answer is read too (#1337): `build` implies `sequence`, so the `!q.sequence` gate
+          // alone skipped every `buildQ` topic — eleven KS2 topics today, and a hand-built Reception build card
+          // answering 99 passed a ceiling of 30 unnoticed. A spelling or any-order sequence still skips (letters,
+          // or a comma list), and so does any form `parseNumericAnswer` does not read, build or not: a remainder
+          // ("303 r 2", y5-shortdiv/y6-longdiv) or `stepsQ`'s "12 → 17" returns null here as it always has.
+          if (!q.sequence || q.build) {
             const n = parseNumericAnswer(q.answer);
             if (n !== null) { expect(n, q.prompt).toBeGreaterThanOrEqual(minAnswer); expect(n, q.prompt).toBeLessThanOrEqual(maxAnswer); }
           }
