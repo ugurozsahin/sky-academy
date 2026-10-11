@@ -6,12 +6,12 @@
 import { y6Hyphen } from './year6-hyphen';
 import { y6SubjectObject } from './year6-subjectobject';
 import { y6Lists } from './year6-lists';
-// import: y6-consistency
 import type { Topic } from './types';
 import { y6Formal } from './year6-formal';
 import { y6Synonyms } from './year6-synonyms';
 import { y6Passive } from './year6-passive';
 import { y6Clauses } from './year6-clauses';
+import { y6Consistency } from './year6-consistency';
 
 export const Y6_GRAMMAR: Topic[] = [
   { id: 'y6-formal', title: 'Formal or Informal', icon: '📝', subject: 'writing', year: 'year6', nc: 'Y6 Grammar: formal and informal vocabulary and structures (Appendix 2)', gen: y6Formal },
@@ -32,5 +32,5 @@ export const Y6_GRAMMAR: Topic[] = [
 
   { id: 'y6-subjectobject', title: 'Subject and Object', icon: '🎯', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y6 Grammar terms: subject and object (Appendix 2)', gen: y6SubjectObject },
 
-  // slot: y6-consistency
+  { id: 'y6-consistency', title: 'Tense and Agreement', icon: '⚖️', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y5/6 Writing: consistent tense and subject–verb agreement', gen: y6Consistency },
 ];
