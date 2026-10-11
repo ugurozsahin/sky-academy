@@ -4005,6 +4005,13 @@ test.describe('Sky Ninja Academy', () => {
     const d = new Date(); d.setDate(d.getDate() + 20);
     await page.locator('#ready-date').fill(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     await expect(page.locator('#ready-weeks')).toHaveText('3 weeks to go');
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await page.reload();                                   // the date is saved, not just shown
+    await openGrownUps(page);
+    await expect(page.locator('#ready-date')).toHaveValue(iso);
+    await expect(page.locator('#ready-weeks')).toHaveText('3 weeks to go');
+    await page.locator('#ready-date').fill('');
+    await expect(page.locator('#ready-weeks')).toHaveText('');
     await page.locator('#ready-date').scrollIntoViewIfNeeded();
     await expectFitsViewport(page, 'grown-ups Check readiness');
   });

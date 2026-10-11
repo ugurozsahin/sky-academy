@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sats56Block, tablesBlock, weeksTo } from '../../src/game/readiness';
 import { readyHTML } from '../../src/ui/parents-ready';
 import { DEFAULT } from '../../src/storage/shape';
-import { listedTopics } from '../../src/curriculum';
+import { listedTopics, type Topic } from '../../src/curriculum';
 import type { Ks2Fact } from '../../src/save-records';
 
 const chk = (score: number) => ({ date: '2026-09-01', score, missed: [] });
@@ -26,10 +26,18 @@ describe('tablesBlock (#1286)', () => {
 
 describe('sats56Block (#1286)', () => {
   const topics = listedTopics().filter(t => t.strand && (t.year === 'year5' || t.year === 'year6'));
+  const prog = (hits: number, tries: number) => ({ stars: 0, plays: 1, best: 0, hits, tries });
+  const fake = (id: string, year: string, strand: string) => ({ id, year, strand }) as unknown as Topic;
   it('ranks Year 5–6 strands by share right, and skips strands under five tries', () => {
     const [a] = topics, other = topics.find(t => t.strand !== a.strand)!;
-    const out = sats56Block({ [a.id]: { stars: 0, plays: 1, best: 0, hits: 6, tries: 10 }, [other.id]: { stars: 0, plays: 1, best: 0, hits: 0, tries: 4 } }, topics);
+    const out = sats56Block({ [a.id]: prog(6, 10), [other.id]: prog(0, 4) }, topics);
     expect(out).toEqual([{ strand: a.strand, pct: 60 }]);
+  });
+  it('lists the three lowest, weakest first, breaking a tie in strand order, and leaves out Year 3–4', () => {
+    const ts = [fake('a', 'year5', 'number'), fake('b', 'year5', 'calc'), fake('c', 'year6', 'fractions'), fake('d', 'year6', 'ratio'),
+      fake('e', 'year6', 'algebra'), fake('x', 'year4', 'geometry')];
+    const p = { a: prog(9, 10), b: prog(5, 10), c: prog(2, 10), d: prog(2, 10), e: prog(7, 10), x: prog(0, 10) };   // x is Year 4: never shown
+    expect(sats56Block(p, ts)).toEqual([{ strand: 'fractions', pct: 20 }, { strand: 'ratio', pct: 20 }, { strand: 'calc', pct: 50 }]);
   });
   it('is empty with no play', () => expect(sats56Block({}, topics)).toEqual([]));
 });
@@ -39,6 +47,7 @@ describe('weeksTo (#1286)', () => {
     const d = new Date(Date.UTC(2026, 9, 11 + days, 12)).toISOString().slice(0, 10);
     expect(weeksTo(d, '2026-10-11')).toBe(w);
   });
+  it('is null for a date that does not exist', () => expect(weeksTo('2026-02-31', '2026-01-01')).toBeNull());
   it('is null for a past, missing or malformed date', () => {
     expect(weeksTo('2026-10-10', '2026-10-11')).toBeNull();
     expect(weeksTo(undefined, '2026-10-11')).toBeNull();
@@ -56,8 +65,17 @@ describe('readyHTML (#1286)', () => {
     expect(html).toContain('3 weeks to go');
   });
   it('shows for Year 6 and points at Arithmetic practice', () => expect(readyHTML(save({ schoolYear: 'year6' }), '2026-10-11')).toContain('Arithmetic practice, Year 6 island'));
+  it('says "this week" and "1 week" in the right places', () => {
+    expect(readyHTML(save({ schoolYear: 'year4', checkDate: '2026-10-11' }), '2026-10-11')).toContain('The check is this week');
+    expect(readyHTML(save({ schoolYear: 'year4', checkDate: '2026-10-18' }), '2026-10-11')).toContain('1 week to go');
+  });
   it('uses no prediction or pass/fail word in any state', () => {
     for (const ks2 of [{ schoolYear: 'year4' }, { schoolYear: 'year6', checks: [chk(3)], facts: { '7×8': fact(0, 9) }, checkDate: '2026-12-01' }])
       expect(readyHTML(save(ks2), '2026-10-11')).not.toMatch(FORBIDDEN);
+    const t = listedTopics().find(x => x.strand && x.year === 'year6')!;
+    const withStrand = { ...save({ schoolYear: 'year6', checkDate: '2026-12-01' }), progress: { [t.id]: { stars: 0, plays: 1, best: 0, hits: 1, tries: 9 } } };
+    const html = readyHTML(withStrand, '2026-10-11');
+    expect(html).toContain('% right');   // a real strand line is on the page
+    expect(html).not.toMatch(FORBIDDEN);
   });
 });
