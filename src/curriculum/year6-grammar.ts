@@ -11,13 +11,14 @@ import { y6Hyphen } from './year6-hyphen';
 // import: y6-consistency
 import type { Topic } from './types';
 import { y6Formal } from './year6-formal';
+import { y6Passive } from './year6-passive';
 
 export const Y6_GRAMMAR: Topic[] = [
   { id: 'y6-formal', title: 'Formal or Informal', icon: '📝', subject: 'writing', year: 'year6', nc: 'Y6 Grammar: formal and informal vocabulary and structures (Appendix 2)', gen: y6Formal },
 
   // slot: y6-synonyms
 
-  // slot: y6-passive
+  { id: 'y6-passive', title: 'Active and Passive', icon: '🔁', subject: 'writing', year: 'year6', nc: 'Y6 Grammar: active and passive (Appendix 2)', gen: y6Passive },
 
   // slot: y6-subjunctive
 

@@ -19,8 +19,8 @@ describe('Year 6 registry (#1212)', () => {
     expect([y.perStage, y.lives]).toEqual([7, 3]);
   });
 
-  it('Year 6 stays off the map until it has enough topics', () => {
-    expect(shownYears().some(y => y.id === 'year6')).toBe(false);
+  it('Year 6 reaches the map once it has 12 maths + 6 writing topics (#1279)', () => {
+    expect(shownYears().some(y => y.id === 'year6')).toBe(true);
   });
 
   it('no topic runs the generic suite twice: Year 6 topics are not in the EYFS/KS1 sweep', () => {
