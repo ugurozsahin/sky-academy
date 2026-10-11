@@ -90,8 +90,11 @@ export function poolWeights(pool: Topic[], progress: Record<string, TopicProgres
   return weights.map((w, i) => (acc[i] === null ? each : w));
 }
 
-/** One draw from `pool` in proportion to `weights` (same length); falls back to uniform if they are unusable. */
+/** One draw from `pool` in proportion to `weights` (same length); falls back to uniform if they are unusable. An empty
+ *  pool throws (#1325): `pool[0]` of `[]` is `undefined` typed as `T`, which `Session.nextQuestion()` then dereferenced
+ *  twice — once in the `try`, once more in the `catch`'s own log line, uncaught. The caller's `try` catches a throw. */
 export function weightedPick<T>(pool: T[], weights: number[] | undefined, rng: () => number): T {
+  if (!pool.length) throw new Error('weightedPick: nothing to draw from (empty pool)');
   const total = weights && weights.length === pool.length ? weights.reduce((s, w) => s + w, 0) : 0;
   if (!weights || !(total > 0)) return pool[Math.floor(rng() * pool.length)];
   let r = rng() * total;

@@ -6,7 +6,7 @@
 // single-sourced in `screen.ts`; the surrounding `.overlay` already scrolls on its own if the list is long.
 import { drillsFor, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { duelPool } from '../game/duel';
-import { answerableBy } from '../game/pools';
+import { answerableBy, subjectTopics } from '../game/pools';
 import { trophyFor } from '../game/trophies';
 import type { TopicProgress } from '../storage/shape';
 import { $, $$ } from './dom';
@@ -23,8 +23,8 @@ export interface ChooserOpts {
 /** Topics the chooser can offer — every topic a bubble pool can ask (#1065: no tracing, no keypad). Shared with the island's trophy count (#912) so the count and the list cannot drift. */
 export const chooserEligible = (t: Topic): boolean => answerableBy(t, 'mixed');
 
-/** What the chooser lists for a year's open subject: the regular topics, then that subject's drills (#915). Drills are never in the Mixed pool. */
-export const chooserTopics = (year: YearId, subject: Topic['subject']): Topic[] => [...topicsFor(year, subject).filter(chooserEligible), ...drillsFor(year, subject)];
+/** What the chooser lists for a year's open subject: the regular topics (the Mixed pool's own list, #1325), then that subject's drills (#915). Drills are never in the Mixed pool. */
+export const chooserTopics = (year: YearId, subject: Topic['subject']): Topic[] => [...subjectTopics(topicsFor(year), subject), ...drillsFor(year, subject)];
 
 /** #957: what Ninja Duel's chooser lists — the open subject's chooser topics that `duelPool` keeps (no sequence or tracing topic, no drill), in the chooser's order. */
 export const duelChooserTopics = (year: YearInfo, subject: Topic['subject']): Topic[] => {
