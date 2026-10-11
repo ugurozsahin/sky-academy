@@ -49,7 +49,8 @@ export function islandsHTML(
   schoolYear?: YearId,
 ): string {
   return years.map((y, i) => {
-    const { s, m } = stars(y); const age = ageLabel(y, schoolYear);
+    const { s, m } = stars(y);
+    const age = ageLabel(y, schoolYear);
     return `
         <button class="island${y.id === selId ? ' sel' : ''}" data-year="${y.id}" style="--tint:${y.tint}" aria-label="${y.title} island">
           <span class="isl-art" style="background-image:url(&quot;${islandArt(y)}&quot;);animation-delay:${(-1.3 * i).toFixed(1)}s"></span>

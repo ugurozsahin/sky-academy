@@ -4,6 +4,8 @@ import { YEARS } from '../../src/curriculum/types';
 import type { YearId } from '../../src/curriculum/types';
 import { isKs2 } from '../../src/curriculum/key-stage';
 import { islandsHTML } from '../../src/ui/map-layout';
+import { senseiTrainLine } from '../../src/ui/home';
+import type { Topic } from '../../src/curriculum';
 
 const years = YEARS.filter(y => !isKs2(y.id));
 const lastKs2 = YEARS[YEARS.length - 1].id;
@@ -23,8 +25,25 @@ describe('ageLabel (#1288)', () => {
   });
   it('the map card carries it, full and compact', () => {
     const stars = () => ({ s: 0, m: 3 });
-    expect(islandsHTML(years, stars, undefined, false, 'year3')).not.toContain('Ages ');
+    const full = islandsHTML(years, stars, undefined, false, 'year3');
+    expect(full).not.toContain('Ages ');
+    for (const y of years) expect(full).toContain(`<small>Warm-up · ${y.blurb}</small>`);
     expect(islandsHTML(years, stars, undefined, true, 'year3')).toContain('<small>Warm-up</small>');
-    expect(islandsHTML(years, stars, undefined, false)).toContain(`<small>${years[2].age} · `);
+    expect(islandsHTML(years, stars, undefined, false)).toContain(`<small>${YEARS.find(y => y.id === 'year2')!.age} · `);
+  });
+});
+
+describe('senseiTrainLine (#1288)', () => {
+  const weakest = [{ title: 'Counting' }, { title: 'Shapes' }] as Topic[];
+  const y2 = YEARS.find(y => y.id === 'year2')!, y3 = YEARS.find(y => y.id === 'year3')!;
+  it('a KS1 island with a KS2 school year calls it a warm-up', () => {
+    expect(senseiTrainLine(y2, 'year3', weakest)).toBe("Sensei says: a warm-up. Let's train Counting, Shapes");
+  });
+  it('a KS1 island with a KS1 or unset school year is unchanged', () => {
+    expect(senseiTrainLine(y2, 'year1', weakest)).toBe("Sensei says: let's train Counting, Shapes");
+    expect(senseiTrainLine(y2, undefined, weakest)).toBe("Sensei says: let's train Counting, Shapes");
+  });
+  it('a KS2 island is never a warm-up', () => {
+    expect(senseiTrainLine(y3, 'year5' as YearId, weakest)).toBe("Sensei says: let's train Counting, Shapes");
   });
 });
