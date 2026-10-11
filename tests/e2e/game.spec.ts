@@ -2381,7 +2381,7 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page);
     expect((await state(page)).answer as string).toMatch(/^[0-9]$/);
     await page.click('#tcheck');
-    await expect(page.locator('.toast.bad')).toBeVisible();
+    await expect(page.locator('.toast.bad')).toContainText('cover the whole number');   // #1556: not "letter" on a digit card
     await page.evaluate(() => window.__sna.tracer.autoTrace());
     await expect(page.locator('.toast.good')).toBeVisible();
   });
