@@ -203,10 +203,11 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     // Confirms scanTokens' exclusion is a hard boundary: nothing inside a detected coordinate span ever
     // reaches the ordinary token scan, so it cannot collide with occurrence counting for a real year
     // elsewhere in the same text, however the coordinate's own components are shaped. The coordinate's own
-    // "−1000" component still gets its own comma-length check (review round 7); only the year exemption is
-    // what's confirmed unaffected here.
+    // "−1000" component is still judged on its own (review round 7) — since #1444 by the same rule as a
+    // standalone token, so its minus sign against a named year is what it is reported for; a signed token
+    // is never counted as an occurrence of the year, so the bare "1000" keeps its exemption either way.
     expect(labelProblems('The point (12,−1000) marks the spot founded in 1000.', { years: [1000] }))
-      .toEqual(['"−1000" is four or more digits with no comma grouping']);
+      .toEqual(['"−1000" is a year and must never carry a sign']);
   });
 
   it('a coordinate component still owes its own "4+ digits needs a comma" check (review round 7)', () => {
@@ -225,6 +226,47 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
       .toEqual(['"2345" is four or more digits with no comma grouping']); // unparenthesised: already worked
     expect(labelProblems('The point (400,12345) on the grid.'))
       .toEqual(['"400,12345" is grouped incorrectly — commas must mark exact groups of three digits']); // never classified as a pair at all (b is 4+ digits, no sign/decimal/space) — read as one number, as before
+  });
+
+  it('a signed token equal to a named year is a defect, never exempted as the year (#1444)', () => {
+    // A year is a non-negative whole number — fmt()'s own `year` option throws on a negative value — but the
+    // checker stripped the sign into `intPart` before any year comparison, so "−1999" and "1999" were
+    // indistinguishable once the exemption was computed, and the signed token was waved through as the year.
+    expect(labelProblems('The event happened in −1999, before records began.', { years: [1999] }))
+      .toEqual(['"−1999" is a year and must never carry a sign']);
+    // Mirrors the decimal-tail rule (review round 5): a signed token is never literally the bare year, so it
+    // is not counted as an occurrence and cannot starve a genuine bare year elsewhere of its exemption.
+    expect(labelProblems('The dip to −1999 came long after 1999.', { years: [1999] }))
+      .toEqual(['"−1999" is a year and must never carry a sign']);
+    // An ASCII "-" is both the usual minus-sign defect and, against a named year, a signed year.
+    expect(labelProblems('-1999', { years: [1999] })).toHaveLength(2);
+    expect(labelProblems('-1999', { years: [1999] })).toContain('"-1999" is a year and must never carry a sign');
+    // One problem per token, the sign ahead of the comma — the same precedence the decimal rule has.
+    expect(labelProblems('−1,999', { years: [1999] })).toEqual(['"−1,999" is a year and must never carry a sign']);
+    // Controls, unchanged: the bare year is exempt; a decimal-tailed year is still reported as such.
+    expect(labelProblems('In 1999.', { years: [1999] })).toEqual([]);
+    expect(labelProblems('1999.5', { years: [1999] }))
+      .toEqual(['"1999" is a year and must not have a decimal place']);
+  });
+
+  it('a coordinate component gets the year exemption, and every other rule, exactly as a standalone token (#1444)', () => {
+    // Round 7's component check was a hand-rolled subset of the standalone rules (digit count only), so a
+    // component equal to a named year was flagged for the comma it must never carry. The component is now
+    // built into the same token shape and judged by the same function as a standalone number.
+    expect(labelProblems('(1999, 3)', { years: [1999] })).toEqual([]);
+    expect(labelProblems('(−3, 1999)', { years: [1999] })).toEqual([]); // second slot, beside a signed neighbour
+    // Neighbours: a non-year 4-digit component is still flagged; a decimal-tailed or signed component equal
+    // to the year is reported for that, as a standalone token would be.
+    expect(labelProblems('(2000, 3)', { years: [1999] }))
+      .toEqual(['"2000" is four or more digits with no comma grouping']);
+    expect(labelProblems('(1999.5, 3)', { years: [1999] }))
+      .toEqual(['"1999" is a year and must not have a decimal place']);
+    expect(labelProblems('(−1999, 3)', { years: [1999] }))
+      .toEqual(['"−1999" is a year and must never carry a sign']);
+    // A component now counts as a plain occurrence of its value (round 3's ambiguity rule applies to it
+    // too): the same digits as a coordinate component and as a bare token leave neither identifiable as the
+    // year, so both are judged as ordinary numbers — the accepted false positive round 3 chose over a guess.
+    expect(labelProblems('Founded in 1999, the club sits at (1999, 3).', { years: [1999] })).toHaveLength(2);
   });
 
   it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {
