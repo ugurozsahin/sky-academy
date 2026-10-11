@@ -130,6 +130,7 @@
 💰	0.6	money bag
 💷	1.0	pound banknote
 📅	0.6	calendar
+📈	0.6	chart increasing
 📊	0.6	bar chart
 📌	0.6	pushpin
 📏	0.6	straight ruler
