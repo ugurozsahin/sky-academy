@@ -9,6 +9,7 @@
 import { y6Simplify } from './year6-simplify';
 import { y6FracAdd } from './year6-fracadd';
 import { y6FracMult } from './year6-fracmult';
+import { y6Decimals } from './year6-decimals';
 import { y6FracDiv } from './year6-fracdiv';
 import type { Topic } from './types';
 
@@ -24,7 +25,7 @@ export const Y6_FRACTIONS: Topic[] = [
 
   // slot: y6-fdp
 
-  // slot: y6-decimals
+  { id: 'y6-decimals', title: 'Decimals to 3 places', icon: '🔟', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: 3 dp place value; ×÷ 10, 100, 1,000', gen: y6Decimals },
 
   // slot: y6-decmult
 

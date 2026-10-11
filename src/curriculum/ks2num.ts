@@ -3,45 +3,53 @@
 // `10^dp` (3.75 is `{ v: 375, dp: 2 }`), and every operation stays on integers: aligning two `dp`s
 // or scaling by a power of ten only ever multiplies (exact), never divides a float. `fmt`/`parseNum`
 // read and write the integer digits directly rather than going through a JS number division.
+// That exactness holds only while `v` is a safe integer (|v| ≤ 2^53 − 1): past it a product rounds to the
+// nearest double and a large `dp` gap scales to Infinity, both silently (#1333). So `dec()` checks
+// `Number.isSafeInteger`, and every Dec this module hands out is built by `dec()` — a rail in
+// `tests/unit/ks2num.test.ts` holds it to that — so an overflow throws rather than reaching a label. The one
+// deliberate exception is `parseNum`, which answers `null` for a label it cannot hold exactly: a parse miss is
+// the caller's branch, not an arithmetic fault.
 import { numberWord } from './util';
 
 export interface Dec { readonly v: number; readonly dp: number }
 
 /** Build a Dec directly from its scaled integer, e.g. `dec(375, 2)` is 3.75. */
 export function dec(v: number, dp: number): Dec {
-  if (!Number.isInteger(v) || !Number.isInteger(dp) || dp < 0) throw new Error(`dec: v and dp must be non-negative integers (got v=${v}, dp=${dp})`);
+  if (!Number.isSafeInteger(v) || !Number.isInteger(dp) || dp < 0) throw new Error(`dec: v must be a safe integer (|v| ≤ 2^53 − 1, #1333) and dp a non-negative integer (got v=${v}, dp=${dp})`);
   return { v, dp };
 }
 
 /** `a`'s integer at `dp` decimal places — always a multiplication (dp only ever rises here). */
 function rescale(a: Dec, dp: number): number {
-  return a.v * 10 ** (dp - a.dp);
+  const v = a.v * 10 ** (dp - a.dp);
+  if (!Number.isSafeInteger(v)) throw new Error(`rescale: ${a.v} × 10^${dp - a.dp} is not a safe integer (#1333)`);
+  return v;
 }
 
 export function addDec(a: Dec, b: Dec): Dec {
   const dp = Math.max(a.dp, b.dp);
-  return { v: rescale(a, dp) + rescale(b, dp), dp };
+  return dec(rescale(a, dp) + rescale(b, dp), dp);
 }
 
 export function subDec(a: Dec, b: Dec): Dec {
   const dp = Math.max(a.dp, b.dp);
-  return { v: rescale(a, dp) - rescale(b, dp), dp };
+  return dec(rescale(a, dp) - rescale(b, dp), dp);
 }
 
 export function mulDecByInt(a: Dec, k: number): Dec {
   if (!Number.isInteger(k)) throw new Error(`mulDecByInt: k must be an integer (got ${k})`);
-  return { v: a.v * k, dp: a.dp };
+  return dec(a.v * k, a.dp);
 }
 
 /** Multiply by 10^n (n = 1, 2 or 3 → ×10, ×100, ×1,000). Renormalises so `dp` never goes negative. */
 export function mulPow10(a: Dec, n: 1 | 2 | 3): Dec {
   const dp = a.dp - n;
-  return dp >= 0 ? { v: a.v, dp } : { v: a.v * 10 ** -dp, dp: 0 };
+  return dp >= 0 ? dec(a.v, dp) : dec(a.v * 10 ** -dp, 0);
 }
 
 /** Divide by 10^n (n = 1, 2 or 3 → ÷10, ÷100, ÷1,000). Exact: the same `v`, more decimal places. */
 export function divPow10(a: Dec, n: 1 | 2 | 3): Dec {
-  return { v: a.v, dp: a.dp + n };
+  return dec(a.v, a.dp + n);
 }
 
 export function compareDec(a: Dec, b: Dec): -1 | 0 | 1 {
@@ -85,7 +93,7 @@ export function parseNum(label: string): Dec | null {
   const [, sign, intPart, fracPart = ''] = m;
   const v = Number(intPart.replace(/,/g, '') + fracPart);
   if (!Number.isSafeInteger(v)) return null;
-  return { v: sign ? -v : v, dp: fracPart.length };
+  return dec(sign ? -v : v, fracPart.length);
 }
 
 const ROUND_UNITS = { 1: 0, 10: 1, 100: 2, 1000: 3, 10000: 4, 100000: 5, 0.1: -1 } as const;
@@ -100,12 +108,12 @@ export function roundTo(n: Dec, unit: RoundUnit): Dec {
   if (!(unit in ROUND_UNITS)) throw new Error(`roundTo: unsupported unit ${unit}`);
   const k = ROUND_UNITS[unit];
   const e = n.dp + k;
-  if (e < 0) return { v: n.v * 10 ** -e, dp: k < 0 ? -k : 0 };
+  if (e < 0) return dec(n.v * 10 ** -e, k < 0 ? -k : 0);
   const divisor = 10 ** e;
   const q = Math.floor(n.v / divisor);
   const r = n.v - q * divisor;
   const rounded = r * 2 >= divisor ? q + 1 : q;
-  return k >= 0 ? { v: rounded * 10 ** k, dp: 0 } : { v: rounded, dp: -k };
+  return k >= 0 ? dec(rounded * 10 ** k, 0) : dec(rounded, -k);
 }
 
 const PLACES = { 1000000: 6, 100000: 5, 10000: 4, 1000: 3, 100: 2, 10: 1, 1: 0, 0.1: -1, 0.01: -2, 0.001: -3 } as const;
@@ -114,7 +122,7 @@ export type Place = keyof typeof PLACES;
 function toDec(n: Dec | number): Dec {
   if (typeof n !== 'number') return n;
   if (!Number.isInteger(n)) throw new Error(`digitAt/digitValue: a plain number must be an integer (got ${n}); pass a Dec for a fractional value`);
-  return { v: n, dp: 0 };
+  return dec(n, 0);
 }
 
 /** The single digit (0–9) at `place` (millions to thousandths) — magnitude only, sign ignored. */
@@ -123,6 +131,8 @@ export function digitAt(n: Dec | number, place: Place): number {
   const d = toDec(n);
   const e = d.dp + PLACES[place];
   const scaled = e >= 0 ? Math.floor(Math.abs(d.v) / 10 ** e) : Math.abs(d.v) * 10 ** -e;
+  // The e < 0 arm scales v up, the one path here that returns a number rather than a Dec (#1333).
+  if (!Number.isSafeInteger(scaled)) throw new Error(`digitAt: ${d.v} × 10^${-e} is not a safe integer (#1333)`);
   return scaled % 10;
 }
 
