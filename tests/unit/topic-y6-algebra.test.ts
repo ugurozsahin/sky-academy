@@ -61,7 +61,7 @@ describe('y6-algebra (#1272)', () => {
       const nums = [...q.prompt.matchAll(/\d+/g)].map(m => Number(m[0]));
       if (q.prompt.startsWith('The angles in a triangle')) { seen.add('tri'); expect(q.answer).toBe(`${180 - nums[0] - nums[1]}°`); expect(q.options).toContain(`${360 - nums[0] - nums[1]}°`); }
       else if (q.prompt.startsWith('Angles on a straight line')) { seen.add('line'); expect(q.answer).toBe(`${180 - nums[0]}°`); }
-      else if (q.prompt.startsWith("A rectangle's perimeter")) { seen.add('rect'); expect(q.answer).toBe(`${nums[0] / 2 - nums[1]} cm`); expect(q.options).toContain(`${nums[0] - nums[1]} cm`); }
+      else if (q.prompt.startsWith('Rectangle: ')) { seen.add('rect'); expect(q.answer).toBe(`${nums[0] / 2 - nums[1]} cm`); expect(q.options).toContain(`${nums[0] - nums[1]} cm`); }
       else throw new Error(`unknown d3 card: ${q.prompt}`);
       expect(q.slow, q.prompt).toBe(true); expect(q.say, q.prompt).toBeTruthy();
       expect(num(q.answer), q.prompt).toBeGreaterThan(0);

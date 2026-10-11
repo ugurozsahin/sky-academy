@@ -19,7 +19,7 @@ const card = (eq: string, ans: number, slips: number[]): Card => ({ eq, ans, sli
 const d1Forms: ((r: Rng) => Card)[] = [
   r => { const n = ri(r, 2, 150), b = ri(r, 3, 50); return card(`n + ${b} = ${n + b}`, n, [n + 2 * b, n + b]); },
   r => { const c = ri(r, 2, 100), b = ri(r, 3, 60); return card(`n − ${b} = ${c}`, c + b, [c - b, c, c + 2 * b]); },
-  r => { const a = ri(r, 2, 12), n = ri(r, 2, 20); return card(`${a} × n = ${a * n}`, n, [a * n * a, a * n - a, a * n + a]); },
+  r => { const a = ri(r, 2, 12), n = ri(r, 2, 20); return card(`${a} × n = ${a * n}`, n, [a * n - a, a * n + a, a * n * a < 1000 ? a * n * a : n + a]); },
   r => { const a = ri(r, 2, 10), c = ri(r, 2, 20); return card(`n ÷ ${a} = ${c}`, a * c, [a + c, c, a * c + a]); },
 ];
 
@@ -57,7 +57,7 @@ const d3Forms: ((r: Rng) => Question)[] = [
   },
   rng => {
     const l = ri(rng, 4, 20), w = ri(rng, 2, l - 1), p = 2 * (l + w), c = { eq: '', ans: w, slips: [p - l, p / 2, p - 2 * l] };
-    const prompt = `A rectangle's perimeter is ${p} cm. Its length is ${l} cm and its width is w. What is w?`;
+    const prompt = `Rectangle: perimeter ${p} cm, length ${l} cm, width w. What is w?`;
     return { ...wordQ(rng, prompt, `${w} cm`, decoys(c, rng).map(v => `${v} cm`), { say: ks2Say(prompt) }), slow: true };
   },
 ];
