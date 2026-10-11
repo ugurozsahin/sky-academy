@@ -143,8 +143,24 @@ export function promptHTML(q: Question, done: number, reveal = false, remaining?
  * markup (`.got`/`.todo`, `src/styles/play.css`); the template's non-`_` characters print as plain text
  * between them. Unlike a spelling sequence, `reveal` never shows an unsliced digit here — the prompt is
  * already on the card, so there is nothing left to reveal.
+ *
+ * The template's `_` count must equal `sequence.length` (`types.ts`); `buildQ`/`stepsQ` (`curriculum/build.ts`)
+ * build both from one answer so a registered card cannot differ, and the generic per-topic loop pins it.
+ * A hand-built card that does differ fails here, loudly and at once (#1337): before this check, one more slot
+ * than digit reached `esc(undefined)` — a TypeError from inside `esc`, only once that slot was `done` — and one
+ * fewer dropped the surplus digit with no error at all, so the card under-counted progress for the rest of
+ * the question. Either way `Session` (`src/game/session.ts`) counts `sequence.length` slices while the card
+ * shows another number of slots — the two disagree, and the card lies to the child. That is the line: `build`
+ * with no `sequence` at all is *not* thrown on (`promptHTML` above falls back to the plain prompt), because
+ * `Session` gates on `sequence` too, so both treat it as an ordinary pick-one card and still agree. Counted
+ * on every call, not only at `done = 0`: `promptHTML` is re-rendered per slice. Nothing catches the throw —
+ * in play it is a console error and a card that does not advance, which is the loud failure wanted here.
  */
-function buildPromptHTML(prompt: string, template: string, sequence: string[], done: number): string {
+function buildPromptHTML(prompt: string, template: string, sequence: readonly string[], done: number): string {
+  const slotCount = Array.from(template).filter(ch => ch === '_').length;
+  if (slotCount !== sequence.length) {
+    throw new Error(`buildPromptHTML: ${slotCount} slot${slotCount === 1 ? '' : 's'} for ${sequence.length} sequence entries — prompt "${prompt}", template "${template}", sequence [${sequence.join(',')}]`);
+  }
   let i = 0;
   const slots = Array.from(template).map(ch => {
     if (ch !== '_') return esc(ch);
