@@ -12,7 +12,28 @@ const topic = TOPICS.find(t => t.id === 'y6-hyphen')!;
 const draws = (d: Difficulty, n = 300) => { const r = rng(1275 + d); return Array.from({ length: n }, () => topic.gen(d, r)); };
 const text = (q: { visual?: unknown }) => (q.visual as { text: string }).text;
 
+// Hand-listed (#1275 review): the cue in each sentence that rules the other word out.
+const CUES: Record<string, string> = {
+  'I hope Gran will _ from her cold soon.': 'from her cold', 'The sofa is torn, so we will _ it with new cloth.': 'new cloth',
+  'Dad will _ from his job today.': 'from his job', 'The pen leaked, so please _ the card.': 'the card',
+  'The mayor wants to _ the old rules.': 'old rules', 'After the break, please _ your line.': 'your line',
+  'She did not _ on the weather.': 'on the weather', 'The teacher had to _ the wrong test.': 'wrong test',
+  'Do not _ your brother for winning.': 'for winning', 'The email failed, so Mum _ it again.': 'again',
+  'We _ a table for six at the cafe.': 'a table', 'The player fell, so she had to _ the ball.': 'the ball',
+  'The family went to a seaside _ for the week.': 'seaside', 'The cards fell, so we must _ them by colour.': 'by colour',
+};
+
 describe('y6-hyphen (#1275)', () => {
+  it('every d1 sentence carries a hand-listed cue that rules the other word out', () => {
+    const all = RE_PAIRS.flatMap(r => [r[2], r[3]]);
+    expect(Object.keys(CUES).sort()).toEqual([...all].sort());
+    for (const s of all) expect(s, s).toContain(CUES[s]);
+  });
+
+  it('no d2 root is a word whose solid spelling is the standard one', () => {
+    for (const [p, r] of HYPHEN_ROOTS) expect(['coordinate', 'cooperate', 'preorder']).not.toContain(p + r);
+  });
+
   it('is registered once in Year 6 grammar', () => {
     expect(TOPICS.filter(t => t.id === 'y6-hyphen')).toHaveLength(1);
     expect(topic).toMatchObject({ year: 'year6', subject: 'writing', strand: 'grammar' });

@@ -6,7 +6,7 @@ import { pick, shuffle, wordQ } from './util';
 
 /** [plain, hyphened, sentence needing plain, sentence needing hyphened]; each sentence holds one `_`. */
 export const RE_PAIRS: readonly (readonly [string, string, string, string])[] = [
-  ['recover', 're-cover', 'I hope Gran will _ from her cold soon.', 'The sofa is torn, so we will _ it.'],
+  ['recover', 're-cover', 'I hope Gran will _ from her cold soon.', 'The sofa is torn, so we will _ it with new cloth.'],
   ['resign', 're-sign', 'Dad will _ from his job today.', 'The pen leaked, so please _ the card.'],
   ['reform', 're-form', 'The mayor wants to _ the old rules.', 'After the break, please _ your line.'],
   ['remark', 're-mark', 'She did not _ on the weather.', 'The teacher had to _ the wrong test.'],
@@ -15,9 +15,9 @@ export const RE_PAIRS: readonly (readonly [string, string, string, string])[] = 
   ['resort', 're-sort', 'The family went to a seaside _ for the week.', 'The cards fell, so we must _ them by colour.'],
 ];
 
-/** [prefix, root]; the first list takes a hyphen (vowel meets vowel), the second does not. */
+/** [prefix, root]; the first list takes a hyphen (vowel meets vowel), the second does not. Only words whose solid spelling is not the standard one (so not coordinate, cooperate, preorder). */
 export const HYPHEN_ROOTS: readonly (readonly [string, string])[] = [
-  ['re', 'enter'], ['co', 'own'], ['co', 'ordinate'], ['co', 'operate'], ['re', 'elect'], ['re', 'examine'], ['de', 'ice'], ['pre', 'order'],
+  ['re', 'enter'], ['co', 'own'], ['re', 'elect'], ['re', 'examine'], ['de', 'ice'],
 ];
 export const SOLID_ROOTS: readonly (readonly [string, string])[] = [
   ['re', 'build'], ['re', 'play'], ['pre', 'view'], ['de', 'frost'], ['re', 'write'], ['re', 'tell'],
