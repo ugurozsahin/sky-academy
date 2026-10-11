@@ -2,7 +2,6 @@
 // would push it past that moves to its own `year6-<slug>.ts` and this file keeps only its row/import.
 // import: y6-simplify
 // import: y6-fracadd
-// import: y6-fracmult
 // import: y6-fracdiv
 // import: y6-fdp
 // import: y6-decimals
@@ -10,6 +9,7 @@
 // import: y6-decdiv
 import { y6Simplify } from './year6-simplify';
 import { y6FracAdd } from './year6-fracadd';
+import { y6FracMult } from './year6-fracmult';
 import type { Topic } from './types';
 
 export const Y6_FRACTIONS: Topic[] = [
@@ -18,7 +18,7 @@ export const Y6_FRACTIONS: Topic[] = [
 
   { id: 'y6-fracadd', title: 'Adding and subtracting fractions', icon: '➕', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: add/subtract, different denominators, mixed numbers', gen: y6FracAdd },
 
-  // slot: y6-fracmult
+  { id: 'y6-fracmult', title: 'Multiplying fractions', icon: '✖️', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: multiply proper fractions, simplest form', gen: y6FracMult },
 
   // slot: y6-fracdiv
 

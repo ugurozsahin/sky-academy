@@ -2305,7 +2305,7 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     expect(unexpectedlyBlind, 'these cells compare nothing and are not on the blind list — add them, with why').toEqual([]);
     expect(nowComparable, 'these cells now compare something — take them off the blind list').toEqual([]);
     expect(split, offenders.slice(0, 8).join('\n')).toBe(0);
-  });
+  }, 60_000);      // #1727: a full-registry sweep outgrows vitest's 5 s default on a loaded CI runner
 
   /**
    * The grouping check above can only speak where an option set recurs with two different answers — 49
@@ -2340,7 +2340,7 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     }
     expect(cards, 'the sweep drew nothing — this rail would pass vacuously').toBe(BUBBLE_TOPICS.length * 3 * DRAWS);
     expect(offenders.slice(0, 8).join('\n'), `${offenders.length} card(s) disagree with the table`).toBe('');
-  });
+  }, 60_000);
 
   it('wordQ widens on a long decoy, not only on a long answer', () => {
     const r = rng(369);
