@@ -19,6 +19,7 @@ describe('edges() unwraps a paren-wrapped module specifier in every branch (#841
     ['import x from (\'y\')', "import rig from ('../three/stage/rig');", 'static'],
     ['import * as x from ((\'y\')) — two extra layers', "import * as rig from (('../three/stage/rig'));", 'static'],
     ['export { c } from (\'y\')', "export { c } from ('../three/stage/rig');", 'static'],
+    ['export * from (\'y\') — no export clause at all', "export * from ('../three/stage/rig');", 'static'],
     ['import type { T } from (\'y\') — still type-only once unwrapped', "import type { T } from ('../three/stage/rig');", 'type'],
   ] as const)('%s still produces its edge, not silently nothing (#841)', (_case, src, kind) => {
     expect(edges('/src/ui/x.ts', src)).toEqual(rig(kind));
@@ -33,6 +34,12 @@ describe('edges() unwraps a paren-wrapped module specifier in every branch (#841
     ['a bare import((\'x\')).T type reference', "let v: import(('../three/stage/rig')).Rig; export const a = v;"],
   ])('%s still produces its type edge, not silently nothing (#841)', (_case, src) => {
     expect(edges('/src/ui/x.ts', src)).toEqual(rig('type'));
+  });
+
+  // pr-test-analyzer (#841): the one gate the split rewired — a non-literal ImportTypeNode argument used to fall
+  // through the old else-if; now it is a hit with nothing readable. Same result, pinned: no edge and no throw.
+  it('a non-literal ImportTypeNode argument still yields no edge, and does not throw (#841)', () => {
+    expect(edges('/src/ui/x.ts', "type T = typeof import(string); type U = import(T).X; export const a = 1;")).toEqual([]);
   });
 
   // Control: the unwrapped forms read exactly as before, so the unwrap changed nothing on the common path.

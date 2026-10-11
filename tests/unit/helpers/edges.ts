@@ -10,8 +10,10 @@ import ts from 'typescript';
 export interface Edge { from: string; spec: string; to: string; kind: 'static' | 'type' | 'dynamic' | 'require' }
 
 /** A node that may carry a specifier, already unwrapped, and the kind of edge it would be. `specText()` decides
- *  whether it carries one at all. */
-type Hit = [spec: ts.Node | undefined, kind: Edge['kind']];
+ *  whether it carries one at all; an `undefined` spec is "my shape, but nothing readable". `ts.Expression`, not
+ *  `ts.Node`, on purpose (type-design-analyzer, #841): handing it a `ParenthesizedType` or a `TypeNode` wrapper —
+ *  the exact mistake this rail has re-learnt five times — is then a compile error rather than a silent `[]`. */
+type Hit = [spec: ts.Expression | undefined, kind: Edge['kind']];
 
 // A template literal with a substitution (`` `../objects/${name}.ts` ``) can't be resolved exactly, but a
 // per-name dynamic loader written that way is a realistic pattern in exactly the area this rail polices
@@ -19,7 +21,7 @@ type Hit = [spec: ts.Node | undefined, kind: Edge['kind']];
 // still say enough to trip a boundary check, so each substitution is replaced with a placeholder rather
 // than the edge vanishing: `` `../three/${x}` `` becomes `../three/${…}`, which still resolves to
 // somewhere under `/src/three/`.
-const specText = (n: ts.Node | undefined): string | null => {
+const specText = (n: ts.Expression | undefined): string | null => {
   if (!n) return null;
   if (ts.isStringLiteralLike(n)) return n.text;
   if (ts.isTemplateExpression(n)) return n.head.text + n.templateSpans.map((s) => '${…}' + s.literal.text).join('');
@@ -72,7 +74,7 @@ const namedExportsAllTypeOnly = (clause: ts.NamedExportBindings | undefined): bo
 
 // One reader per import shape, tried in order; the first that recognises the node answers for it (the same
 // first-match-wins the one `else if` chain had before #841 split it to keep each piece under the complexity
-// limit). `null` means "not my shape", an empty hit means "my shape, but nothing readable".
+// limit). `null` means "not my shape" — never `[]`, which `??` below would take as an answer and stop the chain.
 const importOrExport = (node: ts.Node): Hit[] | null => {
   if (!(ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) || !node.moduleSpecifier) return null;
   const typeOnly = ts.isImportDeclaration(node)
@@ -84,7 +86,8 @@ const importOrExport = (node: ts.Node): Hit[] | null => {
 };
 // `typeof import('x')` and a bare `import('x')` type reference both land here; either way nothing ships.
 // #841: unwrap a ParenthesizedType first — `typeof import(('x'))` parses clean too, and the literal gate below
-// was false on the wrapper, so the whole branch silently never fired.
+// was false on the wrapper, so the whole branch silently never fired. Out of scope, stated: a non-literal argument
+// (`typeof import(T)`, a template-literal *type*) yields no edge — the type-position form has no runtime twin.
 const importType = (node: ts.Node): Hit[] | null => {
   if (!ts.isImportTypeNode(node)) return null;
   const arg = unwrapParensType(node.argument);
