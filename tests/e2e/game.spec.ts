@@ -2342,6 +2342,7 @@ test.describe('Sky Ninja Academy', () => {
     await captureSpeech(page);
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-trace');
+    await expect(page.locator('#hint')).toHaveText('Trace over the dotted letters');      // #1743: a letter card keeps its line
     await page.click('#tcheck');                                       // nothing traced yet
     await expect(page.locator('.toast.bad')).toContainText('Keep tracing');
     await expect.poll(() => page.evaluate(() => window.__spoken)).toContain('Keep tracing, cover the whole letter');
@@ -2398,6 +2399,7 @@ test.describe('Sky Ninja Academy', () => {
     await startTopic(page, 'year1', 'y1-tracenum');
     await expectFitsViewport(page);
     expect((await state(page)).answer as string).toMatch(/^[0-9]$/);
+    await expect(page.locator('#hint')).toHaveText('Trace over the dotted number');       // #1743: the HUD hint, not only the toast
     await page.click('#tcheck');
     await expect(page.locator('.toast.bad')).toContainText('cover the whole number');   // #1556: not "letter" on a digit card
     await page.evaluate(() => window.__sna.tracer.autoTrace());
