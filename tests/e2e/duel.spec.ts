@@ -7,6 +7,7 @@ import { dailyChallenges } from '../../src/game/dojo';
 import { SAVE_VERSION } from '../../src/storage';
 import type { DuelHooks } from '../../src/ui/hooks';
 import { DUEL_TOAST_LONGEST } from '../../src/ui/duel';
+import { fakeBackButton, pressBack, pressBackThenSnapshot } from './back-button';
 
 // Ninja Duel (#16 items 2–4): two arenas on one screen, the same question in both, first correct slice wins
 // the round. Driven through the duel screen's own `window.__sna` hooks, which name the player every call is for.
@@ -142,6 +143,15 @@ async function winWholeMatch(page: Page) {
     await winRound(page, 'a');
   }
   await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+}
+
+/** Player 1 takes nine rounds and the test stops with round 10 live — one `duel.waveEnd()` from the end (#1356). */
+async function reachLastRound(page: Page) {
+  for (let r = 1; r <= 9; r++) {
+    if (r > 1) await page.waitForFunction(r => window.__sna.state().round === r, r);
+    await winRound(page, 'a');
+  }
+  await page.waitForFunction(() => { const s = window.__sna.state(); return s.round === 10 && !s.decided && !s.ended && !!s.prompt; });
 }
 
 test.describe('Ninja Duel', () => {
@@ -478,17 +488,7 @@ test.describe('Ninja Duel', () => {
     expect(await page.locator('#cert-msg').count(), 'nor write its message into whatever screen replaced it').toBe(0);
   });
 
-  /** Same fake as `game.spec.ts`'s `fakeBackButton` (#885) — duplicated rather than shared, as this file's own
-   *  fixtures already are, since the two suites do not share module scope. */
-  async function fakeBackButton(page: Page) {
-    await page.addInitScript(() => {
-      (window as any).Capacitor = {
-        getPlatform: () => 'web',
-        Plugins: { App: { addListener: (event: string, cb: () => void) => { if (event === 'backButton') (window as any).__backCb = cb; }, minimizeApp: () => Promise.resolve() } },
-      };
-    });
-  }
-  const pressBack = (page: Page) => page.evaluate(() => (window as any).__backCb());
+  // #1356: `fakeBackButton` / `pressBack` live in `./back-button.ts`, shared with `game.spec.ts`.
 
   test('a hardware back press during a live duel opens Pause; a second press then leaves to the island (#885)', async ({ page }) => {
     await fakeBackButton(page);
@@ -1717,5 +1717,38 @@ test.describe('Ninja Duel', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390×664').toBe(true);
     await page.click('#chooser-back');
     await expect(page.locator('.duel-screen')).toHaveCount(0);
+  });
+
+  /**
+   * #1356: the duel screen's `pauseIfLive()` and its `|| duel.ended` clause — the twin of the play-screen test
+   * in `game.spec.ts`. `Duel.end()` flips `duel.ended` and its `onMatchEnd` only *schedules* the results
+   * (`HOLD.won + 300`, scaled), so between the two a hardware back press meets a hidden `#overlay` on a game that is over, and
+   * must fall through rather than open Pause. Driven in one page task so the press is inside that window by
+   * construction (`pressBackThenSnapshot`); the second half presses on the open results modal, the other
+   * sub-branch of `!overlay.hidden`. Found by mutation at filing: deleting the clause broke nothing.
+   */
+  test('a hardware back press after the match has ended but before the results open falls through, never Pause; so does one on the open results (#1356)', async ({ page }) => {
+    await fakeBackButton(page);
+    await startDuel(page);
+    await reachLastRound(page);
+    const inWindow = await pressBackThenSnapshot(page, 'end-duel');   // a drawn last round ends the match (a 9–0 Player 1 win)
+    expect(inWindow.pauseOpen, 'no Pause over an ended match').toBe(false);
+    expect(inWindow.paused).toBe(false);
+    expect(inWindow.ended, 'the match ended synchronously').toBe(true);
+    expect(inWindow.overlayHidden, 'no overlay at all at the press: the results beat had not fired — the window this test is about').toBe(true);
+    await expect(page.locator('.island-screen'), 'the press fell through and left the screen').toBeVisible();
+    expect(await page.evaluate(() => (window as any).__minimized), 'left by history, not by minimising').toBeUndefined();
+    // The other sub-branch of `!overlay.hidden`: the results modal is up.
+    await page.click('#duel'); await page.click('.topic[data-mixed]');
+    await expect(page.locator('.duel-screen')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    await reachLastRound(page);
+    await page.evaluate(() => window.__sna.duel.waveEnd());
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    const onResults = await pressBackThenSnapshot(page, 'none');
+    expect(onResults.results, 'the press was taken on the open results modal').toBe(true);
+    expect(onResults.pauseOpen, 'Pause never replaces the results modal').toBe(false);
+    expect(onResults.paused).toBe(false);
+    await expect(page.locator('.island-screen')).toBeVisible();
   });
 });
