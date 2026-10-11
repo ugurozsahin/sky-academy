@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CORRECTION_LINE_MAX, correctionLine, createHud, heartCount, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import { CORRECTION_LINE_MAX, correctionLine, createHud, heartCount, hintText, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import { traceFeedback, type TraceResult } from '../../src/game/tracing';
 import { MODES, type Mode } from '../../src/game/modes';
 import { TOPICS, type Difficulty, type Question } from '../../src/curriculum';
 
@@ -353,6 +354,36 @@ describe('correctionLine (#893 — the spoken line after a wrong slice or a miss
 });
 
 // #1117: play.ts hands createHud `spec.hasLives ? year.lives : 0`, so a mode without lives draws no hearts at all.
+// #1743: the HUD twin of #1556. `traceFeedback` already says "number" on a digit card; the hint line under the
+// prompt said "letters" on the same card, because `hintText`'s tracing fallback never looked at the answer.
+describe('hintText — the tracing fallback names what is traced (#1743)', () => {
+  const tracing = { reveal: false, tracing: true };
+  const card = (answer: string): Pick<Question, 'hint' | 'answer'> => ({ answer });
+
+  it('a digit card reads "number"', () => {
+    for (const n of '0123456789') expect(hintText(card(n), tracing), n).toBe('Trace over the dotted number');
+  });
+  it('a letter card and a word card still read "letters"', () => {
+    for (const a of ['a', 'B', 'cat', 'ship']) expect(hintText(card(a), tracing), a).toBe('Trace over the dotted letters');
+  });
+  it("the card's own hint still wins over the fallback, digit or not", () => {
+    expect(hintText({ answer: '7', hint: 'Start at the top' }, tracing)).toBe('Start at the top');
+  });
+  it('the hint and the toast agree on the noun for every answer a trace topic can draw', () => {
+    // One noun decision, read by both strings — the point of the fix is that they cannot drift apart again.
+    const halfCovered: TraceResult = { coverage: 0.7, outside: 0.1, glyphs: [0.7], weakest: 0, pass: false };
+    const traceTopics = TOPICS.filter(t => t.input === 'tracing');
+    expect(traceTopics.map(t => t.id)).toContain('y1-tracenum');
+    for (const t of traceTopics) for (let seed = 1; seed <= 40; seed++) for (const d of [1, 2, 3] as Difficulty[]) {
+      const q = t.gen(d, rng(seed));
+      if ([...q.answer].length !== 1) continue;                      // the toast says "word" there; the hint has no word form
+      const toast = traceFeedback(halfCovered, q.answer, 'check', 1) ?? '';
+      const hint = hintText(q, tracing);
+      expect(hint.endsWith('number'), `${t.id} "${q.answer}": hint "${hint}" vs toast "${toast}"`).toBe(toast.endsWith('number'));
+    }
+  });
+});
+
 describe('hearts follow ModeSpec.hasLives (#1117)', () => {
   const el = () => ({ innerHTML: '', classList: { add() {}, remove() {} } }) as unknown as HTMLElement;
   const draw = (mode: Mode, lives: number) => {

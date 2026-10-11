@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GLYPH_MIN, MASK_SCALE, type TraceGrid, type TraceResult, type TraceTally, markPoint, paintStroke, scoreTrace, traceFeedback } from '../../src/game/tracing';
+import { GLYPH_MIN, MASK_SCALE, type TraceGrid, type TraceResult, type TraceTally, markPoint, paintStroke, scoreTrace, traceFeedback, traceNoun } from '../../src/game/tracing';
 
 describe('scoreTrace (per-letter pass rule)', () => {
   const totals = [100, 100, 100];
@@ -59,6 +59,12 @@ describe('traceFeedback (#895)', () => {
   it('on Check ✓: an undercovered word with no single weak letter gets the word-shaped nudge', () => {
     const evenlyThin: TraceResult = { coverage: 0.6, outside: 0.1, glyphs: [0.6, 0.6], weakest: 0, pass: false };
     expect(traceFeedback(evenlyThin, 'cat', 'check', 2)).toBe('Keep tracing — cover the whole word');
+  });
+  it('traceNoun is the one noun decision the toast and the HUD hint share (#1743)', () => {
+    for (const n of '0123456789') expect(traceNoun(n), n).toBe('number');
+    expect(traceNoun('a')).toBe('letter'); expect(traceNoun('B')).toBe('letter');
+    expect(traceNoun('cat')).toBe('word');
+    expect(traceFeedback(halfCovered, '7', 'check', 1)).toBe(`Keep tracing — cover the whole ${traceNoun('7')}`);   // the toast agrees with it; hud.test.ts sweeps the hint against it per topic
   });
 });
 
