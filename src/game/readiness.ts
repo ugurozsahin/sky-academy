@@ -44,7 +44,7 @@ export function sats56Block(progress: Record<string, TopicProgress>, topics: rea
     .slice(0, WEAKEST).map(([strand, s]) => ({ strand, pct: Math.round(100 * s.hits / s.tries) }));
 }
 
-/** Whole weeks from `today` to `date` (both `YYYY-MM-DD`), rounded up; null once the date has passed or when either is not a date. */
+/** Whole weeks from `day` (today) to `date` (both `YYYY-MM-DD`), rounded up; null once the date has passed or when either is not a date. */
 export function weeksTo(date: string | undefined, day: string): number | null {
   const ms = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T12:00:00Z`).toISOString().startsWith(s) ? Date.parse(`${s}T12:00:00Z`) : NaN;
   const d = (ms(date ?? '') - ms(day)) / 86_400_000;

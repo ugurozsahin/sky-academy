@@ -4,12 +4,13 @@ import { listedTopics } from '../curriculum';
 import { sats56Block, tablesBlock, weeksTo } from '../game/readiness';
 import { weekSummary } from '../game/parents';
 import { STRANDS } from '../curriculum/strands';
-import { load, save, today } from '../storage';
+import { isReadOnlySave, isWriteFailing, load, save, today } from '../storage';
 import { $ } from './dom';
 
 const weeksLine = (date: string | undefined, day: string): string => {
   const n = weeksTo(date, day);
-  return n === null ? '' : n === 0 ? 'The check is this week' : `${n} ${n === 1 ? 'week' : 'weeks'} to go`;
+  if (n === null) return weeksTo(date, date ?? '') === null ? '' : 'That date has passed';
+  return n === 0 ? 'The check is this week' : `${n} ${n === 1 ? 'week' : 'weeks'} to go`;
 };
 
 /** The section's markup, or '' when neither block has anything to show. */
@@ -35,6 +36,6 @@ export function bindReady(): void {
   input.addEventListener('change', () => {
     const { checkDate: _drop, ...rest } = load().ks2;
     save({ ks2: /^\d{4}-\d{2}-\d{2}$/.test(input.value) ? { ...rest, checkDate: input.value } : rest });
-    $('#ready-weeks').textContent = weeksLine(load().ks2.checkDate, today(new Date()));
+    $('#ready-weeks').textContent = isWriteFailing() || isReadOnlySave() ? "Couldn't save this date on this device" : weeksLine(load().ks2.checkDate, today(new Date()));
   });
 }

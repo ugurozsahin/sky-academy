@@ -19,6 +19,14 @@ describe('tablesBlock (#1286)', () => {
     // 7: 1/5, 8: 1/5, 3: 2/5, 4: 2/5, 9: 2/5, 6: 5/5, 2: only 3 answers (left out)
     expect(tablesBlock([], facts).weakTables).toEqual([7, 8, 3]);
   });
+  it('counts a slow answer as an answer, so it can lift a table over the five-answer minimum', () => {
+    expect(tablesBlock([], { '11×11': fact(3, 0, 2) }).weakTables).toEqual([11]);   // 3 right + 2 slow = 5 answers, 60 % good
+    expect(tablesBlock([], { '11×11': fact(3, 0, 1) }).weakTables).toEqual([]);     // 4 answers: not ranked
+  });
+  it('ranks a table at exactly five answers and not at four', () => {
+    expect(tablesBlock([], { '4×4': fact(4, 1) }).weakTables).toEqual([4]);
+    expect(tablesBlock([], { '4×4': fact(4) }).weakTables).toEqual([]);
+  });
   it('ignores tables outside 2–12', () => {
     expect(tablesBlock([], { '1×5': fact(0, 9), '13×2': fact(0, 9) }).weakTables).toEqual([2, 5]);   // only the 2 and the 5 count
   });
@@ -34,10 +42,15 @@ describe('sats56Block (#1286)', () => {
     expect(out).toEqual([{ strand: a.strand, pct: 60 }]);
   });
   it('lists the three lowest, weakest first, breaking a tie in strand order, and leaves out Year 3–4', () => {
-    const ts = [fake('a', 'year5', 'number'), fake('b', 'year5', 'calc'), fake('c', 'year6', 'fractions'), fake('d', 'year6', 'ratio'),
-      fake('e', 'year6', 'algebra'), fake('x', 'year4', 'geometry')];
-    const p = { a: prog(9, 10), b: prog(5, 10), c: prog(2, 10), d: prog(2, 10), e: prog(7, 10), x: prog(0, 10) };   // x is Year 4: never shown
+    // `ratio` is inserted before `fractions`, so only the strand-order tie-break puts `fractions` first
+    const ts = [fake('a', 'year5', 'number'), fake('b', 'year5', 'calc'), fake('d', 'year6', 'ratio'), fake('c', 'year6', 'fractions'),
+      fake('e', 'year6', 'algebra'), fake('x', 'year4', 'geometry'), fake('y', 'year3', 'stats')];
+    const p = { a: prog(9, 10), b: prog(5, 10), c: prog(2, 10), d: prog(2, 10), e: prog(7, 10), x: prog(0, 10), y: prog(0, 10) };   // x is Year 4: never shown
     expect(sats56Block(p, ts)).toEqual([{ strand: 'fractions', pct: 20 }, { strand: 'ratio', pct: 20 }, { strand: 'calc', pct: 50 }]);
+  });
+  it('ranks a strand at exactly five tries and rounds the percentage', () => {
+    expect(sats56Block({ a: prog(1, 3), b: prog(1, 2) }, [fake('a', 'year5', 'number'), fake('b', 'year5', 'number')])).toEqual([{ strand: 'number', pct: 40 }]);
+    expect(sats56Block({ a: prog(1, 4) }, [fake('a', 'year5', 'number')])).toEqual([]);
   });
   it('is empty with no play', () => expect(sats56Block({}, topics)).toEqual([]));
 });
@@ -65,6 +78,7 @@ describe('readyHTML (#1286)', () => {
     expect(html).toContain('3 weeks to go');
   });
   it('shows for Year 6 and points at Arithmetic practice', () => expect(readyHTML(save({ schoolYear: 'year6' }), '2026-10-11')).toContain('Arithmetic practice, Year 6 island'));
+  it('says so when the date has passed', () => expect(readyHTML(save({ schoolYear: 'year4', checkDate: '2026-10-01' }), '2026-10-11')).toContain('That date has passed'));
   it('says "this week" and "1 week" in the right places', () => {
     expect(readyHTML(save({ schoolYear: 'year4', checkDate: '2026-10-11' }), '2026-10-11')).toContain('The check is this week');
     expect(readyHTML(save({ schoolYear: 'year4', checkDate: '2026-10-18' }), '2026-10-11')).toContain('1 week to go');

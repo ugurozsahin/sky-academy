@@ -4012,6 +4012,9 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#ready-weeks')).toHaveText('3 weeks to go');
     await page.locator('#ready-date').fill('');
     await expect(page.locator('#ready-weeks')).toHaveText('');
+    await page.reload();                                   // …and clearing it is saved too
+    await openGrownUps(page);
+    await expect(page.locator('#ready-date')).toHaveValue('');
     await page.locator('#ready-date').scrollIntoViewIfNeeded();
     await expectFitsViewport(page, 'grown-ups Check readiness');
   });
