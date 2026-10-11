@@ -31,12 +31,15 @@ function runTerms(d: Difficulty, step: Step, rng: () => number): { terms: number
  *  Two shapes leaked the leading digit past the KS2 ≤30% ceiling per step (#1454): in 100s both named decoys
  *  are ±100 and so always leave the answer's hundred (measured 36-38% at d1-d3), and a two-digit answer
  *  (8s count 0, 8, 16, 24 at d2) has its leading digit in the tens column, which ±8 and ±10 both leave
- *  (51% at d2). Those two shapes get a `sameLeadDecoy` guaranteed in the pool, as `moreOrLess` does. */
+ *  (51% at d2). Those two shapes get a `sameLeadDecoy` guaranteed in the pool, as `moreOrLess` does. Only
+ *  those: the rule counts answers ≥20, and a ±1/±2 decoy on a 50s/100s card (answer 0 or 50) or beside 4, 8
+ *  or 12 would be a non-multiple a child never reaches by counting (silent-failure-hunter, round 1). */
 function runDecoys(answer: number, step: Step, localStep: number, rng: () => number): number[] {
   const skipTerm = answer + localStep;
   const slipAmount = step === 50 || step === 100 ? 100 : 10;
   const slipTerm = rng() < 0.5 ? answer + slipAmount : answer - slipAmount;
-  const sameLead = step === 100 || answer < 100 ? sameLeadDecoy(answer, rng) : null;
+  const needsLead = step === 100 ? answer >= 100 : (step === 4 || step === 8) && answer >= 20 && answer < 100;
+  const sameLead = needsLead ? sameLeadDecoy(answer, rng) : null;
   const named = sameLead !== null ? [sameLead, skipTerm, slipTerm] : [skipTerm, slipTerm];
   const pool = new Set<number>(named.filter(v => v !== answer && v >= 0 && v <= 1099));
   while (pool.size < 3) {
@@ -62,7 +65,8 @@ function countRun(d: Difficulty, rng: () => number): Question {
  *  the operation that changes the leading digit, so none of its other three named decoys ever land in the
  *  answer's own hundred there (measured 46-89% leak, past the KS2 ≤30% ceiling). `amt === 10`'s crossing case
  *  needs no such fix: its `otherPower` decoy already lands in the answer's own hundred there, by construction.
- *  `runDecoys` says which of its shapes need it. `null` when no candidate exists (an extreme range edge). */
+ *  `runDecoys` says which of its shapes need it. `null` when no candidate exists — defensive: every answer in
+ *  0-1,099 has at least two candidates, so no caller reaches it today. */
 function sameLeadDecoy(answer: number, rng: () => number): number | null {
   const width = answer < 100 ? 10 : 100, unit = width / 10;
   const lo = Math.max(0, Math.floor(answer / width) * width), hi = Math.min(1099, lo + width - 1);
