@@ -12,6 +12,7 @@ vi.mock('../../src/curriculum/year2-topics', async (importOriginal) => {
 
 import { CORE_TOPICS, TOPICS, drillsFor, listedTopics, shownYears, topicById, topicsFor } from '../../src/curriculum';
 import { chooserTopics } from '../../src/ui/chooser';
+import { subjectTopics } from '../../src/game/pools';
 import { duelPool } from '../../src/game/duel';
 import { masterProgress, weakestTopics } from '../../src/game/sensei';
 import { parentSummary } from '../../src/game/parents';
@@ -51,7 +52,7 @@ describe('a drill topic stays out of everything but the chooser (#915)', () => {
   it('the chooser lists it after the open subject\'s regular topics, in that subject only', () => {
     const maths = chooserTopics('year2', 'maths');
     expect(maths[maths.length - 1].id).toBe(FX);
-    expect(ids(maths.filter(t => !t.drill))).toEqual(ids(topicsFor('year2', 'maths').filter(t => t.input !== 'tracing')));
+    expect(ids(maths.filter(t => !t.drill))).toEqual(ids(subjectTopics(topicsFor('year2'), 'maths')));   // #1325: the chooser's own predicate, not a copy of it
     expect(ids(chooserTopics('year2', 'writing'))).not.toContain(FX);
   });
 });

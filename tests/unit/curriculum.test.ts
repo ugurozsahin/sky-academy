@@ -18,7 +18,7 @@ import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digra
 import { NO_REPEATED_SET, Y2_GENS, Y2_IDS } from './helpers/topic-lists';
 import { solve } from './helpers/ks2-oracle';
 import { genericTopicSuite } from './helpers/generic-topic-suite';
-import { isKs2 } from '../../src/curriculum/key-stage';
+import { isKs2 } from '../../src/curriculum/key-stage'; import { subjectTopics } from '../../src/game/pools';   // #1325: the island's own pool predicate, not a copy
 
 const N = 150;
 
@@ -33,11 +33,11 @@ describe('topic registry', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const y of shownYears()) {
       // The EYFS/KS1 6-maths/3-writing minimum and each KS2 shell's gate are `island-gate.test.ts`'s now (#1040).
-      // #908: Sky Storm/Ninja Sprint/Boss Battle now pool topicsFor(year, subject) filtered to non-tracing — an
-      // empty pool reaches Session.pickTopic() untouched and crashes — never empty for either subject, for any
-      // year a player can reach (`shownYears()`, not raw `YEARS`: a hidden KS2 shell is built one topic at a time).
+      // #908/#1325: Sky Storm/Ninja Sprint/Boss Battle pool `subjectPool()`, which degrades to the whole year when a
+      // subject has none; this calls its own predicate, `subjectTopics()`, so the degrade is pinned unreachable with
+      // real data — never empty for any year a player can reach (`shownYears()`: a hidden KS2 shell grows one topic at a time).
       for (const s of ['maths', 'writing'] as const)
-        expect(topicsFor(y.id, s).filter(t => t.input !== 'tracing').length, `${y.id} ${s}`).toBeGreaterThan(0);
+        expect(subjectTopics(topicsFor(y.id), s).length, `${y.id} ${s}`).toBeGreaterThan(0);
     }
   });
 

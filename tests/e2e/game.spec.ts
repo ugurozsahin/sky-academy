@@ -9,6 +9,7 @@ import { ARITHMETIC, GRAMMAR } from '../../src/game/sprint-pools';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport, gateProduct } from './viewport';
+import { fakeBackButton, pressBack, pressBackThenSnapshot } from './back-button';
 import { seededRng } from '../../src/game/rng';
 import { renderVisual } from '../../src/ui/visuals';
 import { CARD_TEXT_WIDTH_390, PROMPT_FS_PHONE, PROMPT_FS_SHORT, promptLines } from '../unit/helpers/card-budget';
@@ -3409,29 +3410,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.celebrate')).toBeVisible({ timeout: 5000 });
   });
 
-  /**
-   * Fakes just enough of the injected Capacitor bridge (#885) to drive `main.ts`'s real `wireBackButton` call
-   * through a browser, with no device: `Plugins.App` so `plugin('App', …)` registers the real listener and
-   * hands back its callback as `window.__backCb`, and `getPlatform: () => 'web'` so `isNativeShell()` — read
-   * elsewhere by `pwa.ts` and `certificate.ts`, neither under test here — answers exactly as it does with no
-   * bridge at all, rather than flipping unrelated native-only behaviour on for the rest of the page.
-   */
-  async function fakeBackButton(page: Page) {
-    await page.addInitScript(() => {
-      (window as any).Capacitor = {
-        getPlatform: () => 'web',
-        Plugins: {
-          App: {
-            addListener: (event: string, cb: () => void) => { if (event === 'backButton') (window as any).__backCb = cb; },
-            minimizeApp: () => { (window as any).__minimized = ((window as any).__minimized ?? 0) + 1; return Promise.resolve(); },
-          },
-        },
-      };
-    });
-  }
-  /** Fires the captured `backButton` callback — the hardware/gesture press itself. */
-  const pressBack = (page: Page) => page.evaluate(() => (window as any).__backCb());
-
+  // #1356: `fakeBackButton` / `pressBack` moved to `./back-button.ts`, shared with `duel.spec.ts`.
   test('a hardware back press during a live Sprint opens Pause; a second press then leaves to the island (#885)', async ({ page }) => {
     await fakeBackButton(page);
     await seedPlayer(page);
@@ -3453,6 +3432,46 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.home')).toBeVisible();
     await pressBack(page);
     expect(await page.evaluate(() => (window as any).__minimized)).toBe(1);   // #699's own root behaviour, untouched
+  });
+
+  /**
+   * #1356: `pauseIfLive()`'s `|| session.ended` clause. Between `session.end()` and the results overlay
+   * opening there is a window — zero wait on a Sprint, up to ~1.2 s on a mission — in which `#overlay` is still
+   * hidden yet the game is over, and a back press there must fall through (leave), never open Pause over a
+   * game that has ended. The end and the press run in one page task (`pressBackThenSnapshot`), so the test
+   * does not depend on a wall-clock window; the `ended: true, overlayHidden: true` read is the proof the press
+   * landed inside it. The second half presses on the open results modal — the other sub-branch of
+   * `!overlay.hidden`, whose clause the #884/#885 tests above pin. Found by mutation at filing: deleting the
+   * `ended` clause broke nothing in the suite.
+   */
+  test('a hardware back press after the game has ended but before the results open falls through, never Pause; so does one on the open results (#1356)', async ({ page }) => {
+    await fakeBackButton(page);
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await page.click('.topic[data-mixed]');   // #910: Sprint opens a chooser first
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    // The ended window: the clock runs out and the press lands before the results beat fires.
+    const inWindow = await pressBackThenSnapshot(page, 'end-sprint');
+    expect(inWindow.pauseOpen, 'no Pause over an ended game').toBe(false);
+    expect(inWindow.paused).toBe(false);
+    expect(inWindow.ended, 'the session ended synchronously').toBe(true);
+    expect(inWindow.overlayHidden, 'no overlay at all at the press: the results beat had not fired — the window this test is about').toBe(true);
+    await expect(page.locator('.island-screen'), 'the press fell through and left the screen').toBeVisible();
+    expect(await page.evaluate(() => (window as any).__minimized), 'left by history, not by minimising').toBeUndefined();
+    // The other sub-branch of `!overlay.hidden`: the results modal is up (Pause-up is #885's own test above).
+    await page.click('#sprint');
+    await page.click('.topic[data-mixed]');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    const onResults = await pressBackThenSnapshot(page, 'none');
+    expect(onResults.results, 'the press was taken on the open results modal').toBe(true);
+    expect(onResults.pauseOpen, 'Pause never replaces the results modal').toBe(false);
+    expect(onResults.paused).toBe(false);
+    await expect(page.locator('.island-screen')).toBeVisible();
   });
 
   test('Daily Dojo: three challenges on the sky map, progress survives a reload, bonus rows on results', async ({ page }) => {

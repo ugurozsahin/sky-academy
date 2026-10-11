@@ -12,3 +12,18 @@ export function answerableBy(topic: Topic, surface: Surface, d?: Difficulty): bo
   if (topic.input === 'tracing' || topic.input === 'keypad') return false;
   return surface !== 'duel' || topic.sequenceFrom === undefined || (d !== undefined && d < topic.sequenceFrom);
 }
+
+/** A year's bubble topics for one subject, in registry order (#908) — what the island's Mixed modes draw from and the
+ *  chooser lists. Pure over `topics` (a `topicsFor(year.id)` list), the shape `weakestTopics` and `duelPool` take. */
+export const subjectTopics = (topics: Topic[], subject: Topic['subject']): Topic[] =>
+  topics.filter(t => t.subject === subject && answerableBy(t, 'mixed'));
+
+/** The Mixed pool for the open subject tab (#908): `subjectTopics`, or the whole year's bubble topics when the subject
+ *  has none (#1325), so a subject that is still empty never hands `Session.pickTopic()` an empty pool — that throws.
+ *  Unreachable with today's registry (`tests/unit/curriculum.test.ts` pins every shown year's subjects non-empty). */
+export function subjectPool(topics: Topic[], subject: Topic['subject']): Topic[] {
+  const own = subjectTopics(topics, subject);
+  if (own.length) return own;
+  console.warn(`Sky Ninja Academy: no ${subject} bubble topic on this island — drawing from the whole year (#1325)`);   // a degrade a child would not notice must still leave a trace
+  return topics.filter(t => answerableBy(t, 'mixed'));
+}

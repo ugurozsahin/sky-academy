@@ -76,6 +76,12 @@ describe('mixed-pool weighting (#909)', () => {
     expect(weightedPick(pool, undefined, () => 0)).toBe(pool[0]);
     expect(weightedPick(pool, [1, 2], () => 0.99)).toBe(pool[5]);
   });
+  // #1325: `pool[0]` of `[]` is `undefined` typed as `T` — the silent return that let Session's catch block throw a second time.
+  it('an empty pool throws, with or without weights, rather than returning undefined as a T', () => {
+    expect(() => weightedPick([], undefined, () => 0)).toThrow(/empty pool/);
+    expect(() => weightedPick([], [], () => 0)).toThrow(/empty pool/);
+    expect(weightedPick([pool[2]], [5], () => 0.5)).toBe(pool[2]);   // one item is a draw, not an error
+  });
 });
 
 describe('Sensei brings back a topic not played for 14 days (#936)', () => {

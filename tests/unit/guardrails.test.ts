@@ -3595,7 +3595,7 @@ describe('every registered topic stays silent on wordQ\'s #515 collision warning
       // assertion) can't leave `console.warn` mocked as a no-op for the rest of this file's run.
       warn.mockRestore();
     }
-  });
+  }, 60_000);      // #1727: a full-registry sweep outgrows vitest's 5 s default on a loaded CI runner
 
   // #812 (pr-test-analyzer review): the id.length-keyed seed this replaced was a real collision, not a
   // hypothetical one — the live registry has several groups of topics sharing an id.length (15 share
