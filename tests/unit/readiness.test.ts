@@ -23,6 +23,11 @@ describe('tablesBlock (#1286)', () => {
     expect(tablesBlock([], { '11×11': fact(3, 0, 2) }).weakTables).toEqual([11]);   // 3 right + 2 slow = 5 answers, 60 % good
     expect(tablesBlock([], { '11×11': fact(3, 0, 1) }).weakTables).toEqual([]);     // 4 answers: not ranked
   });
+  it('ranks by right-and-not-slow, so a slow-heavy table sorts below a wrong-heavy one', () => {
+    // 5: 1 right + 4 slow = 20 % good; 3 and 4: 2 right + 3 wrong = 40 %. Counting slow as good would put 5 last.
+    expect(tablesBlock([], { '5×5': fact(1, 0, 4), '3×4': fact(2, 3) }).weakTables).toEqual([5, 3, 4]);
+  });
+  it('includes table 12', () => expect(tablesBlock([], { '12×12': fact(0, 5) }).weakTables).toEqual([12]));
   it('ranks a table at exactly five answers and not at four', () => {
     expect(tablesBlock([], { '4×4': fact(4, 1) }).weakTables).toEqual([4]);
     expect(tablesBlock([], { '4×4': fact(4) }).weakTables).toEqual([]);
@@ -50,6 +55,7 @@ describe('sats56Block (#1286)', () => {
   });
   it('ranks a strand at exactly five tries and rounds the percentage', () => {
     expect(sats56Block({ a: prog(1, 3), b: prog(1, 2) }, [fake('a', 'year5', 'number'), fake('b', 'year5', 'number')])).toEqual([{ strand: 'number', pct: 40 }]);
+    expect(sats56Block({ a: prog(1, 6) }, [fake('a', 'year5', 'number')])).toEqual([{ strand: 'number', pct: 17 }]);   // 16.67 rounds up
     expect(sats56Block({ a: prog(1, 4) }, [fake('a', 'year5', 'number')])).toEqual([]);
   });
   it('is empty with no play', () => expect(sats56Block({}, topics)).toEqual([]));
@@ -61,6 +67,10 @@ describe('weeksTo (#1286)', () => {
     expect(weeksTo(d, '2026-10-11')).toBe(w);
   });
   it('is null for a date that does not exist', () => expect(weeksTo('2026-02-31', '2026-01-01')).toBeNull());
+  it('is null for an impossible month or day, without throwing', () => {
+    expect(weeksTo('2026-13-45', '2026-10-11')).toBeNull();
+    expect(weeksTo('2026-10-11', '2026-00-10')).toBeNull();
+  });
   it('is null for a past, missing or malformed date', () => {
     expect(weeksTo('2026-10-10', '2026-10-11')).toBeNull();
     expect(weeksTo(undefined, '2026-10-11')).toBeNull();
@@ -78,6 +88,15 @@ describe('readyHTML (#1286)', () => {
     expect(html).toContain('3 weeks to go');
   });
   it('shows for Year 6 and points at Arithmetic practice', () => expect(readyHTML(save({ schoolYear: 'year6' }), '2026-10-11')).toContain('Arithmetic practice, Year 6 island'));
+  it('renders with an impossible stored date instead of throwing, and leaves the weeks line empty', () => {
+    const html = readyHTML(save({ schoolYear: 'year4', checkDate: '2026-13-45' }), '2026-10-11');
+    expect(html).toContain('type="date"');
+    expect(html).toMatch(/id="ready-weeks">\s*<\/p>/);
+  });
+  it('shows from a Tables Check result alone, and not for a child with neither block', () => {
+    expect(readyHTML(save({ checks: [chk(20)] }), '2026-10-11')).toContain('20 out of 25');
+    expect(readyHTML(save({ schoolYear: 'year3' }), '2026-10-11')).toBe('');
+  });
   it('says so when the date has passed', () => expect(readyHTML(save({ schoolYear: 'year4', checkDate: '2026-10-01' }), '2026-10-11')).toContain('That date has passed'));
   it('says "this week" and "1 week" in the right places', () => {
     expect(readyHTML(save({ schoolYear: 'year4', checkDate: '2026-10-11' }), '2026-10-11')).toContain('The check is this week');

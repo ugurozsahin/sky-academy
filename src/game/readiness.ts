@@ -46,7 +46,10 @@ export function sats56Block(progress: Record<string, TopicProgress>, topics: rea
 
 /** Whole weeks from `day` (today) to `date` (both `YYYY-MM-DD`), rounded up; null once the date has passed or when either is not a date. */
 export function weeksTo(date: string | undefined, day: string): number | null {
-  const ms = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T12:00:00Z`).toISOString().startsWith(s) ? Date.parse(`${s}T12:00:00Z`) : NaN;
+  const ms = (s: string) => {
+    const t = /^\d{4}-\d{2}-\d{2}$/.test(s) ? Date.parse(`${s}T12:00:00Z`) : NaN;   // NaN for 2026-13-45
+    return Number.isNaN(t) || !new Date(t).toISOString().startsWith(s) ? NaN : t;       // and for 2026-02-31, which rolls forward
+  };
   const d = (ms(date ?? '') - ms(day)) / 86_400_000;
   return Number.isFinite(d) && d >= 0 ? Math.ceil(d / 7) : null;
 }
