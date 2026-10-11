@@ -168,6 +168,37 @@ describe('y3-count (#1050)', () => {
       expect(leaked / total, `d${d}: ${leaked}/${total} leaked the leading digit`).toBeLessThanOrEqual(0.30);
     }
   });
+
+  // #1454: the same ≤30% ceiling, but for `countRun` cards and PER STEP, not only per difficulty. In aggregate
+  // the topic passed while step=100 leaked 36-38% at every difficulty and step=8 leaked 51% at d2: both of
+  // `runDecoys`' named decoys are ±100 (or ±8/±10 around a two-digit answer) and so always leave the answer's
+  // leading digit. Every (step, difficulty) shape that produces a countable (≥20) answer is listed, so a
+  // shape going missing fails rather than passing by absence: d2's 4s always count 0, 4, 8, 12 (never ≥20).
+  it('KS2 leak limit, per step: every countRun shape leaks the leading digit at most 30% of the time (#1454)', () => {
+    const SHAPES: Record<Difficulty, number[]> = { 1: [50, 100], 2: [8, 50, 100], 3: [4, 8, 50, 100] };
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1454_000 + d);
+      const buckets = new Map<number, { total: number; leaked: number }>();
+      for (let i = 0; i < 40_000; i++) {
+        const q = topic.gen(d, r);
+        if (!q.prompt.includes(',')) continue; // moreOrLess, the test above
+        const parts = q.prompt.replace(/\s*=\s*\?$/, '').split(', ');
+        const known = [0, 1, 2, 3].filter(idx => parts[idx] !== '?');
+        const step = Math.abs((num(parts[known[1]]) - num(parts[known[0]])) / (known[1] - known[0]));
+        if (num(q.answer) < 20) continue;
+        const b = buckets.get(step) ?? { total: 0, leaked: 0 };
+        b.total++;
+        const lead = q.answer.replace(/[^0-9]/g, '')[0];
+        if (!q.options.some(o => o !== q.answer && o.replace(/[^0-9]/g, '')[0] === lead)) b.leaked++;
+        buckets.set(step, b);
+      }
+      expect([...buckets.keys()].sort((a, b) => a - b), `d${d} shapes seen`).toEqual(SHAPES[d]);
+      for (const [step, b] of buckets) {
+        expect(b.total, `d${d} step=${step}: sample`).toBeGreaterThanOrEqual(2000);
+        expect(b.leaked / b.total, `d${d} step=${step}: ${b.leaked}/${b.total} leaked the leading digit`).toBeLessThanOrEqual(0.30);
+      }
+    }
+  });
 });
 
 describe('Year 3 strand modules (#1050): import direction', () => {
