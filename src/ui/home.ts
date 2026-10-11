@@ -66,6 +66,10 @@ function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', 
     topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
   }, { mixed: true, badge: trophyBadge(year, progress) });
 }
+/** #1288: Sensei's spoken line before training; on a warm-up island he calls it one. */
+export function senseiTrainLine(year: YearInfo, schoolYear: YearId | undefined, weakest: Topic[]): string {
+  return `Sensei says: ${isWarmUp(year, schoolYear) ? "a warm-up. Let's" : "let's"} train ${weakest.map(t => t.title).join(', ')}`;
+}
 /** #894: a Daily Dojo row read aloud, for a pre-reader who cannot read the challenge title on the card. */
 export function dojoRowLine(c: Challenge, progress: number): string {
   return progress >= c.goal ? `${c.title}. Done!` : `${c.title}. ${progress} of ${c.goal} done.`;
@@ -215,10 +219,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const menu = menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
       title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
-      go: () => {
-        const lead = isWarmUp(year, d.ks2.schoolYear) ? "a warm-up. Let's" : "let's";
-        say(`Sensei says: ${lead} train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest });
-      } },
+      go: () => { say(senseiTrainLine(year, d.ks2.schoolYear, weakest)); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
       go: () => playMixed(nav, year, 'endless', mixedPool(), progress) }, ...deckRows(nav, year, progress),
