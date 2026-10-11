@@ -5,6 +5,7 @@ import { y6Formulae } from './year6-formulae';
 // import: y6-sequences
 import { y6Sequences } from './year6-sequences';
 // import: y6-algebra
+import { y6Algebra } from './year6-algebra-missing';
 // import: y6-twounknowns
 import type { Topic } from './types';
 
@@ -16,6 +17,7 @@ export const Y6_ALGEBRA: Topic[] = [
   { id: 'y6-sequences', title: 'Linear sequences', icon: '📈', subject: 'maths', year: 'year6', strand: 'algebra', nc: 'Y6 Alg: linear number sequences', gen: y6Sequences },
 
   // slot: y6-algebra
+  { id: 'y6-algebra', title: 'Missing numbers with letters', icon: '🔤', subject: 'maths', year: 'year6', strand: 'algebra', nc: 'Y6 Alg: missing numbers algebraically', gen: y6Algebra },
 
   // slot: y6-twounknowns
 ];
