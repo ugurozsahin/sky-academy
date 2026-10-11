@@ -19,7 +19,7 @@ const EXCLUDED = ['team', 'family', 'class', 'group', 'crowd', 'none', 'neither'
 const DETERMINERS = ['the', 'my', 'these', 'this', 'our'];
 const TIME_ANCHORS: Record<string, 'past' | 'future' | 'present'> = {
   yesterday: 'past', 'last week': 'past', 'last night': 'past', ago: 'past',
-  tomorrow: 'future', 'next week': 'future', soon: 'future',
+  tomorrow: 'future', 'next week': 'future', 'next month': 'future',
   nowadays: 'present',
 };
 const ANCHOR_VERBS: Record<string, 'past' | 'future'> = { went: 'past', came: 'past', was: 'past', were: 'past', arrived: 'past', will: 'future' };
@@ -34,6 +34,8 @@ const FORMS: Record<string, { past: string; present: string[]; future: string; w
   watch: { past: 'watched', present: ['watch', 'watches'], future: 'will watch', would: 'would watch' },
 };
 
+/** Words that fit more than one tense ("Soon Gran helped you"), so they never anchor a card (#1285 review). */
+const AMBIGUOUS = ['soon', 'later', 'then', 'every day', 'usually', 'always'];
 const FIRST_PERSON = ['i', 'we', 'you', 'they'];
 const wordsOf = (s: string) => s.toLowerCase().match(/[a-z]+/g)!;
 const numberOf = (noun: string): 'singular' | 'plural' => IRREGULAR_PLURALS.includes(noun) || noun.endsWith('s') ? 'plural' : 'singular';
@@ -124,6 +126,17 @@ describe('y6-consistency (#1285)', () => {
           expect(answer, s).toBe(FIRST_PERSON.includes(subject) ? f.present[0] : f.present[1]);
         }
       }
+    }
+  });
+
+  it('no TENSE sentence leans on an ambiguous time word, and every late row also carries a past time word', () => {
+    for (const [s] of [...TENSE_PLAIN, ...TENSE_LATE]) {
+      const padded = ' ' + wordsOf(s).join(' ') + ' ';
+      for (const a of AMBIGUOUS) expect(padded.includes(` ${a} `), `${s} / ${a}`).toBe(false);
+    }
+    for (const [s] of TENSE_LATE) {
+      const before = ' ' + wordsOf(s.split('_')[0]).join(' ') + ' ';
+      expect(['yesterday', 'last night'].some(k => before.includes(` ${k} `)), s).toBe(true);
     }
   });
 

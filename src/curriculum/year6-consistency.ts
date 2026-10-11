@@ -38,27 +38,27 @@ export const AGREE_TRAP: AgreeRow[] = [
 /** [sentence with "_", answer, the three other forms of the same verb]. Every sentence holds a time word or a past/future verb. */
 export type TenseRow = [sentence: string, answer: string, others: string[]];
 
-/** d2: the time word comes first or alone. A present row says "Nowadays" ("every day" and "always" also fit a habitual past, and "usually" a prediction). A future row never offers the present simple, which also names a plan ("Tomorrow my aunt visits"): its decoys are the past, the base form after a third-person subject and "would". */
+/** d2: the time word comes first or alone. A present row says "Nowadays" ("every day" and "always" also fit a habitual past, and "usually" a prediction). A future row says "Next month", never "soon", which also fits a narrative past. A future row never offers the present simple, which also names a plan ("Tomorrow my aunt visits"): its decoys are the past, the base form after a third-person subject and "would". */
 export const TENSE_PLAIN: TenseRow[] = [
   ['Yesterday we went to the park and _ football.', 'played', ['play', 'plays', 'will play']],
   ['Last night my sister _ the dishes.', 'washed', ['wash', 'washes', 'will wash']],
   ['Tomorrow my aunt _ the museum.', 'will visit', ['visited', 'visit', 'would visit']],
   ['Nowadays I _ to school.', 'walk', ['walked', 'walks', 'will walk']],
   ['Next week Dad _ the car.', 'will clean', ['cleaned', 'clean', 'would clean']],
-  ['Soon Gran _ you with the bags.', 'will help', ['helped', 'help', 'would help']],
+  ['Next month Gran _ you with the bags.', 'will help', ['helped', 'help', 'would help']],
   ['Nowadays my brother _ the dinner.', 'cooks', ['cooked', 'cook', 'will cook']],
   ['Two days ago we _ a film.', 'watched', ['watch', 'watches', 'will watch']],
   ['Nowadays she _ her teeth before bed.', 'cleans', ['cleaned', 'clean', 'will clean']],
   ['Last week the farmer _ his cows.', 'watched', ['watch', 'watches', 'will watch']],
 ];
 
-/** d3: the time word is a verb in the second clause. "had washed" also fits there, so it is never offered. */
+/** d3: the clue is a verb in the second clause. A past time word opens each row too, so a habitual present ("Gran helps us after we arrived") cannot fit. "had washed" also fits there, so it is never offered. */
 export const TENSE_LATE: TenseRow[] = [
-  ['I _ the dishes before Mum came home.', 'washed', ['wash', 'washes', 'will wash']],
-  ['We _ in the garden until Dad arrived.', 'played', ['play', 'plays', 'will play']],
-  ['The children _ home when it was dark.', 'walked', ['walk', 'walks', 'will walk']],
-  ['My sister _ the table because Gran was coming.', 'cleaned', ['clean', 'cleans', 'will clean']],
-  ['Gran _ us with the bags after we arrived.', 'helped', ['help', 'helps', 'will help']],
+  ['Yesterday I _ the dishes before Mum came home.', 'washed', ['wash', 'washes', 'will wash']],
+  ['Last night we _ in the garden until Dad arrived.', 'played', ['play', 'plays', 'will play']],
+  ['Yesterday the children _ home when it was dark.', 'walked', ['walk', 'walks', 'will walk']],
+  ['Yesterday my sister _ the table because Gran was coming.', 'cleaned', ['clean', 'cleans', 'will clean']],
+  ['Yesterday Gran _ us with the bags after we arrived.', 'helped', ['help', 'helps', 'will help']],
 ];
 
 const agreeCard: (rng: Parameters<Generator>[1], row: AgreeRow, am: boolean) => ReturnType<Generator> = (rng, [sentence, answer, other], am) =>
