@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { dec, addDec, subDec, mulDecByInt, mulPow10, divPow10, compareDec, fmt, parseNum, roundTo, digitAt, digitValue } from '../../src/curriculum/ks2num';
 import type { Place, RoundUnit } from '../../src/curriculum/ks2num';
@@ -179,6 +180,96 @@ describe('ks2num', () => {
     it('dec rejects a non-integer v or dp', () => {
       expect(() => dec(3.5, 0)).toThrow();
       expect(() => dec(3, -1)).toThrow();
+    });
+  });
+
+  // #1333: a double holds every integer only up to 2^53 − 1. Past it `v * k` rounds to the nearest representable
+  // double — a wrong-but-plausible number, the very failure class this module exists to prevent — and a large dp
+  // gap scales to Infinity, which `fmt` would print. Every function that hands out a Dec must throw instead.
+  describe('safe-integer ceiling (#1333)', () => {
+    const MAX = Number.MAX_SAFE_INTEGER;   // 2^53 − 1 = 9,007,199,254,740,991
+
+    it('dec rejects a v beyond 2^53 − 1 at either sign, and an infinite one', () => {
+      expect(() => dec(MAX + 1, 0)).toThrow(/safe/);
+      expect(() => dec(-(MAX + 1), 2)).toThrow(/safe/);
+      expect(() => dec(Infinity, 0)).toThrow(/safe/);
+    });
+
+    it('dec still accepts the ceiling itself, at either sign', () => {
+      expect(fmt(dec(MAX, 0))).toBe('9,007,199,254,740,991');
+      expect(fmt(dec(-MAX, 3))).toBe('−9,007,199,254,740.991');
+    });
+
+    it('addDec/subDec throw when the aligned result leaves the safe range, never returning a rounded or infinite v', () => {
+      expect(() => addDec(dec(MAX, 0), dec(1, 0))).toThrow(/safe/);
+      expect(() => subDec(dec(-MAX, 0), dec(1, 0))).toThrow(/safe/);
+      // the rescale path: a dp gap of 20 scales 9 to 9 × 10^20; a gap of 400 scales 1 to Infinity
+      expect(() => addDec(dec(9, 0), dec(1, 20))).toThrow(/safe/);
+      expect(() => addDec(dec(1, 0), dec(1, 400))).toThrow(/safe/);
+      expect(() => compareDec(dec(1, 0), dec(1, 400))).toThrow(/safe/);
+    });
+
+    it('addDec landing exactly on the ceiling is still exact', () => {
+      expect(fmt(addDec(dec(MAX - 1, 0), dec(1, 0)))).toBe('9,007,199,254,740,991');
+    });
+
+    it('mulDecByInt throws past the ceiling instead of rounding to the nearest double', () => {
+      // (2^53 − 1) × 3 is odd and above 2^53, so no double holds it: before #1333 it came back as a plausible wrong integer
+      expect(() => mulDecByInt(dec(MAX, 0), 3)).toThrow(/safe/);
+      expect(() => mulDecByInt(dec(MAX, 0), -2)).toThrow(/safe/);
+      expect(compareDec(mulDecByInt(dec(MAX, 2), 1), dec(MAX, 2))).toBe(0);
+    });
+
+    it('mulPow10 throws past the ceiling, and still works right up to it', () => {
+      expect(() => mulPow10(dec(2 ** 52, 0), 1)).toThrow(/safe/);
+      expect(() => mulPow10(dec(MAX, 1), 2)).toThrow(/safe/);                        // one dp absorbed, then v × 10
+      expect(fmt(mulPow10(dec(900_719_925_474_099, 0), 1))).toBe('9,007,199,254,740,990');
+      expect(fmt(mulPow10(dec(MAX, 3), 3))).toBe('9,007,199,254,740,991');           // dp absorbs all of it: v unchanged
+    });
+
+    it('roundTo throws on either branch that would carry v past the ceiling, and stays exact right at it', () => {
+      expect(() => roundTo(dec(MAX, 0), 0.1)).toThrow(/safe/);                     // e < 0: v × 10
+      expect(() => roundTo(dec(MAX, 0), 100)).toThrow(/safe/);                     // rounds up to …741,000, past the ceiling
+      expect(fmt(roundTo(dec(MAX, 0), 10))).toBe('9,007,199,254,740,990');         // the float division stays exact here
+    });
+
+    it('digitAt/digitValue reject a plain integer past the ceiling, which toDec now routes through dec()', () => {
+      expect(() => digitAt(2 ** 53, 1)).toThrow(/safe/);
+      expect(digitAt(MAX, 1)).toBe(1);
+    });
+
+    it('digitAt throws when a finer place scales v past the ceiling, rather than reading a digit off a rounded double', () => {
+      // Before #1333 digitAt(dec(MAX, 0), 0.001) returned 6 — MAX × 1000 is not a safe integer, so `% 10` was noise. True answer: 0.
+      expect(() => digitAt(dec(MAX, 0), 0.001)).toThrow(/safe/);
+      expect(digitAt(dec(MAX, 3), 0.001)).toBe(1);   // 9,007,199,254,740.991 — no scaling needed
+    });
+
+    it('parseNum reads the ceiling exactly and answers null, not a throw, one past it', () => {
+      expect(parseNum('9,007,199,254,740,991')).toEqual({ v: MAX, dp: 0 });
+      expect(parseNum('9,007,199,254,740,992')).toBeNull();                        // 2^53: representable, not safe
+    });
+
+    // guard rail (#1333): the check is an invariant only if every Dec the module hands out passes through dec().
+    // Before #1333 eleven raw `{ v, dp }` literals in eight functions bypassed it. An object literal carrying a `v`
+    // or `dp` key in any position counts. A literal's first key comes before any `(` or `;`, which is what tells it
+    // from a function body passing `dp` or `-v` as an argument; a `.v`/`.dp` read never counts. Comments (the header
+    // and `fmt` quote one in prose), `${…}` template holes and interface bodies are stripped first, since they carry
+    // the same spellings without building anything.
+    const decLiterals = (src: string): string[] => src
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+      .replace(/\$\{[^}]*\}/g, '').replace(/\binterface\b[^{]*\{[^}]*\}/g, '')
+      .match(/\{[^{}();]*(?<![.\w])(v|dp)\s*[:,}]/g) ?? [];
+
+    it('guard rail: ks2num.ts builds a Dec literal only inside dec()', () => {
+      // The matcher must itself catch the shapes the rail exists for, or a regex tweak could make it match nothing.
+      expect(decLiterals('return { v, dp };')).toHaveLength(1);
+      expect(decLiterals('return { dp: 0, v: n };')).toHaveLength(1);
+      expect(decLiterals('return { ...a, v: x };')).toHaveLength(1);
+      expect(decLiterals('{ return dec(a.v, a.dp); }')).toHaveLength(0);
+      expect(decLiterals('{ const dp = a.dp - n; return dec(sign ? -v : v, -dp); }')).toHaveLength(0);
+      expect(decLiterals('`got v=${v}, dp=${dp}`; interface Dec { readonly v: number; readonly dp: number }')).toHaveLength(0);
+      const literals = decLiterals(readFileSync(new URL('../../src/curriculum/ks2num.ts', import.meta.url), 'utf8'));
+      expect(literals, `raw Dec literals: ${literals.length}`).toHaveLength(1);
     });
   });
 
