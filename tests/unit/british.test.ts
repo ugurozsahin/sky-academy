@@ -53,7 +53,7 @@ describe('British English (National Curriculum usage)', () => {
       for (const s of texts) for (const w of offenders(s)) bad.set(`${t.id}: "${s}"`, `${w} → ${AMERICAN[w]}`);
     }
     expect([...bad.entries()].map(([k, v]) => `${k} (${v})`)).toEqual([]);
-  });
+  }, 60_000);      // #1727: a full-registry sweep outgrows vitest's 5 s default on a loaded CI runner
   it('the scanner really reaches nested UI strings and flags offenders', () => {
     expect(tsStrings('play.ts', SOURCES['/src/ui/play.ts']).some(t => t.includes('Slice the bubble!'))).toBe(true);   // nested inside a `${}` template
     expect(tsStrings('x.ts', 'const a = `Well done ${ok ? `Color it ${n}` : "gray"}`;')).toEqual(['Well done ', 'Color it ', '', 'gray', '']);
