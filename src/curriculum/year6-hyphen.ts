@@ -8,9 +8,7 @@ import { pick, shuffle, wordQ } from './util';
 export const RE_PAIRS: readonly (readonly [string, string, string, string])[] = [
   ['recover', 're-cover', 'I hope Gran will _ from her cold soon.', 'The sofa is torn, so we will _ it with new cloth.'],
   ['resign', 're-sign', 'Dad will _ from his job today.', 'The pen leaked, so please _ the card.'],
-  ['reform', 're-form', 'The mayor wants to _ the old rules.', 'The band split up, but they will _ next year.'],
   ['remark', 're-mark', 'She did not _ on the weather.', 'The teacher had to _ the wrong test.'],
-  ['resent', 're-sent', 'Do not _ your brother for winning.', 'The email failed, so Mum _ it again.'],
   ['reserve', 're-serve', 'We _ a table for six at the cafe.', 'The player fell, so she had to _ the ball.'],
   ['resort', 're-sort', 'The family went to a seaside _ for the week.', 'The cards fell, so we must _ them by colour.'],
 ];
