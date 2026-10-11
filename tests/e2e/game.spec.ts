@@ -138,7 +138,7 @@ async function freezeWave(page: Page) {
 async function frozenTarget(page: Page) {
   const b = await page.waitForFunction(() => {
     const s = window.__sna; if (!s || s.state().waiting) return null;
-    const label = s.session.current.sequence ? s.session.current.sequence[s.session.seqIndex] : s.session.current.answer;
+    const label = s.session.current.sequence ? s.session.remaining()[0] : s.session.current.answer;   // the bubble answer() slices (#1540)
     const hit = s.bubbles().find((x: any) => x.label === label && x.y > 60 && x.y < window.innerHeight - 20);
     return hit ? JSON.stringify(hit) : null;
   }, null, { timeout: 15000 });
@@ -162,7 +162,13 @@ async function swipeAnswer(page: Page) {
   await page.mouse.up();
 }
 const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
-const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
+// #1540: every wait here names the next bubble as `session.remaining()[0]` — the one `answer()` slices
+// (`play.ts`) — never `sequence[seqIndex]`. The two agree on a spelling, but `seqIndex` stands still on an
+// any-order card (`session.ts`'s `remainingOf`), so after the first slice that wait watched a bubble already
+// `hit` while the rest of the wave relaunched (#591) and fell: a decisive miss (#918) that `solveCurrent` then
+// covered by solving the NEXT question. Year 1's mixed pool draws `y1-skip-anyorder` about one card in eight,
+// which is how the Relaxed test (#937) read 6/10 and sat 20 s on a finished game. Rail: tests/unit/e2e-next-target.test.ts.
+const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? window.__sna.session.remaining()[0] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
 /** Wait until a specific labelled bubble is launched and hittable, for slicing a chosen (not first-remaining) target. */
 const waitForLabel = (page: Page, label: string) => page.waitForFunction((l) => { const s = window.__sna; if (!s || s.state().waiting) return false; return s.bubbles().some((b: any) => b.label === l); }, label, { timeout: 20000 });
 const state = (page: Page) => page.evaluate(() => window.__sna.state());
@@ -246,16 +252,22 @@ async function solveCurrent(page: Page) {
   const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
   for (let k = 0; k < 16; k++) {
     await waitForTarget(page);
-    if (!await answer(page)) continue;                                   // the wave fell and respawned between the wait and the slice
+    if (!await answer(page)) {
+      // The target fell between the wait and the slice. In a gentle year it relaunches, so try again; in any
+      // other year that fall was a decisive miss (`session.fall`) and the question has moved on — stop here
+      // rather than solve the NEXT question in its place and hand the caller a count one short (#1540).
+      if (await page.evaluate((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before)) break;
+      continue;
+    }
     if (await page.evaluate(() => window.__sna.state().waiting)) break;   // decided; otherwise it was a step in a sequence
   }
   await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
 }
 /** Wait until a wrong bubble can be sliced on a live question — or the game has ended. */
-const waitForWrongOrEnd = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s) return false; if (s.ended) return true; if (s.waiting) return false; const c = window.__sna.session.current; const t = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; const bs = window.__sna.bubbles(); return bs.some((b: any) => b.label === t) && bs.some((b: any) => b.label !== t && b.label !== '💣'); }, null, { timeout: 20000 });   // a decoy must be in flight too (every 3rd Storm wave adds a TNT bubble, which never counts as a wrong slice)
+const waitForWrongOrEnd = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s) return false; if (s.ended) return true; if (s.waiting) return false; const c = window.__sna.session.current; const t = c.sequence ? window.__sna.session.remaining()[0] : c.answer; const bs = window.__sna.bubbles(); return bs.some((b: any) => b.label === t) && bs.some((b: any) => b.label !== t && b.label !== '💣'); }, null, { timeout: 20000 });   // a decoy must be in flight too (every 3rd Storm wave adds a TNT bubble, which never counts as a wrong slice)
 async function answerAll(page: Page, n: number) {
   for (let i = 0; i < n; i++) {
-    await page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.current.sequence[window.__sna.session.seqIndex] : s.answer)); });
+    await page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.remaining()[0] : s.answer)); });
     expect(await answer(page)).toBe(true);
     await page.waitForFunction((i) => { const s = window.__sna?.state(); return s && (s.index > i || s.ended || document.querySelector('.celebrate')); }, i);
   }
@@ -1964,7 +1976,7 @@ test.describe('Sky Ninja Academy', () => {
     const word = (await state(page)).answer as string;
     await expect(page.locator('.prompt .seq span')).toHaveCount(word.length);
     for (let i = 0; i < word.length; i++) {
-      await page.waitForFunction(() => window.__sna.bubbles().some((b: any) => b.label === window.__sna.session.current.sequence[window.__sna.session.seqIndex]));
+      await page.waitForFunction(() => window.__sna.bubbles().some((b: any) => b.label === window.__sna.session.remaining()[0]));
       expect(await answer(page)).toBe(true);
       if (i < word.length - 1) await expect(page.locator('.prompt .seq .got')).toHaveCount(i + 1);
     }
