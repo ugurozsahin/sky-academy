@@ -11,6 +11,10 @@ import { code, e2eSpecFiles } from './helpers/sources';
 // The ban is on the bare token, not on one spelling of the index: `sequence[seqIndex]`, `sequence?.[seqIndex]`,
 // `sequence.at(seqIndex)` and an aliased `const i = seqIndex` are the same mistake, and no e2e code reads
 // `seqIndex` for any other reason (comments are stripped by `code()` first).
+// Scope: `e2eSpecFiles()` reads `tests/e2e/*.spec.ts` only, so a wait hoisted into a non-spec helper file
+// there is outside this ban — widen the read if one appears. And if a `nextTarget()` hook ever joins
+// `PlayHooks` so the wait and the slice read one function, the floor-of-five test below correctly goes to
+// zero: retire or re-point this rail in that PR rather than keep both spellings alive.
 const IDIOM = /\bseqIndex\b/;
 
 describe('an e2e wait names the next bubble the way answer() slices it (#1540)', () => {

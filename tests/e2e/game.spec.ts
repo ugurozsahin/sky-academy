@@ -166,8 +166,9 @@ const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
 // (`play.ts`) — never `sequence[seqIndex]`. The two agree on a spelling, but `seqIndex` stands still on an
 // any-order card (`session.ts`'s `remainingOf`), so after the first slice that wait watched a bubble already
 // `hit` while the rest of the wave relaunched (#591) and fell: a decisive miss (#918) that `solveCurrent` then
-// covered by solving the NEXT question. Year 1's mixed pool draws `y1-skip-anyorder` about one card in eight,
-// which is how the Relaxed test (#937) read 6/10 and sat 20 s on a finished game. Rail: tests/unit/e2e-next-target.test.ts.
+// covered by solving the NEXT question. Year 1's mixed pool of 43 topics draws `y1-skip-anyorder` about one card
+// in 43, often enough that the ten-card Relaxed test (#937) lost about one run in eight — 6/10, then 20 s on a
+// finished game. Rail: tests/unit/e2e-next-target.test.ts.
 const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? window.__sna.session.remaining()[0] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
 /** Wait until a specific labelled bubble is launched and hittable, for slicing a chosen (not first-remaining) target. */
 const waitForLabel = (page: Page, label: string) => page.waitForFunction((l) => { const s = window.__sna; if (!s || s.state().waiting) return false; return s.bubbles().some((b: any) => b.label === l); }, label, { timeout: 20000 });
@@ -253,10 +254,14 @@ async function solveCurrent(page: Page) {
   for (let k = 0; k < 16; k++) {
     await waitForTarget(page);
     if (!await answer(page)) {
-      // The target fell between the wait and the slice. In a gentle year it relaunches, so try again; in any
-      // other year that fall was a decisive miss (`session.fall`) and the question has moved on — stop here
-      // rather than solve the NEXT question in its place and hand the caller a count one short (#1540).
-      if (await page.evaluate((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before)) break;
+      // The target was not hittable in the one round trip between the wait and the slice. Benign while
+      // `waiting` is still false — a required sequence bubble that left the arena un-hit relaunches (#591, in
+      // every year), a gentle year's single answer gets its deferred free trip (#742) — so try again. But
+      // `waiting` true means `session.fall()` has already decided this question as a miss: `questionsAsked`
+      // only moves after the reveal hold (`play-session.ts`'s `waveEnd`), so looping on would wait that hold
+      // out and solve the NEXT question in this one's place, handing the caller a count one short (#1540). A
+      // lost question is the test's failure, named here, not routed around.
+      if (await page.evaluate(() => window.__sna.state().waiting)) throw new Error('solveCurrent: the target fell before answer() could slice it — session.fall() decided the question as a miss, so it was lost, not solved (#1540)');
       continue;
     }
     if (await page.evaluate(() => window.__sna.state().waiting)) break;   // decided; otherwise it was a step in a sequence
