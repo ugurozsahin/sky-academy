@@ -62,19 +62,22 @@ export function certFromStored(c: StoredCert): CertInfo {
  * So the avatar's id comes from the resolved `Avatar` this certificate actually carries, and the award day from
  * its own `date`. Both are narrowings of the same value rather than second readings of the source — which is
  * what makes "the stored assertions cover the drawn object" true rather than merely claimed (#397 round 2, B1).
- * `date` is required on `CertInfo` (#410) precisely so this function's UTC day and `certificateText()`'s
- * printed day are always narrowings of that one caller-supplied instant, rather than two independent
- * `new Date()` defaults free to land a whole calendar day apart.
+ * `date` is required on `CertInfo` (#410) so the filed day and `certificateText()`'s printed day are narrowings of
+ * one caller-supplied instant, never two `new Date()` defaults a calendar day apart. An Invalid `Date` throws rather
+ * than filing (#1030): `isoDay()` would yield `"NaN-NaN-NaN"`, which `isCert()` accepts on every later load, and both
+ * live callers (`certInfo()` in `play.ts`, `duelCert()` in `duel.ts`) pass a fresh `new Date()`, so only a bug reaches it.
  */
 export function certToStored(c: CertInfo, o: { id: string }): StoredCert {
+  if (Number.isNaN(c.date.getTime())) throw new RangeError(`certToStored: Invalid Date — certificate ${o.id} cannot be filed under "NaN-NaN-NaN"`);
   return {
     id: o.id, name: c.name, avatar: c.avatar.id, year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
     date: isoDay(c.date), training: c.training, duel: c.duel,
   };
 }
-/** The award day as the album stores it. Mirrors `storage.ts`'s `today()`; kept here so this module's two
- *  directions (`certToStored`/`certFromStored`) agree about the format without importing save machinery. */
+/** The award day as the album stores it. Mirrors `storage/progress.ts`'s `today()`; kept here so `certToStored`/
+ *  `certFromStored` agree about the format without importing save machinery. An Invalid `Date` yields the literal
+ *  `"NaN-NaN-NaN"` (the `toISOString()` form before PR #1027 threw), so every caller guards first (#1030). */
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /**
  * `isoDay(d)`, read for a human at local noon (#410) — the same trick `certFromStored()` uses when it parses
@@ -84,13 +87,10 @@ const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSt
  * through the stored day first means the printed keepsake and the album row always name the same day, whatever
  * the child's timezone and whatever the clock read at the exact moment each was computed.
  *
- * Guards an Invalid `Date` before it reaches `isoDay`'s `toISOString()`, which throws rather than degrading
- * (#410 review): `date` is required on every fresh `CertInfo`, but `certFromStored()` parses it back out of
- * `StoredCert.date`, a plain string `isCert()` only checks is a `string`, never that it parses. A hand-edited
- * or corrupted save reaches `showStoredCertificate()` → `drawCertificate()` → `certificateText()` →
- * `displayDay()` with no `catch` above it, so a throw here is an unhandled rejection, not a caught error — the
- * "My certificates" view button silently re-enables and nothing opens. Returning `''` instead matches the
- * degradation `certAlbumHTML` already applies to the same input (`Number.isNaN(d.getTime()) ? '' : ...`).
+ * Guards an Invalid `Date` before `isoDay` (#410 review): `certFromStored()` parses `StoredCert.date`, a string
+ * `isCert()` never checks parses, and `showStoredCertificate()` → `drawCertificate()` → `certificateText()` reaches
+ * here with no `catch` above. `isoDay` once threw (`toISOString()`) — an unhandled rejection, a dead "View" button;
+ * since PR #1027 it yields `"NaN-NaN-NaN"`, printed below as "Invalid Date" (#1030). `''` matches `certAlbumHTML`.
  */
 const displayDay = (d: Date): string =>
   Number.isNaN(d.getTime()) ? '' :

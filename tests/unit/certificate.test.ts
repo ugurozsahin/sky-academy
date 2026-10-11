@@ -45,6 +45,14 @@ describe('certToStored() (#409 item 1)', () => {
     });
     expect(back.avatar.id).toBe(cert.avatar.id);
   });
+  // #1030: PR #1027 rewrote `isoDay()` from `toISOString()` (throws on an Invalid Date) to a `getFullYear()`
+  // form, which degrades to the literal `"NaN-NaN-NaN"` instead. Neither live caller (`certInfo()` in
+  // `ui/play.ts`, `duelCert()` in `ui/duel.ts`) can reach this — both pass a fresh `new Date()` — so the guard
+  // pins the persist boundary against a future caller threading a parsed or round-tripped date through. Proved
+  // red first: without the guard this received `{ date: 'NaN-NaN-NaN' }` and no throw.
+  it('refuses to file an Invalid Date as "NaN-NaN-NaN" — it throws, as the old toISOString() did (#1030)', () => {
+    expect(() => certToStored({ ...base, date: new Date('not-a-date') }, { id: 'year1:number-bonds' })).toThrow(RangeError);
+  });
 });
 
 describe('certAlbumHTML ("My certificates", #110)', () => {
@@ -98,12 +106,13 @@ describe('mission certificate text', () => {
   // #410 review: `isCert()` only checks `date` is a string, never that it parses, so a hand-edited or
   // corrupted save reaches here via `certFromStored()` with an Invalid `Date` — the reachable path
   // `showStoredCertificate()` → `drawCertificate()` → `certificateText()` walks with no `catch` above it.
-  // `toISOString()` throws on an Invalid Date; proved against the bug by reverting `displayDay`'s guard and
-  // watching this fail with `RangeError: Invalid time value` instead of the assertion below.
-  it('tolerates an unparsable stored date via certFromStored, instead of throwing', () => {
+  // When the guard was written `isoDay()` used `toISOString()`, which threw `RangeError: Invalid time value`
+  // here; since PR #1027 it degrades to `"NaN-NaN-NaN"` instead, and `new Date('NaN-NaN-NaNT12:00:00')` then
+  // formats as the string `"Invalid Date"` on the printed keepsake (#1030). Proved against the bug by reverting
+  // `displayDay`'s guard and watching the assertion below receive `'Invalid Date'` rather than `''`.
+  it('prints an empty date for an unparsable stored date via certFromStored, never "Invalid Date"', () => {
     const stored: StoredCert = { id: 'x', name: 'Ada', avatar: AVATARS[0].id, year: 'Year 1', title: 'Number Bonds', stars: 3, score: 30, correct: 3, attempts: 3, date: 'not-a-date' };
     const c = certFromStored(stored);
-    expect(() => certificateText(c)).not.toThrow();
     expect(certificateText(c).date).toBe('');
   });
 });

@@ -10,11 +10,11 @@ export interface LabelProblemsOpts {
    * number that happens to fall in the same range" apart. A value alone still can't say which *occurrence*
    * is the year when the same digits appear twice for different reasons in one string ("1200 sheep were
    * counted, and in 1200 AD the town was founded" — one needs a comma, the other must not carry one).
-   * Round 3's fix: when a candidate value's digits occur more than once as a plain (non-money,
-   * non-coordinate) token, none of those occurrences is treated as the year — every one is judged as an
-   * ordinary number instead. That can produce one false "needs a comma" on the real year in that specific
-   * collision, but the alternative (silently trusting an unresolvable guess) hides an always-real defect in
-   * the other occurrence entirely.
+   * Round 3's fix: when a candidate value's digits occur more than once as a plain (non-money, unsigned,
+   * decimal-free) token — a coordinate's components included since #1444 — none of those occurrences is
+   * treated as the year — every one is judged as an ordinary number instead. That can produce one false
+   * "needs a comma" on the real year in that specific collision, but the alternative (silently trusting an
+   * unresolvable guess) hides an always-real defect in the other occurrence entirely.
    */
   years?: number[];
 }
@@ -38,8 +38,8 @@ const PLAIN_COMPONENT_RE = /^[-−]?\d+(?:\.\d+)?$/;
  * 1, 3, 4, 5 — a coordinate component is not bounded to 3 digits the way a thousands group is).
  *
  * Being a genuine pair only settles what the *separating* comma means; it is not a verdict on either
- * component's own formatting (review round 7) — `coordinateComponentProblems`, below, is what still checks
- * that.
+ * component's own formatting (review round 7) — `coordinateTokens`, below, hands each component to the
+ * same `groupingProblem` a standalone number gets (#1444).
  */
 function findCoordinateSpans(text: string): CoordinateSpan[] {
   const spans: CoordinateSpan[] = [];
@@ -58,31 +58,41 @@ function findCoordinateSpans(text: string): CoordinateSpan[] {
   return spans;
 }
 
-/**
- * A coordinate component is never subject to the multi-group comma-*position* rule — the split above
- * already guarantees it carries no comma of its own to misplace — but it still owes the one rule that
- * applies to any number regardless of context: 4 or more digits needs a comma (review round 7). Every
- * round through the sixth treated "is this genuinely a pair" as the whole question and, once it answered
- * yes, exempted both components from every check `labelProblems` exists to run — silently, for anything
- * sitting in parens next to a comma, however long either side was.
- */
-function coordinateComponentProblems(spans: CoordinateSpan[]): string[] {
-  const problems: string[] = [];
-  for (const { components } of spans) {
-    for (const c of components) {
-      const digits = c.replace(/^[-−]/, '').split('.')[0];
-      if (digits.length >= 4) problems.push(`"${c}" is four or more digits with no comma grouping`);
-    }
-  }
-  return problems;
-}
+/** A token's sign exactly as written — an ASCII "-" or U+2212 — or "" when there is none. */
+type Sign = '' | '-' | '−';
+const readSign = (written: string): Sign => (/^[-−]/.test(written) ? written[0] as Sign : '');
 
 interface NumberToken {
+  /** A year can never carry a sign (#1444: `fmt()`'s own `year` option throws on a negative value, and
+   *  this checker must hold hand-written text to the same rule). */
+  sign: Sign;
   /** The integer part exactly as written: digits and commas, no sign, no "£", no decimal tail. */
   intPart: string;
   /** Whether this token carries a decimal tail at all — a year can never have one (D3). */
   hasDecimal: boolean;
   isMoney: boolean;
+}
+
+/**
+ * A coordinate's two components, each as the same token shape a standalone number gets, so that one
+ * function (`groupingProblem`) judges both. A component is never money (`findCoordinateSpans` refuses a
+ * "£"), and it carries no comma of its own to misplace — the split above guarantees that — but it still
+ * owes every rule that applies to a number regardless of context: 4 or more digits needs a comma (review
+ * round 7), and against a named year the exemption, the no-decimal rule and the no-sign rule (#1444). Every
+ * round through the sixth treated "is this genuinely a pair" as the whole question and, once it answered
+ * yes, exempted both components from every check `labelProblems` exists to run; round 7 then re-applied
+ * exactly one of those checks by hand, as a length-only subset that never saw `years` at all, which is how
+ * a component equal to the named year came to be flagged for the comma it must never carry (#1444).
+ */
+function coordinateTokens(spans: CoordinateSpan[]): NumberToken[] {
+  const tokens: NumberToken[] = [];
+  for (const { components } of spans) {
+    for (const c of components) {
+      const sign = readSign(c);
+      tokens.push({ sign, intPart: c.slice(sign.length).split('.')[0], hasDecimal: c.includes('.'), isMoney: false });
+    }
+  }
+  return tokens;
 }
 
 // Sign (ASCII "-" or the proper U+2212), then an optional "£", then the digit/comma run, then an optional
@@ -91,19 +101,20 @@ interface NumberToken {
 // to sit next to a bare digit run afterwards (review round 5).
 const NUMBER_RE = /[-−]?(£)?\d(?:[\d,]*\d)?(?:\.\d+)?/g;
 
-/** Every standalone number token in `text` — a coordinate's two components are pulled out first (see
- *  `findCoordinateSpans`) and never reach this scan at all, rather than being matched here and separately
+/** Every standalone number token in `text` — a coordinate's two components (`coordinateSpans`, from
+ *  `findCoordinateSpans`) never reach this scan at all, rather than being matched here and separately
  *  filtered afterwards; that split is what keeps this scan from having to understand coordinate shapes
- *  (a sign, a decimal or a space in the "wrong" position) in the first place. */
-function scanTokens(text: string): NumberToken[] {
-  const coordinateSpans = findCoordinateSpans(text);
+ *  (a sign, a decimal or a space in the "wrong" position) in the first place. `coordinateTokens` reads
+ *  the components into the same token shape from the spans themselves. */
+function scanTokens(text: string, coordinateSpans: CoordinateSpan[]): NumberToken[] {
   const tokens: NumberToken[] = [];
   for (const m of text.matchAll(NUMBER_RE)) {
     const start = m.index;
     const end = start + m[0].length;
     if (coordinateSpans.some(s => start >= s.start && end <= s.end)) continue;
-    const intPart = m[0].replace(/^[-−]?£?/, '').split('.')[0];
-    tokens.push({ intPart, hasDecimal: m[0].includes('.'), isMoney: m[1] === '£' });
+    const sign = readSign(m[0]);
+    const intPart = m[0].slice(sign.length).replace(/^£/, '').split('.')[0];
+    tokens.push({ sign, intPart, hasDecimal: m[0].includes('.'), isMoney: m[1] === '£' });
   }
   return tokens;
 }
@@ -112,51 +123,67 @@ function scanTokens(text: string): NumberToken[] {
  *  tokens are excluded (their validity never depends on being "the year", so they must not count towards
  *  whether a real year elsewhere is ambiguous — review round 5), and so is a decimal-tailed token (a
  *  fractional value is never literally the bare year, so an unrelated "1999.5" must not starve a real bare
- *  "1999" of its one unambiguous count). Coordinates never reach this at all (scanTokens' own comment). */
+ *  "1999" of its one unambiguous count), and so, for the same reason, is a signed one (#1444: "−1999" is
+ *  never literally the bare year either). A coordinate's components are counted like any other plain
+ *  token since #1444, now that they are judged like one. */
 function occurrenceCounts(tokens: NumberToken[], values: number[]): Map<number, number> {
   const counts = new Map(values.map(v => [v, 0]));
   for (const t of tokens) {
-    if (t.isMoney || t.hasDecimal) continue;
+    if (t.isMoney || t.hasDecimal || t.sign) continue;
     const v = Number(t.intPart.replace(/,/g, ''));
     if (counts.has(v)) counts.set(v, counts.get(v)! + 1);
   }
   return counts;
 }
 
+/** Whether the comma-split `parts` of an integer part are exact SATs groups: up to 3 digits, then 3 each. */
+function groupedInThrees(parts: string[]): boolean {
+  return parts[0].length <= 3 && parts.slice(1).every(p => p.length === 3);
+}
+
+/** The grouping problem (or none) of a token judged purely as a quantity — no year exemption applies. */
+function plainGroupingProblem(intPart: string, written: string): string | null {
+  const parts = intPart.split(',');
+  if (parts.length === 1) {
+    if (intPart.length < 4) return null;
+    return `"${written}" is four or more digits with no comma grouping`;
+  }
+  if (groupedInThrees(parts) || intPart.length < 4) return null;
+  // A comma inside the token does not excuse the digits either side of it: "12,3456" still has an
+  // ungrouped run of four after the comma, which a check that merely skips anything comma-adjacent would
+  // miss entirely.
+  return `"${written}" is grouped incorrectly — commas must mark exact groups of three digits`;
+}
+
 /** The one problem (or none) a single token has, given whether it is the unambiguous named year. Split out
  *  of `labelProblems` so that function's own complexity stays under this repo's ratchet, not because this
- *  half is independently reusable. */
+ *  half is independently reusable; the plain-quantity tail is split out again for the same reason (#1444). */
 function groupingProblem(t: NumberToken, isYear: boolean, looksLikeNamedYear: boolean): string | null {
   const parts = t.intPart.split(',');
+  const written = t.sign + t.intPart; // sign and integer part as the reader sees them (no "£", no decimal tail)
   if (t.isMoney) {
     // Money is always checked, however short — round 5: a money-shaped token equal to a named year is
     // still just money (correctly required to group at 4+ digits, never exempted as "the year"), and the
     // reverse (a malformed money value that happens to equal a year) is still a grouping defect, not a
     // year violation. Neither direction reads `isYear` at all.
-    const structurallyValid = parts[0].length <= 3 && parts.slice(1).every(p => p.length === 3);
-    if (structurallyValid || (parts.length === 1 && t.intPart.length < 4)) return null;
-    return `"${t.intPart}" is grouped incorrectly — commas must mark exact groups of three digits`;
+    if (groupedInThrees(parts) || (parts.length === 1 && t.intPart.length < 4)) return null;
+    return `"${written}" is grouped incorrectly — commas must mark exact groups of three digits`;
   }
   // A decimal tail on a token whose integer part IS a named year value is wrong on its own (a year has no
   // decimal places, D3) whether or not that occurrence is the *unambiguous* one — review round 5 finding 6.
   // Checked ahead of (and independently of) `isYear`, since a decimal-tailed token is never counted towards
   // occurrence ambiguity in the first place (occurrenceCounts' own comment), so `isYear` alone would never
   // catch this: nothing would ever make it the "sole" occurrence to begin with.
-  if (t.hasDecimal && looksLikeNamedYear) return `"${t.intPart}" is a year and must not have a decimal place`;
+  if (t.hasDecimal && looksLikeNamedYear) return `"${written}" is a year and must not have a decimal place`;
+  // A sign on such a token is wrong on exactly the same terms (#1444): a year is never negative, and a
+  // signed token is likewise never counted as an occurrence, so this too has to be read off the token
+  // itself rather than off `isYear`.
+  if (t.sign && looksLikeNamedYear) return `"${written}" is a year and must never carry a sign`;
   if (isYear) {
-    if (parts.length > 1) return `"${t.intPart}" is a year and must never carry a comma`;
+    if (parts.length > 1) return `"${written}" is a year and must never carry a comma`;
     return null; // a bare, comma-free year needs nothing further
   }
-  if (parts.length === 1) {
-    if (t.intPart.length < 4) return null;
-    return `"${t.intPart}" is four or more digits with no comma grouping`;
-  }
-  const structurallyValid = parts[0].length <= 3 && parts.slice(1).every(p => p.length === 3);
-  if (structurallyValid || t.intPart.length < 4) return null;
-  // A comma inside the token does not excuse the digits either side of it: "12,3456" still has an
-  // ungrouped run of four after the comma, which a check that merely skips anything comma-adjacent would
-  // miss entirely.
-  return `"${t.intPart}" is grouped incorrectly — commas must mark exact groups of three digits`;
+  return plainGroupingProblem(t.intPart, written);
 }
 
 /**
@@ -190,13 +217,11 @@ export function labelProblems(text: string, opts: LabelProblemsOpts = {}): strin
     problems.push(`"${m[0]}" groups digits with a space, not a comma`);
   }
 
-  // A coordinate's own components, each checked for the one rule that survives being read as a pair
-  // (review round 7) — see coordinateComponentProblems' own comment.
-  problems.push(...coordinateComponentProblems(findCoordinateSpans(text)));
-
-  // Every standalone number token (a coordinate's two components are excluded before this point — see
-  // scanTokens), judged for grouping.
-  const tokens = scanTokens(text);
+  // Every number token — a coordinate's two components first (read from their spans, see
+  // coordinateTokens), then every standalone number (those spans excluded, see scanTokens) — judged by
+  // one rule set. Components used to go through a hand-rolled subset of it instead (#1444).
+  const coordinateSpans = findCoordinateSpans(text);
+  const tokens = [...coordinateTokens(coordinateSpans), ...scanTokens(text, coordinateSpans)];
   const yearCounts = occurrenceCounts(tokens, opts.years ?? []);
   for (const t of tokens) {
     const value = Number(t.intPart.replace(/,/g, ''));
