@@ -27,9 +27,9 @@ const CUES: Record<string, string[]> = {
   guessed: ['answer', 'riddle'], guest: ['hotel', 'stayed'], heard: ['noise', 'night'], herd: ['cows', 'field'], led: ['yesterday', 'path'], lead: ['tomorrow', 'heavy', 'pipe'],
   morning: ['toast', 'breakfast'], mourning: ['funeral', 'black'], past: ['ago', 'cars'], passed: ['test', 'spelling'], profit: ['shop', 'big'], prophet: ['ancient', 'foretold'],
   stationary: ['traffic', 'car'], stationery: ['pens', 'paper'], steal: ['thief', 'jewels'], steel: ['bridge', 'strong'],
-  ascent: ['mountain', 'day'], assent: ['royal', 'law'], descent: ['plane', 'runway'], dissent: ['protest', 'crowd'], compliment: ['kind', 'thank'], complement: ['red', 'green'],
+  ascent: ['mountain', 'day'], assent: ['royal', 'law'], descent: ['plane', 'runway'], dissent: ['protest', 'crowd'], compliment: ['kind', 'thank'], complement: ['angles', 'other'],
   desert: ['camel', 'hot'], dessert: ['cream', 'pie'], farther: ['walk', 'sister'], father: ['mother', 'park'], precede: ['number', 'will'], proceed: ['gate', 'bell'],
-  principal: ['school', 'parents'], principle: ['honesty', 'live'], wary: ['strangers', 'sweets'], weary: ['travellers', 'journey'],
+  principal: ['school', 'parents'], principle: ['honesty', 'live'], wary: ['stranger', 'sweets'], weary: ['travellers', 'journey'],
 };
 const words = (s: string): string[] => s.toLowerCase().match(/[a-z]+/g) ?? [];
 const EXCLUDE = ['gay', 'queer', 'bitch', 'butt'];
@@ -139,7 +139,7 @@ describe('y6-homophones (#1276)', () => {
         "The plane began its slow _ to the runway.|descent|dissent|3",
         "The crowd showed its _ and began to protest.|dissent|descent|3",
         "Thank you for the kind _.|compliment|complement|3",
-        "Red and green _ each other.|complement|compliment|3",
+        "Angles can _ each other.|complement|compliment|3",
         "The camel walked across the hot _.|desert|dessert|3",
         "We had apple pie and cream for _.|dessert|desert|3",
         "I can walk _ than my little sister.|farther|father|3",
@@ -148,7 +148,7 @@ describe('y6-homophones (#1276)', () => {
         "Please _ to the gate when the bell rings.|proceed|precede|3",
         "The _ of the school welcomed the parents.|principal|principle|3",
         "Honesty is a good _ to live by.|principle|principal|3",
-        "Be _ of strangers who offer you sweets.|wary|weary|3",
+        "Be _ when a stranger offers you sweets.|wary|weary|3",
         "The _ travellers fell asleep after the journey.|weary|wary|3",
       ]
     `);
@@ -198,7 +198,26 @@ describe('y6-homophones (#1276)', () => {
         per.set(p, (per.get(p) ?? 0) + 1);
         tally.set(a, (tally.get(a) ?? 0) + 1);
       }
-      for (const [p, n] of per) if (n >= 300) for (const w of p.split('/')) expect((tally.get(w) ?? 0) / n, w).toBeGreaterThan(0.3);
+      for (const [p, n] of per) if (n >= 100) for (const w of p.split('/')) { const share = (tally.get(w) ?? 0) / n; expect(share, w).toBeGreaterThan(0.3); expect(share, w).toBeLessThan(0.7); }
     }
+  });
+
+  it('d3 mixes d1–d2 rows in at about 30%', () => {
+    const lower = new Set(Y6_HOMOPHONES.filter(r => r[3] < 3).map(r => r[1]));
+    const share = draws(3, 1000).filter(q => lower.has(String(q.answer))).length / 1000;
+    expect(share).toBeGreaterThan(0.2);
+    expect(share).toBeLessThan(0.4);
+  });
+
+  it('lettered cards put the answer on A and on B, and only compliment/complement are lettered', () => {
+    const r = rng(7);
+    const letters = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      const q = topic.gen(3, r), lettered = q.options.includes('A');
+      const word = lettered ? /^A: (\w+)\. B: (\w+)\./.exec(q.prompt)![q.answer === 'A' ? 1 : 2] : String(q.answer);
+      expect(lettered, q.prompt).toBe(['compliment', 'complement'].includes(word));
+      if (lettered) letters.add(String(q.answer));
+    }
+    expect([...letters].sort()).toEqual(['A', 'B']);
   });
 });

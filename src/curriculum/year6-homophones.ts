@@ -33,12 +33,12 @@ export const Y6_HOMOPHONES: Y6HomRow[] = [
   ...pair(2, 'steal', 'steel', ['The thief tried to _ the jewels.'], ['The bridge is made of strong _.']),
   ...pair(3, 'ascent', 'assent', ['The _ of the mountain took all day.'], ['The king gave his royal _ to the new law.']),
   ...pair(3, 'descent', 'dissent', ['The plane began its slow _ to the runway.'], ['The crowd showed its _ and began to protest.']),
-  ...pair(3, 'compliment', 'complement', ['Thank you for the kind _.'], ['Red and green _ each other.']),
+  ...pair(3, 'compliment', 'complement', ['Thank you for the kind _.'], ['Angles can _ each other.']),
   ...pair(3, 'desert', 'dessert', ['The camel walked across the hot _.'], ['We had apple pie and cream for _.']),
   ...pair(3, 'farther', 'father', ['I can walk _ than my little sister.'], ['My _ and mother took us to the park.']),
   ...pair(3, 'precede', 'proceed', ['The number 7 will _ the number 8.'], ['Please _ to the gate when the bell rings.']),
   ...pair(3, 'principal', 'principle', ['The _ of the school welcomed the parents.'], ['Honesty is a good _ to live by.']),
-  ...pair(3, 'wary', 'weary', ['Be _ of strangers who offer you sweets.'], ['The _ travellers fell asleep after the journey.']),
+  ...pair(3, 'wary', 'weary', ['Be _ when a stranger offers you sweets.'], ['The _ travellers fell asleep after the journey.']),
 ];
 
 /** Words too long to read on a bubble (R-LBL, #1046): the card names both as A and B and the bubbles are the letters. */
