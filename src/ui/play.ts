@@ -1,4 +1,4 @@
-import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatars';
+import { avatarById, praiseLine, SENSEI, tutorialLine, VILLAIN, voiced } from '../avatars';
 import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
@@ -24,7 +24,7 @@ import type { PlayHooks } from './hooks';
 export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'> & { input?: PlayInput; title?: string };
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
-  const d = load(); const av = avatarById(d.avatar);
+  const d = load(); const av = voiced(avatarById(d.avatar), d, o.year.id);
   const trailItem = equippedItem(wallet(), 'trail');
   const skin = trailItem?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
   const fx = trailItem?.fx ?? av.fx;   // a bought element trail overrides the avatar's own particle/sound effect too (#69)
@@ -144,7 +144,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   function showTutorial(): number {
     const t = $('#tutorial'); if (!t || !t.hidden) return 0;
     if (load().tutorialSeen || session.questionsAsked > 1) return 0;   // only ever before the very first wave
-    t.hidden = false; say(SENSEI_LINES.tutorial);
+    t.hidden = false; say(tutorialLine(d, o.year.id));
     later(hideTutorial, scaled(9000));            // never block play for long, even if the child just watches
     // #138: the hold before the first wave is a game beat too. Shortening it at speed is safe now that the
     // font gate is explicit (#44's gatedSpawn) rather than resting on 1800 ms happening to exceed the cap.
