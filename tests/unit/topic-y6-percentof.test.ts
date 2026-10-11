@@ -56,12 +56,24 @@ describe('y6-percentof (#1269)', () => {
   });
 
   it('amounts stay within range: d1 up to 400, d2 up to 2,000', () => {
-    for (const c of draw(1)) expect(num(c.prompt.match(/of (\d+)/)![1])).toBeLessThanOrEqual(400);
-    for (const c of draw(2)) expect(num(c.prompt.match(/of (\d+)/)![1])).toBeLessThanOrEqual(2000);
+    const amount = (c: Question) => num(c.prompt.match(/of ([\d,]+)/)![1]);
+    expect(amount({ prompt: '15% of 1,200 = ?' } as Question)).toBe(1200);
+    for (const c of draw(1)) expect(amount(c)).toBeLessThanOrEqual(400);
+    for (const c of draw(2)) expect(amount(c)).toBeLessThanOrEqual(2000);
+    expect(Math.max(...draw(2, 600).map(amount))).toBeGreaterThan(1000);
   });
 
-  it('every d2 card offers the 10 % or 5 % step alone; every discount card offers the discount', () => {
-    for (const c of draw(2)) expect(solve(c.prompt).steps.some(v => c.options.includes(v.toLocaleString('en-GB'))), c.prompt).toBe(true);
+  it('d1 draws only 50, 25, 10, 20 and 75 %; d2 only 5, 15, 30, 35, 45 and 60 %', () => {
+    const pcts = (d: Difficulty) => new Set(draw(d, 600).map(c => num(c.prompt.match(/^(\d+)%/)![1])));
+    expect([...pcts(1)].sort((a, b) => a - b)).toEqual([10, 20, 25, 50, 75]);
+    expect([...pcts(2)].sort((a, b) => a - b)).toEqual([5, 15, 30, 35, 45, 60]);
+  });
+
+  it('every d2 card offers the 10 % step alone (the 5 % step only when a leak decoy leaves room); every discount card offers the discount', () => {
+    for (const c of draw(2)) {
+      const s = solve(c.prompt);
+      expect(c.options, c.prompt).toContain(s.steps[0].toLocaleString('en-GB'));
+    }
     let discounts = 0;
     for (const c of draw(3, 600)) {
       const s = solve(c.prompt);
