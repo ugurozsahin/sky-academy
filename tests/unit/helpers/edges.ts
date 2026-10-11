@@ -47,6 +47,9 @@ const isRequireCallee = (e: ts.Expression): boolean => {
 // are both valid, compiling shapes (a bundler/minifier can add or preserve stray parens around either), and
 // specText() has no ParenthesizedExpression case, so an unwrapped argument silently produced no edge at all.
 const unwrapParens = (e: ts.Expression): ts.Expression => ts.isParenthesizedExpression(e) ? unwrapParens(e.expression) : e;
+// #841: the type-node twin, for `typeof import(('x'))` — there the parens are a ParenthesizedType wrapping the
+// LiteralType, which unwrapParens (an Expression unwrapper) never sees.
+const unwrapParensType = (t: ts.TypeNode): ts.TypeNode => ts.isParenthesizedTypeNode(t) ? unwrapParensType(t.type) : t;
 const arg0 = (call: ts.CallExpression): ts.Expression | undefined => {
   const a = call.arguments[0];
   return a ? unwrapParens(a) : undefined;
@@ -75,11 +78,18 @@ const importOrExport = (node: ts.Node): Hit[] | null => {
   const typeOnly = ts.isImportDeclaration(node)
     ? !!node.importClause?.isTypeOnly || namedBindingsAllTypeOnly(node.importClause)
     : !!node.isTypeOnly || namedExportsAllTypeOnly(node.exportClause);
-  return [[node.moduleSpecifier, typeOnly ? 'type' : 'static']];
+  // #841: `import x from ('y')` and `export { c } from ('y')` both parse clean, with a ParenthesizedExpression as
+  // the moduleSpecifier — the one branch of the six that never got #829's unwrap, and the commonest form of all.
+  return [[unwrapParens(node.moduleSpecifier), typeOnly ? 'type' : 'static']];
 };
 // `typeof import('x')` and a bare `import('x')` type reference both land here; either way nothing ships.
-const importType = (node: ts.Node): Hit[] | null =>
-  ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) ? [[node.argument.literal, 'type']] : null;
+// #841: unwrap a ParenthesizedType first — `typeof import(('x'))` parses clean too, and the literal gate below
+// was false on the wrapper, so the whole branch silently never fired.
+const importType = (node: ts.Node): Hit[] | null => {
+  if (!ts.isImportTypeNode(node)) return null;
+  const arg = unwrapParensType(node.argument);
+  return [[ts.isLiteralTypeNode(arg) ? arg.literal : undefined, 'type']];
+};
 const dynamicImport = (node: ts.Node): Hit[] | null =>
   ts.isCallExpression(node) && isDynamicImportTarget(node.expression) ? [[arg0(node), 'dynamic']] : null;
 // Bare `require('x')` and `obj.require('x')` alike — the old regex matched the literal substring
