@@ -405,10 +405,10 @@ describe('the line under the prompt says whose it is (#328)', () => {
 
   it('does not mark the tracing instruction, on the path the harness never used to reach', async () => {
     // `build()` hardcoded `tracing: false` and nothing in the suite overrode it, so `hintText`'s tracing
-    // branch had no coverage in either direction (#430 review, addendum to note 5). No live bug — the three
+    // branch had no coverage in either direction (#430 review, addendum to note 5). No live bug — the four
     // trace topics emit no `hint` — but the line is this screen's words, so it must not be marked.
     save({ voice: 'yes' });
-    const { els, ps } = build(plainQ, { tracing: true });
+    const { els, ps } = build(() => ({ prompt: 'Trace the letter a', answer: 'a', options: ['a'] }), { tracing: true });   // a letter card: #1743 gives a digit its own line
     ps.session.start(); await settle();
     expect(els.hint.textContent).toBe('Trace over the dotted letters');
     expect(els.hint.classes.has('own')).toBe(false);

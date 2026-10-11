@@ -6,6 +6,7 @@
 // play.ts keeps all the wiring, exactly as the overlays split (#99) did.
 import type { Question } from '../curriculum';
 import { say } from '../audio';
+import { traceNoun } from '../game/tracing';
 import { $, esc, fillAnswer } from './dom';
 
 /** The lives row: `total` hearts, the first `n` lit and the rest dimmed. */
@@ -177,10 +178,14 @@ function buildPromptHTML(prompt: string, template: string, sequence: readonly st
  * live in `hint` and nowhere else on the card, so a card without this line asks "Which is fuller?" over two
  * coloured bubbles and cannot be answered without read-aloud (#65). Only when there is no hint does it fall
  * back to telling the child what to do.
+ *
+ * The tracing fallback names what is traced through `traceNoun` (#1743) — the same decision the toast makes
+ * (`traceFeedback`, #1556) — so a digit card reads "number" in both places and the two cannot drift apart
+ * again; a letter or a word keeps "letters", the line every trace card showed before.
  */
-export function hintText(q: Pick<Question, 'hint'>, o: { reveal: boolean; tracing?: boolean; keypad?: boolean }): string {
+export function hintText(q: Pick<Question, 'hint' | 'answer'>, o: { reveal: boolean; tracing?: boolean; keypad?: boolean }): string {
   if (q.hint) return q.hint;
-  if (o.tracing) return 'Trace over the dotted letters';
+  if (o.tracing) return `Trace over the dotted ${traceNoun(q.answer) === 'number' ? 'number' : 'letters'}`;
   if (o.keypad) return 'Type the answer, then tap ✓';
   return o.reveal ? 'Read, then slice the answer' : 'Tap or slice the answer';
 }
