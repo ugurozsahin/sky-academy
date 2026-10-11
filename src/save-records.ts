@@ -2,6 +2,7 @@
 // field-check infrastructure storage.ts's own CERT_FIELDS/DUEL_FIELDS used to define locally (`Fields`,
 // `checkFields`, `str`, `fin`, `strOrNull`, `count`), moved here for the same reason and imported back.
 import { YEARS, type YearId } from './curriculum/types';
+import type { StreakState } from './game/streak';
 export type Fields<T> = { [K in keyof T]-?: (v: unknown) => v is T[K] };
 export const checkFields = <T>(fields: Fields<T>, x: Record<string, unknown>): boolean =>
   (Object.keys(fields) as (keyof T)[]).every(k => fields[k](x[k as string]));
@@ -107,15 +108,23 @@ export const sanitizeSettings = (v: unknown): Settings => {
   return { slow: typeof r.slow === 'boolean' ? r.slow : false, timeX: r.timeX === 1.5 || r.timeX === 0 ? r.timeX : 1 };
 };
 
+/** What a device that has never played holds; `shape.ts`'s `DEFAULT.streak` is this object. */
+export const DEFAULT_STREAK: StreakState = { last: '', days: 0 };
 /**
- * Drops `rest` unless it is a stored day (#950 reads it as the Daily Dojo's rest-day marker).
- * Round 3 review: rebuilds from `streak`'s two known fields (`last`, `days`, left as whatever type they
- * already were — this function has never validated them, only `rest`) rather than spreading the input, the
- * same unknown-key gap round 2 closed for `sanitizeSlips`/`sanitizeLog`/`sanitizeSettings` but left open here
- * and in `sanitizeProgressExtras` below.
+ * The daily streak's own guard. `last` is `''` or a stored day (the two values `touchStreak`'s `today()` ever
+ * writes) and `days` a whole number of days; anything else resets the whole streak to `DEFAULT_STREAK`, `rest`
+ * included — a partial streak is not a streak, the same way `sanitizeSettings` resets rather than keeps a
+ * partial record (#1375: this used to copy the pair unchecked, so a present-but-malformed `streak` loaded as
+ * `{ last: undefined, days: undefined }` and the home screen read "undefined day streak"; the key being present,
+ * `migrate()`'s `{ ...DEFAULT, ...s }` merge never filled the default in). Drops `rest` unless it is a stored
+ * day (#950 reads it as the Daily Dojo's rest-day marker). Round 3 review: rebuilds from the known fields
+ * rather than spreading the input, the same unknown-key gap round 2 closed for `sanitizeSlips`/`sanitizeLog`/
+ * `sanitizeSettings`.
  */
-export function sanitizeStreakRest(streak: Record<string, unknown>): Record<string, unknown> {
-  const clean: Record<string, unknown> = { last: streak.last, days: streak.days };
+export function sanitizeStreak(streak: Record<string, unknown>): StreakState {
+  const { last, days } = streak;
+  if (!(last === '' || isoDay(last)) || !count(days)) return { ...DEFAULT_STREAK };
+  const clean: StreakState = { last, days };
   if (isoDay(streak.rest)) clean.rest = streak.rest;
   return clean;
 }
@@ -166,7 +175,7 @@ export function sanitizeV5Fields(clean: Record<string, unknown>): void {
   if ('log' in clean) clean.log = sanitizeLog(clean.log);
   if ('settings' in clean) clean.settings = sanitizeSettings(clean.settings);
   if ('ks2' in clean) clean.ks2 = sanitizeKs2(clean.ks2);   // #1054
-  if (isRecord(clean.streak)) clean.streak = sanitizeStreakRest(clean.streak as Record<string, unknown>);
+  if (isRecord(clean.streak)) clean.streak = sanitizeStreak(clean.streak);
   if (isRecord(clean.progress)) clean.progress = sanitizeProgressExtras(clean.progress as Record<string, unknown>);
 }
 
@@ -183,7 +192,7 @@ export function toV5(s: Record<string, unknown>): Record<string, unknown> {
   // override that default with a real `streak: undefined` property, which is what sanitizeTypes already
   // deletes a wrong-typed streak/progress down to.
   const out: Record<string, unknown> = { ...s, slips: sanitizeSlips(s.slips), log: sanitizeLog(s.log), settings: sanitizeSettings(s.settings) };
-  if (isRecord(s.streak)) out.streak = sanitizeStreakRest(s.streak as Record<string, unknown>);
+  if (isRecord(s.streak)) out.streak = sanitizeStreak(s.streak);
   if (isRecord(s.progress)) out.progress = sanitizeProgressExtras(s.progress);
   return out;
 }
