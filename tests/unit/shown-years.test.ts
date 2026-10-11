@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { isKs2, meetsShowGate, previewAllYears, shownYears, SHOWN_YEARS_KEY, YEARS, type YearInfo } from '../../src/curriculum';
-import { islandArt } from '../../src/ui/island-placeholder';
+import { escapeXml, islandArt } from '../../src/ui/island-placeholder';
 
 // minimal localStorage shim for node — same shape tests/unit/storage.test.ts and three.test.ts use
 const mem: Record<string, string> = {};
@@ -131,5 +131,66 @@ describe('islandArt (#1032)', () => {
   it('an already-opaque 7-char tint is used as-is, not sliced short', () => {
     const svg = decodeURIComponent(islandArt(fixture({ tint: '#7a5ad6' })));
     expect(svg).toContain('#7a5ad6');
+  });
+});
+
+// #1327: `svg()` prints `YearInfo.short` inside `<text>` and the tint inside a `fill='…'`. `encodeURIComponent`
+// of the whole string makes a valid URI, never valid XML, so a `short` of `R&D` would render the island tile
+// blank with nothing failing loudly. Two halves, both pinned here — in this sibling file rather than beside
+// the tint rail in `curriculum.test.ts`, which `fileLines` freezes at its length (#1388).
+describe('islandArt escapes its two interpolations (#1327)', () => {
+  const fixture = (over: Partial<YearInfo>): YearInfo => ({
+    id: 'year3', title: 'Year 3', short: 'Y3', age: 'Ages 7–8', blurb: 'blurb',
+    tint: '#ffb02055', maxAnswer: 2000, perStage: 7, lives: 3, gentle: false,
+    speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 },
+    ...over,
+  });
+  const decoded = (y: YearInfo) => decodeURIComponent(islandArt(y).replace(/^data:image\/svg\+xml,/, ''));
+  // A cheap well-formedness check, since the unit environment has no XML parser: every `&` opens one of the
+  // five predefined entities, and every `<` opens one of the six tags the template writes — nothing else.
+  const wellFormed = (svg: string) => {
+    expect(svg.match(/&/g)?.length ?? 0).toBe(svg.match(/&(amp|lt|gt|apos|quot);/g)?.length ?? 0);
+    expect(svg.match(/</g)?.length).toBe(6);
+    expect(svg.match(/<(svg|rect|ellipse|text|\/text|\/svg)[ >]/g)?.length).toBe(6);
+  };
+
+  // guard rail — the data-source half: fail where the row is written, as the tint rail does. The set is what
+  // every row uses today (`R`, `Y1`–`Y6`); a future value outside it needs this line widened on purpose.
+  it('every YEARS row’s short is 1–4 of [A-Za-z0-9], so escapeXml() is the identity on every real row', () => {
+    for (const y of YEARS) expect(y.short, y.id).toMatch(/^[A-Za-z0-9]{1,4}$/);
+  });
+
+  it('escapeXml() rewrites the five XML-significant characters and nothing else', () => {
+    expect(escapeXml(`R&D <'Y3'> "a"`)).toBe('R&amp;D &lt;&apos;Y3&apos;&gt; &quot;a&quot;');
+    expect(escapeXml('R Y1 Y6 #ffb020 0123456789')).toBe('R Y1 Y6 #ffb020 0123456789');
+    expect(escapeXml('')).toBe('');
+  });
+
+  // the belt-and-braces half: a value the rail above would refuse still yields a well-formed SVG
+  it('a short containing &, <, > and quotes yields a well-formed SVG with the characters as entities', () => {
+    const svg = decoded(fixture({ short: `R&D<'x">` }));
+    wellFormed(svg);
+    expect(svg).toContain(`>R&amp;D&lt;&apos;x&quot;&gt;</text>`);
+  });
+
+  it('a tint containing an apostrophe cannot close the fill attribute early', () => {
+    const svg = decoded(fixture({ tint: `#ab'cd` }));   // 6 chars: skips the alpha-byte slice, reaches fill raw
+    wellFormed(svg);
+    expect(svg).toContain(`fill='#ab&apos;cd'/>`);
+    expect(svg).not.toContain(`fill='#ab'cd'`);
+  });
+
+  // not a new look: for every real row the output is what main produced before the escape existed
+  it('is byte-identical to the pre-#1327 output for every real YEARS row without art', () => {
+    const y3 = YEARS.find(y => y.id === 'year3')!;
+    expect(y3.art).toBeUndefined();   // the literal below is the placeholder; if Y3 art lands, move this pin to the next art-less row
+    expect(islandArt(y3)).toBe("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20120%2070'%3E%3Crect%20width%3D'120'%20height%3D'70'%20fill%3D'%230d1226'%2F%3E%3Cellipse%20cx%3D'60'%20cy%3D'40'%20rx%3D'46'%20ry%3D'22'%20fill%3D'%23ffb020'%2F%3E%3Ctext%20x%3D'60'%20y%3D'40'%20text-anchor%3D'middle'%20dominant-baseline%3D'central'%20font-family%3D'sans-serif'%20font-weight%3D'700'%20font-size%3D'24'%20fill%3D'%23f4f6ff'%3EY3%3C%2Ftext%3E%3C%2Fsvg%3E");
+    for (const y of YEARS.filter(y => !y.art)) {
+      const svg = decoded(y);
+      wellFormed(svg);
+      expect(svg, y.id).not.toContain('&');                        // escaping was the identity on this row
+      expect(svg, y.id).toContain(`>${y.short}</text>`);
+      expect(svg, y.id).toContain(`fill='${y.tint.slice(0, 7)}'/>`);
+    }
   });
 });
