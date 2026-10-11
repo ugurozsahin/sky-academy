@@ -46,6 +46,13 @@ describe('y6-fracdiv (#1263)', () => {
     }
   });
 
+  it('every option is in lowest terms and no two options are equal in value', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 1000)) {
+      for (const o of c.options) { const [n, dd] = o.split('/').map(Number); expect(gcd(n, dd), `${c.prompt} ${o}`).toBe(1); }
+      for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) expect(equal(fr(c.options[i]), fr(c.options[j])), `${c.prompt} ${c.options}`).toBe(false);
+    }
+  });
+
   it('the multiply-instead decoy is on every card where it differs from the answer', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d)) {
       const s = solve(c.prompt), wrong = { n: s.a * s.k, d: s.b };

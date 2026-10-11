@@ -13,16 +13,18 @@ const lab = (f: Frac) => `${f.n}/${f.d}`;
 /** `f ÷ k` in lowest terms. */
 export const divide = (f: Frac, k: number): Frac => simplify({ n: f.n, d: f.d * k });
 
-/** Three distinct decoys from the named slips, then the answer's neighbours. None equals the answer in value or is a whole number. */
+/** Three decoys from the named slips, then the answer's neighbours. Every option is shown in lowest terms (the answer is, so an unreduced
+ * decoy would give it away), no two are equal in value, none equals the answer in value or is a whole number. */
 function decoys(ans: Frac, named: Frac[]): string[] {
-  const out: string[] = [], taken = new Set([lab(ans)]);
-  const add = (f: Frac) => {
-    if (out.length >= 3 || f.d < 2 || f.n < 1 || f.n % f.d === 0 || taken.has(lab(f)) || equal(f, ans)) return;
-    taken.add(lab(f)); out.push(lab(f));
+  const out: Frac[] = [ans];
+  const add = (raw: Frac) => {
+    const f = simplify(raw);
+    if (out.length >= 4 || f.d < 2 || f.n < 1 || f.n % f.d === 0 || out.some(o => equal(o, f))) return;
+    out.push(f);
   };
   named.forEach(add);
-  for (const f of [{ n: ans.n + 1, d: ans.d }, { n: ans.n, d: ans.d + 1 }, { n: ans.n + 1, d: ans.d + 1 }, { n: ans.n + 2, d: ans.d }]) add(f);
-  return out;
+  for (let i = 1; out.length < 4 && i < 30; i++) [{ n: ans.n + i, d: ans.d }, { n: ans.n, d: ans.d + i }, { n: ans.n + i, d: ans.d + i }].forEach(add);
+  return out.slice(1).map(lab);
 }
 
 function slips(f: Frac, k: number): Frac[] {
