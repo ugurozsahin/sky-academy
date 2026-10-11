@@ -4,8 +4,8 @@
 // import: y6-subjunctive
 // import: y6-cohesion
 import { y6Hyphen } from './year6-hyphen';
+import { y6SubjectObject } from './year6-subjectobject';
 import { y6Lists } from './year6-lists';
-// import: y6-subjectobject
 // import: y6-consistency
 import type { Topic } from './types';
 import { y6Formal } from './year6-formal';
@@ -30,7 +30,7 @@ export const Y6_GRAMMAR: Topic[] = [
 
   { id: 'y6-hyphen', title: 'Hyphens', icon: '➖', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y6 Punctuation: hyphens to avoid ambiguity (Appendix 1, Appendix 2)', gen: y6Hyphen },
 
-  // slot: y6-subjectobject
+  { id: 'y6-subjectobject', title: 'Subject and Object', icon: '🎯', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y6 Grammar terms: subject and object (Appendix 2)', gen: y6SubjectObject },
 
   // slot: y6-consistency
 ];
