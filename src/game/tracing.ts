@@ -19,7 +19,8 @@ export function traceFeedback(r: TraceResult, answer: string, via: 'stroke' | 'c
   if (via === 'stroke') return strokes >= 1 && r.outside > 0.6 ? 'Stay on the dotted lines' : null;
   if (r.outside > 0.45) return 'Stay on the dotted lines';
   const missing = r.glyphs.filter(g => g < GLYPH_MIN).length;   // name the letter the child skipped
-  return answer.length > 1 && missing ? `Trace the "${[...answer][r.weakest]}" too — every letter!` : `Keep tracing — cover the whole ${answer.length > 1 ? 'word' : 'letter'}`;
+  const noun = /\d/.test(answer) ? 'number' : answer.length > 1 ? 'word' : 'letter';   // #1556: a digit card (y1-tracenum) is not a "letter"
+  return answer.length > 1 && missing ? `Trace the "${[...answer][r.weakest]}" too — every letter!` : `Keep tracing — cover the whole ${noun}`;
 }
 
 /** The mask is built at half the canvas resolution, so a canvas point maps to `x * MASK_SCALE` in the grid. */
