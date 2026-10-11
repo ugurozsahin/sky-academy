@@ -27,12 +27,21 @@ function runTerms(d: Difficulty, step: Step, rng: () => number): { terms: number
 }
 
 /** Misconception decoys first (#1050 KS2 rule): the term after next (a skipped term), and a column slip that
- *  keeps the units digit (±10 for 4s/8s, ±100 for 50s/100s); `nearby`-style fill only tops up the rest. */
+ *  keeps the units digit (±10 for 4s/8s, ±100 for 50s/100s); `nearby`-style fill only tops up the rest.
+ *  Two shapes leaked the leading digit past the KS2 ≤30% ceiling per step (#1454): in 100s both named decoys
+ *  are ±100 and so always leave the answer's hundred (measured 36-38% at d1-d3), and a two-digit answer
+ *  (8s count 0, 8, 16, 24 at d2) has its leading digit in the tens column, which ±8 and ±10 both leave
+ *  (51% at d2). Those two shapes get a `sameLeadDecoy` guaranteed in the pool, as `moreOrLess` does. Only
+ *  those: the rule counts answers ≥20, and a ±1/±2 decoy on a 50s/100s card (answer 0 or 50) or beside 4, 8
+ *  or 12 would be a non-multiple a child never reaches by counting (silent-failure-hunter, round 1). */
 function runDecoys(answer: number, step: Step, localStep: number, rng: () => number): number[] {
   const skipTerm = answer + localStep;
   const slipAmount = step === 50 || step === 100 ? 100 : 10;
   const slipTerm = rng() < 0.5 ? answer + slipAmount : answer - slipAmount;
-  const pool = new Set<number>([skipTerm, slipTerm].filter(v => v !== answer && v >= 0 && v <= 1099));
+  const needsLead = step === 100 ? answer >= 100 : (step === 4 || step === 8) && answer >= 20 && answer < 100;
+  const sameLead = needsLead ? sameLeadDecoy(answer, rng) : null;
+  const named = sameLead !== null ? [sameLead, skipTerm, slipTerm] : [skipTerm, slipTerm];
+  const pool = new Set<number>(named.filter(v => v !== answer && v >= 0 && v <= 1099));
   while (pool.size < 3) {
     const v = answer + ri(rng, -Math.max(step, 10), Math.max(step, 10));
     if (v !== answer && v >= 0 && v <= 1099 && !pool.has(v)) pool.add(v);
@@ -49,15 +58,19 @@ function countRun(d: Difficulty, rng: () => number): Question {
   return { prompt: `${prompt} = ?`, say: `Count in ${step}s. ${prompt.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options };
 }
 
-/** A decoy sharing the answer's leading (hundreds) digit, the same way `mistakes.ts`'s `fillLead` guarantees
- *  one for its sibling module (#1448 review). Only needed for `amt === 100`: adding/subtracting exactly 100
- *  is precisely the operation that changes the leading digit, so none of `moreOrLess`'s other three named
- *  decoys ever land in the answer's own hundred there (measured 46-89% leak, past the KS2 ≤30% ceiling).
- *  `amt === 10`'s crossing case needs no such fix: its `otherPower` decoy already lands in the answer's own
- *  hundred there, by construction. `null` when no same-hundred candidate exists (an extreme range edge). */
+/** A decoy sharing the answer's leading digit, the same way `mistakes.ts`'s `fillLead` guarantees one for its
+ *  sibling module (#1448 review): ±10/±20 inside the answer's own hundred (1,000-1,099 is the tenth hundred and
+ *  its leading digit is that 1), or ±1/±2 inside its own ten for a two-digit answer, whose leading digit is the
+ *  tens digit (#1454). `moreOrLess` needs it only for `amt === 100`: adding/subtracting exactly 100 is precisely
+ *  the operation that changes the leading digit, so none of its other three named decoys ever land in the
+ *  answer's own hundred there (measured 46-89% leak, past the KS2 ≤30% ceiling). `amt === 10`'s crossing case
+ *  needs no such fix: its `otherPower` decoy already lands in the answer's own hundred there, by construction.
+ *  `runDecoys` says which of its shapes need it. `null` when no candidate exists — defensive: every answer in
+ *  0-1,099 has at least two candidates, so no caller reaches it today. */
 function sameLeadDecoy(answer: number, rng: () => number): number | null {
-  const lo = Math.max(0, Math.floor(answer / 100) * 100), hi = Math.min(1099, lo + 99);
-  const candidates = [answer - 20, answer - 10, answer + 10, answer + 20].filter(v => v !== answer && v >= lo && v <= hi);
+  const width = answer < 100 ? 10 : 100, unit = width / 10;
+  const lo = Math.max(0, Math.floor(answer / width) * width), hi = Math.min(1099, lo + width - 1);
+  const candidates = [answer - 2 * unit, answer - unit, answer + unit, answer + 2 * unit].filter(v => v !== answer && v >= lo && v <= hi);
   return candidates.length ? pick(rng, candidates) : null;
 }
 
