@@ -52,6 +52,10 @@ describe('traceFeedback (#895)', () => {
   it('on Check ✓: a single letter gets the generic nudge, never "every letter!"', () => {
     expect(traceFeedback(halfCovered, 'a', 'check', 1)).toBe('Keep tracing — cover the whole letter');
   });
+  it('on Check ✓: a digit is a "number", not a "letter" (#1556)', () => {
+    for (const n of '0123456789') expect(traceFeedback(halfCovered, n, 'check', 1)).toBe('Keep tracing — cover the whole number');
+    expect(traceFeedback(halfCovered, 'a', 'check', 1)).not.toContain('number');   // a letter card is untouched
+  });
   it('on Check ✓: an undercovered word with no single weak letter gets the word-shaped nudge', () => {
     const evenlyThin: TraceResult = { coverage: 0.6, outside: 0.1, glyphs: [0.6, 0.6], weakest: 0, pass: false };
     expect(traceFeedback(evenlyThin, 'cat', 'check', 2)).toBe('Keep tracing — cover the whole word');

@@ -8,6 +8,9 @@ describe('every test yields one macrotask turn to the worker RPC (#1645)', () =>
   it('vitest.config.ts loads tests/unit/setup.ts for every file', () => {
     expect(readFileSync('vitest.config.ts', 'utf8')).toMatch(/setupFiles: \['tests\/unit\/setup\.ts'\]/);
   });
+  it('vitest.config.ts lifts the 5 s default test timeout so a loaded CI runner cannot fail a tree-scanning test (#1742)', () => {
+    expect(readFileSync('vitest.config.ts', 'utf8')).toMatch(/testTimeout: 60_000/);
+  });
   it('setup.ts captures setImmediate before a test can fake it, and awaits it after each test', () => {
     const src = readFileSync('tests/unit/setup.ts', 'utf8');
     expect(src).toContain('const nextTurn = globalThis.setImmediate;');

@@ -14,7 +14,7 @@ const canon = (a: Dec): Dec => parseNum(fmt(a))!;
 const digits = (s: string) => s.replace(/\D/g, '');
 const twins = (ds: string[], ans: string) => ds.some(d => digits(d).slice(-1) === digits(ans).slice(-1)) && ds.some(d => digits(d)[0] === digits(ans)[0]);
 
-/** The glued slip: whole × k and decimal digits × k printed side by side (2.35 × 4 → 8.140, printed 8.14). */
+/** The glued slip: whole × k and the decimal digits × k printed side by side (2.35 × 4 → 8.140, printed 8.14). A zero tenths digit drops out of the second part (1.05 × 4 → 4.20), which is still a distinct, plausible wrong answer. */
 function glued(a: Dec, k: number): Dec | null {
   const p = 10 ** a.dp, whole = Math.floor(a.v / p), frac = a.v % p;
   return parseNum(`${whole * k}.${frac * k}`);
