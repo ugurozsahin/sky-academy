@@ -148,7 +148,7 @@ export function changeAvatarScreen(go: () => void) {
 export function introScreen(finish: () => void, skip: () => void = finish) {
   const d = load();
   const avatar = avatarById(d.avatar);
-  const line = welcomeLine(d.name);
+  const line = welcomeLine(d.name, d);
   render(`
   <section class="screen avatar-screen intro-screen">
     <div class="intro-card" style="--glow:${avatar.glow}">
