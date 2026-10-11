@@ -5861,3 +5861,18 @@ test('a y6-coords four-quadrant grid fits a 390×664 phone (#1213)', async ({ pa
   await expectFitsViewport(page, 'y6-coords four-quadrant grid');
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
 });
+
+// #1288: a KS1 island reads "Warm-up" for a child whose school year is KS2.
+test('the Year 2 card reads Warm-up for a Year 3 child, its age band otherwise (#1288)', async ({ page }) => {
+  await seedPreview(page);
+  await seedPlayer(page, 'volt', 'Ada', { ks2: { schoolYear: 'year3', facts: {}, checks: [], words: {} } });
+  const card = page.locator('.island[data-year="year2"]');
+  await expect(card).toContainText('Warm-up');
+  await expect(card).not.toContainText('Ages 6–7');
+  await card.click();
+  await expect(page.locator('.isl-head small')).toContainText('Warm-up');
+});
+test('the Year 2 card keeps its age band with no school year (#1288)', async ({ page }) => {
+  await seedPlayer(page);
+  await expect(page.locator('.island[data-year="year2"]')).toContainText('Ages 6–7');
+});

@@ -1,4 +1,5 @@
-import type { YearInfo } from '../curriculum/types';
+import type { YearId, YearInfo } from '../curriculum/types';
+import { ageLabel } from './year-label';
 import { islandArt } from './island-placeholder';
 
 /**
@@ -45,13 +46,14 @@ export function islandsHTML(
   stars: (y: YearInfo) => { s: number; m: number },
   selId: string | undefined,
   compact: boolean,
+  schoolYear?: YearId,
 ): string {
   return years.map((y, i) => {
-    const { s, m } = stars(y);
+    const { s, m } = stars(y); const age = ageLabel(y, schoolYear);
     return `
         <button class="island${y.id === selId ? ' sel' : ''}" data-year="${y.id}" style="--tint:${y.tint}" aria-label="${y.title} island">
           <span class="isl-art" style="background-image:url(&quot;${islandArt(y)}&quot;);animation-delay:${(-1.3 * i).toFixed(1)}s"></span>
-          <span class="isl-text"><b>${y.title}</b><small>${compact ? y.age : `${y.age} · ${y.blurb}`}</small>
+          <span class="isl-text"><b>${y.title}</b><small>${compact ? age : `${age} · ${y.blurb}`}</small>
           <span class="isl-bar"><i style="width:${m ? Math.round(100 * s / m) : 0}%"></i></span><span class="isl-stars">★ ${s}/${m}</span></span>
           <span class="isl-go">Go →</span>
         </button>`;
