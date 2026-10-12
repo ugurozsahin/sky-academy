@@ -11,7 +11,7 @@ import { fakeBackButton, pressBack, pressBackThenSnapshot } from './back-button'
 
 // Ninja Duel (#16 items 2–4): two arenas on one screen, the same question in both, first correct slice wins
 // the round. Driven through the duel screen's own `window.__sna` hooks, which name the player every call is for.
-declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __said: string[]; __deadArenas: { time: number }[]; __seedMiss: boolean } }
+declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __said: string[]; __deadArenas: { time: number }[]; __seedMiss: boolean; __saved?: string | null; __wasDisabled?: boolean | null } }   // `__saved`/`__wasDisabled`, #1797: the certificate test's fake `save` — the filename it was handed, and `#cert.disabled` as it stood when the save began
 
 // #748: same override as game.spec.ts's FAST — kept as its own constant here since the two files don't share
 // module scope, so a CI trial can pass one PW_FAST and have both suites honour it identically.
@@ -356,17 +356,18 @@ test.describe('Ninja Duel', () => {
     // `b.disabled = true`, so `__wasDisabled` is that flag at the one moment this is about. Rail:
     // tests/unit/e2e-transient-disabled.test.ts.
     await page.evaluate(() => {
-      (window as any).__saved = null; (window as any).__wasDisabled = null;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__wasDisabled = (document.querySelector('.duel-end #cert') as HTMLButtonElement).disabled; (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 600)); return { status: 'saved' }; } } : null };
+      window.__saved = null; window.__wasDisabled = null;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { window.__wasDisabled = (document.querySelector('.duel-end #cert') as HTMLButtonElement).disabled; window.__saved = r.filename; await new Promise(res => setTimeout(res, 600)); return { status: 'saved' }; } } : null };
     });
     await page.click('.duel-end #cert');
     await expect(page.locator('.duel-end #cert-msg'), 'reported where the child is already looking, not behind the overlay').toHaveText('Certificate saved!');
-    // Re-enabled once delivery settles — the handler's matching `b.disabled = false` — and disabled while the
-    // save was in flight, as the fake `save` saw it. The flag is read after the certificate is drawn, so it
-    // proves the disable HELD through delivery, not where in the handler it was set.
+    // Re-enabled once delivery settles — the handler's matching `b.disabled = false` — and disabled when the
+    // save began, as the fake `save` saw it. The flag is read at the start of `save`, after the certificate is
+    // drawn and inside the handler's own delivery, so it proves the button was still disabled that far in —
+    // not where in the handler it was set, and not that it held through the fake's delay itself.
     await expect(page.locator('.duel-end #cert')).toBeEnabled();
-    expect(await page.evaluate(() => (window as any).__wasDisabled), 'the 🎓 button is disabled while the save is in flight').toBe(true);
-    expect(await page.evaluate(() => (window as any).__saved), "the duel handler's own filename, not the mission path's").toMatch(/^sky-ninja-duel-.*\.png$/);
+    expect(await page.evaluate(() => window.__wasDisabled), 'the 🎓 button is disabled when the save begins').toBe(true);
+    expect(await page.evaluate(() => window.__saved), "the duel handler's own filename, not the mission path's").toMatch(/^sky-ninja-duel-.*\.png$/);
     // (b) artifact viewer WITHOUT a downloads grant → the full-screen "press and hold" fallback (the 'shown'
     // route, the mission path's own second half of the same #50 rule: the button never silently does nothing).
     await page.evaluate(() => { (window as any).claude = { use: async () => null }; });

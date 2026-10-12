@@ -17,13 +17,20 @@ import { code, e2eSpecFiles } from './helpers/sources';
 // over a two-line window rather than one regex over one line. Comments are stripped by `code()` first, so
 // this very explanation does not trip the rail where it is quoted in a spec. Known hole: a locator held in a
 // variable (`const cert = page.locator('#cert')` … `expect(cert).toBeDisabled()`) is outside the window —
-// neither spec writes `#cert` that way today; widen the window if one starts to.
+// neither spec writes `#cert` that way today; widen the window if one starts to. This is a "do not
+// reintroduce exactly this" rail, not a proof that no Node-side read of `#cert.disabled` exists: it pins the
+// three shapes the specs had, and `toHaveJSProperty('disabled', …)`, `toHaveAttribute('disabled', …)`,
+// `page.isDisabled('#cert')` or a `$eval` polled from Node would pass it (review of #1797, N3).
 // `#next`, `#go` and the other `toBeDisabled()` sites are settled states, not transient ones, and stay.
 const CERT_LOCATOR = /locator\((['"`])[^'"`]*#cert\1\)/;
 const POLLED_DISABLED = /\.(toBeDisabled|not\.toBeEnabled|isDisabled)\(/;
 // The assertion itself, not just the flag's initialiser: `__wasDisabled = null` alone would satisfy a bare
 // `includes('__wasDisabled')` after the `toBe(true)` line was deleted — the exact regression this guards.
 const FLAG_ASSERTED = /__wasDisabled\)[^\n]*\.toBe\(true\)/;
+// A hit is reported at its line in the real file, not in `code()`'s output (review of #1797, N2): stripping
+// collapses every `/** */` block to one space, so the stripped text's line numbers run below the file's (the
+// red run on main printed `game.spec.ts:1178` for real line 1259). The stripped line is looked up in the raw text.
+const realLine = (raw: string, stripped: string) => { const i = raw.split('\n').findIndex(r => r.includes(stripped.trim())); return i === -1 ? '?' : String(i + 1); };
 
 describe('a transient disabled state is read inside the fake save, never polled from outside (#1797)', () => {
   const specs = e2eSpecFiles();
@@ -43,9 +50,10 @@ describe('a transient disabled state is read inside the fake save, never polled 
   });
 
   it.each(specs.map(s => s.name))('%s never reads #cert.disabled from outside the fake save', name => {
-    const lines = code(specs.find(s => s.name === name)!.text).split('\n');
+    const raw = specs.find(s => s.name === name)!.text;
+    const lines = code(raw).split('\n');
     // A statement can wrap, so judge each read by the line it is on and the one before it.
-    const hits = lines.flatMap((l, i) => (POLLED_DISABLED.test(l) && (CERT_LOCATOR.test(l) || CERT_LOCATOR.test(lines[i - 1] ?? '')) ? [`${name}:${i + 1}`] : []));
+    const hits = lines.flatMap((l, i) => (POLLED_DISABLED.test(l) && (CERT_LOCATOR.test(l) || CERT_LOCATOR.test(lines[i - 1] ?? '')) ? [`${name}:${realLine(raw, l)}`] : []));
     expect(hits, 'read #cert.disabled inside the fake save and assert that flag — a polled toBeDisabled() races the fake delay (#1797)').toEqual([]);
   });
 

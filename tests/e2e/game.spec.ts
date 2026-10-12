@@ -31,6 +31,7 @@ declare global {
   interface Window { __seedMiss?: boolean }                         // #518: true when a dojo seed keyed by date missed the page's own day
   interface Window { __cancelled?: number }                         // #884: how many times the engine's cancel() ran — hush() reaches it
   interface Window { __tutShown?: boolean }                         // #1648: the tutorial hand was rendered visible at least once
+  interface Window { __saved?: string | null; __wasDisabled?: boolean | null }   // #1797: the certificate test's fake `save` — the filename it was handed, and `#cert.disabled` as it stood when the save began
 }
 
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
@@ -270,25 +271,37 @@ async function solveCurrent(page: Page) {
 }
 /** Wait until a wrong bubble can be sliced on a live question — or the game has ended. */
 const waitForWrongOrEnd = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s) return false; if (s.ended) return true; if (s.waiting) return false; const c = window.__sna.session.current; const t = c.sequence ? window.__sna.session.remaining()[0] : c.answer; const bs = window.__sna.bubbles(); return bs.some((b: any) => b.label === t) && bs.some((b: any) => b.label !== t && b.label !== '💣'); }, null, { timeout: 20000 });   // a decoy must be in flight too (every 3rd Storm wave adds a TNT bubble, which never counts as a wrong slice)
-/** `answerAll`'s wait: the next bubble `answer()` would slice is in flight and the question is still live. */
-const waitForNext = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.remaining()[0] : s.answer)); });
+/** `answerAll`'s wait: the next bubble `answer()` would slice is in flight and the question is still live.
+ *  Resolves to that question's `questionsAsked` — the pin every slice below is checked against. */
+const waitForNext = async (page: Page) => (await page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.remaining()[0] : s.answer)) ? { asked: window.__sna.session.questionsAsked } : null; })).jsonValue();
+/** `answer()` on the question pinned by `asked`, in ONE round trip: the count is read beside the slice, so a
+ *  question that moved on while the Node side was between two evaluates is reported as `'moved'` instead of
+ *  being sliced — a slice there would land on the NEXT question's target and return true (review of #1797, B1). */
+const sliceOn = (page: Page, asked: number) => page.evaluate((a) => window.__sna.session.questionsAsked !== a ? 'moved' as const : window.__sna.answer(), asked);
 async function answerAll(page: Page, n: number) {
   for (let i = 0; i < n; i++) {
-    await waitForNext(page);
-    let sliced = await answer(page);
+    const { asked } = (await waitForNext(page))!;
+    const lost = (why: string) => new Error(`answerAll: question ${i + 1} of ${n} — ${why}, so the question was decided as a miss and lost, not answered (#1797)`);
+    let sliced = await sliceOn(page, asked);
+    if (sliced === 'moved') throw lost('the question moved on between the wait and the slice');
     if (!sliced) {
       // The wait and the slice are two round trips, and under load (five workers on a ten-core Mac, #1797) the
       // target the wait just saw can leave the arena before `answer()` runs — the window `solveCurrent` above
       // handles since #1540. Benign while the question is still live: the bubble relaunches (#591, every
       // ordered label) or a gentle year gives it its free trip (#742), so wait for THIS question to settle one
-      // way or the other — the target back in flight, or decided — and slice once more. `waiting`/`ended`, or
-      // `questionsAsked` moved (an armed question's `expire()` decides a miss without `fall()`), means the
-      // question was lost: the test's failure, named here, never a count one short later, and never a wait
-      // that resolves on the NEXT question's target. The second miss still fails the assertion below.
-      const asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      // way or the other — the target back in flight, or decided — and slice once more. Decided is any of
+      // `waiting`, `ended`, or `questionsAsked` past the pin — all three, because `waiting` is a window, not a
+      // state: `fall()` sets it, and the miss hold plus `waveEnd()`'s breath later (about 270 ms at FAST 8)
+      // `advance()` → `nextQuestion()` clears it and moves the count in one statement, with the next question's
+      // target then in flight; `session.waveEnd()`'s undecided branch (only decoys fell) and an armed
+      // question's `expire()` decide the miss and `advance()` in the same synchronous call, so `waiting` true
+      // is never pollable there at all. A lost question is the test's failure, named here, never a count one
+      // short later, and never a slice that lands on the NEXT question's target — which is why the pin is
+      // read in the same evaluate as every slice (`sliceOn`), not a round trip apart from it.
       const back = await page.waitForFunction((a) => { const s = window.__sna.state(); if (s.waiting || s.ended || window.__sna.session.questionsAsked > a) return 'lost'; const c = window.__sna.session.current; return window.__sna.bubbles().some((b: any) => b.label === (c.sequence ? window.__sna.session.remaining()[0] : s.answer)) ? 'back' : null; }, asked);
-      if (await back.jsonValue() === 'lost') throw new Error(`answerAll: question ${i + 1} of ${n} — the target fell before answer() could slice it and the question was decided as a miss, so it was lost, not answered (#1797)`);
-      sliced = await answer(page);
+      if (await back.jsonValue() === 'lost') throw lost('the target fell before answer() could slice it');
+      sliced = await sliceOn(page, asked);
+      if (sliced === 'moved') throw lost('the question moved on between the target coming back and the second slice');
     }
     expect(sliced, `answerAll: question ${i + 1} of ${n} — answer() found nothing to slice on two attempts, with the question still live (#1797)`).toBe(true);
     await page.waitForFunction((i) => { const s = window.__sna?.state(); return s && (s.index > i || s.ended || document.querySelector('.celebrate')); }, i);
@@ -1272,17 +1285,18 @@ test.describe('Sky Ninja Academy', () => {
     // The fake runs within the handler's own `try`, after `play-results.ts`'s synchronous `b.disabled = true`,
     // so `__wasDisabled` is that flag at the one moment the test is about. Rail: tests/unit/e2e-transient-disabled.test.ts.
     await page.evaluate(() => {
-      (window as any).__saved = null; (window as any).__wasDisabled = null;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__wasDisabled = (document.querySelector('#cert') as HTMLButtonElement).disabled; (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 60)); return { status: 'saved' }; } } : null };
+      window.__saved = null; window.__wasDisabled = null;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { window.__wasDisabled = (document.querySelector('#cert') as HTMLButtonElement).disabled; window.__saved = r.filename; await new Promise(res => setTimeout(res, 60)); return { status: 'saved' }; } } : null };
     });
     await page.click('#cert');
     await expect(page.locator('#toast')).toContainText('saved');
-    // Re-enabled once delivery settles — the handler's matching `b.disabled = false` — and disabled while the
-    // save was in flight, as the fake `save` saw it. The flag is read after the certificate is drawn, so it
-    // proves the disable HELD through delivery, not where in the handler it was set.
+    // Re-enabled once delivery settles — the handler's matching `b.disabled = false` — and disabled when the
+    // save began, as the fake `save` saw it. The flag is read at the start of `save`, after the certificate is
+    // drawn and inside the handler's own delivery, so it proves the button was still disabled that far in —
+    // not where in the handler it was set, and not that it held through the fake's delay itself.
     await expect(page.locator('#cert')).toBeEnabled();
-    expect(await page.evaluate(() => (window as any).__wasDisabled), 'the 🎓 button is disabled while the save is in flight').toBe(true);
-    expect(await page.evaluate(() => (window as any).__saved)).toMatch(/^sky-ninja-certificate-.*\.png$/);
+    expect(await page.evaluate(() => window.__wasDisabled), 'the 🎓 button is disabled when the save begins').toBe(true);
+    expect(await page.evaluate(() => window.__saved)).toMatch(/^sky-ninja-certificate-.*\.png$/);
     // AND IT GOES AWAY AGAIN. The auto-hide is 1300ms, and nothing asserted it until now: PR #474's round-1
     // review found that a beat armed under the results screen's own hold was frozen and never armed, so this
     // toast pinned itself over the modal for the life of the screen — and the untested auto-hide made the
