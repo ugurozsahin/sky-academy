@@ -43,6 +43,8 @@ describe('ghostBest gates, each failing alone (#914)', () => {
   it('is silent in Extra time, in practice and on a deck', () => {
     save.timeX = 1.5;
     expect(run({})).toEqual([null, null, null]);
+    save.timeX = 0;                                                                   // no time limit keeps no best either
+    expect(run({})).toEqual([null, null, null]);
     save.timeX = 1;
     expect(run({ practice: true })).toEqual([null, null, null]);
     expect(run({ deck: [] })).toEqual([null, null, null]);
