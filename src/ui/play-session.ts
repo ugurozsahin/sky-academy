@@ -19,7 +19,7 @@ import type { CertInfo } from './certificate'; import { firstQuestionLine, type 
 import { createFactLog } from '../fact-record';
 import { $, esc } from './dom';
 import { freezeUntilVisible } from './hidden-hold';
-import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
+import { createGhost } from './ghost'; import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { correctionLine, hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
 import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
@@ -248,7 +248,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     return false;
   }
 
-  const session = new Session(opts, {
+  const ghost = createGhost(opts); const session = new Session(opts, {
     onQuestion(q, info) {
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
       const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { deps.later(() => show(), wait + scaled(450)); return; } show();
@@ -311,7 +311,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     },
     onCorrect(q, points, combo) {
       sfx.correct(); els.score.textContent = String(session.score); solid.cheer();   // #740: the card's solid cheers
-      const c = cheerLine(deps.av); deps.toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', scaled(hold.correct) + 300);
+      const c = ghost.beat(session.correct) ?? cheerLine(deps.av); deps.toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', scaled(hold.correct) + 300);
       const arena = deps.arena();
       if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, deps.av.glow);
       // a finished sequence spotlights its last letter; everything else spotlights the answer itself
