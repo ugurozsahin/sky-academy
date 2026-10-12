@@ -88,10 +88,10 @@ describe('the word record is written and read end to end (#1289)', () => {
     expect(load().ks2.words).toEqual({ address: 'rr', answer: 'w' });
   });
   it('the dashboard section is absent with no tried word, and reads "N of 100 secure" with the not-yet words', () => {
-    expect(wordsHTML(parentSummary(load(), CORE_TOPICS, YEARS, STICKER_IDS.length).words)).toBe('');
+    expect(wordsHTML(parentSummary(load(), CORE_TOPICS, YEARS, STICKER_IDS.length, new Date(), CORE_TOPICS).words)).toBe('');
     const w = STATUTORY_LISTS[0].words;
     recordGameEnd({ ...game, words: [...w.slice(0, 2), w[0], w[0]].map((word, i) => ({ word, right: i !== 1 })) }, 0);
-    const html = wordsHTML(parentSummary(load(), CORE_TOPICS, YEARS, STICKER_IDS.length).words);
+    const html = wordsHTML(parentSummary(load(), CORE_TOPICS, YEARS, STICKER_IDS.length, new Date(), CORE_TOPICS).words);
     expect(html).toContain('Year 3–4 words: 1 of 100 secure · 1 not yet secure · 98 not tried yet');
     expect(html).toContain(w[1]);
     expect(html).toContain('Copy these words');

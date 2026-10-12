@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { numberWord } from '../../src/curriculum/util';
 import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, factsToPractise, type SlipRow } from '../../src/game/parents';
-import { TOPICS, CORE_TOPICS, YEARS, topicsFor } from '../../src/curriculum';
+import { TOPICS, CORE_TOPICS, YEARS, topicsFor, listedTopics, shownYears } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
-import { topicRow, canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
+import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
+import { chooserEligible } from '../../src/ui/chooser';
+import { topicRow, noTrophyHTML } from '../../src/ui/parents-trophies';
 import { ABOUT_LINES, aboutHTML } from '../../src/ui/about';
 import { settingsHTML } from '../../src/ui/parents-settings';
 import { slipsHTML } from '../../src/ui/parents-slips';
@@ -62,7 +64,7 @@ describe('grown-ups gate', () => {
 
 describe('parent dashboard summary', () => {
   it('an untouched save reports nothing played but the full topic count', () => {
-    const sm = parentSummary(base, CORE_TOPICS, YEARS, STICKER_IDS.length);
+    const sm = parentSummary(base, CORE_TOPICS, YEARS, STICKER_IDS.length, new Date(), CORE_TOPICS);
     expect(sm.totalAnswered).toBe(0);
     expect(sm.overallAccuracy).toBeNull();
     expect(sm.starsEarned).toBe(0);
@@ -87,7 +89,7 @@ describe('parent dashboard summary', () => {
       endless: { year1: 120 }, sprint: { year1: 15 }, boss: { year1: 2 }, memory: { year1: 1 }, training: { year1: 3 },
       coins: 70, stickers: ['volt', 'blaze'], streak: { last: '2026-09-06', days: 4 },
     };
-    const sm = parentSummary(data, CORE_TOPICS, YEARS, STICKER_IDS.length);
+    const sm = parentSummary(data, CORE_TOPICS, YEARS, STICKER_IDS.length, new Date(), CORE_TOPICS);
 
     expect(sm.totalAnswered).toBe(50 + 20 + 5 + 3);
     expect(sm.totalCorrect).toBe(45 + 6 + 3 + 2);
@@ -140,7 +142,7 @@ describe('parent dashboard summary', () => {
       training: 42 as unknown as SaveData['training'],
     };
     let sm: ReturnType<typeof parentSummary>;
-    expect(() => { sm = parentSummary(corrupted, TOPICS, YEARS, STICKER_IDS.length); }).not.toThrow();
+    expect(() => { sm = parentSummary(corrupted, TOPICS, YEARS, STICKER_IDS.length, new Date(), TOPICS); }).not.toThrow();
     expect(sm!.topicsTried).toBe(0);
     expect(sm!.starsEarned).toBe(0);
     expect(sm!.modes.every(m => m.endless === 0 && m.sprint === 0 && m.boss === 0 && m.memory === 0 && m.training === 0)).toBe(true);
@@ -181,7 +183,7 @@ describe('recentSlips (#938): the grown-ups "Recent slips" reader', () => {
   });
   it('parentSummary exposes the same rows as its own .slips field', () => {
     const data: SaveData = { ...base, slips: [{ topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' }] };
-    const sm = parentSummary(data, TOPICS, YEARS, STICKER_IDS.length);
+    const sm = parentSummary(data, TOPICS, YEARS, STICKER_IDS.length, new Date(), TOPICS);
     expect(sm.slips).toEqual(recentSlips(data, TOPICS));
   });
 });
@@ -399,7 +401,7 @@ describe('curriculum statements in words for grown-ups (#944)', () => {
   it('no registered topic still shows A&S, NPV or M&D, and its statement is unchanged at source', () => {
     for (const t of TOPICS) expect(ncForGrownUps(t.nc)).not.toMatch(/A&S|NPV|M&D/);
     const data = { ...load(), progress: { 'y1-sub': { stars: 1, plays: 3, hits: 6, tries: 20, best: 0 } } } as SaveData;
-    const [w] = parentSummary(data, CORE_TOPICS, YEARS, 0).weakest;
+    const [w] = parentSummary(data, CORE_TOPICS, YEARS, 0, new Date(), CORE_TOPICS).weakest;
     expect(w.id).toBe('y1-sub');
     expect(w.nc).toBe(ncForGrownUps(TOPICS.find(t => t.id === 'y1-sub')!.nc));
   });
@@ -436,7 +438,7 @@ describe('factsToPractise (#1123): the grown-ups "Facts to practise" lines', () 
   it('writes a pair as "9 × 6 and 6 × 9", with U+00D7 and spaces', () => {
     const data = { ...base, ks2: { ...base.ks2, facts: { '9×6': fact(2, 'ww'), '6×9': { ...fact(1, 'w'), day: '2026-10-05' }, '7×7': fact(1, 'w') } } };
     expect(factsToPractise(data)).toEqual(['7 × 7', '9 × 6 and 6 × 9']);
-    expect(parentSummary(data, CORE_TOPICS, YEARS, STICKER_IDS.length).facts).toEqual(['7 × 7', '9 × 6 and 6 × 9']);
+    expect(parentSummary(data, CORE_TOPICS, YEARS, STICKER_IDS.length, new Date(), CORE_TOPICS).facts).toEqual(['7 × 7', '9 × 6 and 6 × 9']);
   });
   it('is null with an empty tally, so the section is hidden', () => {
     expect(factsToPractise(base)).toBeNull();
@@ -451,5 +453,59 @@ describe('factsToPractise (#1123): the grown-ups "Facts to practise" lines', () 
     const html = factsHTML(['9 × 6 and 6 × 9']);
     expect(html).toContain('<h3 class="p-h">Facts to practise</h3>');
     expect(html.match(/class="p-topic"/g)).toHaveLength(1);
+  });
+});
+
+describe('Yet to earn a trophy (#913)', () => {
+  const y1 = topicsFor('year1');
+  const [won, tried, untried] = y1;
+  const rows = (progress: Record<string, TopicProgress>, eligible = [won, tried, untried]) =>
+    parentSummary({ ...base, progress }, eligible, YEARS.filter(y => y.id === 'year1'), 0, new Date(), eligible).noTrophy;
+
+  it('puts a trophied, a tried-bare and an untried topic in the right buckets', () => {
+    const [r] = rows({ [won.id]: { ...p(1, 1, 1, 2), sprint: 3 }, [tried.id]: p(1, 1, 1, 2) });
+    expect(r.topics.map(t => t.id)).toEqual([tried.id]);
+    expect(r.untried).toBe(1);
+  });
+  it('lists only the topics it is given, so a tracing topic left out by the filter never appears', () => {
+    const trace = topicsFor('reception').find(t => t.id.includes('trace')) ?? topicsFor('year1')[0];
+    const [r] = rows({ [trace.id]: p(1, 1, 1, 2) }, [won]);
+    expect(r.topics).toEqual([]);
+    expect(r.untried).toBe(1);
+  });
+  it('built as the screen builds it, never lists or counts a topic the Sprint chooser cannot offer', () => {
+    const eligible = listedTopics().filter(chooserEligible);
+    const barred = listedTopics().filter(t => !chooserEligible(t));
+    expect(barred.length, 'tracing topics exist, or this test proves nothing').toBeGreaterThan(0);
+    const progress = Object.fromEntries(barred.map(t => [t.id, p(1, 1, 1, 2)]));
+    const rs = parentSummary({ ...base, progress }, listedTopics(), shownYears(), 0, new Date(), eligible).noTrophy;
+    const barredIds = new Set(barred.map(t => t.id));
+    expect(rs.flatMap(r => r.topics).filter(t => barredIds.has(t.id))).toEqual([]);
+    expect(rs.reduce((n, r) => n + r.untried, 0)).toBe(eligible.length);
+  });
+  it('the trophy boundary: a best of 0 is listed, a best of 1 is not', () => {
+    const [a] = rows({ [won.id]: { ...p(1, 1, 1, 2), sprint: 0 } }, [won]);
+    expect(a.topics.map(t => t.id)).toEqual([won.id]);
+    const [b] = rows({ [won.id]: { ...p(1, 1, 1, 2), sprint: 1 } }, [won]);
+    expect(b.topics).toEqual([]);
+  });
+  it('keeps curriculum order', () => {
+    const [r] = rows({ [untried.id]: p(0, 1, 0, 1), [won.id]: p(0, 1, 0, 1) });
+    expect(r.topics.map(t => t.id)).toEqual([won.id, untried.id]);
+  });
+  it('a corrupted progress gives empty lists, not a throw', () => {
+    for (const bad of [null, 'x', [], { [won.id]: 5, [tried.id]: null }]) {
+      const rs = parentSummary({ ...base, progress: bad as any }, [won, tried], YEARS.filter(y => y.id === 'year1'), 0, new Date(), [won, tried]).noTrophy;
+      expect(rs[0].topics).toEqual([]);
+      expect(rs[0].untried).toBe(2);
+    }
+  });
+  it('renders positive copy and the untried count', () => {
+    const html = noTrophyHTML(rows({ [tried.id]: p(1, 1, 1, 2) }));
+    expect(html).toContain('<h3 class="p-h">Yet to earn a trophy</h3>');
+    expect(html).toContain('and 2 not tried yet');
+    expect(html.match(/class="p-topic"/g)).toHaveLength(1);
+    expect(html).not.toMatch(/fail|missing/i);
+    expect(noTrophyHTML(rows({}, []))).toContain('Every topic tried has a trophy!');
   });
 });
