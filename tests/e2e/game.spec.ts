@@ -3319,6 +3319,30 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#sprint small')).toContainText('best 10');
   });
 
+  // #925: the Daily Sprint's one-line result is copyable only behind the grown-ups gate, and never carries the child's name.
+  test('Daily Sprint result line: absent before a Daily Sprint, then on the grown-ups dashboard with Copy and no name (#925)', async ({ page }) => {
+    await page.addInitScript(() => { (window as any).__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { (window as any).__copied.push(t); } }, configurable: true }); });
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await expect(page.locator('#daily-copy')).toHaveCount(0);
+    await page.click('#back');
+    await page.click('.island[data-year="year1"]');
+    await page.click('#daily');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results')).not.toContainText('Copy');   // no child-facing share or copy
+    await page.click('#home');
+    await page.click('#back');
+    await openGrownUps(page);
+    const line = await page.locator('#daily-text').inputValue();
+    expect(line).toMatch(/^Sky Ninja Academy · Daily Sprint · Year 1 · \d{4}-\d{2}-\d{2} · 0 correct$/);
+    expect(line).not.toContain('Ada');
+    await page.click('#daily-copy');
+    await expect(page.locator('#daily-msg')).toContainText('Copied');
+    expect(await page.evaluate(() => (window as any).__copied)).toEqual([line]);
+  });
+
   test('Ninja Sprint topic chooser (#910): 🎲 Mixed first, then the open subject\'s topics', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
