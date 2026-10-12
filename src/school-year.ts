@@ -15,6 +15,9 @@ export function placementYear(d: { ks2: { schoolYear?: YearId } }, shownNow: rea
   return undefined;
 }
 
+/** The year a ninja's voice is written for (#1287): the school year as `placementYear` reads it when it is set, else the island being played. */
+export const voiceYear = (d: { ks2: { schoolYear?: YearId } }, played?: YearId): YearId | undefined => placementYear(d) ?? played;
+
 /** The usual year group for a birth date on `today`: 0 is Reception, n is Year n, `null` outside Reception–Year 6.
  *  A school year runs 1 September to 31 August, so only the birth year and whether it is September or later matter. */
 export function schoolYearFromBirthDate(birth: Date, today: Date): number | null {

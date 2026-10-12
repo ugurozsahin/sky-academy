@@ -3991,6 +3991,34 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.parents-dash .p-h', { hasText: 'Facts to practise' })).toHaveCount(0);
   });
 
+  test('For grown-ups: "Check readiness" shows the Tables Check trend and weeks to the date, and no child screen has it (#1286)', async ({ page }) => {
+    const chk = (score: number) => ({ date: '2026-10-01', score, missed: [] });
+    await seedPlayer(page, 'volt', 'Ada', { ks2: { schoolYear: 'year4', facts: {}, checks: [chk(22), chk(19), chk(16)], words: {} } });
+    await expect(page.locator('body')).not.toContainText('Check readiness');   // the map
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Check readiness');   // an island
+    await page.click('#back');
+    await openGrownUps(page);
+    const dash = page.locator('.parents-dash');
+    await expect(dash).toContainText('16 → 19 → 22 out of 25');
+    const d = new Date(); d.setDate(d.getDate() + 20);
+    await page.locator('#ready-date').fill(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    await expect(page.locator('#ready-weeks')).toHaveText('3 weeks to go');
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await page.reload();                                   // the date is saved, not just shown
+    await openGrownUps(page);
+    await expect(page.locator('#ready-date')).toHaveValue(iso);
+    await expect(page.locator('#ready-weeks')).toHaveText('3 weeks to go');
+    await page.locator('#ready-date').fill('');
+    await expect(page.locator('#ready-weeks')).toHaveText('');
+    await page.reload();                                   // …and clearing it is saved too
+    await openGrownUps(page);
+    await expect(page.locator('#ready-date')).toHaveValue('');
+    await page.locator('#ready-date').scrollIntoViewIfNeeded();
+    await expectFitsViewport(page, 'grown-ups Check readiness');
+  });
+
   test('For grown-ups: "Share a progress summary" falls back to the clipboard, with no save code in the text (#942)', async ({ page }) => {
     await page.addInitScript(() => { (navigator as any).share = undefined; (window as any).__copied = ''; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { (window as any).__copied = t; } }, configurable: true }); });
     await seedPlayer(page, 'volt', 'Ada');
