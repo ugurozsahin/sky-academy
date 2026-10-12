@@ -132,7 +132,13 @@ function dojoSeeds(volume: 'short' | 'fresh'): Record<string, unknown> {
 /** Wait until player `p`'s arena has the answer in flight, then slice it there. */
 async function winRound(page: Page, p: 'a' | 'b') {
   await page.waitForFunction(p => { const s = window.__sna.state(); return !s.decided && !s.ended && window.__sna.bubbles(p).some(b => b.label === s.answer); }, p);
-  expect(await page.evaluate(p => window.__sna.answer(p), p)).toBe(true);
+  // No second try here, unlike `game.spec.ts`'s `answerAll` (#1797): a duel wave never relaunches a fallen
+  // answer (`duel.ts`'s `onFall` is a no-op, and a duel wave has no ordered labels for `seqRelaunch`), and
+  // `decided` only flips in `settleDraw()` once BOTH arenas are empty — so a false slice after this wait means
+  // the answer left the arena in the round trip and the round this helper was to WIN is already a draw. A wait
+  // for the answer again would resolve on the NEXT round's and report that one as this one. Named instead.
+  const sliced = await page.evaluate(p => window.__sna.answer(p), p);
+  if (!sliced) throw new Error(`winRound(${p}): the answer left the arena between the wait and the slice, so this round is a draw — lost, not won (#1797)`);
 }
 
 /** Play out a whole 10-round match with Player 1 taking every round, for a test whose subject is the earned
@@ -344,17 +350,22 @@ test.describe('Ninja Duel', () => {
     // `toBeEnabled()` check taken only after `page.click()` returns would pass whether or not the handler ever
     // disabled the button at all, since Playwright's auto-retry keeps polling past a synchronous flip either
     // way. The delay gives a window in which `#cert` must genuinely be disabled before this test claims it saw it (600 ms, #860: 60 ms was gone before a loaded runner polled).
+    // The disabled state is read INSIDE the fake `save` (#1797), where that window is, not polled from here:
+    // a `toBeDisabled()` from the Node side has to land its first poll inside the delay, and lengthening the
+    // delay only moves the threshold a loaded runner misses. The fake runs after `duel.ts`'s synchronous
+    // `b.disabled = true`, so `__wasDisabled` is that flag at the one moment this is about. Rail:
+    // tests/unit/e2e-transient-disabled.test.ts.
     await page.evaluate(() => {
-      (window as any).__saved = null;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 600)); return { status: 'saved' }; } } : null };
+      (window as any).__saved = null; (window as any).__wasDisabled = null;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__wasDisabled = (document.querySelector('.duel-end #cert') as HTMLButtonElement).disabled; (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 600)); return { status: 'saved' }; } } : null };
     });
     await page.click('.duel-end #cert');
-    // Disabled for the length of the delivery — the handler's own `b.disabled = true`, set synchronously before
-    // its first `await`, checked while the fake `save` above is still mid-flight.
-    await expect(page.locator('.duel-end #cert')).toBeDisabled();
     await expect(page.locator('.duel-end #cert-msg'), 'reported where the child is already looking, not behind the overlay').toHaveText('Certificate saved!');
-    // ...and re-enabled once delivery settles — the handler's matching `b.disabled = false`.
+    // Re-enabled once delivery settles — the handler's matching `b.disabled = false` — and disabled while the
+    // save was in flight, as the fake `save` saw it. The flag is read after the certificate is drawn, so it
+    // proves the disable HELD through delivery, not where in the handler it was set.
     await expect(page.locator('.duel-end #cert')).toBeEnabled();
+    expect(await page.evaluate(() => (window as any).__wasDisabled), 'the 🎓 button is disabled while the save is in flight').toBe(true);
     expect(await page.evaluate(() => (window as any).__saved), "the duel handler's own filename, not the mission path's").toMatch(/^sky-ninja-duel-.*\.png$/);
     // (b) artifact viewer WITHOUT a downloads grant → the full-screen "press and hold" fallback (the 'shown'
     // route, the mission path's own second half of the same #50 rule: the button never silently does nothing).

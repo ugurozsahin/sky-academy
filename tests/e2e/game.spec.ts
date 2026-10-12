@@ -270,10 +270,27 @@ async function solveCurrent(page: Page) {
 }
 /** Wait until a wrong bubble can be sliced on a live question — or the game has ended. */
 const waitForWrongOrEnd = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s) return false; if (s.ended) return true; if (s.waiting) return false; const c = window.__sna.session.current; const t = c.sequence ? window.__sna.session.remaining()[0] : c.answer; const bs = window.__sna.bubbles(); return bs.some((b: any) => b.label === t) && bs.some((b: any) => b.label !== t && b.label !== '💣'); }, null, { timeout: 20000 });   // a decoy must be in flight too (every 3rd Storm wave adds a TNT bubble, which never counts as a wrong slice)
+/** `answerAll`'s wait: the next bubble `answer()` would slice is in flight and the question is still live. */
+const waitForNext = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.remaining()[0] : s.answer)); });
 async function answerAll(page: Page, n: number) {
   for (let i = 0; i < n; i++) {
-    await page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.remaining()[0] : s.answer)); });
-    expect(await answer(page)).toBe(true);
+    await waitForNext(page);
+    let sliced = await answer(page);
+    if (!sliced) {
+      // The wait and the slice are two round trips, and under load (five workers on a ten-core Mac, #1797) the
+      // target the wait just saw can leave the arena before `answer()` runs — the window `solveCurrent` above
+      // handles since #1540. Benign while the question is still live: the bubble relaunches (#591, every
+      // ordered label) or a gentle year gives it its free trip (#742), so wait for THIS question to settle one
+      // way or the other — the target back in flight, or decided — and slice once more. `waiting`/`ended`, or
+      // `questionsAsked` moved (an armed question's `expire()` decides a miss without `fall()`), means the
+      // question was lost: the test's failure, named here, never a count one short later, and never a wait
+      // that resolves on the NEXT question's target. The second miss still fails the assertion below.
+      const asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      const back = await page.waitForFunction((a) => { const s = window.__sna.state(); if (s.waiting || s.ended || window.__sna.session.questionsAsked > a) return 'lost'; const c = window.__sna.session.current; return window.__sna.bubbles().some((b: any) => b.label === (c.sequence ? window.__sna.session.remaining()[0] : s.answer)) ? 'back' : null; }, asked);
+      if (await back.jsonValue() === 'lost') throw new Error(`answerAll: question ${i + 1} of ${n} — the target fell before answer() could slice it and the question was decided as a miss, so it was lost, not answered (#1797)`);
+      sliced = await answer(page);
+    }
+    expect(sliced, `answerAll: question ${i + 1} of ${n} — answer() found nothing to slice on two attempts, with the question still live (#1797)`).toBe(true);
     await page.waitForFunction((i) => { const s = window.__sna?.state(); return s && (s.index > i || s.ended || document.querySelector('.celebrate')); }, i);
   }
 }
@@ -1249,16 +1266,22 @@ test.describe('Sky Ninja Academy', () => {
     // A deliberate delay in the fake `save`, not an instant resolve (#603, the same gap #409 item 2 named for
     // the duel path): a `toBeEnabled()` taken only after `page.click()` returns would pass whether or not the
     // handler ever disabled the button, since Playwright's auto-retry polls past a synchronous flip either way.
+    // And the disabled state is read INSIDE the fake `save` (#1797), not polled from here: it lasts exactly as
+    // long as that delay, and a `toBeDisabled()` from the Node side has to land its first poll inside it —
+    // under load (five workers on a ten-core Mac) it did not, and the test failed on behaviour that is right.
+    // The fake runs within the handler's own `try`, after `play-results.ts`'s synchronous `b.disabled = true`,
+    // so `__wasDisabled` is that flag at the one moment the test is about. Rail: tests/unit/e2e-transient-disabled.test.ts.
     await page.evaluate(() => {
-      (window as any).__saved = null;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 60)); return { status: 'saved' }; } } : null };
+      (window as any).__saved = null; (window as any).__wasDisabled = null;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__wasDisabled = (document.querySelector('#cert') as HTMLButtonElement).disabled; (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 60)); return { status: 'saved' }; } } : null };
     });
     await page.click('#cert');
-    // Disabled for the length of the delivery — `play.ts`'s own synchronous `b.disabled = true`, checked while
-    // the fake `save` above is still mid-flight.
-    await expect(page.locator('#cert')).toBeDisabled();
-    await expect(page.locator('#cert')).toBeEnabled();
     await expect(page.locator('#toast')).toContainText('saved');
+    // Re-enabled once delivery settles — the handler's matching `b.disabled = false` — and disabled while the
+    // save was in flight, as the fake `save` saw it. The flag is read after the certificate is drawn, so it
+    // proves the disable HELD through delivery, not where in the handler it was set.
+    await expect(page.locator('#cert')).toBeEnabled();
+    expect(await page.evaluate(() => (window as any).__wasDisabled), 'the 🎓 button is disabled while the save is in flight').toBe(true);
     expect(await page.evaluate(() => (window as any).__saved)).toMatch(/^sky-ninja-certificate-.*\.png$/);
     // AND IT GOES AWAY AGAIN. The auto-hide is 1300ms, and nothing asserted it until now: PR #474's round-1
     // review found that a beat armed under the results screen's own hold was frozen and never armed, so this
