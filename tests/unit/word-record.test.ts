@@ -12,6 +12,7 @@ import { parentSummary } from '../../src/game/parents';
 import { CORE_TOPICS, YEARS } from '../../src/curriculum';
 import { STICKER_IDS } from '../../src/storage';
 import { wordsHTML } from '../../src/ui/parents-words';
+import { factsOf } from '../../src/ui/play-facts';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -48,10 +49,13 @@ describe('the statutory lists (#1289)', () => {
     expect(all.every(w => /^[A-Za-z]{1,20}$/.test(w))).toBe(true);
     expect(all.length).toBeLessThanOrEqual(200);
   });
-  it('every entry’s card carries its first form as listWord, whichever form was drawn', () => {
+  it('every entry’s card carries its first form as listWord, whichever form is drawn', () => {
+    let multi = 0;
     for (const e of [...Y3_WORDLIST, ...Y4_WORDLIST, ...Y5_WORDLIST, ...Y6_WORDLIST]) {
-      for (const d of [1, 2, 3] as const) expect(wordListQ(rng, e, d).listWord).toBe(e.forms[0].w);
+      const n = e.forms.length; if (n > 1) multi++;
+      for (let k = 0; k < n; k++) for (const d of [1, 2, 3] as const) expect(wordListQ(() => (k + 0.5) / n, e, d).listWord).toBe(e.forms[0].w);
     }
+    expect(multi).toBeGreaterThan(0);   // busy/business and friends: the property is only tested if some entry has two forms
   });
 });
 
@@ -62,6 +66,21 @@ describe('the word record is written and read end to end (#1289)', () => {
     log.note(wordListQ(rng, Y3_WORDLIST[2], 1), 'correct');
     log.note({ prompt: 'p', answer: 'a', options: [] }, 'wrong');
     expect(log.words()).toEqual([{ word: Y3_WORDLIST[2].forms[0].w, right: true }]);
+  });
+  it('note() credits only a correct answer: wrong and miss are both w', () => {
+    const q = wordListQ(rng, Y3_WORDLIST[2], 1), log = createFactLog();
+    for (const o of ['correct', 'wrong', 'miss']) log.note(q, o);
+    expect(log.words().map(w => w.right)).toEqual([true, false, false]);
+  });
+  it('factsOf hands the logged words to the save, and a mixed game keeps both facts and words', () => {
+    const log = createFactLog();
+    log.note(wordListQ(rng, Y3_WORDLIST[2], 1), 'correct');
+    log.note({ prompt: '7 × 8', answer: '56', options: [], fact: '7×8' }, 'correct');
+    const e = factsOf({ facts: log } as any, { mode: 'mission' }, { incomplete: false } as any);
+    expect(e.words).toEqual([{ word: Y3_WORDLIST[2].forms[0].w, right: true }]);
+    recordGameEnd({ ...game, ...e, check: undefined }, 0);
+    expect(load().ks2.words).toEqual({ [Y3_WORDLIST[2].forms[0].w]: 'r' });
+    expect(load().ks2.facts['7×8']).toMatchObject({ right: 1 });
   });
   it('recordGameEnd merges words into ks2.words; a wrong or missed answer is w', () => {
     recordGameEnd({ ...game, words: [{ word: 'address', right: true }, { word: 'answer', right: false }] }, 0);
@@ -77,5 +96,12 @@ describe('the word record is written and read end to end (#1289)', () => {
     expect(html).toContain(w[1]);
     expect(html).toContain('Copy these words');
     expect(html).not.toContain('Year 5–6');
+  });
+  it('with only Year 5–6 tried the button is indexed from 0; with both tried each list has its own', () => {
+    const row = (title: string, notSecure: string[]) => ({ title, secure: 0, tried: notSecure.length, total: 100, notSecure });
+    const only56 = wordsHTML([row('Year 5–6', ['yacht'])]);
+    expect(only56).toContain('data-words="0"'); expect(only56).toContain('id="words-0">yacht');
+    const both = wordsHTML([row('Year 3–4', ['busy']), row('Year 5–6', ['yacht'])]);
+    expect(both).toContain('id="words-1">yacht'); expect(both).toContain('data-words="1"');
   });
 });

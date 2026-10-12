@@ -2,7 +2,7 @@
 // × fact a child answers — right, wrong, slow — for the readers that follow (#1123, #1124, #1176).
 import type { Question } from './curriculum/types';
 import type { Ks2Check, Ks2Fact } from './save-records';
-import type { WordEntry } from './word-record';
+import type { WordAnswer } from './word-record';
 
 /** `outcome` is the play screen's `Outcome` (`src/ui/hud.ts`), typed as a string: `src/` may not reach into `src/ui/` from here (#557). */
 export interface FactEntry { fact: string; outcome: string; ms?: number }
@@ -12,11 +12,11 @@ export const SLOW_MS = 6000;
 const MAX_CHECKS = 10, MAX_MISSED = 25;
 
 export function createFactLog() {
-  const log: FactEntry[] = [], words: WordEntry[] = [];
+  const log: FactEntry[] = [], words: WordAnswer[] = [];
   return {
     /** Cards with no `fact` are ignored. `ms` is only measured in a timed `mtc` run; elsewhere it is undefined. */
     note(q: Question, outcome: string, ms?: number) { if (q.fact) log.push({ fact: q.fact, outcome, ms }); if (q.listWord) words.push({ word: q.listWord, right: outcome === 'correct' }); },   // #1289: the word record rides the same beat
-    words: (): readonly WordEntry[] => words,
+    words: (): readonly WordAnswer[] => words,
     entries: (): readonly FactEntry[] => log,
   };
 }

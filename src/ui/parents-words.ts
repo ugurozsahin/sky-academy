@@ -21,7 +21,8 @@ export function bindWords() {
     const box = document.getElementById(`words-${btn.dataset.words}`)!, msg = document.getElementById('words-msg')!;
     const say = (t: string) => { msg.textContent = t; msg.hidden = false; };
     const byHand = () => { window.getSelection()?.selectAllChildren(box); say('Select the words above and copy them by hand — this browser will not do it for us.'); };
-    const written = navigator.clipboard?.writeText(box.textContent ?? '');
+    let written: Promise<void> | undefined;
+    try { written = navigator.clipboard?.writeText(box.textContent ?? ''); } catch { /* a synchronous refusal: select by hand */ }
     if (!written) { byHand(); return; }
     written.then(() => say('Copied. Paste the words where you like.')).catch(byHand);
   }));

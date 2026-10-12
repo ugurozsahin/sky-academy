@@ -1,7 +1,7 @@
 // Paying out coins, stickers and the Daily Dojo when a game ends.
 import { applyEvent, dojoFor, type DojoEvent, type DojoOutcome, type DojoState } from '../game/dojo';
 import { mergeFacts, pushCheck, type FactEntry } from '../fact-record';
-import { ks2WithWords, type WordEntry } from '../word-record';
+import { ks2WithWords, type WordAnswer } from '../word-record';
 import { keepBest } from '../speed-record';
 import { logGame, sanitizeSlips, type Slip } from '../save-records';
 import { load, save } from './store';
@@ -48,7 +48,7 @@ export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[]; /** The be
  * is unreachable rather than merely unlikely. A refusal still leaves `writeFailed` for the grown-ups screen to
  * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
  */
-export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topics?: string[]; facts?: readonly FactEntry[]; words?: readonly WordEntry[]; check?: { score: number; missed: string[] }; speed?: number | null }, gameCoins: number, now = new Date()): GameEndOutcome {
+export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topics?: string[]; facts?: readonly FactEntry[]; words?: readonly WordAnswer[]; check?: { score: number; missed: string[] }; speed?: number | null }, gameCoins: number, now = new Date()): GameEndOutcome {
   if (!Number.isFinite(gameCoins)) console.warn(`recordGameEnd: non-finite gameCoins (${gameCoins}) — ignored`);   // same #797 guard as addCoins()
   const d = load(); const dojo = applyEvent(d.dojo, e, today(now));
   // `gameCoins`, not `coins`: every call site on `main` read `addCoins(paid + dojo.coins)`, so a maintainer
