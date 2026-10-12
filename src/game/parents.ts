@@ -59,6 +59,8 @@ export interface ParentSummary {
   facts: string[] | null;
   /** The "Spelling word lists" rows (#1289): one per statutory list with a tried word; empty hides the section. */
   words: WordListRow[];
+  /** The KS2 lines the copyable summary appends (#1290): 0–3 only-when-there's-data strings. */
+  ks2: string[];
 }
 export interface WordListRow extends WordProgress { title: string }
 /** The last seven local days of play (#939), read from the day log. `accuracy` is null with no questions. */
@@ -149,6 +151,7 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
     week: weekSummary(data.log, today(now)),
     facts: factsToPractise(data),
     words: wordListRows(data),
+    ks2: ks2Lines(data),
   };
 }
 
@@ -161,6 +164,24 @@ export function factsToPractise(data: SaveData): string[] | null {
   const facts = data.ks2?.facts ?? {};
   if (!Object.keys(facts).length) return null;
   return leastSecure(facts).map(l => l.map(f => f.replace('×', ' × ')).join(' and '));
+}
+
+const MAX_WORDS = 12;
+/**
+ * The KS2 lines for the copyable summary (#1290), each present only when its data exists: the Tables Check practice
+ * best (and last), the five facts to practise (#1123's ranking, unchanged) and, per tried list, the words not yet secure.
+ */
+export function ks2Lines(data: SaveData): string[] {
+  const out: string[] = [], checks = data.ks2?.checks ?? [];
+  if (checks.length) out.push(`Tables Check practice: best ${Math.max(...checks.map(c => c.score))} out of 25 (last ${checks[0].score})`);
+  const facts = leastSecure(data.ks2?.facts ?? {}, 5).map(l => l.map(f => f.replace('×', ' × ')).join(' and '));
+  if (facts.length) out.push(`Times-table facts to practise: ${facts.join(', ')}`);
+  for (const r of wordListRows(data)) {
+    if (!r.notSecure.length) continue;
+    const more = r.notSecure.length - MAX_WORDS;
+    out.push(`${r.title} spelling words not yet secure: ${r.notSecure.slice(0, MAX_WORDS).join(', ')}${more > 0 ? `, … (+${more} more)` : ''}`);
+  }
+  return out;
 }
 
 /** Whole-number percent for display (null → em dash handled by the caller). */
@@ -185,6 +206,7 @@ export function progressText(sm: ParentSummary, name: string, now: Date = new Da
     `Stars: ${sm.years.map(y => `${y.title} ${y.stars}/${y.maxStars}`).join(' · ')} (${sm.starsEarned}/${sm.starsMax} in all)`,
     `Going well: ${sm.strongest.length ? titles(sm.strongest) : 'not enough play yet'}`,
     `Where to help: ${sm.weakest.length ? titles(sm.weakest) : 'not enough play yet'}`,
+    ...sm.ks2,
   ].join('\n');
 }
 /** How the summary leaves the device: the browser's share sheet, the APK's, the clipboard, else selected for copying by hand. */
