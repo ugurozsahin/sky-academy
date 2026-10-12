@@ -3431,6 +3431,39 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.celebrate')).toBeVisible({ timeout: 5000 });
   });
 
+  // #1354: Pause refuses an ended game, so hiding in the gap between the last life going and the results overlay
+  // used to leave the deferred results beat running — `say(headline)` and the chime started while hidden.
+  test('hiding the app after a game-ending answer holds the results (and their speech) until the app is visible again (#1354)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page, 'kai', 'Sam');
+    await startTopic(page, 'year1', 'y1-bonds');
+    for (let guard = 0; guard < 12; guard++) {
+      await waitForWrongOrEnd(page);
+      if (await page.evaluate(() => window.__sna.state().lives) === 1) break;
+      const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+      await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, before);
+    }
+    let spokenBefore = 0;
+    const ended = await page.evaluate(() => {
+      window.__sna.wrong();                                                // the losing slice
+      const e = window.__sna.state().ended;
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));               // same tick — before the results beat can run
+      return e;
+    });
+    spokenBefore = (await page.evaluate(() => window.__spoken))!.length;   // the losing slice's own correction is already in
+    expect(ended, 'the losing slice ended the game synchronously').toBe(true);
+    await page.waitForTimeout(3000);                                       // real time, well past the results reveal
+    await expect(page.locator('.results')).toHaveCount(0);
+    expect((await page.evaluate(() => window.__spoken))!.length, 'no speech starts while hidden').toBe(spokenBefore);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.locator('.results')).toBeVisible({ timeout: 5000 });
+  });
+
   // #1356: `fakeBackButton` / `pressBack` moved to `./back-button.ts`, shared with `duel.spec.ts`.
   test('a hardware back press during a live Sprint opens Pause; a second press then leaves to the island (#885)', async ({ page }) => {
     await fakeBackButton(page);

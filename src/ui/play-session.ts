@@ -14,10 +14,11 @@ import type { DojoOutcome } from '../game/dojo';
 import { Session, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { waveOptsFor } from './wave-opts';
-import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
+import { canHear, haptic, hush, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate'; import { firstQuestionLine, type ResultCandidate } from './results';   // #897; one line: at its #714 cap
 import { createFactLog } from '../fact-record';
 import { $, esc } from './dom';
+import { freezeUntilVisible } from './hidden-hold';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { correctionLine, hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
@@ -96,6 +97,12 @@ export interface PlaySession {
    */
   hold(open: boolean, beats?: boolean): void;
   /**
+   * The app went to the background (#884): silence speech, then `pauseIfLive()` opens Pause on a live game. It
+   * refuses an ended game, and an ended game has its results beat still pending for a moment — freeze that
+   * beat until the app is visible again (#1354), or `showResults()` would speak and chime while hidden.
+   */
+  hidden(pauseIfLive: () => boolean): void;
+  /**
    * The child tapped the card or 🔊. On a device that speaks the screen reads the line again; on one that
    * cannot, a hidden sentence is shown again for the peek time. Returns true when it was handled here, so
    * the button is never a no-op on a silent device (the #205 rule).
@@ -155,8 +162,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   // launch, for the first peek of a question). `holdOpen` mirrors the pause overlay; `readThrough` marks a
   // question whose verdict arrived after its bubbles launched, so its sentence stays readable instead.
   let peekToken = 0; let peekActive = false; let peekLeft = 0; let peekSince = 0;
-  let peekDone: (() => void) | null = null;
-  let holdOpen = false; let readThrough = false;
+  let peekDone: (() => void) | null = null; let holdOpen = false; let readThrough = false;
   let prevLives = opts.year.lives;
   // #44: false only until Fredoka is usable (or the capped wait gives up). The first wave is held back that
   // long so its labels are measured and drawn in the real face; every wave after it spawns synchronously.
@@ -378,6 +384,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       const gap = scaled(lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650);
       deps.later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
     },
+    hidden: (pauseIfLive) => { hush(); if (!pauseIfLive() && session.ended && !holdOpen) freezeUntilVisible(deps.holdTimers); },
     hold(open, beats = true) {
       if (open === holdOpen) return;
       holdOpen = open;
