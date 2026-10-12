@@ -23,7 +23,7 @@ import { dojoRowsHTML } from './memory';
 import { pauseHTML } from './overlays';
 import { waveOptsFor } from './play-session';
 import { renderVisual } from './visuals';
-import { duelTopic } from '../game/duel-topic'; import { fontReady } from './font';
+import { duelTopic } from '../game/duel-topic'; import { fontReady } from './font'; import { calmReduced } from '../device-settings';
 import type { DuelHooks } from './hooks';
 
 export interface DuelScreenOpts { year: YearInfo; topic?: string }
@@ -218,7 +218,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       },
       onFall() { /* no lives in a duel: a fallen bubble is just a bubble nobody sliced */ },
       onWaveEnd: () => waveEnd(p),
-    }, { trailColor: av.glow, fx: av.fx, onSwish: () => sfx.swish(), onThrow: () => sfx.whoosh(), onLand: () => sfx.slice() });
+    }, { trailColor: av.glow, fx: av.fx, reducedMotion: calmReduced(), onSwish: () => sfx.swish(), onThrow: () => sfx.whoosh(), onLand: () => sfx.slice() });
   }
   const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };
   // The arena's pause AND the screen's beats (#301): `syncPaused()` alone left `endWave`'s `clearWave`, the

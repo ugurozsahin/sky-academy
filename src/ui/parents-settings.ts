@@ -1,6 +1,6 @@
 // The grown-ups Settings section (#904): the 3-D pictures control plus the per-ninja "Slower bubbles" row
 // (#905), under one "Settings" heading so #906/#907/#940 each have room to add their own row.
-import { beepSetting, REST_SETTINGS, restSetting, setBeepSetting, setRestSetting, setThreeSetting, THREE_SETTINGS, threeSetting, type RestSetting, type ThreeSetting } from '../device-settings';
+import { beepSetting, CALM_SETTINGS, calmSetting, applyCalm, setCalmSetting, type CalmSetting, REST_SETTINGS, restSetting, setBeepSetting, setRestSetting, setThreeSetting, THREE_SETTINGS, threeSetting, type RestSetting, type ThreeSetting } from '../device-settings';
 import { sfx } from '../audio';
 import { isWriteFailing, load, save } from '../storage';
 import { $, $$ } from './dom';
@@ -9,13 +9,14 @@ import type { Settings } from '../save-records';
 import { schoolYearFromBirthDate, yearIdFromLevel } from '../school-year';
 
 export const THREE_LABEL: Readonly<Record<ThreeSetting, string>> = { auto: 'Auto', on: 'On', off: 'Off' };
+export const CALM_LABEL: Readonly<Record<CalmSetting, string>> = { auto: 'Auto', on: 'On' };
 export const REST_LABEL: Readonly<Record<RestSetting, string>> = { off: 'Off', '10': '10 min', '20': '20 min', '30': '30 min' };
 export const TIMEX_ORDER = ['1', '1.5', '0'] as const;   // #1121: a grown-up sees Normal first (an object's integer-like keys would sort 0 first)
 export const TIMEX_LABEL: Readonly<Record<`${Settings['timeX']}`, string>> = { '1': 'Normal', '1.5': 'Extra time (×1.5)', '0': 'No time limit' };
 const SLOW_LABEL: Readonly<Record<'off' | 'on', string>> = { off: 'Off', on: 'On' };
 
 /** The Settings section's markup: the 3-D pictures control, then "Slower bubbles" (#905). */
-export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean = load().settings.slow, rest: RestSetting = restSetting()): string {
+export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean = load().settings.slow, rest: RestSetting = restSetting(), calm: CalmSetting = calmSetting()): string {
   return `
     <h3 class="p-h">Settings</h3>
     <div class="p-three">
@@ -45,6 +46,12 @@ export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean
       <div class="tabs p-rest-pick" role="radiogroup" aria-label="Suggest a break">${REST_SETTINGS.map(v =>
         `<button class="tab${v === rest ? ' on' : ''}" data-rest="${v}" role="radio" aria-checked="${v === rest}">${REST_LABEL[v]}</button>`).join('')}</div>
       <p class="p-three-msg" id="rest-msg" role="status" hidden></p>
+    </div>
+    <div class="p-three p-calm">
+      <p class="p-three-say">Calmer animations: no shaking cards, falling confetti or bobbing pictures, and fewer sparks. <b>Auto</b> follows this device's own setting; <b>On</b> keeps things calm whatever the device says.</p>
+      <div class="tabs p-calm-pick" role="radiogroup" aria-label="Calm motion">${CALM_SETTINGS.map(v =>
+        `<button class="tab${v === calm ? ' on' : ''}" data-calm="${v}" role="radio" aria-checked="${v === calm}">${CALM_LABEL[v]}</button>`).join('')}</div>
+      <p class="p-three-msg" id="calm-msg" role="status" hidden></p>
     </div>
     <div class="p-three p-year">
       <p class="p-three-say">Set the school year so a new ninja starts on the right island. A birthday can help work it out; it is never saved.</p>
@@ -98,6 +105,17 @@ export function bindSettings(): void {
     const msg = $('#rest-msg');
     msg.hidden = stored;
     if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays on ${REST_LABEL[now]}.`; }
+  }));
+  // #906: device-wide, painted from what the store holds after the write; the class on <html> follows the store.
+  $$('button[data-calm]').forEach(b => b.addEventListener('click', () => {
+    sfx.tap();
+    const stored = setCalmSetting(b.dataset.calm as CalmSetting);
+    const now = calmSetting();
+    applyCalm();
+    $$('button[data-calm]').forEach(o => { const on = o.dataset.calm === now; o.classList.toggle('on', on); o.setAttribute('aria-checked', String(on)); });
+    const msg = $('#calm-msg');
+    msg.hidden = stored;
+    if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays on ${CALM_LABEL[now]}.`; }
   }));
   bindTimeSettings();
   // #1055: stored in `ks2.schoolYear` only. The birthday is read once to fill the select and is never saved.

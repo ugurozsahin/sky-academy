@@ -52,3 +52,21 @@ export function setBeepSetting(on: boolean): boolean {
   try { if (on) localStorage.setItem(BEEP_KEY, 'on'); else localStorage.removeItem(BEEP_KEY); } catch { /* fall through to the read */ }
   return beepSetting() === on;
 }
+
+/* ─── Calm motion: the grown-ups' "Calm motion" switch (#906) ────────────────────────────────────────────────
+ * Device-wide like the rest. `auto` (the default, stored as absence) follows the device's own reduced-motion
+ * preference; `on` forces the same calm behaviour. There is no "off": the switch never overrides a device that
+ * asks for less motion. */
+export type CalmSetting = 'auto' | 'on';
+const CALM_KEY = 'sna:calm';
+export const CALM_SETTINGS: readonly CalmSetting[] = ['auto', 'on'];
+export const calmSetting = (): CalmSetting => (readItem(CALM_KEY) === 'on' ? 'on' : 'auto');
+/** Returns whether the store now holds `v` — a refused write leaves the previous answer, and the control paints that. */
+export function setCalmSetting(v: CalmSetting): boolean {
+  try { if (v === 'auto') localStorage.removeItem(CALM_KEY); else localStorage.setItem(CALM_KEY, v); } catch { /* fall through to the read */ }
+  return calmSetting() === v;
+}
+/** Puts class `calm` on `<html>` when the switch is on — the CSS calm rules hang off `:root.calm` beside their media query. */
+export function applyCalm(): void { document.documentElement.classList.toggle('calm', calmSetting() === 'on'); }
+/** The `Arena` `reducedMotion` option: `true` when the switch is on, else unset so the media query decides as before. */
+export const calmReduced = (): true | undefined => (calmSetting() === 'on' ? true : undefined);
