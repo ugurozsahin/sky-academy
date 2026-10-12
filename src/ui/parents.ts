@@ -1,7 +1,7 @@
 import { avatarOrNull } from '../avatars';
 import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
-import { sfx, voiceState } from '../audio';
+import { hush, sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
 import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
 import { $, $$, esc, render } from './dom';
@@ -412,7 +412,7 @@ export function parentsScreen(nav: Nav) {
       go.addEventListener('click', () => {
         sfx.tap();
         snapshot = load();       // kept in memory only — the "Undo" affordance below is what can bring it back
-        reset();
+        reset(); hush();   // a speech verdict still pending would save() a fresh blob over the cleared key (#1630)
         pendingReset = true;
         overlay.innerHTML = resetDoneHTML();
         $('#reset-undo').addEventListener('click', () => {
