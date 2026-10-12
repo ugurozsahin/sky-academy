@@ -843,6 +843,31 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#timer')).toContainText(/⏱ (90|89|88)/);
   });
 
+  test('Easy-read card: On sets 1.5 line height and 0.12em spacing on the prompt, Off keeps today\'s, and a long prompt fits a phone (#907)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await expect(page.locator('button[data-easy="off"]')).toHaveAttribute('aria-checked', 'true');
+    await page.click('#back');
+    await startTopic(page, 'year2', 'y2-tables');
+    const spacing = () => page.locator('#prompt').evaluate(el => { const c = getComputedStyle(el); return { ls: c.letterSpacing, lh: c.lineHeight, fs: c.fontSize }; });
+    const off = await spacing();
+    expect(off.lh).toBe('normal');
+    expect(parseFloat(off.ls) / parseFloat(off.fs)).toBeCloseTo(0.02, 2);
+    await page.evaluate(() => localStorage.setItem('sna:easyread', 'on'));
+    await page.reload();
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await expect(page.locator('button[data-easy="on"]')).toHaveAttribute('aria-checked', 'true');
+    await page.click('#back');
+    await startTopic(page, 'year2', 'y2-tables');
+    const on = await spacing();
+    expect(parseFloat(on.lh) / parseFloat(on.fs)).toBeCloseTo(1.5, 2);
+    expect(parseFloat(on.ls) / parseFloat(on.fs)).toBeCloseTo(0.12, 2);
+    expect(await page.evaluate(() => { const q = document.querySelector('#qcard') as HTMLElement; return q.scrollWidth <= q.clientWidth; })).toBe(true);
+    await page.evaluate(() => localStorage.removeItem('sna:easyread'));
+  });
+
   test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
     await page.clock.install();
     await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));

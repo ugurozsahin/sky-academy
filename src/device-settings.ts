@@ -70,3 +70,17 @@ export function setCalmSetting(v: CalmSetting): boolean {
 export function applyCalm(): void { document.documentElement.classList.toggle('calm', calmSetting() === 'on'); }
 /** The `Arena` `reducedMotion` option: `true` when the switch is on, else unset so the media query decides as before. */
 export const calmReduced = (): true | undefined => (calmSetting() === 'on' ? true : undefined);
+
+/* ─── Easy-read question card: the grown-ups' wider spacing switch (#907) ─────────────────────────────────────
+ * Device-wide like the rest. Off is the default, stored as absence; on is `'on'`. The play screen reads it once,
+ * as inline custom properties on its own root, which the existing `.prompt` and `.hint` declarations pick up. */
+const EASYREAD_KEY = 'sna:easyread';
+export const easyRead = (): boolean => readItem(EASYREAD_KEY) === 'on';
+/** Returns whether the store now holds `on` — a refused write leaves the previous answer, and the control paints that. */
+export function setEasyRead(on: boolean): boolean {
+  try { if (on) localStorage.setItem(EASYREAD_KEY, 'on'); else localStorage.removeItem(EASYREAD_KEY); } catch { /* fall through to the read */ }
+  return easyRead() === on;
+}
+/** The play root's `style` attribute: the glow, plus the three spacing properties when the switch is on. Off leaves it exactly as it was. */
+export const playStyleAttr = (glow: string): string => (easyRead()
+  ? `style="--glow:${glow};--q-ls:.12em;--q-ls-hint:.12em;--q-lh:1.5"` : `style="--glow:${glow}"`);
