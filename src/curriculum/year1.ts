@@ -177,6 +177,14 @@ const y1Doubles: Generator = (d, rng) => {
   const p = `Double ${n} = ?`;
   return numQ(rng, p, n * 2, { min: 0, max: 20, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined, ...q(p) });
 };
+/** The "Doubles and halves" drill (#921): `Double n` or `Half of 2n`, n on y1Doubles's ladder, no picture; the inverse's answer is a decoy where it fits. */
+const y1DoublesHalves: Generator = (d, rng) => {
+  const n = d === 1 ? ri(rng, 1, 5) : d === 2 ? ri(rng, 1, 10) : ri(rng, 6, 10);
+  const half = rng() < 0.5;
+  const p = half ? `Half of ${n * 2} = ?` : `Double ${n} = ?`;
+  const say = half ? `What is half of ${n * 2}?` : `What is double ${n}?`;
+  return numQ(rng, p, half ? n : n * 2, { min: 0, max: 20, say, distractors: [half ? n * 2 : n] });
+};
 const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
 /**
  * The notes Year 1 recognises beside the coins — the programme of study says "coins **and notes**" (#298
@@ -529,6 +537,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year1', nc: 'Y1 A&S: subtract within 20', gen: y1Sub },
   { id: 'y1-missing', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year1', nc: 'Y1 A&S: missing number problems', gen: y1Missing },
   { id: 'y1-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'year1', nc: 'Y1 A&S: doubles', gen: y1Doubles },
+  { id: 'y1-doubles-halves', title: 'Doubles and halves', icon: '👯', subject: 'maths', year: 'year1', nc: 'Y1 A&S: doubles and halves', drill: true, gen: y1DoublesHalves },
   { id: 'y1-skip', title: 'Count in 2s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year1', nc: 'Y1 NPV: count in multiples', sequenceFrom: 2, gen: y1Skip },
   { id: 'y1-moreless', title: 'One More, One Less', icon: '🔼', subject: 'maths', year: 'year1', nc: 'Y1 NPV: one more/less, counting back, to 100', gen: y1MoreLess },
   { id: 'y1-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year1', nc: 'Y1 NPV: numbers to 20 in words', gen: y1Words },
