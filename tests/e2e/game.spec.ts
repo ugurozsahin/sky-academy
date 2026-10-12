@@ -3254,6 +3254,21 @@ test.describe('Sky Ninja Academy', () => {
     expect(ids.some(id => TOPICS.find(t => t.id === id)?.input === 'tracing')).toBe(false);   // non-tracing only
   });
 
+  test('Ninja Sprint: "You beat your best!" is toasted once, on the answer that passes the topic best (#914)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y2-tables-5': { stars: 0, best: 0, plays: 1, sprint: 2 } } });
+    await page.click('.island[data-year="year2"]');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y2-tables-5"]');
+    await expect(page.locator('.play')).toBeVisible();
+    const toast = page.locator('#toast');
+    await solveCurrent(page); await solveCurrent(page);
+    await expect(toast).not.toContainText('You beat your best!');
+    await solveCurrent(page);
+    await expect(toast).toContainText('You beat your best!');
+    await solveCurrent(page);
+    await expect(toast).not.toContainText('You beat your best!');
+  });
+
   test('Ninja Sprint: the 5× table drill asks only the five times table (#916)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year2"]');
