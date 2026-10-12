@@ -125,16 +125,23 @@ function scanTokens(text: string, coordinateSpans: CoordinateSpan[]): NumberToke
  *  fractional value is never literally the bare year, so an unrelated "1999.5" must not starve a real bare
  *  "1999" of its one unambiguous count), and so, for the same reason, is a signed one (#1444: "−1999" is
  *  never literally the bare year either). A coordinate's components are counted like any other plain
- *  token since #1444, now that they are judged like one. */
-function occurrenceCounts(tokens: NumberToken[], values: number[]): Map<number, number> {
-  const counts = new Map(values.map(v => [v, 0]));
+ *  token since #1444, now that they are judged like one. Keyed by the year's digit string (`yearDigits`),
+ *  not its numeric value, for the reason given there (#1754). */
+function occurrenceCounts(tokens: NumberToken[], values: number[]): Map<string, number> {
+  const counts = new Map(values.map(v => [String(v), 0]));
   for (const t of tokens) {
     if (t.isMoney || t.hasDecimal || t.sign) continue;
-    const v = Number(t.intPart.replace(/,/g, ''));
-    if (counts.has(v)) counts.set(v, counts.get(v)! + 1);
+    const digits = yearDigits(t);
+    if (counts.has(digits)) counts.set(digits, counts.get(digits)! + 1);
   }
   return counts;
 }
+
+/** The digits a token would have to show, comma-free, to be a named year — compared as a string, never via
+ *  `Number(...)`, because a written year carries no leading zero (`fmt()` pads nothing) and `Number("01999")`
+ *  is 1999: by value, a leading-zero token passed as the year instead of being judged as the ordinary
+ *  5-digit quantity it is (#1754). */
+const yearDigits = (t: NumberToken): string => t.intPart.replace(/,/g, '');
 
 /** Whether the comma-split `parts` of an integer part are exact SATs groups: up to 3 digits, then 3 each. */
 function groupedInThrees(parts: string[]): boolean {
@@ -224,12 +231,12 @@ export function labelProblems(text: string, opts: LabelProblemsOpts = {}): strin
   const tokens = [...coordinateTokens(coordinateSpans), ...scanTokens(text, coordinateSpans)];
   const yearCounts = occurrenceCounts(tokens, opts.years ?? []);
   for (const t of tokens) {
-    const value = Number(t.intPart.replace(/,/g, ''));
+    const digits = yearDigits(t);
     // A candidate year is only treated as one where it is the sole occurrence of that value among plain
     // tokens in the text (review rounds 3 and 5) — see occurrenceCounts' own comment for what is excluded
-    // from that count and why.
-    const looksLikeNamedYear = (opts.years ?? []).includes(value);
-    const isYear = looksLikeNamedYear && yearCounts.get(value) === 1;
+    // from that count and why. Matched on the digit string, so "01999" is never the year 1999 (#1754).
+    const looksLikeNamedYear = (opts.years ?? []).some(y => String(y) === digits);
+    const isYear = looksLikeNamedYear && yearCounts.get(digits) === 1;
     const problem = groupingProblem(t, isYear, looksLikeNamedYear);
     if (problem) problems.push(problem);
   }

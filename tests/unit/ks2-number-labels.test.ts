@@ -111,8 +111,9 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     // "(19,99)" is an ordinary coordinate; naming 1999 as a year must not make the coordinate-detection
     // lose to the year check just because "19" + "99" happens to concatenate to the named value.
     expect(labelProblems('The shape is at (19,99) on the grid.', { years: [1999] })).toEqual([]);
-    // A real bare year sharing digits with a nearby coordinate is still correctly exempt — the coordinate
-    // itself does not count as a competing "1999" occurrence (occurrenceCounts skips parenthesised tokens).
+    // A real bare year sharing digits with a nearby coordinate is still correctly exempt. Since #1444 a
+    // coordinate's components DO count as plain occurrences (occurrenceCounts); this stays safe only because
+    // "19" and "99" are each a different value from 1999, so neither competes with the bare year (#1754).
     expect(labelProblems('The shape is at (19,99) on the grid, in 1999.', { years: [1999] })).toEqual([]);
   });
 
@@ -144,7 +145,8 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     expect(labelProblems('This vase, worth £1999, was made that year.', { years: [1999] }))
       .toEqual(['"1999" is grouped incorrectly — commas must mark exact groups of three digits']);
     // A bare real year elsewhere in the same sentence as money sharing its digits is unaffected either way
-    // — money is excluded from occurrence-ambiguity counting, the same as a coordinate.
+    // — money is excluded from occurrence-ambiguity counting, like a signed or decimal-tailed token (a
+    // coordinate's components, by contrast, are counted since #1444 — see the round-3 coordinate test).
     expect(labelProblems('The book, made in 1999, costs £1,999.', { years: [1999] })).toEqual([]);
   });
 
@@ -243,6 +245,11 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     expect(labelProblems('-1999', { years: [1999] })).toContain('"-1999" is a year and must never carry a sign');
     // One problem per token, the sign ahead of the comma — the same precedence the decimal rule has.
     expect(labelProblems('−1,999', { years: [1999] })).toEqual(['"−1,999" is a year and must never carry a sign']);
+    // And between the two token-shape rules, the decimal check runs first (#1754): a token that is both
+    // signed and decimal-tailed reports the decimal message alone, never the sign message or both. Pinned
+    // because swapping the two checks in groupingProblem used to pass the whole suite.
+    expect(labelProblems('−1999.5', { years: [1999] }))
+      .toEqual(['"−1999" is a year and must not have a decimal place']);
     // Controls, unchanged: the bare year is exempt; a decimal-tailed year is still reported as such.
     expect(labelProblems('In 1999.', { years: [1999] })).toEqual([]);
     expect(labelProblems('1999.5', { years: [1999] }))
@@ -267,6 +274,19 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     // too): the same digits as a coordinate component and as a bare token leave neither identifiable as the
     // year, so both are judged as ordinary numbers — the accepted false positive round 3 chose over a guess.
     expect(labelProblems('Founded in 1999, the club sits at (1999, 3).', { years: [1999] })).toHaveLength(2);
+  });
+
+  it('a leading-zero token is never the named year, standalone or as a coordinate component (#1754)', () => {
+    // A written year has no leading zero — fmt() never pads a whole number — yet the checker used to compare
+    // the year by `Number(...)`, so "01999" equalled 1999 and passed as the year. The comparison is now on
+    // the digit string, so "01999" is judged as the ordinary 5-digit token it is and reported for its
+    // missing comma; the one genuine "1999" beside it keeps its exemption (no shared occurrence count).
+    expect(labelProblems('In 01999.', { years: [1999] }))
+      .toEqual(['"01999" is four or more digits with no comma grouping']);
+    expect(labelProblems('(01999, 3)', { years: [1999] }))
+      .toEqual(['"01999" is four or more digits with no comma grouping']);
+    expect(labelProblems('In 1999, not 01999.', { years: [1999] }))
+      .toEqual(['"01999" is four or more digits with no comma grouping']);
   });
 
   it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {
