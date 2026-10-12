@@ -610,6 +610,23 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.wizard-progress')).toHaveCount(0);
   });
 
+  test('the Maths/Writing tabs announce the selected one and the panel they control (#901)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    const topics = page.locator('#topics');
+    await expect(topics).toHaveAttribute('role', 'tabpanel');
+    const expectState = async (on: 'maths' | 'writing', off: 'maths' | 'writing') => {
+      await expect(page.locator(`#tab-${on}`)).toHaveAttribute('aria-selected', 'true');
+      await expect(page.locator(`#tab-${off}`)).toHaveAttribute('aria-selected', 'false');
+      await expect(topics).toHaveAttribute('aria-labelledby', `tab-${on}`);
+    };
+    await expect(page.locator('#tab-maths')).toHaveAttribute('aria-controls', 'topics');
+    await expect(page.locator('#tab-writing')).toHaveAttribute('aria-controls', 'topics');
+    await expectState('maths', 'writing');
+    await page.click('#tab-writing'); await expectState('writing', 'maths');
+    await page.click('#tab-maths'); await expectState('maths', 'writing');
+  });
+
   test('every year has maths and writing topics listed', async ({ page }) => {
     await seedPlayer(page);
     for (const y of ['reception', 'year1', 'year2']) {
