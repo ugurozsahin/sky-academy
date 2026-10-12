@@ -34,7 +34,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 
 ## Year 1 — 6 q/stage, 3 lives
 Maths:
-- y1-bonds — bonds within 20
+- y1-bonds — bonds within 20; at d2–d3 one card in three is the reverse form, "Which makes T?" with four sums (#922)
 - y1-bonds-10 — drill (Sprint chooser only): `a + ? = 10` / `? + a = 10`, the same card at every difficulty, ten-frame shown
 - y1-bonds-20 — drill (Sprint chooser only): `a + ? = 20` / `? + a = 20`, the same card at every difficulty
 - y1-add — within 20, incl. 0

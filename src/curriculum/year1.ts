@@ -23,7 +23,22 @@ const bondsQ = (rng: () => number, total: number) => {
   const p = missingLeft ? `? + ${a} = ${total}` : `${a} + ? = ${total}`;
   return numQ(rng, p, total - a, { min: 0, max: 20, ...q(p), visual: total <= 10 ? { type: 'tenframe', n: a } : undefined });
 };
-const y1Bonds: Generator = (d, rng) => bondsQ(rng, d === 1 ? 10 : d === 2 ? pick(rng, [10, 12, 15]) : 20);
+/**
+ * #922: the reverse form — "Which makes T?" with four sums on the bubbles. Decoys sum to T±1 or T±2 (never T,
+ * so no decoy is the answer's commuted form or another bond of T); at T = 20 only 18 and 19 fit in 0–20, so
+ * T−3 fills the third place.
+ */
+const bondsPickQ = (rng: () => number, total: number) => {
+  const sum = (s: number) => { const x = ri(rng, 0, s); return `${x} + ${s - x}`; };
+  const near = [total - 2, total - 1, total + 1, total + 2].filter(s => s >= 0 && s <= 20);
+  const sums = shuffle(rng, near).concat(total >= 3 ? [total - 3] : []).slice(0, 3);
+  const answer = sum(total);
+  return wordQ(rng, `Which makes ${total}?`, answer, sums.map(sum), { say: `Which two numbers make ${total}?` });
+};
+const y1Bonds: Generator = (d, rng) => {
+  const total = d === 1 ? 10 : d === 2 ? pick(rng, [10, 12, 15]) : 20;
+  return d > 1 && rng() < 1 / 3 ? bondsPickQ(rng, total) : bondsQ(rng, total);
+};
 const y1Add: Generator = (d, rng) => {
   const max = d === 1 ? 10 : d === 2 ? 15 : 20;
   const a = ri(rng, 0, max), b = ri(rng, 0, max - a);
