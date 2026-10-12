@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { pinSentence } from './helpers/pin-sentence';
 
 /**
  * Shared repo-file readers (#536). `doc()`, `unitsOf()` and `unitWith()` used to be redefined per describe
@@ -4427,13 +4428,11 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     expect(s, 'the incident that bought this — and that every one of those rounds was correct')
       .toMatch(/four blocking rounds/);
     // #771: the plain `/Every one of those rounds was correct/` pin this replaced left the exhaustiveness
-    // claim after it — "the round count was simply how many members the class had (#466)" — completely
-    // unpinned, so a rewrite could insert "not" before "simply" (or otherwise soften the clause) without
-    // touching any existing match. Anchored through its own full stop, so nothing can be inserted between
-    // "correct" and the citation without breaking the match.
-    expect(s, 'which is the whole point: the round cap cannot fix this, because no round was wrong — and the '
-      + 'exhaustiveness claim that follows is pinned too, not just the sentence introducing it')
-      .toMatch(/Every one of those rounds was correct\*\* and met `review-pr` §7's bar, so nothing in the round cap could stop them: the round count was simply how many members the class had \(#466\)\./);
+    // claim after it — "the round count was simply how many members the class had (#466)" — unpinned, so
+    // "not simply" could land there green. Held as one whole sentence, so nothing can be inserted inside it.
+    pinSentence(s, 'Every one of those rounds was correct** and met `review-pr` §7\'s bar, so nothing in the round cap '
+      + 'could stop them: the round count was simply how many members the class had (#466).',
+      { label: 'the whole point: the round cap cannot fix this, because no round was wrong — and the exhaustiveness claim is pinned too' });
   });
 
   it('open-pr §4 concedes no exemption, in any of the voices one would be written in', () => {
@@ -4502,15 +4501,13 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/agents: cannot spawn \(subagent\)/);
     expect(a, "§4's reachability test comes with the agents, or the diff grows hardening nobody can reach")
       .toMatch(/reachability test before you change anything/);
-    // #771: the free-floating `/a note for the body, not an edit to the diff/` pin this replaced does not
-    // care what precedes it, so "is not automatically a note for the body, not an edit to the diff" — which
-    // reverses the disposition — still matched. Anchored to the word immediately before it.
-    expect(a, 'and what to do with such a finding, which is the disposition the test is for — anchored to the '
-      + 'word right before it, so nothing can be inserted between "is" and "a note" unnoticed')
-      .toMatch(/produce is a note for the body, not an edit to the diff\./);
-    expect(a, 'the absolute is pinned through its own full stop, so a hedge cannot be appended before it and '
-      + 'turn the prohibition into a conditional')
-      .toMatch(/a gap and a result must never be written the same way, and "say so in your own words" leaves them indistinguishable\./);
+    // #771: the free-floating `/a note for the body, not an edit to the diff/` pin this replaced let "is not
+    // automatically a note for the body…" reverse the disposition, and the absolute two sentences on had no
+    // end anchor, so a hedge could follow it inside the sentence. Both held as whole sentences.
+    pinSentence(a, 'produce is a note for the body, not an edit to the diff.',
+      { label: 'what to do with such a finding — the disposition the test is for, anchored to the word before it' });
+    pinSentence(a, 'a gap and a result must never be written the same way, and "say so in your own words" leaves them indistinguishable.',
+      { label: 'the absolute, so a hedge cannot turn the prohibition into a conditional' });
     expect(a, 'the reason, which is the only one that survives "but you cannot review your own work"')
       .toMatch(/different context/);
     expect(a, 'it is not a verdict').toMatch(/not for a verdict/i);
@@ -4528,12 +4525,10 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
   it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
     const b = bullet();
     expect(b, 'a commit is the one form a reviewer cannot use').toMatch(/as an issue, not a commit/);
-    // #771: this sentence carried no pin of any kind before, so a hedge inserted right after the colon —
-    // "though not every topic, every spelling, every route needs listing" — would gut the enumeration
-    // requirement with nothing here to catch it. Anchored through its own full stop.
-    expect(b, 'the enumeration itself is pinned through its own full stop, so a hedge inserted right after the '
-      + 'colon cannot land there unnoticed')
-      .toMatch(/You enumerated a class to find it: every topic, every spelling, every route\./);
+    // #771: this sentence carried no pin before, so a hedge after the colon — "though not every topic, every
+    // spelling, every route needs listing" — would gut the enumeration requirement. Held as one whole sentence.
+    pinSentence(b, 'You enumerated a class to find it: every topic, every spelling, every route.',
+      { label: 'the enumeration itself, so a hedge inserted right after the colon cannot land unnoticed' });
     expect(b, "and the rule says so in the reviewer's own terms, not only by implication")
       .toMatch(/develops nothing and may not\s+push/);
     expect(b, 'with a title shape, so two reviewers file the same thing under the same name')
