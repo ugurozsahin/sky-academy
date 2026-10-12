@@ -4,7 +4,7 @@ import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
 import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options'; import { playTitle } from '../game/sprint-pools';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed'; import { calmReduced } from '../device-settings';   // #32: test-only time compression; #906
-import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools';   // #1065: one pool rule
+import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools'; import { createHud, heartCount } from './hud';   // #1065: one pool rule
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
 } from '../storage';
@@ -12,8 +12,7 @@ import { equippedItem } from '../game/shop'; import { tickWithBeep } from './che
 import { canHear, haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
-import { createHud, heartCount } from './hud';
-import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './play-input';   // #1064: how a child answers
+import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './play-input'; import { seedRng } from '../game/daily-sprint';   // #1064: how a child answers
 import { BOMB, createPlaySession, type ResultPayout } from './play-session'; import { factsOf, speedCandidates } from './play-facts';   // #36
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
@@ -21,7 +20,8 @@ import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'> & { input?: PlayInput; title?: string };
+export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'>
+  & { input?: PlayInput; title?: string; seed?: string };   // #924: a seed, not an rng, so a replay re-deals the same deck
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
   const d = load(); const av = voiced(avatarById(d.avatar), d, o.year.id);
@@ -90,7 +90,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
     mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, resume: o.resume, legend: o.legend, ...timeOptsFor(o.mode, d.settings),
-    pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => answerableBy(t, 'mixed')) : undefined),
+    rng: seedRng(o.seed), pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => answerableBy(t, 'mixed')) : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
     arena: () => arena,
