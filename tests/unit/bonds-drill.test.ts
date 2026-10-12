@@ -32,8 +32,28 @@ describe('number-bond drills (#917)', () => {
       expect(c.options).toContain(c.answer);
     }
   });
-  it('y1-bonds gives byte-identical cards to before for the same seed', () => {
+  it('y1-bonds gives byte-identical cards to before at d1 (#922 adds a reverse form at d2–d3 only)', () => {
     const gen = topicById('y1-bonds')!.gen;
-    for (const d of DS) for (let seed = 1; seed <= 300; seed++) expect(gen(d, rngOf(seed))).toEqual(before(d, rngOf(seed)));
+    for (let seed = 1; seed <= 300; seed++) expect(gen(1, rngOf(seed))).toEqual(before(1, rngOf(seed)));
+  });
+  it('y1-bonds d2–d3: about one card in three is "Which makes T?" and satisfies the oracle (#922)', () => {
+    const gen = topicById('y1-bonds')!.gen;
+    for (const d of [2, 3] as Difficulty[]) {
+      let rev = 0; const N = 1500;
+      for (let seed = 1; seed <= N; seed++) {
+        const c = gen(d, rngOf(seed));
+        const m = /^Which makes (\d+)\?$/.exec(c.prompt);
+        if (!m) continue;
+        rev++;
+        const T = +m[1];
+        const val = (o: string) => { const [x, y] = o.split(' + ').map(Number); expect(x).toBeGreaterThanOrEqual(0); expect(y).toBeGreaterThanOrEqual(0); expect(x + y).toBeLessThanOrEqual(20); return x + y; };
+        expect(c.options).toHaveLength(4);
+        expect(c.options.filter(o => val(o) === T)).toEqual([c.answer]);
+        for (const o of c.options) if (o !== c.answer) expect([1, 2, 3].includes(Math.abs(val(o) - T))).toBe(true);
+        expect(new Set(c.options.map(val)).size).toBe(4);
+        expect(c.say).toBe(`Which two numbers make ${T}?`);
+      }
+      expect(rev / N).toBeGreaterThan(0.28); expect(rev / N).toBeLessThan(0.39);
+    }
   });
 });
