@@ -1,4 +1,5 @@
 // Switching to a profile and adding one (#20).
+import { forgetDailyLine } from '../game/daily-line';
 import { currentIndex, PROFILE_IDS, readItem, readTombstones, saveKeyFor, slotState, writeIndex, writeTombstones, type ProfileId } from './profile-index';
 import { leaveProfile, rereadProfile, state } from './state';
 /**
@@ -105,6 +106,7 @@ export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: '
  * there.
  */
 export function addProfile(): AddProfileResult {
+  forgetDailyLine();   // #925: a new child never inherits a line kept by another tab or an earlier one
   const idx = currentIndex();
   const tombstoned = readTombstones();
   const free = PROFILE_IDS.find(id => !idx.ids.includes(id) && (slotState(id) === 'empty' || tombstoned.includes(id)));

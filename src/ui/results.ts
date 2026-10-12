@@ -189,7 +189,7 @@ export const spokenLine = (l: ResultCandidate): string => l.spoken ?? l.text;
  * results candidates, so `commitResult()` stays one line for it.
  */
 export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r: { correct: number; score: number; stars?: number }, pooled = false, daily = false): { newBest: boolean; candidates: ResultCandidate[] } {
-  if (daily) keepDailyLine(activeProfile(), today(), dailyLine({ correct: r.correct, stars: r.stars ?? 0 }, year.title, today()));   // #925: for the grown-ups' copy row, in memory only
+  if (daily) { const day = today(); keepDailyLine(activeProfile(), day, dailyLine({ correct: r.correct, stars: r.stars ?? 0 }, year.title, day)); }   // #925: for the grown-ups' copy row, in memory only
   if (pooled || load().settings.timeX !== 1) return { newBest: false, candidates: [] };   // #1121: a best is always a 60-second run; #1234: a titled pool (Grammar mix) keeps no year record
   if (!topic) return { newBest: recordSprint(year.id, r.score), candidates: [] };
   if (!topicById(topic.id)) return { newBest: false, candidates: [] };   // #1124: a drill built for one run (Tricky Facts) has no row to keep a best on

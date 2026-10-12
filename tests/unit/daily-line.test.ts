@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+const mem: Record<string, string> = {};
+(globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
 import { recordSprintOutcome } from '../../src/ui/results';
-import { exportSave, importSave, reset } from '../../src/storage';
+import { activeProfile, addProfile, deleteProfile, exportSave, importSave, reset } from '../../src/storage';
 import { YEARS } from '../../src/curriculum';
 import { dailyLine, dailyLineFor, forgetDailyLine, keepDailyLine } from '../../src/game/daily-line';
 
@@ -39,5 +41,19 @@ describe('Daily Sprint result line (#925)', () => {
     keepDailyLine('p1', '2026-09-28', 'line');
     reset();
     expect(dailyLineFor('p1', '2026-09-28')).toBeNull();
+  });
+  it('deleting a profile forgets the kept line, for another slot and for the one playing (#925 review)', () => {
+    localStorage.clear(); reset();
+    const added = addProfile(); expect(added.ok).toBe(true);
+    const other = added.ok ? added.id : 'p2';
+    keepDailyLine(other, '2026-09-28', 'line');
+    expect(deleteProfile(other).ok).toBe(true);
+    expect(dailyLineFor(other, '2026-09-28')).toBeNull();
+    const second = addProfile(); expect(second.ok).toBe(true);
+    const id = second.ok ? second.id : 'p2';
+    keepDailyLine(activeProfile(), '2026-09-28', 'line');
+    expect(id).toBe(activeProfile());
+    const self = deleteProfile(activeProfile()); expect(self.ok).toBe(true);
+    expect(dailyLineFor(id, '2026-09-28')).toBeNull();
   });
 });
