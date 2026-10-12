@@ -6073,3 +6073,20 @@ test('the Year 2 card keeps its age band with no school year (#1288)', async ({ 
   await seedPlayer(page);
   await expect(page.locator('.island[data-year="year2"]')).toContainText('Ages 6–7');
 });
+test('Daily Sprint deals the same first three questions on every start the same day (#924)', async ({ page }) => {
+  await seedPlayer(page);
+  await page.click('.island[data-year="year1"]');
+  await expect(page.locator('#daily')).toBeVisible();
+  const firstThree = async () => {
+    await page.click('#daily');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    const got = await page.evaluate(() => { const s = window.__sna.session; const out = [s.current!.prompt]; for (let i = 0; i < 2; i++) { s.nextQuestion(); out.push(s.current!.prompt); } return out; });
+    await leavePlayScreen(page);
+    return got;
+  };
+  const first = await firstThree();
+  expect(await firstThree()).toEqual(first);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});
