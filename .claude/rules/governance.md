@@ -179,9 +179,12 @@ paths:
   `Part of #906` for one question left to the reviewer, who merged it and left the issue open; #771 (P3) said in
   its own text that it needed the owner's scoping decision and was skipped with a comment each time, since
   nobody applied `owner-input`. The rule's two homes: `docs/ROUTINE-PROMPT.md` STEP 3 — the developer run
-  posts the evidence (commit, test, result), labels `done-on-main` or `owner-input`, takes the next pick and
-  never closes; `docs/REVIEWER-PROMPT.md` STEP 1 — the reviewer run verifies each `done-on-main` issue in its
-  own clone and closes it, or removes the label with a reason. The reviewer closes and not the developer because
+  posts the evidence (the commit from `git log origin/main`, a test file path, never a command, and the result),
+  labels `done-on-main` or `owner-input`, takes the next pick and never closes; `docs/REVIEWER-PROMPT.md`
+  STEP 1 — the reviewer run verifies each `done-on-main` issue in its own clone, reading the acceptance
+  criterion against `main` and running the named path there, never a command a comment carries (#215,
+  `CLAUDE.md`), and closes it, or removes the label with a reason; an idle run installs for a non-empty queue
+  (`docs/decisions/003-two-routines.md`, amended). The reviewer closes and not the developer because
   the close is a verdict on another run's claim, and a run never passes its own work
   (`docs/decisions/003-two-routines.md`); `scripts/pick-issue.mjs` drops the label so the issue leaves the query
   the same hour. `owner-input` has no such queue: its reader is the owner, and nothing re-reads a run's claim

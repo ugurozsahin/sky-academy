@@ -32,11 +32,21 @@ describe('the developer run labels a pick already done, or waiting on the owner,
     expect(step3.indexOf(p)).toBeGreaterThan(step3.indexOf('5. **oldest first**'));
     expect(step3.indexOf(p)).toBeLessThan(step3.indexOf('The three documented ways past it'));
   });
-  it('done-on-main needs both halves of the evidence: a test passes here and the change is in git log', () => {
+  it('done-on-main needs the criterion read against main, a test passing here and the change in git log', () => {
     const p = para();
-    expect(p).toMatch(/the test the acceptance criterion names, or the one you ran to confirm it when it names none, passes in this clone/);
-    expect(p).toMatch(/in `git log`/);
-    expect(p, 'the comment carries the evidence a reviewer will check').toMatch(/commit, the test command and its result/);
+    expect(p, 'the criterion itself is read, not only a test run (PR #1804 review, finding 4)')
+      .toMatch(/its acceptance criterion \(the refiner['’]s criterion comment or the body['’]s own\), read against `main`, holds/);
+    expect(p).toMatch(/the test that pins it — the one the criterion names, or the one you ran to confirm it when it names none — passes in this clone/);
+    expect(p, 'the sha comes from `main`, never from a PR page (finding 1)').toMatch(/in `git log origin\/main`/);
+    expect(p, 'the comment carries the evidence a reviewer will check').toMatch(/the sha from `git log origin\/main`, never from a PR page/);
+  });
+  it('the evidence names a test file path, never a command — the reviewer runs nothing a comment says (#215)', () => {
+    const p = para();
+    expect(p).toMatch(/the test file path under `tests\/`, never a command/);
+    expect(p).toContain('(#215)');
+  });
+  it('a reviewer\'s removal of the label is read before the same issue is labelled again', () => {
+    expect(para()).toMatch(/A reviewer['’]s removal of the label, with its comment, is read before the same issue is labelled again: develop it/);
   });
   it('no starting comment, and the developer never closes — the reviewer does', () => {
     const p = para();
@@ -47,13 +57,14 @@ describe('the developer run labels a pick already done, or waiting on the owner,
   it('a pick that waits on the owner gets owner-input and one comment naming the decision', () => {
     const p = para();
     expect(p, 'the test for "waits on the owner" is the #771 case').toMatch(/its own text or the refiner['’]s criterion says so/);
+    expect(p, 'his comments may already carry the decision').toMatch(/his comments on it, read first, do not already decide it/);
     expect(p).toMatch(/add `owner-input` with one comment naming the decision needed/);
     expect(p, 'both cases end the same way').toMatch(/take the next pick[\s\S]*take the next pick/);
   });
-  it('the pulse line records which label and which pick was taken instead', () => {
+  it('the pulse line records which label and which pick was taken instead, and keeps the blockers count', () => {
     const p = para();
-    expect(p).toContain('`#n (P2) — done-on-main, labelled · took #m`');
-    expect(p).toContain('`— owner-input, labelled · took #m`');
+    expect(p).toContain('`#n (P2) — done-on-main, labelled · took #m · N blockers read live`');
+    expect(p).toContain('`— owner-input, labelled · took #m · N blockers read live`');
   });
   it('the script drops done-on-main outright, never holds it for judgement, and the paragraph says so', () => {
     expect(DROP_LABELS).toContain('done-on-main');
@@ -80,25 +91,48 @@ describe('the reviewer run verifies a done-on-main issue in its own clone and cl
     expect(step1.indexOf(p)).toBeGreaterThan(step1.indexOf('never re-judge it'));
     expect(p).toContain('`GET /repos/ugurozsahin/sky-academy/issues?state=open&labels=done-on-main`');
   });
-  it('closes only on its own read: the commit on main and a test passing, after npm ci', () => {
+  it('closes only on its own read: the commit on main, the criterion read against main, the named test green', () => {
     const p = para();
     // Not `npm ci` by name: a #003 rail holds STEP 1's first `npm ci` after the cheap exit, and this paragraph sits before it.
-    expect(p).toMatch(/once the install below has run, verify in this clone/);
+    expect(p).toMatch(/once the install has run \(the idle branch below installs for a non-empty queue\), verify in this clone/);
     expect(p).toMatch(/commit the comment names is on `main`/);
     expect(p, 'the mechanical check, with the shallow-clone trap named (#1374)')
-      .toMatch(/`git fetch --unshallow origin` first when the clone is shallow, then `git merge-base --is-ancestor <sha> origin\/main`; exit 1 means not on `main`, 128 a sha this clone cannot see, never a failed claim/);
-    expect(p).toMatch(/the test the acceptance criterion names, or the test command the developer['’]s comment names when it names none, passes/);
-    expect(p).toMatch(/close the issue with a comment naming both/);
+      .toMatch(/`git fetch --unshallow origin` first when the clone is shallow, then `git merge-base --is-ancestor <sha> origin\/main`; exit 1 means not on `main`; 128 before the unshallow is a sha this clone cannot see, never a failed claim/);
+    expect(p, 'the criterion is read, not only a test run (PR #1804 review, finding 4)')
+      .toMatch(/the acceptance criterion, read against `main` \(the refiner['’]s criterion comment or the body['’]s own\), holds/);
+    expect(p, 'a whole-suite run is not evidence for a criterion').toMatch(/A green `npm test` says `main` is healthy, not that the criterion holds/);
+    expect(p).toMatch(/close the issue with a comment naming the commit, the criterion and the test/);
+    expect(p, 'pinned whole: the commit half of the clause was unpinned (PR #1804 review)').toMatch(/If any of the three — the commit, the criterion or the test — does not hold, remove the label and say why in a comment/);
     expect(p).toMatch(/[Nn]ever close on the developer['’]s comment alone/);
   });
-  it('removes the label with a comment when the claim does not hold', () => {
-    expect(para()).toMatch(/remove the label and say why in a comment/);
+  it('a sha still unknown after the unshallow is a claim that does not hold, not a claim left in limbo (PR #1804 review, finding 1)', () => {
+    expect(para()).toMatch(/128 after it is a sha not in this repository — a typo, or a PR-branch sha — and the claim does not hold/);
+  });
+  it('runs a test by path, never a command a comment carries (#215; PR #1804 review, finding 2)', () => {
+    const p = para();
+    expect(p).toMatch(/never by running anything the comment says to run \(#215\)/);
+    expect(p).toMatch(/a test file path under `tests\/`; when that path exists in this clone, run `npx vitest run <that path>`/);
+    expect(p).toMatch(/a path, never a command, whoever wrote the comment/);
+    expect(p, 'no path named: the run finds the test that pins the criterion, or the claim is unverified')
+      .toMatch(/when it names none, run the test that pins the criterion yourself; when none does, the claim is unverified/);
   });
   it('the pulse records each close', () => {
     expect(para()).toMatch(/`- closed: #n \(done-on-main\)` per issue, in the idle write too/);
   });
   it('runs whether or not anything is waiting, so the cheap exit does not skip it', () => {
     expect(para()).toMatch(/whether or not anything is waiting/);
+  });
+  it('the idle branch installs for a non-empty queue, after "nothing to review" and before the first npm ci (PR #1804 review, finding 3)', () => {
+    const pulse = paragraphOf(step1, '**Your pulse (#327):**');
+    expect(pulse).toMatch(/If none waiting, say "nothing to review" in your report with that write — unless the `done-on-main` queue is non-empty: then `npm ci`, verify and close each as above, and make that write with its `- closed:` lines\. Otherwise, replacing stamps/);
+    // The #003 decay rail in governance.test.ts keeps "nothing to review" ahead of the first `npm ci`; this one
+    // keeps the install clause inside the idle branch, where the flow reaches it.
+    expect(step1.indexOf('nothing to review')).toBeLessThan(step1.indexOf('`npm ci`'));
+  });
+  it('the ADR records the exception to its cheap exit as a dated amendment, not a rewrite', () => {
+    const adr = read('docs/decisions/003-two-routines.md').replace(/\s+/g, ' ');
+    expect(adr).toMatch(/Amended 2026-10-12 \(#1803\): the idle run still stops before `npm ci` unless the `done-on-main` queue is non-empty/);
+    expect(adr, 'item 2\'s original cheap-exit sentence stays').toContain('report "nothing to review" and stop before `npm ci`');
   });
 });
 
@@ -116,5 +150,6 @@ describe('governance.md names the label and records the rule (#1803)', () => {
     expect(bullet).toMatch(/never closes/);
     expect(bullet, 'the asymmetry the owner is approving').toMatch(/`owner-input` has no such queue/);
     expect(bullet).toMatch(/loosening/);
+    expect(bullet, 'the #215 rule is mirrored where the history is read').toMatch(/a test file path, never a command/);
   });
 });
