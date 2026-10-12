@@ -77,7 +77,7 @@
 .p-topics { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .p-topic { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
 .p-topic .ic { font-size: 22px; } .p-topic-t { flex: 1; min-width: 0; } .p-topic-t b { display: block; } .p-topic-t small { color: var(--muted); font-weight: 600; }
-.p-acc { font-weight: 700; font-size: 18px; }
+.p-acc { font-weight: 700; font-size: 18px; } .p-tip { display: block; }
 .p-empty { color: var(--muted); font-weight: 600; }
 /*
  * #109 asked whether this nested horizontal scroller is what makes the page scroll badly on a tablet.
