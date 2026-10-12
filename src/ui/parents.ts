@@ -162,10 +162,10 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
       <div class="p-year-row"><span>Accuracy ${showPct(y.accuracy)}</span>${bar(y.accuracy ?? 0)}</div>
     </div>`).join('');
   const weak = sm.weakest.length
-    ? `<ul class="p-topics">${sm.weakest.map(topicRow).join('')}</ul>`
+    ? `<ul class="p-topics">${sm.weakest.map(w => topicRow(w, true)).join('')}</ul>`
     : `<p class="p-empty">Not enough play yet to spot tricky topics — keep going!</p>`;
   const strong = sm.strongest.length
-    ? `<ul class="p-topics">${sm.strongest.map(topicRow).join('')}</ul>`
+    ? `<ul class="p-topics">${sm.strongest.map(s => topicRow(s)).join('')}</ul>`
     : '';
   return `
     <div class="p-stats">
