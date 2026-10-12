@@ -24,6 +24,6 @@ export function bindWords() {
     let written: Promise<void> | undefined;
     try { written = navigator.clipboard?.writeText(box.textContent ?? ''); } catch { /* a synchronous refusal: select by hand */ }
     if (!written) { byHand(); return; }
-    written.then(() => say('Copied. Paste the words where you like.')).catch(byHand);
+    written.then(() => say('Copied. Paste the words where you like.'), byHand);
   }));
 }

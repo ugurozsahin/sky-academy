@@ -735,6 +735,34 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 
+  // #1289 round 3: the copy button's paths — a working clipboard, and none (select by hand) — and that button 1 copies list 1's words.
+  // The selection's range text: the words element it was set on (selection.toString() is empty in headless Chromium for a programmatic range).
+  const selectedWords = (page: Page) => page.evaluate(() => { const s = window.getSelection()!; return s.rangeCount ? s.getRangeAt(0).toString() : ''; });
+  const seedBothLists = (page: Page) => seedPlayer(page, 'volt', 'Ada', { ks2: { facts: {}, checks: [], words: { address: 'w', answer: 'w', accommodate: 'w', accompany: 'w' } } });
+
+  test('Spelling word lists: each "Copy these words" button copies its own list and says Copied (#1289)', async ({ page }) => {
+    await page.addInitScript(() => { (window as any).__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { (window as any).__copied.push(t); } }, configurable: true }); });
+    await seedBothLists(page);
+    await openGrownUps(page);
+    await page.locator('button[data-words="0"]').click();
+    await expect(page.locator('#words-msg')).toContainText('Copied');
+    await page.locator('button[data-words="1"]').click();
+    expect(await page.evaluate(() => (window as any).__copied as string[])).toEqual(['address, answer', 'accommodate, accompany']);
+  });
+
+  test('Spelling word lists: with no clipboard, or one that refuses, the words are selected and the by-hand message shows (#1289)', async ({ page }) => {
+    await page.addInitScript(() => { Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }); });
+    await seedBothLists(page);
+    await openGrownUps(page);
+    await page.locator('button[data-words="1"]').click();
+    await expect(page.locator('#words-msg')).toContainText('by hand');
+    expect(await selectedWords(page)).toBe('accommodate, accompany');
+    await page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('no')) }, configurable: true }); document.getElementById('words-msg')!.hidden = true; window.getSelection()!.removeAllRanges(); });
+    await page.locator('button[data-words="0"]').click();
+    await expect(page.locator('#words-msg')).toContainText('by hand');
+    expect(await selectedWords(page)).toBe('address, answer');
+  });
+
   test('Time arrangements: Extra time and the beep persist, and a Sprint then runs 90 seconds (#1121)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });
     await seedPlayer(page);
