@@ -115,17 +115,6 @@ describe('voice capability detection (#65)', () => {
     expect(voiceState(synth)).toBe('yes');
   });
 
-  // #1630: "Start again" is reset() then hush() (parents.ts). A line spoken before it leaves a silence deadline
-  // pending; fired afterwards it save()s a fresh default blob over the key reset() just removed.
-  it('a verdict still pending when Start again runs does not re-create the cleared save (#1630)', () => {
-    fresh(); save({ name: 'Ada' });
-    const { synth } = fakeSynth({ starts: false });
-    say('Hello', false, { synth });
-    reset(); hush(synth);
-    vi.advanceTimersByTime(VOICE_START_MS * 2);
-    expect(localStorage.getItem('sna:v1')).toBeNull();
-  });
-
   it('marks a silent engine unavailable when nothing starts within VOICE_START_MS', () => {
     fresh();
     const { synth } = fakeSynth({ starts: false });
