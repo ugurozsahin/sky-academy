@@ -113,7 +113,7 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     expect(labelProblems('The shape is at (19,99) on the grid.', { years: [1999] })).toEqual([]);
     // A real bare year sharing digits with a nearby coordinate is still correctly exempt. Since #1444 a
     // coordinate's components DO count as plain occurrences (occurrenceCounts); this stays safe only because
-    // "19" and "99" are each a different value from 1999, so neither competes with the bare year (#1754).
+    // "19" and "99" are each different digits from "1999", so neither competes with the bare year (#1754).
     expect(labelProblems('The shape is at (19,99) on the grid, in 1999.', { years: [1999] })).toEqual([]);
   });
 

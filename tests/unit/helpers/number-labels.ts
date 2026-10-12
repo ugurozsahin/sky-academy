@@ -73,6 +73,12 @@ interface NumberToken {
   isMoney: boolean;
 }
 
+/** The digits a token would have to show, comma-free, to be a named year — compared as a string, never via
+ *  `Number(...)`, because a written year carries no leading zero (`fmt()` pads nothing) and `Number("01999")`
+ *  is 1999: by value, a leading-zero token passed as the year instead of being judged as the ordinary
+ *  5-digit quantity it is (#1754). */
+const yearDigits = (t: NumberToken): string => t.intPart.replace(/,/g, '');
+
 /**
  * A coordinate's two components, each as the same token shape a standalone number gets, so that one
  * function (`groupingProblem`) judges both. A component is never money (`findCoordinateSpans` refuses a
@@ -136,12 +142,6 @@ function occurrenceCounts(tokens: NumberToken[], values: number[]): Map<string, 
   }
   return counts;
 }
-
-/** The digits a token would have to show, comma-free, to be a named year — compared as a string, never via
- *  `Number(...)`, because a written year carries no leading zero (`fmt()` pads nothing) and `Number("01999")`
- *  is 1999: by value, a leading-zero token passed as the year instead of being judged as the ordinary
- *  5-digit quantity it is (#1754). */
-const yearDigits = (t: NumberToken): string => t.intPart.replace(/,/g, '');
 
 /** Whether the comma-split `parts` of an integer part are exact SATs groups: up to 3 digits, then 3 each. */
 function groupedInThrees(parts: string[]): boolean {
