@@ -18,7 +18,7 @@ const before: Generator = (d, rng) => {
 
 describe('number-bond drills (#917)', () => {
   it('are the two Year 1 drills, in the chooser list only', () => {
-    expect(drillsFor('year1', 'maths').map(t => t.id)).toEqual(['y1-bonds-10', 'y1-bonds-20']);
+    expect(drillsFor('year1', 'maths').map(t => t.id)).toEqual(['y1-bonds-10', 'y1-bonds-20', 'y1-doubles-halves']);
   });
   it.each([10, 20])('y1-bonds-%i always totals %i and its answer satisfies the oracle', (T) => {
     const gen = topicById(`y1-bonds-${T}`)!.gen;
