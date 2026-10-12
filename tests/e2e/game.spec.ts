@@ -3331,7 +3331,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.play')).toBeVisible();
     await page.evaluate(() => window.__sna.session.tick(60_000));
     await expect(page.locator('.results')).toBeVisible();
-    await expect(page.locator('.results')).not.toContainText('Copy');   // no child-facing share or copy
+    await expect(page.locator('.results')).not.toContainText(/copy|share|send/i);   // no child-facing share or copy
     await page.click('#home');
     await page.click('#back');
     await openGrownUps(page);

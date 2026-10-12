@@ -20,7 +20,8 @@ export function bindDaily() {
   const byHand = () => { box.select(); say('Select the text above and copy it by hand — this browser will not do it for us.'); };
   $('#daily-copy').addEventListener('click', () => {
     sfx.tap(); box.select();
-    const written = navigator.clipboard?.writeText(box.value);
+    let written: Promise<void> | undefined;
+    try { written = navigator.clipboard?.writeText(box.value); } catch { /* a synchronous throw: fall through to by hand */ }
     if (!written) { byHand(); return; }
     written.then(() => say('Copied. Paste it where you like.')).catch(byHand);
   });

@@ -13,6 +13,9 @@ let kept: { profile: ProfileId; date: string; line: string } | null = null;
 /** Keep the line of the Daily Sprint just finished, for this profile and day; a later one replaces it. */
 export const keepDailyLine = (profile: ProfileId, date: string, line: string) => { kept = { profile, date, line }; };
 
+/** Forget the kept line: a deleted, reset or restored-over slot must not show its old child's result to the next one (#925 review). */
+export const forgetDailyLine = () => { kept = null; };
+
 /** Today's line for this profile, or null (none played, another day, another profile). */
 export const dailyLineFor = (profile: ProfileId, date: string): string | null =>
   kept && kept.profile === profile && kept.date === date ? kept.line : null;
