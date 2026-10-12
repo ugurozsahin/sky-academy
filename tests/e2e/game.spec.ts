@@ -2468,6 +2468,38 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.toast.good')).toBeVisible();
   });
 
+  test('Esc or P pauses a live mission, Space repeats the question, and none works once the screen is left (#902)', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as unknown as { __said: string[] }).__said = [];
+      Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+        speaking: false, pending: false, getVoices: () => [], onvoiceschanged: null, cancel: () => {},
+        speak: (u: SpeechSynthesisUtterance) => { (window as unknown as { __said: string[] }).__said.push(u.text); },
+      } });
+    });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    const said = () => page.evaluate(() => (window as unknown as { __said: string[] }).__said.length);
+    await page.evaluate(() => { (window as unknown as { __said: string[] }).__said = []; });
+    await page.keyboard.press('Space');
+    await expect.poll(said, 'Space says the question again').toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#resume')).toBeVisible();
+    const before = await said();
+    await page.keyboard.press('Space');                                            // an overlay is open: Space does nothing
+    await page.keyboard.press('Escape');
+    expect(await said()).toBe(before);
+    await page.click('#resume');
+    await expect(page.locator('#resume')).toBeHidden();
+    await page.keyboard.press('p');
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.click('#quit');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    const left = await said();
+    await page.keyboard.press('Space'); await page.keyboard.press('Escape');       // the listeners went with the screen
+    await expect(page.locator('#resume')).toHaveCount(0);
+    expect(await said()).toBe(left);
+  });
+
   test('back button opens Pause first, then steps back: play → island → sky map (#887, Android/browser history)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');

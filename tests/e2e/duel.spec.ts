@@ -411,6 +411,28 @@ test.describe('Ninja Duel', () => {
     expect(leaked).toEqual({ advanced: [0, 0], sna: 'undefined' });
   });
 
+  test('Esc or P pauses a live duel and Space repeats the question (#902)', async ({ page }) => {
+    await recordingEngine(page);
+    await startDuel(page, dojoSeeds('fresh'));
+    await expect(page.locator('#round')).toHaveText('Round 1 of 10');
+    await page.evaluate(() => { window.__said = []; });
+    await page.keyboard.press('Space');
+    await expect.poll(() => page.evaluate(() => window.__said.filter(l => !l.startsWith('<')).length), 'Space says the question again').toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#resume')).toBeVisible();
+    const before = await page.evaluate(() => window.__said.length);
+    await page.keyboard.press('Space');                                            // an overlay is open: Space does nothing
+    expect(await page.evaluate(() => window.__said.length)).toBe(before);
+    await page.click('#resume');
+    await expect(page.locator('#resume')).toBeHidden();
+    await page.keyboard.press('p');
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.click('#quit');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await page.keyboard.press('Escape');                                           // the listeners went with the screen
+    await expect(page.locator('#resume')).toHaveCount(0);
+  });
+
   test('back button opens Pause first on a live duel too, and Quit reaches the island with no dead entry (#887)', async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');

@@ -80,7 +80,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
-  const scope = screenScope(); const { later, toast, onBack, onHidden } = scope; onBack(pauseIfLive); onHidden(() => { hush(); pauseIfLive(); }); pushBackGuard();   // #885, #886, #887
+  const scope = screenScope(); const { later, toast, onBack, onHidden } = scope; onBack(pauseIfLive); scope.onKeys(pauseIfLive, () => overlay.hidden && repeat()); onHidden(() => { hush(); pauseIfLive(); }); pushBackGuard();   // #885, #886, #887, #902
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
   let waveId = 0; let holdOpen = false; let paused = false;   // #886: mirrors the Pause overlay, for state()
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */

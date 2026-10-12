@@ -452,3 +452,50 @@ describe('screenScope.onBack / backGuard (#885)', () => {
     expect(backGuard()).toBe(false);
   });
 });
+
+// #902: Esc/P pause and Space repeat. Node has no `window` event target, so the scope's listeners are captured
+// on a stub registry and replayed by hand.
+describe('onKeys (#902 — desktop pause and repeat)', () => {
+  type Ev = { code?: string; key: string; repeat?: boolean; ctrlKey?: boolean; target?: { tagName: string }; preventDefault: () => void };
+  const reg = new Map<string, (e: Ev) => void>();
+  beforeEach(() => {
+    reg.clear();
+    (globalThis as any).addEventListener = (t: string, f: (e: Ev) => void) => { reg.set(t, f); };
+    (globalThis as any).removeEventListener = (t: string, f: (e: Ev) => void) => { if (reg.get(t) === f) reg.delete(t); };
+  });
+  const press = (type: 'keydown' | 'keyup', key: string, extra: Partial<Ev> = {}) => {
+    let prevented = false;
+    reg.get(type)?.({ key, code: key === ' ' ? 'Space' : key, preventDefault: () => { prevented = true; }, ...extra });
+    return prevented;
+  };
+
+  it('Esc and P pause, Space repeats and is preventDefaulted on keydown and keyup', () => {
+    const scope = screenScope(); const calls: string[] = [];
+    scope.onKeys(() => calls.push('pause'), () => calls.push('repeat'));
+    press('keydown', 'Escape'); press('keydown', 'p'); press('keydown', 'P');
+    expect(press('keydown', ' ')).toBe(true);
+    expect(press('keyup', ' ')).toBe(true);
+    expect(calls).toEqual(['pause', 'pause', 'pause', 'repeat']);
+    scope.dispose();
+  });
+
+  it('ignores auto-repeat, modifier chords, other keys and typing into an input', () => {
+    const scope = screenScope(); const calls: string[] = [];
+    scope.onKeys(() => calls.push('pause'), () => calls.push('repeat'));
+    press('keydown', 'Escape', { repeat: true }); press('keydown', ' ', { repeat: true });
+    press('keydown', 'p', { ctrlKey: true }); press('keydown', 'a');
+    press('keydown', ' ', { target: { tagName: 'INPUT' } }); press('keydown', 'p', { target: { tagName: 'TEXTAREA' } });
+    expect(calls).toEqual([]);
+    scope.dispose();
+  });
+
+  it('dispose() removes both listeners, and a disposed scope registers none', () => {
+    const scope = screenScope();
+    scope.onKeys(() => {}, () => {});
+    expect([...reg.keys()].sort()).toEqual(['keydown', 'keyup']);
+    scope.dispose();
+    expect(reg.size, 'no listener may outlive the screen').toBe(0);
+    scope.onKeys(() => {}, () => {});
+    expect(reg.size).toBe(0);
+  });
+});
