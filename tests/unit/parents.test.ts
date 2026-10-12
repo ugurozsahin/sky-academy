@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { numberWord } from '../../src/curriculum/util';
-import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, factsToPractise, type SlipRow } from '../../src/game/parents';
+import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, factsToPractise, untriedLine, type SlipRow } from '../../src/game/parents';
 import { TOPICS, CORE_TOPICS, YEARS, topicsFor, listedTopics, shownYears } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
@@ -507,5 +507,37 @@ describe('Yet to earn a trophy (#913)', () => {
     expect(html.match(/class="p-topic"/g)).toHaveLength(1);
     expect(html).not.toMatch(/fail|missing/i);
     expect(noTrophyHTML(rows({}, []))).toContain('Every topic tried has a trophy!');
+  });
+});
+
+describe('untried topics per island (#945)', () => {
+  const tp = (plays: number): TopicProgress => ({ stars: 0, plays, hits: 0, tries: 0 } as TopicProgress);
+  const summary = (progress: Record<string, TopicProgress>) =>
+    parentSummary({ ...load(), progress } as SaveData, listedTopics(), shownYears(), STICKER_IDS.length, new Date(), []);
+
+  it('names every topic with no plays, in registry order, and the count matches', () => {
+    const first = topicsFor(YEARS[0].id)[0];
+    for (const progress of [{}, { [first.id]: tp(2) }, { [first.id]: tp(0) }]) {
+      for (const y of summary(progress).years) {
+        expect(y.untried.length).toBe(y.topicsTotal - y.topicsTried);
+        const ids = listedTopics().filter(t => t.year === y.id && !(progress[t.id]?.plays > 0)).map(t => t.title);
+        expect(y.untried.map(u => u.title)).toEqual(ids);
+      }
+    }
+  });
+
+  it('says "No topics tried yet" for an untouched island and lists nothing else', () => {
+    const y = summary({}).years[0];
+    expect(untriedLine(y)).toBe('No topics tried yet');
+  });
+
+  it('lists the rest once one is tried, and shows no line when all are', () => {
+    const y0 = summary({}).years[0], ts = listedTopics().filter(t => t.year === y0.id);
+    const one = summary({ [ts[0].id]: tp(1) }).years[0];
+    expect(untriedLine(one)).toBe(`Not tried yet: ${one.untried.map(u => `${u.icon} ${u.title}`).join(', ')}`);
+    expect(untriedLine(one)).not.toContain(ts[0].title);
+    const all = summary(Object.fromEntries(ts.map(t => [t.id, tp(1)]))).years[0];
+    expect(all.untried).toEqual([]);
+    expect(untriedLine(all)).toBe('');
   });
 });

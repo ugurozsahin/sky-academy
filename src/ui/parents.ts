@@ -2,7 +2,7 @@ import { avatarOrNull } from '../avatars';
 import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { hush, sfx, voiceState } from '../audio';
-import { gateChallenge, checkGate, parentSummary, type ParentSummary } from '../game/parents';
+import { gateChallenge, checkGate, parentSummary, untriedLine, type ParentSummary } from '../game/parents';
 import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words'; import { noTrophyHTML, showPct, topicRow } from './parents-trophies';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
 import { $, $$, esc, render } from './dom'; import { chooserEligible } from './chooser';
 
@@ -157,7 +157,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
     <tr><th scope="row">${esc(m.title)}</th><td>${m.endless}</td><td>${m.sprint}</td><td>${m.boss}</td><td>${m.memory}</td><td>${m.training}</td></tr>`).join('');
   const yearCards = sm.years.map(y => `
     <div class="p-year">
-      <div class="p-year-head"><b>${esc(y.title)}</b><small>${y.topicsTried}/${y.topicsTotal} topics tried</small></div>
+      <div class="p-year-head"><b>${esc(y.title)}</b><small>${y.topicsTried}/${y.topicsTotal} topics tried</small></div>${untriedLine(y) ? `<small class="p-empty">${esc(untriedLine(y))}</small>` : ''}
       <div class="p-year-row"><span>★ ${y.stars}/${y.maxStars}</span>${bar(y.maxStars ? y.stars / y.maxStars : 0)}</div>
       <div class="p-year-row"><span>Accuracy ${showPct(y.accuracy)}</span>${bar(y.accuracy ?? 0)}</div>
     </div>`).join('');

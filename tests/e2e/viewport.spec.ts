@@ -148,6 +148,15 @@ test.describe('tablet viewports (#116)', () => {
     await expectFitsViewport(page, 'grown-ups dashboard');
   });
 
+  /** #945: every island card names what is left to try, and the longest list (Year 2) still fits a 390x664 phone. */
+  test('the grown-ups cards list untried topics and fit (#945)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });   // the phone the issue names
+    await seedProgress(page);
+    await openDashboard(page);
+    await expect(page.locator('.p-year .p-empty', { hasText: /^(Not tried yet: |No topics tried yet)/ }).first()).toBeVisible();
+    await expectFitsViewport(page, 'grown-ups dashboard with untried lists');
+  });
+
   /**
    * The other two portrait-tablet geometries the issue names (#109). They are one test rather than two
    * projects on purpose: a project costs a whole sequential leg of the nightly (see `playwright.config.ts`),

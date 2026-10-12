@@ -42,7 +42,12 @@ export interface YearStat {
   id: YearId; title: string;
   stars: number; maxStars: number; answered: number; correct: number; accuracy: number | null;
   topicsTried: number; topicsTotal: number;
+  /** The topics with no plays (#945), registry order — the same `plays > 0` rule as `topicsTried`. */
+  untried: { title: string; icon: string }[];
 }
+/** The card's "Not tried yet" line (#945): all names, a plain note when none is tried, '' when all are. */
+export const untriedLine = (y: Pick<YearStat, 'topicsTried' | 'topicsTotal' | 'untried'>): string =>
+  y.topicsTried === 0 ? (y.topicsTotal ? 'No topics tried yet' : '') : y.untried.length ? `Not tried yet: ${y.untried.map(u => `${u.icon} ${u.title}`).join(', ')}` : '';
 export interface ModeBest {
   id: YearId; title: string;
   endless: number; sprint: number; boss: number; memory: number; training: number;
@@ -130,6 +135,7 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
       stars: sum(ts.map(s => s.stars)), maxStars: ts.length * 3,
       answered, correct, accuracy: acc(correct, answered),
       topicsTried: ts.filter(s => s.plays > 0).length, topicsTotal: ts.length,
+      untried: ts.filter(s => !(s.plays > 0)).map(s => ({ title: s.title, icon: s.icon })),
     };
   });
 
