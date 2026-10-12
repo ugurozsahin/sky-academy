@@ -17,7 +17,8 @@
  *     written right after a colon, and "every route; though not every one needs listing." is the same hedge
  *     after a semicolon — a pin stopping at either would let both through (silent-failure-hunter, this PR).
  *  Whitespace is normalised first (`\s+` → one space, a blank line → a paragraph break), the same way the
- *  governance slicers flatten a section, so a re-wrap at another column changes nothing.
+ *  governance slicers flatten a section, so a re-wrap at another column changes nothing. A caller that has
+ *  already flattened its text uses `pinNormalised` — `normalise` is not idempotent (see it).
  *
  * `opts.tail` is for a pin that deliberately stops mid-sentence: the exact remainder of the sentence, leading
  * space included, which must then follow the fragment verbatim and itself end at the boundary above.
@@ -39,7 +40,8 @@ const ENDS_WITH_TERMINATOR = new RegExp(`[.!?]${CLOSERS}$`);
 const CLOSERS_THEN_SPACE = new RegExp(`^${CLOSERS}(?:\\s|$)`);
 
 /** Blank lines become `\n` (a paragraph break is a sentence boundary); every other run of whitespace one
- *  space. Not idempotent — a second pass reads the `\n` as a wrap — so it runs once per input, below. */
+ *  space. Not idempotent — a second pass reads the `\n` as a wrap — so it runs once per input: `pinSentence`
+ *  applies it, `pinNormalised` expects it already applied. */
 export const normalise = (text: string): string =>
   text.replace(/[^\S\n]*\n(?:[^\S\n]*\n)+/g, '\u0000').replace(/\s+/g, ' ').replace(/ ?\u0000 ?/g, '\n').trim();
 
@@ -63,9 +65,14 @@ const after = (who: string, flatText: string, flatFragment: string): string => {
 };
 
 export function pinSentence(text: string, fragment: string, opts: PinSentenceOptions = {}): void {
+  pinNormalised(normalise(text), normalise(fragment), opts);
+}
+
+/** The core, on inputs `normalise` has already flattened once — for a caller that mutates the flat text
+ *  before pinning it (the #771 mutation proofs); everything else goes through `pinSentence`. */
+export function pinNormalised(flatText: string, fragment: string, opts: PinSentenceOptions = {}): void {
   const who = opts.label ? `${opts.label}: ` : '';
-  const flatText = normalise(text);
-  let flatFragment = normalise(fragment);
+  let flatFragment = fragment;
   let rest = after(who, flatText, flatFragment);
   if (opts.tail !== undefined) {
     // The tail is the exact continuation, leading space included — only its inner whitespace is normalised.
@@ -87,19 +94,30 @@ export function pinSentence(text: string, fragment: string, opts: PinSentenceOpt
 /**
  * The ratchet's counter (#771, decision item 2): every **unanchored fragment pin** in a test file's source.
  *
- * Mechanically, a pin is a `.toMatch(/…/)` or `.toContain('…')` call whose argument is one regex, string or
- * `${}`-free template literal, directly closed by `)`. It is **unanchored** when that literal does not end at
- * a sentence boundary: a regex that does not end in `$` or an escaped `\.`, `\!` or `\?` (a bare `.` is a
- * wildcard and a bare `?`/`!` is syntax, so `/foo./` and `/foo?/` are unanchored; `;` and `:` are not sentence
- * ends — see `pinSentence`), each optionally followed by escaped closers (`\*\*`, `\)`, `\]`, `"`, `'`,
- * backtick); a string that does not end in `.`, `!` or `?` plus those closers.
+ * Mechanically, a pin is a `.toMatch(…)` or `.toContain(…)` call whose argument is one regex, string or
+ * `${}`-free template literal, directly closed by `)` (whitespace and newlines inside the parentheses are
+ * allowed). It is **unanchored** when that literal does not end at a sentence boundary: a regex that does
+ * not end in `$` or an escaped `\.`, `\!` or `\?` (a bare `.` is a wildcard and a bare `?`/`!` is syntax, so
+ * `/foo./` and `/foo?/` are unanchored; `;` and `:` are not sentence ends — see `pinSentence`), each
+ * optionally followed by escaped closers (`\*\*`, `\)`, `\]`, `"`, `'`, backtick); a string that does not
+ * end in `.`, `!` or `?` plus those closers.
  *
  * Not counted, by design: a `.not.toMatch`/`.not.toContain` (a forbidden-phrasing check holds nothing in
  * place, so a boundary means nothing there); and a `pinSentence(` call, which is the anchored form. **Not
  * counted, and porous**: a non-literal argument — `toContain(agent)` in a loop, `toMatch(RULE)`,
- * `new RegExp(…)`, a string built with `+` — which this cannot classify, so a pin written one of those ways
- * moves the number by nothing. The reviewer's diff read is the guard there, as before this ratchet; a
- * literal-only count is still the whole of the class #771 names, which was all literals.
+ * `new RegExp(…)`, a `${}` template, a string built with `+` — which this cannot classify. So a pin written
+ * one of those ways moves the number by nothing, and a literal pin *moved* into one of them lowers the
+ * number by one without anchoring anything — the ratchet's "fell" message says so; the reviewer's diff read
+ * is the guard there, as before this ratchet. A literal-only count is still the whole of the class #771
+ * names, which was all literals.
+ *
+ * Known limits, counted knowingly (PR #1805 review): a literal that is not a sentence at all — an identifier,
+ * a label, a path, `'owner-session'`, `/labels=routine-ok/` — is counted when it lacks a terminator (64 of
+ * the 372 today), so a new `toContain('some-id')` raises the count and is anchored by using `pinSentence` on
+ * the sentence that names the id, or by a `toMatch(/some-id\b.*\./)` that runs to its sentence's end; and a
+ * pin inside a comment (`// expect(s).toMatch(/x/)`) counts like a live one (none today). Neither is
+ * narrowed here: skipping whitespace-free literals would also skip a one-word sentence fragment, and a
+ * comment parser is more machinery than the number is worth.
  */
 const PIN = /(\.not\s*)?\.(?:toMatch|toContain)\(\s*(?:\/((?:\\.|\[(?:\\.|[^\]\n])*\]|[^/\\\n])+)\/[a-z]*|'((?:\\.|[^'\\\n])*)'|"((?:\\.|[^"\\\n])*)"|`((?:\\.|(?!\$\{)[^`\\])*)`)\s*\)/g;
 const ANCHORED_REGEX = /(?:\\[.!?]|\$)(?:\\\*\\\*|\\\)|\\\]|["'`])*$/;

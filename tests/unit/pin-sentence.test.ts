@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { normalise, pinSentence, unanchoredPins } from './helpers/pin-sentence';
+import { normalise, pinNormalised, pinSentence, unanchoredPins } from './helpers/pin-sentence';
 
 const doc = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
@@ -23,6 +23,21 @@ describe('pinSentence holds a sentence to its boundary (#771)', () => {
     expect(() => pinSentence(text, 'A heading line without a full stop')).not.toThrow(); // blank line
     // A stop the fragment carries may be followed by a closer the fragment omits: "stop.** Next".
     expect(() => pinSentence('**Must never.** Next one.', 'Must never.')).not.toThrow();
+  });
+
+  it('reads `!` and `?` as sentence ends, and lets a closing quote, bracket or backtick follow the stop', () => {
+    const t = 'Never do this! Is it done? He said "stop now." Then [the rule]. And `code.` Last.';
+    for (const ok of ['Never do this', 'Is it done', 'stop now', 'He said "stop now."', 'Then [the rule]', 'And `code'])
+      expect(() => pinSentence(t, ok), ok).not.toThrow();
+    expect(() => pinSentence(t.replace('this!', 'this, mostly!'), 'Never do this')).toThrow(/something follows .* ", mostly"/);
+    expect(() => pinSentence(t.replace('done?', 'done yet?'), 'Is it done')).toThrow(/something follows .* "yet"/);
+  });
+
+  it('a stop glued to the next character is no boundary: "1.5", "claude.ai" (the `(?=\\s|$)` lookahead)', () => {
+    // Without the lookahead the first `.` ends the sentence and both pins below pass silently (PR #1805 review).
+    expect(() => pinSentence('Version 1.5 is out.', 'Version 1')).toThrow(/something follows .* "\.5 is out"/);
+    expect(() => pinSentence('Read it on claude.ai today.', 'Read it on claude')).toThrow(/something follows .* "\.ai today"/);
+    expect(() => pinSentence('Version 1.5 is out.', 'Version 1.5 is out')).not.toThrow();
   });
 
   it('does not read `;` or `:` as a sentence end — a hedge after either is still inside the sentence', () => {
@@ -62,6 +77,11 @@ describe('pinSentence holds a sentence to its boundary (#771)', () => {
     expect(() => pinSentence(wrapped, 'the round count was simply how many members the class had (#466).')).not.toThrow();
     expect(() => pinSentence(wrapped, 'how many members the class')).toThrow(/something follows .* "had \(#466\)"/);
     expect(normalise('a\n  b\n\n\n c  d')).toBe('a b\nc d');
+    // `normalise` is not idempotent — a second pass reads the paragraph break as a wrap — which is why a
+    // caller holding flat text uses `pinNormalised`, and `pinSentence` on the same flat text is the wrong call.
+    expect(normalise(normalise('a\n\nb'))).toBe('a b');
+    expect(() => pinNormalised(normalise('A heading line\n\nNext.'), 'A heading line')).not.toThrow();
+    expect(() => pinSentence(normalise('A heading line\n\nNext.'), 'A heading line')).toThrow(/something follows .* "Next"/);
   });
 
   it('takes the exact remainder as `tail` when a pin deliberately stops mid-sentence', () => {
@@ -80,6 +100,10 @@ describe('pinSentence holds a sentence to its boundary (#771)', () => {
  * pin — and, for three of them, shown to fail the helper on the **pre-#814 fragment** while a plain
  * `includes()` of that fragment still passes: that gap is the class, and it is the helper, not the hand-written
  * `\.`, that closes it. Member 3 is the exception and says so.
+ *
+ * The skill text is flattened once here so the mutation's `replace()` is not defeated by a line wrap, and the
+ * pins then go through `pinNormalised` — `pinSentence` is that call after the same `normalise`, so the proof is
+ * of the migrated pin as written, without running `normalise` twice (PR #1805 review).
  */
 describe('the four #771 pins reject the insertion listed against each (#771)', () => {
   const openPr = normalise(doc('.claude/skills/open-pr/SKILL.md'));
@@ -92,7 +116,8 @@ describe('the four #771 pins reject the insertion listed against each (#771)', (
 
   // `weak` is the pre-#814 substring pin; `names` is the inserted hedge, which the helper's error must quote
   // so the proof is "the helper saw the hedge", not merely "the helper threw" (pr-test-analyzer, this PR).
-  const PINS: { n: number; text: string; pinned: string; from: string; to: string; weak: string | null; names: string }[] = [
+  type Member = { n: number; text: string; pinned: string; from: string; to: string; weak: string | null; names: string };
+  const PINS: Member[] = [
     {
       n: 1, text: openPr,
       pinned: 'Every one of those rounds was correct** and met `review-pr` §7\'s bar, so nothing in the round cap '
@@ -126,19 +151,20 @@ describe('the four #771 pins reject the insertion listed against each (#771)', (
       weak: 'leaves them indistinguishable', names: 'only in the rare case where the author is careless',
     },
   ];
+  const WITH_WEAK = PINS.filter((p): p is Member & { weak: string } => p.weak !== null);
 
   it.each(PINS)('member $n: the migrated pin holds on the live text and fails on the mutation', ({ text, pinned, from, to, names }) => {
-    expect(() => pinSentence(text, pinned)).not.toThrow();
+    expect(() => pinNormalised(text, pinned)).not.toThrow();
     const mutated = mutate(text, from, to);
     expect(mutated, 'the mutation really carries the hedge').toContain(names);
-    expect(() => pinSentence(mutated, pinned)).toThrow(/gone or reworded/);
+    expect(() => pinNormalised(mutated, pinned)).toThrow(/gone or reworded/);
   });
 
-  it.each(PINS.filter((p) => p.weak !== null))('member $n: the pre-#814 fragment passes includes() on the mutation and fails the helper',
+  it.each(WITH_WEAK)('member $n: the pre-#814 fragment passes includes() on the mutation and fails the helper',
     ({ text, from, to, weak, names }) => {
       const mutated = mutate(text, from, to);
-      expect(mutated.includes(weak!), 'the old substring pin is still satisfied — this is the hole').toBe(true);
-      expect(() => pinSentence(mutated, weak!)).toThrow(new RegExp(`something follows .*${names}`));
+      expect(mutated.includes(weak), 'the old substring pin is still satisfied — this is the hole').toBe(true);
+      expect(() => pinNormalised(mutated, weak)).toThrow(new RegExp(`something follows .*${names}`));
     });
 
   it('governance.test.ts pins these four through the helper, and the counter no longer sees them', () => {
@@ -150,6 +176,7 @@ describe('the four #771 pins reject the insertion listed against each (#771)', (
       expect(source, `the pinned text "${piece}" is in the file as a string literal ending at its boundary`).toContain(`${piece}'`);
     // The list above and the file agree on the file names: both skills are the ones the four pins read.
     expect(source).toContain("sliceSkill('.claude/skills/open-pr/SKILL.md')");
+    expect(source).toContain("'../../.claude/skills/review-pr/SKILL.md'");
     const counted = unanchoredPins(source);
     for (const piece of pieces)
       expect(counted.filter((p) => p.includes(piece.slice(0, -1))), `no unanchored pin on "${piece}" is left`).toEqual([]);
