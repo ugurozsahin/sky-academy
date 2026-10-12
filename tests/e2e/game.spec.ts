@@ -4155,11 +4155,14 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('For grown-ups: "Yet to earn a trophy" lists a tried topic with no Sprint trophy and fits the phone (#913)', async ({ page }) => {
-    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 1, best: 0, plays: 1, hits: 1, tries: 2 } } });
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 1, best: 0, plays: 1, hits: 1, tries: 2 }, 'y1-sub': { stars: 1, best: 0, plays: 1, hits: 1, tries: 2, sprint: 3 } } });
     await openGrownUps(page);
     const sec = page.locator('.parents-dash .p-h', { hasText: 'Yet to earn a trophy' });
     await expect(sec).toBeVisible();
     await expect(page.locator('.parents-dash')).toContainText('not tried yet');
+    const mine = page.locator('.parents-dash h3.p-h:has-text("Yet to earn a trophy") ~ ul.p-topics').first();
+    await expect(mine).toContainText('Adding to 20');
+    await expect(mine).not.toContainText('Subtracting');
     await sec.scrollIntoViewIfNeeded();
     await expectFitsViewport(page, 'grown-ups Yet to earn a trophy');
   });

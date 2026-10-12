@@ -111,7 +111,7 @@ function stat(t: Topic, p: TopicProgress | undefined): TopicStat {
 }
 
 /** Build the whole read-only dashboard model from the save. `stickersTotal` is passed in so storage stays the source of the album size. */
-export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number, now = new Date(), sprintTopics: readonly Topic[] = topics): ParentSummary {
+export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number, now: Date, sprintTopics: readonly Topic[]): ParentSummary {
   // #95: `data` can be a hand-edited or corrupted "Restore" paste — importSave() only checks the version, so
   // any of these fields can arrive as anything. Read the same tolerant way storage.ts's own achievement
   // calculations already do, rather than indexing `data.progress` directly and throwing on the dashboard.
