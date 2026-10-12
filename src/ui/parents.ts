@@ -412,7 +412,7 @@ export function parentsScreen(nav: Nav) {
       go.addEventListener('click', () => {
         sfx.tap();
         snapshot = load();       // kept in memory only — the "Undo" affordance below is what can bring it back
-        reset(); hush();   // a speech verdict still pending would save() a fresh blob over the cleared key (#1630)
+        hush(); reset();   // hush first: a speech verdict still pending would save() a fresh blob over the cleared key (#1630)
         pendingReset = true;
         overlay.innerHTML = resetDoneHTML();
         $('#reset-undo').addEventListener('click', () => {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hush, resetVoiceProbe, say, VOICE_START_MS, type SynthLike } from '../../src/audio';
 import { reset, save } from '../../src/storage';
@@ -23,8 +24,16 @@ describe('Start again and a pending speech verdict (#1630)', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
     reset(); resetVoiceProbe(); save({ name: 'Ada' });
     say('Hello', false, { synth: silent });
-    reset(); hush(silent);
+    hush(silent); reset();
     vi.advanceTimersByTime(VOICE_START_MS * 2);
     expect(localStorage.getItem('sna:v1')).toBeNull();
+  });
+
+  // The unit test above pins hush()'s behaviour; this pins that the Start again handler makes the call, and in
+  // the order that lets hush()'s own cancel() events land before reset() clears the key (review of PR #1781).
+  it('guard rail: the Start again handler in parents.ts calls hush() before reset() (#1630)', () => {
+    const src = readFileSync('src/ui/parents.ts', 'utf8');
+    const go = src.slice(src.indexOf("go.addEventListener('click'"));
+    expect(go.slice(0, go.indexOf("pendingReset = true")), 'hush() then reset(), in that order').toMatch(/hush\(\);\s*reset\(\);/);
   });
 });
