@@ -1,5 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { arithmeticPool, grammarPool, offeredPool } from '../game/sprint-pools';
+import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint';
 import { mtcDeck } from '../game/mtc';
 import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
@@ -9,7 +10,7 @@ import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, ty
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
 import { ageLabel, isWarmUp } from './year-label';
-import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
+import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, today, type TopicProgress } from '../storage';
 import type { Ks2Fact } from '../save-records';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
@@ -193,9 +194,17 @@ const arithmeticRow = (nav: Nav, year: YearInfo): MenuRow[] => {
     blurb: '60 seconds of Paper 1-style sums', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Arithmetic Sprint' }) }];
 };
 
-/** The island menu's rows that come between Sky Storm and Ninja Sprint: Legend, Tables Check (twice), Arithmetic practice, Arithmetic Sprint, Grammar mix. */
+/** Daily Sprint (#924): one 60-second Sprint whose deck is the same for every child on this island today. */
+const dailySprintRow = (nav: Nav, year: YearInfo): MenuRow[] => {
+  const pool = dailySprintPool(topicsFor(year.id));
+  return !pool.length ? [] : [{ id: 'daily', mod: 'sprint', vport: '<span class="vport emoji">📅</span>', title: 'Daily Sprint',
+    blurb: 'Same 60 seconds for everyone today', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Daily Sprint', seed: dailySprintSeed(today(), year.id) }) }];
+};
+
+/** The island menu's rows that come between Sky Storm and Ninja Sprint: Legend, Tables Check (twice), Arithmetic practice, Arithmetic Sprint, Grammar mix, Daily Sprint (#924). */
 const deckRows = (nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>): MenuRow[] =>
-  [...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year), ...arithmeticRow(nav, year), ...grammarRow(nav, year)];
+  [...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year),
+    ...arithmeticRow(nav, year), ...grammarRow(nav, year), ...dailySprintRow(nav, year)];
 
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
