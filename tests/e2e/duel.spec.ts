@@ -232,37 +232,72 @@ test.describe('Ninja Duel', () => {
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    // #860: round 1's clock runs while the test makes the checks below, and on a loaded machine they outlast it.
+    // So the match is paused through the real Pause button as soon as the wave is in flight, checked there, and
+    // resumed (the arenas shift their clocks by the pause, #883).
+    const seen = await page.evaluate(async () => {
+      const both = () => (['a', 'b'] as const).every(p => window.__sna.bubbles(p).some(b => b.label === window.__sna.state().answer));
+      // The handover utterance is queued on a scope timer a pause would freeze, so pause only once it is out.
+      while (!(both() && window.__said.some(l => l.includes('Ninja Duel!')))) await new Promise<void>(res => requestAnimationFrame(() => res()));
+      window.__sna.setSpeed(3);   // a slower round clock than the suite's, so a slow frame cannot fall a whole wave
+      document.querySelector<HTMLElement>('#pause')!.click();
+      return { options: window.__sna.duel.current!.options, a: window.__sna.bubbles('a').map(b => b.label), b: window.__sna.bubbles('b').map(b => b.label) };
+    });
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expectHandoverHeard(page);   // the second child's one instruction is in round 1's own utterance
     // The same wave in both arenas: each arena launches the ONE question's options, and the answer reaches
     // both. Since #389 the two are laid out from one draw, so the orders match as well as the sets — the
     // test below is the one that holds that; this one stays a check on the option set.
-    await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
-    const seen = await page.evaluate(() => ({
-      options: window.__sna.duel.current!.options, a: window.__sna.bubbles('a').map(b => b.label), b: window.__sna.bubbles('b').map(b => b.label),
-    }));
     for (const l of [...seen.a, ...seen.b]) expect(seen.options).toContain(l);
-    await page.waitForFunction(() => { const s = window.__sna.state(); return (['a', 'b'] as const).every(p => window.__sna.bubbles(p).some(b => b.label === s.answer)); });
-    // Player 2 slices a wrong bubble: no point, the round goes on; Player 1 then takes it.
-    await page.waitForFunction(() => window.__sna.bubbles('b').some(b => b.label !== window.__sna.state().answer));
-    expect(await page.evaluate(() => window.__sna.wrong('b'))).toBe(true);
-    await winRound(page, 'a');
-    await expect(page.locator('#score-a')).toHaveText('1');
-    await expect(page.locator('#score-b')).toHaveText('0');
-    // Once a round is decided, the other player's slice of the same answer is ignored — no second point.
-    expect(await page.evaluate(() => window.__sna.duel.hit('b', window.__sna.state().answer!))).toBe('ignored');
-    // Play out the match: Player 1 wins 6 rounds, Player 2 takes the rest.
-    for (let r = 2; r <= 10; r++) {
-      await page.waitForFunction(r => window.__sna.state().round === r, r);
-      // Round 2: Player 1 cuts a wrong bubble and then still takes the round. The round is won — a wrong slice
-      // costs nothing — but Sensei is told what a mission would have scored, a miss, so this is the round that
-      // makes `hits < tries` reach the save through the real arena (#374 review, B1).
-      if (r === 2) {
-        await page.waitForFunction(() => window.__sna.bubbles('a').some(b => b.label !== window.__sna.state().answer));
-        expect(await page.evaluate(() => window.__sna.wrong('a'))).toBe(true);
+    // #860: the whole match is ONE page-side script. Driven from here, every step between a round starting and
+    // its answer being sliced cost the test queued page round trips, and on a loaded machine the round clock
+    // outran them: the rounds expired as draws (reproduced at 4 workers on 4 vCPUs). In the page, nothing sits
+    // in that gap but the next animation frame.
+    const round1 = await page.evaluate(async () => {
+      const t0 = performance.now();
+      const frame = () => new Promise<void>((res, rej) => requestAnimationFrame(() => {
+        if (performance.now() - t0 > 40_000) rej(new Error(`the match stalled: ${JSON.stringify(window.__sna.state())}`));
+        else res();
+      }));
+      const text = (id: string) => document.querySelector(id)?.textContent;
+      // A round that is already past can never come back: fail naming it, instead of polling until the test times out.
+      const live = (r: number) => {
+        const s = window.__sna.state();
+        if (s.round > r || (s.ended && !s.decided)) throw new Error(`round ${r} ran out before it was sliced (now round ${s.round}, ${s.scoreA}–${s.scoreB})`);
+        return s.round === r && !s.decided && !s.ended;
+      };
+      const until = async (r: number, ready: () => boolean) => { while (!(live(r) && ready())) await frame(); };
+      const answerIn = (p: 'a' | 'b') => () => window.__sna.bubbles(p).some(b => b.label === window.__sna.state().answer);
+      const wrongIn = (p: 'a' | 'b') => () => window.__sna.bubbles(p).some(b => b.label !== window.__sna.state().answer);
+      const slice = (r: number, p: 'a' | 'b') => { if (!window.__sna.answer(p)) throw new Error(`round ${r}: the answer was in flight but was not sliced`); };
+      document.querySelector<HTMLElement>('#resume')!.click();   // in the page, so no round trip sits between the resume and the first slice
+      if (window.__sna.state().paused) throw new Error('Resume did not lift the pause');
+      // Round 1. Player 2 slices a wrong bubble: no point, the round goes on; Player 1 then takes it.
+      await until(1, wrongIn('b'));
+      if (!window.__sna.wrong('b')) throw new Error('round 1: the wrong slice did not land');
+      await until(1, answerIn('a'));
+      slice(1, 'a');
+      // Once a round is decided, the other player's slice of the same answer is ignored — no second point.
+      const ignored = window.__sna.duel.hit('b', window.__sna.state().answer!);
+      await frame();
+      const shown = { a: text('#score-a'), b: text('#score-b') };
+      // Play out the rest: Player 1 wins 6 rounds, Player 2 takes the rest.
+      for (let r = 2; r <= 10; r++) {
+        // Round 2: Player 1 cuts a wrong bubble and then still takes the round. The round is won — a wrong slice
+        // costs nothing — but Sensei is told what a mission would have scored, a miss, so this is the round that
+        // makes `hits < tries` reach the save through the real arena (#374 review, B1).
+        if (r === 2) {
+          await until(2, wrongIn('a'));
+          if (!window.__sna.wrong('a')) throw new Error('round 2: the wrong slice did not land');
+        }
+        const p = r <= 6 ? 'a' : 'b';
+        await until(r, answerIn(p));
+        slice(r, p);
       }
-      await winRound(page, r <= 6 ? 'a' : 'b');
-    }
+      return { ignored, shown };
+    });
+    expect(round1.shown, 'after round 1 the scoreboard reads 1–0').toEqual({ a: '1', b: '0' });
+    expect(round1.ignored).toBe('ignored');
     await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
@@ -308,10 +343,10 @@ test.describe('Ninja Duel', () => {
     // A deliberate delay in the fake `save`, not an instant resolve (pr-test-analyzer review of this PR): a
     // `toBeEnabled()` check taken only after `page.click()` returns would pass whether or not the handler ever
     // disabled the button at all, since Playwright's auto-retry keeps polling past a synchronous flip either
-    // way. The delay gives a window in which `#cert` must genuinely be disabled before this test claims it saw it.
+    // way. The delay gives a window in which `#cert` must genuinely be disabled before this test claims it saw it (600 ms, #860: 60 ms was gone before a loaded runner polled).
     await page.evaluate(() => {
       (window as any).__saved = null;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 60)); return { status: 'saved' }; } } : null };
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 600)); return { status: 'saved' }; } } : null };
     });
     await page.click('.duel-end #cert');
     // Disabled for the length of the delivery — the handler's own `b.disabled = true`, set synchronously before

@@ -3,7 +3,7 @@ import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
 import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options'; import { playTitle } from '../game/sprint-pools';
-import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
+import { gameSpeed, scaled, setGameSpeed } from '../game/speed'; import { calmReduced } from '../device-settings';   // #32: test-only time compression; #906
 import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools';   // #1065: one pool rule
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
@@ -127,7 +127,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
       onFall(b) { if (b.label !== BOMB) session.fall(b.label); },
       onWaveEnd: waveEnd,   // the beat lives with the callbacks (#36): it reads the outcome still being shown
     }, {
-      trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx,
+      trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx, reducedMotion: calmReduced(),
       onSwish: () => sfx.swish(),
       // A tap throws the ninja's projectile: the whoosh goes with the throw, the element slice with the pop (#48).
       onThrow: () => sfx.whoosh(),

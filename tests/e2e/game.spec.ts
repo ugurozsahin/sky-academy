@@ -763,6 +763,36 @@ test.describe('Sky Ninja Academy', () => {
     expect(await selectedWords(page)).toBe('address, answer');
   });
 
+  test('Calm motion: On calms a wrong-answer card with no OS preference, Auto leaves it, and the row fits a phone (#906)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await expect(page.locator('button[data-calm="auto"]')).toHaveAttribute('aria-checked', 'true');
+    await page.click('button[data-calm="on"]');
+    expect(await page.evaluate(() => localStorage.getItem('sna:calm'))).toBe('on');
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('button[data-calm="on"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('html')).toHaveClass(/calm/);
+    const wrongCardAnimation = async () => {
+      await page.click('#back');
+      await startTopic(page, 'year2', 'y2-tables');
+      await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+      return page.locator('.qcard.bad').evaluate(el => getComputedStyle(el).animationName);
+    };
+    expect(await wrongCardAnimation()).toBe('none');
+    expect(await page.evaluate(() => (window.__sna.arena as any).reducedMotion)).toBe(true);
+    await page.evaluate(() => localStorage.removeItem('sna:calm'));
+    await page.reload();
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    expect(await page.locator('.qcard.bad').evaluate(el => getComputedStyle(el).animationName)).not.toBe('none');
+  });
+
   test('Time arrangements: Extra time and the beep persist, and a Sprint then runs 90 seconds (#1121)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });
     await seedPlayer(page);

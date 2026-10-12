@@ -11,6 +11,7 @@ import { clearPendingReset, isPendingReset, parentsScreen } from './ui/parents';
 import { profilesScreen } from './ui/profiles';
 import { load, profileIds, save } from './storage';
 import { initGameSpeed } from './game/speed';
+import { applyCalm } from './device-settings';
 import { restClock } from './game/rest';
 import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
@@ -211,6 +212,7 @@ wireBackButton({
 const params = new URLSearchParams(location.search);
 if (params.get('reset')) { try { localStorage.clear(); } catch { /* ignore */ } }
 document.addEventListener('visibilitychange', () => restClock.show(document.visibilityState === 'visible'));   // #940: hidden time never counts toward the rest prompt
+applyCalm();   // #906: the grown-ups' Calm motion switch, as a class on <html> before the first screen
 initGameSpeed();   // #32: test-only `?fast=N` time compression; default 1 (ordinary play)
 // #44: start waiting for Fredoka at boot, not when a mission starts. The result is cached, so by the time a
 // child has picked an avatar, an island and a topic the answer is already in — and the wait, including the
