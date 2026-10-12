@@ -94,7 +94,7 @@ describe('weekHTML (#939)', () => {
 
 describe('progressText and summaryRoute (#942)', () => {
   beforeEach(() => reset());
-  const sm = (log: LogDay[] = []) => { const d = load(); d.log = log; return parentSummary(d, listedTopics(), shownYears(), 0, new Date('2026-10-03T12:00:00')); };
+  const sm = (log: LogDay[] = []) => { const d = load(); d.log = log; return parentSummary(d, listedTopics(), shownYears(), 0, new Date('2026-10-03T12:00:00'), listedTopics()); };
   const now = new Date('2026-10-03T12:00:00');
 
   it('an empty save has no NaN, undefined or a dash percentage, and a nameless child is "your ninja"', () => {
@@ -106,7 +106,7 @@ describe('progressText and summaryRoute (#942)', () => {
   });
   it('a played week quotes days, questions and accuracy; stars come per island; no save code leaks', () => {
     const d = load(); d.progress['y1-add'] = { plays: 3, stars: 3, hits: 9, tries: 10, best: 50 };
-    const s = parentSummary({ ...d, log: [day('2026-10-02', 10, 8, ['y1-add'])] }, listedTopics(), shownYears(), 0, now);
+    const s = parentSummary({ ...d, log: [day('2026-10-02', 10, 8, ['y1-add'])] }, listedTopics(), shownYears(), 0, now, listedTopics());
     const t = progressText(s, 'Mia', now);
     expect(t).toContain('progress for Mia, 3 October 2026');
     expect(t).toContain('This week: 1/7 days played, 10 questions, 80% right.');

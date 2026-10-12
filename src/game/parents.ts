@@ -10,6 +10,7 @@ import { beltFor } from './belts';
 import { leastSecure } from '../fact-record';
 import { STATUTORY_LISTS } from '../curriculum/statutory-lists';
 import { listProgress, type WordProgress } from '../word-record';
+import { trophyFor } from './trophies';
 
 // ---------- Grown-ups gate ----------
 // A times-table question a Reception/Year-1 child cannot do yet, but any grown-up answers at a glance.
@@ -59,10 +60,14 @@ export interface ParentSummary {
   facts: string[] | null;
   /** The "Spelling word lists" rows (#1289): one per statutory list with a tried word; empty hides the section. */
   words: WordListRow[];
+  /** "Yet to earn a trophy" (#913), one row per island, in curriculum order. */
+  noTrophy: NoTrophyRow[];
   /** The KS2 lines the copyable summary appends (#1290): 0–3 only-when-there's-data strings. */
   ks2: string[];
 }
 export interface WordListRow extends WordProgress { title: string }
+/** One island's line of "Yet to earn a trophy" (#913): tried topics with no Sprint trophy, and how many are untried. */
+export interface NoTrophyRow { year: YearId; title: string; topics: TopicStat[]; untried: number }
 /** The last seven local days of play (#939), read from the day log. `accuracy` is null with no questions. */
 export interface WeekSummary { days: number; questions: number; accuracy: number | null; topics: string[] }
 /** Seven local days ending `day` (`YYYY-MM-DD`): days played, questions, accuracy and the distinct topic ids. */
@@ -106,7 +111,7 @@ function stat(t: Topic, p: TopicProgress | undefined): TopicStat {
 }
 
 /** Build the whole read-only dashboard model from the save. `stickersTotal` is passed in so storage stays the source of the album size. */
-export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number, now = new Date()): ParentSummary {
+export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number, now: Date, sprintTopics: readonly Topic[]): ParentSummary {
   // #95: `data` can be a hand-edited or corrupted "Restore" paste — importSave() only checks the version, so
   // any of these fields can arrive as anything. Read the same tolerant way storage.ts's own achievement
   // calculations already do, rather than indexing `data.progress` directly and throwing on the dashboard.
@@ -151,8 +156,18 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
     week: weekSummary(data.log, today(now)),
     facts: factsToPractise(data),
     words: wordListRows(data),
+    noTrophy: noTrophyRows(progress, sprintTopics, years),
     ks2: ks2Lines(data),
   };
+}
+
+/** Per island, the Sprint-eligible topics with no trophy (#913): `topics` those the child has started, `untried` the rest. Eligibility is the caller's (the chooser's filter lives in `src/ui/`). */
+export function noTrophyRows(progress: Record<string, TopicProgress>, eligible: readonly Topic[], years: readonly YearInfo[]): NoTrophyRow[] {
+  return years.map(y => {
+    const bare = eligible.filter(t => t.year === y.id && trophyFor(progress[t.id]?.sprint ?? 0, y) === null);
+    const tried = bare.filter(t => (progress[t.id]?.tries ?? 0) > 0);
+    return { year: y.id, title: y.title, topics: tried.map(t => stat(t, progress[t.id])), untried: bare.length - tried.length };
+  });
 }
 
 /** One row per statutory list the child has tried a word of (#1289). */

@@ -38,7 +38,7 @@ describe('a drill topic stays out of everything but the chooser (#915)', () => {
     const islands = shownYears().map(y => topicsFor(y.id));
     const starred = Object.fromEntries(CORE_TOPICS.map(t => [t.id, { stars: 3, best: 1, plays: 1 }])) as never;
     expect(masterProgress(islands, starred).unlocked).toBe(true);   // every core topic starred, the unstarred drill does not block it
-    const sm = parentSummary(load(), listedTopics(), shownYears(), 1);
+    const sm = parentSummary(load(), listedTopics(), shownYears(), 1, new Date(), listedTopics());
     expect(sm.topicsTotal).toBe(listedTopics().length);
     expect(listedTopics().length).toBe(shownYears().flatMap(y => topicsFor(y.id)).length);
   });

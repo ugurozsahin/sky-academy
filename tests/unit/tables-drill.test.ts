@@ -34,11 +34,30 @@ describe('times-table drills (#916)', () => {
       expect(c.options).toContain(c.answer);
     }
   });
-  it('y2-tables gives byte-identical cards to before for the same seed', () => {
+  it('y2-tables gives byte-identical d1 cards to before for the same seed (the reverse form is d2–d3 only, #923)', () => {
     const now = topicById('y2-tables')!.gen;
-    for (const d of DS) for (let seed = 1; seed <= 200; seed++) expect(now(d, rngOf(seed))).toEqual(before(d, rngOf(seed)));
+    for (const d of [1 as Difficulty]) for (let seed = 1; seed <= 200; seed++) expect(now(d, rngOf(seed))).toEqual(before(d, rngOf(seed)));
   });
   it('tablesQ is the one factory the mixed topic calls', () => {
     expect(tablesQ(1, rngOf(3), 5).prompt).toMatch(/5/);
+  });
+});
+
+describe('y2-tables "Which makes P?" (#923)', () => {
+  const gen = topicById('y2-tables')!.gen;
+  const reverse = (d: Difficulty, n: number) => Array.from({ length: n }, (_, i) => gen(d, rngOf(i * 13 + d + 1))).filter(c => c.prompt.startsWith('Which makes'));
+  it('d1 never asks it', () => expect(reverse(1, 400)).toHaveLength(0));
+  it.each([2, 3] as Difficulty[])('d%i: about a third of cards, exactly one option multiplies to P, four fitting options', (d) => {
+    const N = 1200, cards = reverse(d, N);
+    expect(cards.length / N).toBeGreaterThan(0.28); expect(cards.length / N).toBeLessThan(0.38);
+    for (const c of cards) {
+      const P = +/^Which makes (\d+)\?$/.exec(c.prompt)![1];
+      const prod = (o: string) => { const m = /^(\d+) × (\d+)$/.exec(o)!; return +m[1] * +m[2]; };
+      expect(c.options).toHaveLength(4); expect(new Set(c.options).size).toBe(4);
+      expect(c.options.filter(o => prod(o) === P)).toEqual([c.answer]);
+      const tables = new Set(c.options.map(o => o.split(' × ')[1])); expect(tables.size).toBe(1);
+      expect([2, 5, 10]).toContain(+[...tables][0]);
+      expect(c.say).toBe(`Which fact makes ${P}?`);
+    }
   });
 });

@@ -8,7 +8,7 @@ import { listedTopics, shownYears } from '../../src/curriculum';
 
 const now = new Date('2026-10-03T12:00:00');
 const withKs2 = (ks2: Partial<SaveData['ks2']>): SaveData => ({ ...DEFAULT, ks2: { ...DEFAULT.ks2, ...ks2 } });
-const text = (d: SaveData) => progressText(parentSummary(d, listedTopics(), shownYears(), STICKER_IDS.length, now), 'Mia', now);
+const text = (d: SaveData) => progressText(parentSummary(d, listedTopics(), shownYears(), STICKER_IDS.length, now, listedTopics()), 'Mia', now);
 const w = STATUTORY_LISTS[0].words;
 
 describe('KS2 lines in the copyable summary (#1290)', () => {

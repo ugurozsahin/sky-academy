@@ -2,9 +2,9 @@ import { avatarOrNull } from '../avatars';
 import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { hush, sfx, voiceState } from '../audio';
-import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
-import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
-import { $, $$, esc, render } from './dom';
+import { gateChallenge, checkGate, parentSummary, type ParentSummary } from '../game/parents';
+import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words'; import { noTrophyHTML, showPct, topicRow } from './parents-trophies';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
+import { $, $$, esc, render } from './dom'; import { chooserEligible } from './chooser';
 
 /** `launch` is where a grown-up lands after removing the ninja this session was playing (#20 slice 3): the
  *  boot decision, re-run — the picker while two or more profiles are left, otherwise that child's map, or
@@ -26,12 +26,7 @@ let pendingReset = false;
 export const isPendingReset = () => pendingReset;
 export const clearPendingReset = () => { pendingReset = false; };
 
-const showPct = (x: number | null) => (x === null ? '—' : `${pct(x)}%`);
 const bar = (frac: number) => `<span class="isl-bar"><i style="width:${Math.round(100 * Math.max(0, Math.min(1, frac)))}%"></i></span>`;
-
-export function topicRow(s: TopicStat): string {
-  return `<li class="p-topic"><span class="ic">${s.icon}</span><span class="p-topic-t"><b>${esc(s.title)}</b><small>${s.hits}/${s.tries} right · ${'★'.repeat(s.stars)}${'☆'.repeat(3 - s.stars)}</small><small>${esc(s.nc)}</small></span><span class="p-acc">${showPct(s.accuracy)}</span></li>`;
-}
 
 /** One of #151's two distinguishable not-saving reasons, or null when saving is working normally. The wording
  *  differs because the remedy differs: a newer-device save needs the *other* device or an update; a browser
@@ -189,7 +184,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
     <h3 class="p-h">Where to help ${sm.weakest.length ? '(trickiest topics)' : ''}</h3>
     ${weak}${readyHTML()}
 
-    ${strong ? `<h3 class="p-h">Going well</h3>${strong}` : ''}${wordsHTML(sm.words)}${factsHTML(sm.facts)}${slipsHTML(sm.slips)}${shareHTML()}
+    ${strong ? `<h3 class="p-h">Going well</h3>${strong}` : ''}${wordsHTML(sm.words)}${factsHTML(sm.facts)}${slipsHTML(sm.slips)}${noTrophyHTML(sm.noTrophy)}${shareHTML()}
 
     <h3 class="p-h">Game modes — personal bests</h3>
     <div class="p-table-wrap"><table class="p-table">
@@ -331,7 +326,7 @@ export function parentsScreen(nav: Nav) {
   const drawDash = () => {
     let snapshot: SaveData | null = null;
 
-    const sm = parentSummary(load(), listedTopics(), shownYears(), STICKER_IDS.length);
+    const sm = parentSummary(load(), listedTopics(), shownYears(), STICKER_IDS.length, new Date(), listedTopics().filter(chooserEligible));
     render(`
     <section class="screen home parents dash">
       <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Grown-ups dashboard</b><small>How ${esc(load().name || 'your ninja')} is getting on</small></div></div>
