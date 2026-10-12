@@ -1,9 +1,9 @@
 import { avatarOrNull } from '../avatars';
 import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
-import { sfx, voiceState } from '../audio';
+import { hush, sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
-import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts'; import { bindWords, wordsHTML } from './parents-words';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
+import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
 import { $, $$, esc, render } from './dom';
 
 /** `launch` is where a grown-up lands after removing the ninja this session was playing (#20 slice 3): the
@@ -187,7 +187,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
     <div class="p-years">${yearCards}</div>
 
     <h3 class="p-h">Where to help ${sm.weakest.length ? '(trickiest topics)' : ''}</h3>
-    ${weak}
+    ${weak}${readyHTML()}
 
     ${strong ? `<h3 class="p-h">Going well</h3>${strong}` : ''}${wordsHTML(sm.words)}${factsHTML(sm.facts)}${slipsHTML(sm.slips)}${shareHTML()}
 
@@ -343,7 +343,7 @@ export function parentsScreen(nav: Nav) {
     // never on the map with an empty profile (#115). "Undo" is the only way out of that state.
     $('#back').addEventListener('click', () => { sfx.tap(); if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else nav.map(); });
     wireMove(() => drawDash()); bindShare(sm, load().name); bindWords();
-    bindSettings();
+    bindSettings(); bindReady();
 
     const overlay = $('#reset-overlay');
     const closeOverlay = () => { overlay.hidden = true; overlay.innerHTML = ''; };
@@ -412,7 +412,7 @@ export function parentsScreen(nav: Nav) {
       go.addEventListener('click', () => {
         sfx.tap();
         snapshot = load();       // kept in memory only — the "Undo" affordance below is what can bring it back
-        reset();
+        hush(); reset();   // hush first: a speech verdict still pending would save() a fresh blob over the cleared key (#1630)
         pendingReset = true;
         overlay.innerHTML = resetDoneHTML();
         $('#reset-undo').addEventListener('click', () => {

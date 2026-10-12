@@ -8,6 +8,7 @@ import { beltFor, totalStarsOf } from '../game/belts';
 import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
+import { ageLabel, isWarmUp } from './year-label';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import type { Ks2Fact } from '../save-records';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
@@ -65,6 +66,10 @@ function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', 
     topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
   }, { mixed: true, badge: trophyBadge(year, progress) });
 }
+/** #1288: Sensei's spoken line before training; on a warm-up island he calls it one. */
+export function senseiTrainLine(year: YearInfo, schoolYear: YearId | undefined, weakest: Topic[]): string {
+  return `Sensei says: ${isWarmUp(year, schoolYear) ? "a warm-up. Let's" : "let's"} train ${weakest.map(t => t.title).join(', ')}`;
+}
 /** #894: a Daily Dojo row read aloud, for a pre-reader who cannot read the challenge title on the card. */
 export function dojoRowLine(c: Challenge, progress: number): string {
   return progress >= c.goal ? `${c.title}. Done!` : `${c.title}. ${progress} of ${c.goal} done.`;
@@ -108,7 +113,7 @@ export function mapScreen(nav: Nav) {
     ${tb.html}
     <h2 class="section-title">${ask ? 'Tap your school year' : 'Where will you train today?'}</h2>
     <div class="islands big" style="--cols:${layout.cols}${layout.compact ? ';--isl-h:88px;--isl-pad:118px;--art-w:96px;--art-h:62px' : ''}">
-      ${islandsHTML(shown, y => ({ s: totalStars(y), m: maxStars(y) }), d.year, layout.compact)}
+      ${islandsHTML(shown, y => ({ s: totalStars(y), m: maxStars(y) }), d.year, layout.compact, d.ks2.schoolYear)}
     </div>
     ${dojoCard(dojoState, dojoChallenges)}
     <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS${shown.some(y => isKs2(y.id)) ? ', KS1 & KS2' : ' & KS1'} National Curriculum</span>
@@ -214,7 +219,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const menu = menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
       title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
-      go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
+      go: () => { say(senseiTrainLine(year, d.ks2.schoolYear, weakest)); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
       go: () => playMixed(nav, year, 'endless', mixedPool(), progress) }, ...deckRows(nav, year, progress),
@@ -242,13 +247,12 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     <div class="isl-head">
       <button class="icon-btn" id="back" aria-label="Back to the sky map">←</button>
       <span class="isl-art" style="background-image:url(&quot;${islandArt(year)}&quot;)"></span>
-      <div><b>${year.title} Island</b><small>${year.age} · ${year.blurb}${trophyCount(year, progress)}</small></div>
+      <div><b>${year.title} Island</b><small>${ageLabel(year, d.ks2.schoolYear)} · ${year.blurb}${trophyCount(year, progress)}</small></div>
     </div>
     <div class="tabs" role="tablist">
-      <button class="tab${subject === 'maths' ? ' on' : ''}" data-s="maths" role="tab">🔢 Maths</button>
-      <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
+      ${subjectTab('maths', subject, '🔢 Maths')}${subjectTab('writing', subject, '✍️ Writing')}
     </div>
-    <div class="topics" id="topics"></div>
+    <div class="topics" id="topics" role="tabpanel" aria-labelledby="tab-${subject}"></div>
     <div class="mode-grid">
       ${menu.map(m =>
         `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`
@@ -266,9 +270,17 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
   $$('.tab').forEach(b => b.addEventListener('click', () => {
     subject = b.dataset.s as 'maths' | 'writing';
-    $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics();
+    $$('.tab').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', String(x === b)); });
+    $('#topics').setAttribute('aria-labelledby', b.id); sfx.tap(); drawTopics();
   }));
   menu.forEach(m => $(`#${m.id}`).addEventListener('click', () => { sfx.tap(); m.go(); }));
+}
+
+/** #901: a Maths/Writing tab that announces whether it is selected and which panel it controls. */
+function subjectTab(id: 'maths' | 'writing', current: string, label: string): string {
+  const on = id === current;
+  return `<button class="tab${on ? ' on' : ''}" id="tab-${id}" data-s="${id}" role="tab"` +
+    ` aria-selected="${on}" aria-controls="topics">${label}</button>`;
 }
 
 /** #894: a locked sticker shows only "???" and a small-print hint, so tapping it reads how it is earned aloud. */

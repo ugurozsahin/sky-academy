@@ -52,6 +52,12 @@ export interface ScreenScope {
    *  `true` return consumes a hardware/gesture back press. One guard at a time — a later call replaces `fn`,
    *  same as `onHidden` — and `dispose()` clears it, so no guard outlives the screen that set it. */
   onBack(fn: () => boolean): void;
+  /** #902: desktop keys for the live screen — Esc or P runs `pause`; Space runs `repeat`, which returns `true`
+   *  only when it acted (it does nothing while an overlay is open, so Space still presses a focused button).
+   *  One `keydown` + `keyup` pair on `window`, removed by `dispose()`; a later call replaces the handlers.
+   *  Auto-repeat, chords and typing into an input/textarea are ignored; a used Space is `preventDefault`ed on
+   *  keydown and keyup so the page does not scroll. */
+  onKeys(handlers: KeyHandlers): void;
   /** Show the `#toast` message with an optional class, auto-hiding after `ms`. Each call invalidates any
    *  earlier call's pending auto-hide (#478), so two toasts raised inside one hold no longer race: the first
    *  one's timer can no longer strip the second. */
@@ -73,6 +79,30 @@ export interface ScreenScope {
  *  tell: only an armed beat has a live `setTimeout` handle to clear. */
 type Beat = { fn: () => void; id: number; dueAt: number } | { fn: () => void; left: number };
 
+/** #902: one `keydown` + `keyup` pair on `window` per scope, added on the first `set()` and removed by
+ *  `clear()` — never left running against a screen that is gone. Space is `preventDefault`ed only when
+ *  `repeat()` reported it used the press (`true`): otherwise a focused Resume/Replay button would lose its
+ *  Space activation. The keyup of a used press, and any auto-repeat of it, are swallowed with it. */
+export interface KeyHandlers { pause: () => unknown; repeat: () => boolean }
+function keyBinding() {
+  let fns: KeyHandlers | null = null;
+  let used = false;   // the Space currently held down was consumed by repeat()
+  const typing = (e: KeyboardEvent) => ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement | null)?.tagName ?? '');
+  const down = (e: KeyboardEvent) => {
+    if (!fns || e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
+    if (e.code === 'Space') { if (e.repeat ? used : (used = fns.repeat())) e.preventDefault(); }
+    else if (!e.repeat && (e.key === 'Escape' || e.key?.toLowerCase() === 'p')) fns.pause();
+  };
+  const up = (e: KeyboardEvent) => { if (e.code === 'Space' && used) { used = false; e.preventDefault(); } };
+  return {
+    set(h: KeyHandlers) {
+      if (!fns) { window.addEventListener('keydown', down); window.addEventListener('keyup', up); }
+      fns = h;
+    },
+    clear() { if (fns) { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); fns = null; used = false; } },
+  };
+}
+
 /** Build the per-screen scaffolding. One `alive` flag + beat list backs `later`, `holdTimers`, `toast` and
  *  `dispose`. */
 export function screenScope(): ScreenScope {
@@ -89,6 +119,7 @@ export function screenScope(): ScreenScope {
   // dispose() — never left running against a screen that is gone.
   let hiddenFn: (() => void) | null = null;
   const onVisibility = () => { if (document.visibilityState === 'hidden') hiddenFn?.(); };
+  const keys = keyBinding();   // #902
   // Builds the armed shape; the `id` `setTimeout` returns is only known once `b` exists, so `b` is built with a
   // placeholder and patched once — the closure below still needs to name `b` to remove itself from `beats`.
   const arm = (fn: () => void, ms: number): Beat => {
@@ -112,6 +143,7 @@ export function screenScope(): ScreenScope {
       if (!alive) return;   // same guard as onHidden(): dispose() has already done its one cleanup
       backFn = fn;
     },
+    onKeys(h) { if (alive) keys.set(h); },   // same guard as onHidden()
     holdTimers(open) {
       if (open === held) return;
       held = open;
@@ -149,7 +181,7 @@ export function screenScope(): ScreenScope {
     dispose() {
       alive = false; for (const b of beats) if ('id' in b) clearTimeout(b.id); beats.clear(); hush();
       if (hiddenFn) { document.removeEventListener('visibilitychange', onVisibility); hiddenFn = null; }
-      backFn = null;
+      backFn = null; keys.clear();
       delete window.__sna;
     },
   };

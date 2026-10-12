@@ -610,6 +610,23 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.wizard-progress')).toHaveCount(0);
   });
 
+  test('the Maths/Writing tabs announce the selected one and the panel they control (#901)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    const topics = page.locator('#topics');
+    await expect(topics).toHaveAttribute('role', 'tabpanel');
+    const expectState = async (on: 'maths' | 'writing', off: 'maths' | 'writing') => {
+      await expect(page.locator(`#tab-${on}`)).toHaveAttribute('aria-selected', 'true');
+      await expect(page.locator(`#tab-${off}`)).toHaveAttribute('aria-selected', 'false');
+      await expect(topics).toHaveAttribute('aria-labelledby', `tab-${on}`);
+    };
+    await expect(page.locator('#tab-maths')).toHaveAttribute('aria-controls', 'topics');
+    await expect(page.locator('#tab-writing')).toHaveAttribute('aria-controls', 'topics');
+    await expectState('maths', 'writing');
+    await page.click('#tab-writing'); await expectState('writing', 'maths');
+    await page.click('#tab-maths'); await expectState('maths', 'writing');
+  });
+
   test('every year has maths and writing topics listed', async ({ page }) => {
     await seedPlayer(page);
     for (const y of ['reception', 'year1', 'year2']) {
@@ -2464,6 +2481,39 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.toast.good')).toBeVisible();
   });
 
+  test('Esc or P pauses a live mission, Space repeats the question, and none works once the screen is left (#902)', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as unknown as { __said: string[] }).__said = [];
+      Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+        speaking: false, pending: false, getVoices: () => [], onvoiceschanged: null, cancel: () => {},
+        speak: (u: SpeechSynthesisUtterance) => { (window as unknown as { __said: string[] }).__said.push(u.text); },
+      } });
+    });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    const said = () => page.evaluate(() => (window as unknown as { __said: string[] }).__said.length);
+    await page.evaluate(() => { (window as unknown as { __said: string[] }).__said = []; });
+    await page.keyboard.press('Space');
+    await expect.poll(said, 'Space says the question again').toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#resume')).toBeVisible();
+    const before = await said();
+    await page.keyboard.press('Space');                                            // an overlay is open: Space does nothing
+    await page.keyboard.press('Escape');
+    expect(await said()).toBe(before);
+    await page.focus('#resume');
+    await page.keyboard.press('Space');                                            // review: Space still presses a focused button
+    await expect(page.locator('#resume')).toBeHidden();
+    await page.keyboard.press('p');
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.click('#quit');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    const left = await said();
+    await page.keyboard.press('Space'); await page.keyboard.press('Escape');       // the listeners went with the screen
+    await expect(page.locator('#resume')).toHaveCount(0);
+    expect(await said()).toBe(left);
+  });
+
   test('back button opens Pause first, then steps back: play → island → sky map (#887, Android/browser history)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
@@ -3444,6 +3494,39 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.celebrate')).toBeVisible({ timeout: 5000 });
   });
 
+  // #1354: Pause refuses an ended game, so hiding in the gap between the last life going and the results overlay
+  // used to leave the deferred results beat running — `say(headline)` and the chime started while hidden.
+  test('hiding the app after a game-ending answer holds the results (and their speech) until the app is visible again (#1354)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page, 'kai', 'Sam');
+    await startTopic(page, 'year1', 'y1-bonds');
+    for (let guard = 0; guard < 12; guard++) {
+      await waitForWrongOrEnd(page);
+      if (await page.evaluate(() => window.__sna.state().lives) === 1) break;
+      const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+      await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, before);
+    }
+    let spokenBefore = 0;
+    const ended = await page.evaluate(() => {
+      window.__sna.wrong();                                                // the losing slice
+      const e = window.__sna.state().ended;
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));               // same tick — before the results beat can run
+      return e;
+    });
+    spokenBefore = (await page.evaluate(() => window.__spoken))!.length;   // the losing slice's own correction is already in
+    expect(ended, 'the losing slice ended the game synchronously').toBe(true);
+    await page.waitForTimeout(3000);                                       // real time, well past the results reveal
+    await expect(page.locator('.results')).toHaveCount(0);
+    expect((await page.evaluate(() => window.__spoken))!.length, 'no speech starts while hidden').toBe(spokenBefore);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.locator('.results')).toBeVisible({ timeout: 5000 });
+  });
+
   // #1356: `fakeBackButton` / `pressBack` moved to `./back-button.ts`, shared with `duel.spec.ts`.
   test('a hardware back press during a live Sprint opens Pause; a second press then leaves to the island (#885)', async ({ page }) => {
     await fakeBackButton(page);
@@ -4002,6 +4085,34 @@ test.describe('Sky Ninja Academy', () => {
     await seedPlayer(page, 'volt', 'Ada');
     await openGrownUps(page);
     await expect(page.locator('.parents-dash .p-h', { hasText: 'Facts to practise' })).toHaveCount(0);
+  });
+
+  test('For grown-ups: "Check readiness" shows the Tables Check trend and weeks to the date, and no child screen has it (#1286)', async ({ page }) => {
+    const chk = (score: number) => ({ date: '2026-10-01', score, missed: [] });
+    await seedPlayer(page, 'volt', 'Ada', { ks2: { schoolYear: 'year4', facts: {}, checks: [chk(22), chk(19), chk(16)], words: {} } });
+    await expect(page.locator('body')).not.toContainText('Check readiness');   // the map
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Check readiness');   // an island
+    await page.click('#back');
+    await openGrownUps(page);
+    const dash = page.locator('.parents-dash');
+    await expect(dash).toContainText('16 → 19 → 22 out of 25');
+    const d = new Date(); d.setDate(d.getDate() + 20);
+    await page.locator('#ready-date').fill(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    await expect(page.locator('#ready-weeks')).toHaveText('3 weeks to go');
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await page.reload();                                   // the date is saved, not just shown
+    await openGrownUps(page);
+    await expect(page.locator('#ready-date')).toHaveValue(iso);
+    await expect(page.locator('#ready-weeks')).toHaveText('3 weeks to go');
+    await page.locator('#ready-date').fill('');
+    await expect(page.locator('#ready-weeks')).toHaveText('');
+    await page.reload();                                   // …and clearing it is saved too
+    await openGrownUps(page);
+    await expect(page.locator('#ready-date')).toHaveValue('');
+    await page.locator('#ready-date').scrollIntoViewIfNeeded();
+    await expectFitsViewport(page, 'grown-ups Check readiness');
   });
 
   test('For grown-ups: "Share a progress summary" falls back to the clipboard, with no save code in the text (#942)', async ({ page }) => {
@@ -5873,4 +5984,19 @@ test('a y6-coords four-quadrant grid fits a 390×664 phone (#1213)', async ({ pa
   expect(await page.locator('#vis svg .ax').allTextContents()).toEqual(['−5', '−4', '−3', '−2', '−1', '0', '1', '2', '3', '4', '5']);
   await expectFitsViewport(page, 'y6-coords four-quadrant grid');
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
+});
+
+// #1288: a KS1 island reads "Warm-up" for a child whose school year is KS2.
+test('the Year 2 card reads Warm-up for a Year 3 child, its age band otherwise (#1288)', async ({ page }) => {
+  await seedPreview(page);
+  await seedPlayer(page, 'volt', 'Ada', { ks2: { schoolYear: 'year3', facts: {}, checks: [], words: {} } });
+  const card = page.locator('.island[data-year="year2"]');
+  await expect(card).toContainText('Warm-up');
+  await expect(card).not.toContainText('Ages 6–7');
+  await card.click();
+  await expect(page.locator('.isl-head small')).toContainText('Warm-up');
+});
+test('the Year 2 card keeps its age band with no school year (#1288)', async ({ page }) => {
+  await seedPlayer(page);
+  await expect(page.locator('.island[data-year="year2"]')).toContainText('Ages 6–7');
 });
