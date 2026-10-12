@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { accuracy, weakestTopics, TRAIN_TOPICS, poolWeights, weightedPick } from '../../src/game/sensei';
+import { accuracy, weakestTopics, TRAIN_TOPICS, poolWeights, weightedPick, nextIsland, nextIslandLine } from '../../src/game/sensei';
+import { evaluateStickers } from '../../src/storage/stickers';
+import { load, type SaveData } from '../../src/storage';
 import { seededRng } from '../../src/game/rng';
-import { topicsFor } from '../../src/curriculum';
+import { listedTopics, shownYears, topicsFor } from '../../src/curriculum';
 import type { TopicProgress } from '../../src/storage';
 
 const Y1 = topicsFor('year1');
@@ -113,5 +115,39 @@ describe('Sensei brings back a topic not played for 14 days (#936)', () => {
   it('without `now` the result is today\'s, whatever `last` says', () => {
     const pr = base({ 'y1-coins': { ...p(2, 3, 9, 10), last: day(30) } });
     expect(ids(pr)).toEqual(['y1-add', 'y1-sub', 'y1-bonds']);
+  });
+});
+
+describe('nextIsland (#935)', () => {
+  const years = shownYears();
+  const starAll = (...ids: string[]): Record<string, TopicProgress> =>
+    Object.fromEntries(ids.flatMap(id => listedTopics().filter(t => t.year === id).map(t => [t.id, p(1, 1)] as const)));
+  const [a, b] = years;
+  it('a finished first island points at the next one', () => {
+    expect(nextIsland(starAll(a.id), years, a.id)?.id).toBe(b.id);
+  });
+  it('a finished last island wraps back to the first unfinished earlier one', () => {
+    const last = years[years.length - 1];
+    expect(nextIsland(starAll(last.id), years, last.id)?.id).toBe(a.id);
+  });
+  it('skips islands that are already complete', () => {
+    expect(nextIsland(starAll(a.id, b.id), years, a.id)?.id).toBe(years[2].id);
+  });
+  it('is null while the current island is only partly starred, or unknown', () => {
+    const partial = { [listedTopics().find(t => t.year === a.id)!.id]: p(1, 1) };
+    expect(nextIsland(partial, years, a.id)).toBeNull();
+    expect(nextIsland({}, years, a.id)).toBeNull();
+    expect(nextIsland(starAll(a.id), years, undefined)).toBeNull();
+  });
+  it('is null when every island is complete', () => {
+    expect(nextIsland(starAll(...years.map(y => y.id)), years, a.id)).toBeNull();
+  });
+  it('names the island in the Sensei line', () => {
+    expect(nextIslandLine(b)).toBe(`Sensei says: ${b.title} Island is waiting for you!`);
+  });
+  it('the hammer sticker still follows the same rule', () => {
+    const save = { ...load(), progress: starAll(a.id) } as SaveData;
+    expect(evaluateStickers(save)).toContain('hammer');
+    expect(evaluateStickers({ ...save, progress: {} } as SaveData)).not.toContain('hammer');
   });
 });

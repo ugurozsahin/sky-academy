@@ -30,9 +30,15 @@ export function stickersFor(coins: number): string[] {
 export const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
 const topicsStarred = (d: SaveData) => Object.values(safeRecord<TopicProgress>(d.progress)).filter(p => (p?.stars ?? 0) > 0).length;
 const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return shownYears().filter(y => listedTopics().some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
+/** True when every listed topic on island `yearId` has a star (#935). The `hammer` sticker, Sensei's next-island
+ * nudge and any certificate read this one rule, so a topic excluded from the listing is excluded from all of them. */
+export const islandComplete = (progress: Record<string, TopicProgress>, yearId: string): boolean => {
+  const ts = listedTopics().filter(t => t.year === yearId);
+  return ts.length > 0 && ts.every(t => (progress[t.id]?.stars ?? 0) > 0);
+};
 const islandFullyStarred = (d: SaveData) => {
   const p = safeRecord<TopicProgress>(d.progress);
-  return shownYears().some(y => { const ts = listedTopics().filter(t => t.year === y.id); return ts.length > 0 && ts.every(t => (p[t.id]?.stars ?? 0) > 0); });
+  return shownYears().some(y => islandComplete(p, y.id));
 };
 const sumOf = (x: unknown) => Object.values(safeRecord<number>(x)).reduce((n: number, v) => n + (typeof v === 'number' ? v : 0), 0);
 const totalBossWins = (d: SaveData) => sumOf(d.boss);

@@ -1,9 +1,25 @@
 // Train with Sensei: adaptive practice picks the topics a child finds hardest. Pure so it can be unit-tested.
-import type { Topic } from '../curriculum';
+import type { Topic, YearInfo } from '../curriculum';
 import { answerableBy } from './pools';
 import type { TopicProgress } from '../storage';
+import { islandComplete } from '../storage/stickers';
 
 export const TRAIN_TOPICS = 3;
+
+/** Sensei's spoken nudge toward an unstarted island (#935). */
+export const nextIslandLine = (y: YearInfo): string => `Sensei says: ${y.title} Island is waiting for you!`;
+
+/**
+ * Where to send a child who has starred every topic on `current` (#935): the first island after it, in `years`
+ * order, that is not fully starred; failing that the first earlier one. `null` when `current` is not yet fully
+ * starred, or every island is. Pass `shownYears()` so a hidden island never counts.
+ */
+export function nextIsland(progress: Record<string, TopicProgress>, years: readonly YearInfo[], current: string | undefined): YearInfo | null {
+  const at = years.findIndex(y => y.id === current);
+  if (at < 0 || !islandComplete(progress, current!)) return null;
+  const open = (y: YearInfo) => !islandComplete(progress, y.id);
+  return years.slice(at + 1).find(open) ?? years.slice(0, at).find(open) ?? null;
+}
 
 // #1039 Decision D7. Its own constant, deliberately not `TRAIN_TOPICS` above: the two are unrelated invariants
 // that happen to share a value today, and reusing one for the other would silently couple them.

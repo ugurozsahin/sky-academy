@@ -16,7 +16,7 @@ import { sfx, say } from '../audio';
 import { needsSchoolYear } from '../school-year';
 import { SPRINT_SECONDS } from '../game/session';
 import { MODES } from '../game/modes';
-import { senseiTopics, poolWeights } from '../game/sensei';
+import { senseiTopics, poolWeights, nextIsland, nextIslandLine } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
@@ -90,6 +90,17 @@ function dojoCard(s: DojoState, cs: Challenge[]) {
     </div>`;
 }
 
+let islandNudged = false;   // #935: Sensei names the next island once per app launch
+/** #935: the next island to point at once `current` is fully starred, only while it has no star yet. */
+function unstartedNext(progress: Record<string, TopicProgress>, shown: YearInfo[], current: string | undefined, stars: (y: YearInfo) => number): YearInfo | null {
+  const next = nextIsland(progress, shown, current);
+  return next && stars(next) === 0 ? next : null;
+}
+/** Speak only once a tap has happened (the browser drops earlier speech), and spend the flag only when it did. */
+function sayNextIsland(y: YearInfo, speechOn: boolean) {
+  if (!speechOn || islandNudged || navigator.userActivation?.hasBeenActive === false) return;
+  islandNudged = true; say(nextIslandLine(y));
+}
 let yearAsked = false;   // #1055: spoken once per page load, not on every redraw
 /** Sky Map: one decision — which island (year group). */
 export function mapScreen(nav: Nav) {
@@ -102,6 +113,7 @@ export function mapScreen(nav: Nav) {
   const maxStars = (y: YearInfo) => topicsFor(y.id).length * 3;
   const shown = shownYears();
   const layout = mapLayout(shown.length);
+  const nudge = unstartedNext(progress, shown, d.year, totalStars);
   const ask = needsSchoolYear(d);   // #1055: first run only
   const tb = topbar(nav, () => mapScreen(nav));
   const dojoState = dojoToday(); const dojoChallenges = dailyChallenges(dojoState.date);
@@ -113,7 +125,7 @@ export function mapScreen(nav: Nav) {
     ${tb.html}
     <h2 class="section-title">${ask ? 'Tap your school year' : 'Where will you train today?'}</h2>
     <div class="islands big" style="--cols:${layout.cols}${layout.compact ? ';--isl-h:88px;--isl-pad:118px;--art-w:96px;--art-h:62px' : ''}">
-      ${islandsHTML(shown, y => ({ s: totalStars(y), m: maxStars(y) }), d.year, layout.compact, d.ks2.schoolYear)}
+      ${islandsHTML(shown, y => ({ s: totalStars(y), m: maxStars(y) }), nudge?.id ?? d.year, layout.compact, d.ks2.schoolYear)}
     </div>
     ${dojoCard(dojoState, dojoChallenges)}
     <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS${shown.some(y => isKs2(y.id)) ? ', KS1 & KS2' : ' & KS1'} National Curriculum</span>
@@ -123,6 +135,7 @@ export function mapScreen(nav: Nav) {
       </div></footer>
   </section>`, 'bg-sky');
   tb.bind();
+  if (nudge && !ask) sayNextIsland(nudge, d.speech);
   if (ask && !yearAsked) { yearAsked = true; say('Tap your school year'); }
   $$('.island').forEach(b => b.addEventListener('click', () => {
     const y = shown.find(x => x.id === b.dataset.year)!;
