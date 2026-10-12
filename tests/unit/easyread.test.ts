@@ -27,7 +27,9 @@ describe('easy-read question card setting (#907)', () => {
   it('has a radiogroup row in the grown-ups settings that follows the store', () => {
     const row = (html: string) => html.slice(html.indexOf('p-easy'), html.indexOf('p-year'));
     expect(row(settingsHTML())).toMatch(/data-easy="off" role="radio" aria-checked="true"/);
+    expect(row(settingsHTML())).toMatch(/data-easy="on" role="radio" aria-checked="false"/);
     setEasyRead(true);
     expect(row(settingsHTML())).toMatch(/data-easy="on" role="radio" aria-checked="true"/);
+    expect(row(settingsHTML())).toMatch(/data-easy="off" role="radio" aria-checked="false"/);
   });
 });
