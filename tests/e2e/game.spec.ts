@@ -6123,6 +6123,26 @@ test('the Year 2 card keeps its age band with no school year (#1288)', async ({ 
   await seedPlayer(page);
   await expect(page.locator('.island[data-year="year2"]')).toContainText('Ages 6–7');
 });
+
+// #935: once every topic on the current island is starred, the map moves the highlight to the next unstarted one.
+test('the map highlights the next island once every topic on the current one is starred (#935)', async ({ page }) => {
+  const progress = Object.fromEntries(TOPICS.filter(t => t.year === 'reception').map(t => [t.id, { stars: 1, best: 10, plays: 1 }]));
+  await seedPlayer(page, 'volt', 'Ada', { year: 'reception', progress });
+  await expect(page.locator('.island[data-year="year1"]')).toHaveClass(/sel/);
+  await expect(page.locator('.island[data-year="reception"]')).not.toHaveClass(/sel/);
+});
+test('the map keeps the current island highlighted while it is only partly starred (#935)', async ({ page }) => {
+  await seedPlayer(page, 'volt', 'Ada', { year: 'reception' });
+  await expect(page.locator('.island[data-year="reception"]')).toHaveClass(/sel/);
+});
+test('the map keeps the current island highlighted once the next one already has a star (#935)', async ({ page }) => {
+  const stars = Object.fromEntries(TOPICS.filter(t => t.year === 'reception').map(t => [t.id, { stars: 1, best: 10, plays: 1 }]));
+  const y1 = TOPICS.find(t => t.year === 'year1')!;
+  await seedPlayer(page, 'volt', 'Ada', { year: 'reception', progress: { ...stars, [y1.id]: { stars: 1, best: 10, plays: 1 } } });
+  await expect(page.locator('.island[data-year="reception"]')).toHaveClass(/sel/);
+  await expect(page.locator('.island[data-year="year1"]')).not.toHaveClass(/sel/);
+});
+
 test('Daily Sprint deals the same first three questions on every start the same day (#924)', async ({ page }) => {
   await seedPlayer(page);
   await page.click('.island[data-year="year1"]');
