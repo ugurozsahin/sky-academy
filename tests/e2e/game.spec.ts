@@ -2488,7 +2488,8 @@ test.describe('Sky Ninja Academy', () => {
     await page.keyboard.press('Space');                                            // an overlay is open: Space does nothing
     await page.keyboard.press('Escape');
     expect(await said()).toBe(before);
-    await page.click('#resume');
+    await page.focus('#resume');
+    await page.keyboard.press('Space');                                            // review: Space still presses a focused button
     await expect(page.locator('#resume')).toBeHidden();
     await page.keyboard.press('p');
     await expect(page.locator('#resume')).toBeVisible();

@@ -469,33 +469,53 @@ describe('onKeys (#902 — desktop pause and repeat)', () => {
     return prevented;
   };
 
-  it('Esc and P pause, Space repeats and is preventDefaulted on keydown and keyup', () => {
+  it('Esc and P pause, Space repeats and is preventDefaulted on keydown, auto-repeat and keyup', () => {
     const scope = screenScope(); const calls: string[] = [];
-    scope.onKeys(() => calls.push('pause'), () => calls.push('repeat'));
+    scope.onKeys({ pause: () => calls.push('pause'), repeat: () => { calls.push('repeat'); return true; } });
     press('keydown', 'Escape'); press('keydown', 'p'); press('keydown', 'P');
     expect(press('keydown', ' ')).toBe(true);
+    expect(press('keydown', ' ', { repeat: true }), 'a held Space keeps its default prevented').toBe(true);
     expect(press('keyup', ' ')).toBe(true);
     expect(calls).toEqual(['pause', 'pause', 'pause', 'repeat']);
     scope.dispose();
   });
 
-  it('ignores auto-repeat, modifier chords, other keys and typing into an input', () => {
+  it('leaves Space alone when repeat() did nothing, so a focused button still activates (#902 review)', () => {
+    const scope = screenScope();
+    scope.onKeys({ pause: () => {}, repeat: () => false });
+    expect(press('keydown', ' ')).toBe(false);
+    expect(press('keyup', ' ')).toBe(false);
+    scope.dispose();
+  });
+
+  it('ignores auto-repeat, modifier chords, other keys and typing into an input; a missing key does not throw', () => {
     const scope = screenScope(); const calls: string[] = [];
-    scope.onKeys(() => calls.push('pause'), () => calls.push('repeat'));
-    press('keydown', 'Escape', { repeat: true }); press('keydown', ' ', { repeat: true });
-    press('keydown', 'p', { ctrlKey: true }); press('keydown', 'a');
+    scope.onKeys({ pause: () => calls.push('pause'), repeat: () => { calls.push('repeat'); return true; } });
+    press('keydown', 'Escape', { repeat: true });
+    for (const mod of ['ctrlKey', 'metaKey', 'altKey'] as const) { press('keydown', 'p', { [mod]: true }); press('keydown', ' ', { [mod]: true }); }
+    press('keydown', 'a');
     press('keydown', ' ', { target: { tagName: 'INPUT' } }); press('keydown', 'p', { target: { tagName: 'TEXTAREA' } });
+    expect(() => press('keydown', undefined as unknown as string, { code: 'KeyA' })).not.toThrow();
     expect(calls).toEqual([]);
+    scope.dispose();
+  });
+
+  it('a second onKeys() replaces the handlers rather than adding listeners', () => {
+    const scope = screenScope(); const calls: string[] = [];
+    scope.onKeys({ pause: () => calls.push('old'), repeat: () => false });
+    scope.onKeys({ pause: () => calls.push('new'), repeat: () => false });
+    press('keydown', 'Escape');
+    expect(calls).toEqual(['new']);
     scope.dispose();
   });
 
   it('dispose() removes both listeners, and a disposed scope registers none', () => {
     const scope = screenScope();
-    scope.onKeys(() => {}, () => {});
+    scope.onKeys({ pause: () => {}, repeat: () => true });
     expect([...reg.keys()].sort()).toEqual(['keydown', 'keyup']);
     scope.dispose();
     expect(reg.size, 'no listener may outlive the screen').toBe(0);
-    scope.onKeys(() => {}, () => {});
+    scope.onKeys({ pause: () => {}, repeat: () => true });
     expect(reg.size).toBe(0);
   });
 });

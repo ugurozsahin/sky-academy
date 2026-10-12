@@ -154,7 +154,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   /** Repeat the prompt (tap the question card, or the 🔊 button): aloud, or — on a device that cannot be
    *  heard — the hidden sentence is shown again (#65). Never a no-op on a silent device (the #205 rule). */
   function repeatPrompt() {
-    const q = session.current; if (!q || !els.overlay.hidden) return;   // #902: Space behind an overlay does nothing
+    const q = session.current; if (!q) return;
     if (!playSession.repeat()) say(q.say ?? q.prompt, true);
     els.qcard.classList.remove('pulse'); void els.qcard.offsetWidth; els.qcard.classList.add('pulse');
   }
@@ -251,7 +251,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // #884: opens Pause on a live game (no overlay up, not yet ended); a stage-clear/results overlay stays as it is.
   function pauseIfLive(): boolean { if (!els.overlay.hidden || session.ended) return false; showPause(); return true; }
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
-  $('#speak').addEventListener('click', repeatPrompt); scope.onKeys(pauseIfLive, repeatPrompt);   // #902: Esc/P pause, Space repeats
+  $('#speak').addEventListener('click', repeatPrompt); scope.onKeys({ pause: pauseIfLive, repeat: () => els.overlay.hidden && (repeatPrompt(), true) });   // #902
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
   // #35: dispose() stops timers, cancels speech and drops window.__sna.
   function cleanup() {
