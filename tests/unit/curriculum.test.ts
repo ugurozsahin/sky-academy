@@ -90,8 +90,7 @@ describe('curriculum ranges', () => {
   it('Year 2 tables only use 2, 5, 10', () => {
     const t = TOPICS.find(x => x.id === 'y2-tables')!; const r = rng(9);
     for (let i = 0; i < 300; i++) {
-      const p = t.gen(3, r).prompt;
-      const nums = p.match(/\d+/g)!.map(Number);
+      const c = t.gen(3, r), nums = (c.prompt.startsWith('Which makes') ? c.answer : c.prompt).match(/\d+/g)!.map(Number);   // #923: the reverse form carries its table in the answer fact
       expect(nums.some(n => [2, 5, 10].includes(n))).toBe(true);
     }
   });

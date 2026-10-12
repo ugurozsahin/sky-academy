@@ -30,8 +30,8 @@ describe('totalStarsOf (#951)', () => {
     reset();
     const save = { ...load(), progress: { [topics[0].id]: { stars: 3, best: 1, plays: 1 }, [topics[1].id]: { stars: 2, best: 1, plays: 1 } } };
     expect(totalStarsOf(save.progress, topics)).toBe(5);
-    expect(totalStarsOf(save.progress, topics)).toBe(parentSummary(save, topics, shownYears(), 0).starsEarned);
-    expect(parentSummary(save, topics, shownYears(), 0).belt).toBe(beltFor(5).name);
+    expect(totalStarsOf(save.progress, topics)).toBe(parentSummary(save, topics, shownYears(), 0, new Date(), topics).starsEarned);
+    expect(parentSummary(save, topics, shownYears(), 0, new Date(), topics).belt).toBe(beltFor(5).name);
   });
   it('survives a corrupted progress (#95)', () => {
     for (const bad of [null, undefined, 'x', 7, [], [1, 2]]) expect(totalStarsOf(bad, topics)).toBe(0);
