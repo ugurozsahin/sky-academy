@@ -4154,6 +4154,16 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'grown-ups Facts to practise');
   });
 
+  test('For grown-ups: "Yet to earn a trophy" lists a tried topic with no Sprint trophy and fits the phone (#913)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 1, best: 0, plays: 1, hits: 1, tries: 2 } } });
+    await openGrownUps(page);
+    const sec = page.locator('.parents-dash .p-h', { hasText: 'Yet to earn a trophy' });
+    await expect(sec).toBeVisible();
+    await expect(page.locator('.parents-dash')).toContainText('not tried yet');
+    await sec.scrollIntoViewIfNeeded();
+    await expectFitsViewport(page, 'grown-ups Yet to earn a trophy');
+  });
+
   test('For grown-ups: no × answers recorded, no "Facts to practise" section (#1123)', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada');
     await openGrownUps(page);

@@ -3,7 +3,8 @@ import { numberWord } from '../../src/curriculum/util';
 import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, factsToPractise, type SlipRow } from '../../src/game/parents';
 import { TOPICS, CORE_TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
-import { topicRow, canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
+import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
+import { topicRow, noTrophyHTML } from '../../src/ui/parents-trophies';
 import { ABOUT_LINES, aboutHTML } from '../../src/ui/about';
 import { settingsHTML } from '../../src/ui/parents-settings';
 import { slipsHTML } from '../../src/ui/parents-slips';
@@ -451,5 +452,43 @@ describe('factsToPractise (#1123): the grown-ups "Facts to practise" lines', () 
     const html = factsHTML(['9 × 6 and 6 × 9']);
     expect(html).toContain('<h3 class="p-h">Facts to practise</h3>');
     expect(html.match(/class="p-topic"/g)).toHaveLength(1);
+  });
+});
+
+describe('Yet to earn a trophy (#913)', () => {
+  const y1 = topicsFor('year1');
+  const [won, tried, untried] = y1;
+  const rows = (progress: Record<string, TopicProgress>, eligible = [won, tried, untried]) =>
+    parentSummary({ ...base, progress }, eligible, YEARS.filter(y => y.id === 'year1'), 0).noTrophy;
+
+  it('puts a trophied, a tried-bare and an untried topic in the right buckets', () => {
+    const [r] = rows({ [won.id]: { ...p(1, 1, 1, 2), sprint: 3 }, [tried.id]: p(1, 1, 1, 2) });
+    expect(r.topics.map(t => t.id)).toEqual([tried.id]);
+    expect(r.untried).toBe(1);
+  });
+  it('lists only the topics it is given, so a tracing topic left out by the filter never appears', () => {
+    const trace = topicsFor('reception').find(t => t.id.includes('trace')) ?? topicsFor('year1')[0];
+    const [r] = rows({ [trace.id]: p(1, 1, 1, 2) }, [won]);
+    expect(r.topics).toEqual([]);
+    expect(r.untried).toBe(1);
+  });
+  it('keeps curriculum order', () => {
+    const [r] = rows({ [untried.id]: p(0, 1, 0, 1), [won.id]: p(0, 1, 0, 1) });
+    expect(r.topics.map(t => t.id)).toEqual([won.id, untried.id]);
+  });
+  it('a corrupted progress gives empty lists, not a throw', () => {
+    for (const bad of [null, 'x', [], { [won.id]: 5, [tried.id]: null }]) {
+      const rs = parentSummary({ ...base, progress: bad as any }, [won, tried], YEARS.filter(y => y.id === 'year1'), 0).noTrophy;
+      expect(rs[0].topics).toEqual([]);
+      expect(rs[0].untried).toBe(2);
+    }
+  });
+  it('renders positive copy and the untried count', () => {
+    const html = noTrophyHTML(rows({ [tried.id]: p(1, 1, 1, 2) }));
+    expect(html).toContain('<h3 class="p-h">Yet to earn a trophy</h3>');
+    expect(html).toContain('and 2 not tried yet');
+    expect(html.match(/class="p-topic"/g)).toHaveLength(1);
+    expect(html).not.toMatch(/fail|missing/i);
+    expect(noTrophyHTML(rows({}, []))).toContain('Every topic tried has a trophy!');
   });
 });
