@@ -452,3 +452,70 @@ describe('screenScope.onBack / backGuard (#885)', () => {
     expect(backGuard()).toBe(false);
   });
 });
+
+// #902: Esc/P pause and Space repeat. Node has no `window` event target, so the scope's listeners are captured
+// on a stub registry and replayed by hand.
+describe('onKeys (#902 — desktop pause and repeat)', () => {
+  type Ev = { code?: string; key: string; repeat?: boolean; ctrlKey?: boolean; target?: { tagName: string }; preventDefault: () => void };
+  const reg = new Map<string, (e: Ev) => void>();
+  beforeEach(() => {
+    reg.clear();
+    (globalThis as any).addEventListener = (t: string, f: (e: Ev) => void) => { reg.set(t, f); };
+    (globalThis as any).removeEventListener = (t: string, f: (e: Ev) => void) => { if (reg.get(t) === f) reg.delete(t); };
+  });
+  const press = (type: 'keydown' | 'keyup', key: string, extra: Partial<Ev> = {}) => {
+    let prevented = false;
+    reg.get(type)?.({ key, code: key === ' ' ? 'Space' : key, preventDefault: () => { prevented = true; }, ...extra });
+    return prevented;
+  };
+
+  it('Esc and P pause, Space repeats and is preventDefaulted on keydown, auto-repeat and keyup', () => {
+    const scope = screenScope(); const calls: string[] = [];
+    scope.onKeys({ pause: () => calls.push('pause'), repeat: () => { calls.push('repeat'); return true; } });
+    press('keydown', 'Escape'); press('keydown', 'p'); press('keydown', 'P');
+    expect(press('keydown', ' ')).toBe(true);
+    expect(press('keydown', ' ', { repeat: true }), 'a held Space keeps its default prevented').toBe(true);
+    expect(press('keyup', ' ')).toBe(true);
+    expect(calls).toEqual(['pause', 'pause', 'pause', 'repeat']);
+    scope.dispose();
+  });
+
+  it('leaves Space alone when repeat() did nothing, so a focused button still activates (#902 review)', () => {
+    const scope = screenScope();
+    scope.onKeys({ pause: () => {}, repeat: () => false });
+    expect(press('keydown', ' ')).toBe(false);
+    expect(press('keyup', ' ')).toBe(false);
+    scope.dispose();
+  });
+
+  it('ignores auto-repeat, modifier chords, other keys and typing into an input; a missing key does not throw', () => {
+    const scope = screenScope(); const calls: string[] = [];
+    scope.onKeys({ pause: () => calls.push('pause'), repeat: () => { calls.push('repeat'); return true; } });
+    press('keydown', 'Escape', { repeat: true });
+    for (const mod of ['ctrlKey', 'metaKey', 'altKey'] as const) { press('keydown', 'p', { [mod]: true }); press('keydown', ' ', { [mod]: true }); }
+    press('keydown', 'a');
+    press('keydown', ' ', { target: { tagName: 'INPUT' } }); press('keydown', 'p', { target: { tagName: 'TEXTAREA' } });
+    expect(() => press('keydown', undefined as unknown as string, { code: 'KeyA' })).not.toThrow();
+    expect(calls).toEqual([]);
+    scope.dispose();
+  });
+
+  it('a second onKeys() replaces the handlers rather than adding listeners', () => {
+    const scope = screenScope(); const calls: string[] = [];
+    scope.onKeys({ pause: () => calls.push('old'), repeat: () => false });
+    scope.onKeys({ pause: () => calls.push('new'), repeat: () => false });
+    press('keydown', 'Escape');
+    expect(calls).toEqual(['new']);
+    scope.dispose();
+  });
+
+  it('dispose() removes both listeners, and a disposed scope registers none', () => {
+    const scope = screenScope();
+    scope.onKeys({ pause: () => {}, repeat: () => true });
+    expect([...reg.keys()].sort()).toEqual(['keydown', 'keyup']);
+    scope.dispose();
+    expect(reg.size, 'no listener may outlive the screen').toBe(0);
+    scope.onKeys({ pause: () => {}, repeat: () => true });
+    expect(reg.size).toBe(0);
+  });
+});

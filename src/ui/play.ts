@@ -251,7 +251,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // #884: opens Pause on a live game (no overlay up, not yet ended); a stage-clear/results overlay stays as it is.
   function pauseIfLive(): boolean { if (!els.overlay.hidden || session.ended) return false; showPause(); return true; }
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
-  $('#speak').addEventListener('click', repeatPrompt);
+  $('#speak').addEventListener('click', repeatPrompt); scope.onKeys({ pause: pauseIfLive, repeat: () => els.overlay.hidden && (repeatPrompt(), true) });   // #902
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
   // #35: dispose() stops timers, cancels speech and drops window.__sna.
   function cleanup() {
