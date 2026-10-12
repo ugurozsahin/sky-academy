@@ -16,9 +16,17 @@ const before: Generator = (d, rng) => {
   return numQ(rng, p, total - a, { min: 0, max: 20, ...q(p), visual: total <= 10 ? { type: 'tenframe', n: a } : undefined });
 };
 
+// #922: the original card for a fixed total, continuing from the rng state after the total and the reverse-form draw.
+const originalFrom = (rng: () => number, total: number) => {
+  const a = ri(rng, 0, total);
+  const missingLeft = rng() < 0.4;
+  const p = missingLeft ? `? + ${a} = ${total}` : `${a} + ? = ${total}`;
+  return numQ(rng, p, total - a, { min: 0, max: 20, ...q(p), visual: total <= 10 ? { type: 'tenframe', n: a } : undefined });
+};
+
 describe('number-bond drills (#917)', () => {
   it('are the two Year 1 drills, in the chooser list only', () => {
-    expect(drillsFor('year1', 'maths').map(t => t.id)).toEqual(['y1-bonds-10', 'y1-bonds-20']);
+    expect(drillsFor('year1', 'maths').map(t => t.id)).toEqual(['y1-bonds-10', 'y1-bonds-20', 'y1-doubles-halves']);
   });
   it.each([10, 20])('y1-bonds-%i always totals %i and its answer satisfies the oracle', (T) => {
     const gen = topicById(`y1-bonds-${T}`)!.gen;
@@ -32,8 +40,43 @@ describe('number-bond drills (#917)', () => {
       expect(c.options).toContain(c.answer);
     }
   });
-  it('y1-bonds gives byte-identical cards to before for the same seed', () => {
+  it('y1-bonds gives byte-identical cards to before at d1 (#922 adds a reverse form at d2–d3 only)', () => {
     const gen = topicById('y1-bonds')!.gen;
-    for (const d of DS) for (let seed = 1; seed <= 300; seed++) expect(gen(d, rngOf(seed))).toEqual(before(d, rngOf(seed)));
+    for (let seed = 1; seed <= 300; seed++) expect(gen(1, rngOf(seed))).toEqual(before(1, rngOf(seed)));
+  });
+  it('y1-bonds d2–d3: the original cards keep their totals (10/12/15 at d2, 20 at d3) and bytes (#922)', () => {
+    const gen = topicById('y1-bonds')!.gen;
+    for (const d of [2, 3] as Difficulty[]) {
+      let kept = 0;
+      for (let seed = 1; seed <= 600; seed++) {
+        const r = rngOf(seed);
+        const total = d === 2 ? pick(r, [10, 12, 15]) : 20;
+        if (r() < 1 / 3) continue;
+        kept++;
+        expect(gen(d, rngOf(seed))).toEqual(originalFrom(r, total));
+      }
+      expect(kept).toBeGreaterThan(300);
+    }
+  });
+  it('y1-bonds d2–d3: about one card in three is "Which makes T?" and satisfies the oracle (#922)', () => {
+    const gen = topicById('y1-bonds')!.gen;
+    for (const d of [2, 3] as Difficulty[]) {
+      let rev = 0; const N = 1500;
+      for (let seed = 1; seed <= N; seed++) {
+        const c = gen(d, rngOf(seed));
+        const m = /^Which makes (\d+)\?$/.exec(c.prompt);
+        if (!m) continue;
+        rev++;
+        const T = +m[1];
+        expect(d === 2 ? [10, 12, 15] : [20]).toContain(T);
+        const val = (o: string) => { const [x, y] = o.split(' + ').map(Number); expect(x).toBeGreaterThanOrEqual(0); expect(y).toBeGreaterThanOrEqual(0); expect(x + y).toBeLessThanOrEqual(20); return x + y; };
+        expect(c.options).toHaveLength(4);
+        expect(c.options.filter(o => val(o) === T)).toEqual([c.answer]);
+        for (const o of c.options) if (o !== c.answer) expect(T === 20 ? [1, 2, 3] : [1, 2]).toContain(Math.abs(val(o) - T));
+        expect(new Set(c.options.map(val)).size).toBe(4);
+        expect(c.say).toBe(`Which two numbers make ${T}?`);
+      }
+      expect(rev / N).toBeGreaterThan(0.28); expect(rev / N).toBeLessThan(0.39);
+    }
   });
 });

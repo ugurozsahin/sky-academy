@@ -34,7 +34,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 
 ## Year 1 — 6 q/stage, 3 lives
 Maths:
-- y1-bonds — bonds within 20
+- y1-bonds — bonds within 20; at d2–d3 one card in three is the reverse form, "Which makes T?" with four sums (#922)
 - y1-bonds-10 — drill (Sprint chooser only): `a + ? = 10` / `? + a = 10`, the same card at every difficulty, ten-frame shown
 - y1-bonds-20 — drill (Sprint chooser only): `a + ? = 20` / `? + a = 20`, the same card at every difficulty
 - y1-add — within 20, incl. 0
@@ -42,6 +42,7 @@ Maths:
 - y1-sub — within 20, incl. 0
 - y1-missing — missing-number problems; from d2 the sum can sit after the equals sign (`7 = ? − 9`: a quarter of d2 cards, half of d3, #984)
 - y1-doubles — double within 20
+- y1-doubles-halves — drill (Sprint chooser only): `Double n = ?` or `Half of 2n = ?`, n as y1-doubles, no picture, the inverse answer a decoy where it fits (#921)
 - y1-skip — count in 2s/5s/10s; at d2–d3 one card in three is "Slice every multiple of 5/10" (any order, #920)
 - y1-moreless — to 100; half the cards are "Count back: 42, 41, 40, ?", d3 crossing a tens boundary a third of the time (#983)
 - y1-words — 1–20 in words

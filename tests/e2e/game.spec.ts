@@ -722,6 +722,47 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
   });
 
+  // #1289: the grown-ups page reads the word record out of `ks2.words`; nothing of it is shown to the child.
+  test('Spelling word lists: the grown-ups page shows "of 100 secure" and the words not yet secure, on a 390×664 phone (#1289)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page, 'volt', 'Ada', { ks2: { facts: {}, checks: [], words: { accident: 'rrr', address: 'rw', answer: 'w' } } });
+    await openGrownUps(page);
+    const section = page.locator('.parents-dash');
+    await expect(section).toContainText('Year 3–4 words: 1 of 100 secure · 2 not yet secure · 97 not tried yet');
+    await expect(section).toContainText('address, answer');
+    await expect(section).not.toContainText('Year 5–6 words');
+    await expect(page.locator('button[data-words="0"]')).toHaveText('Copy these words');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+
+  // #1289 round 3: the copy button's paths — a working clipboard, and none (select by hand) — and that button 1 copies list 1's words.
+  // The selection's range text: the words element it was set on (selection.toString() is empty in headless Chromium for a programmatic range).
+  const selectedWords = (page: Page) => page.evaluate(() => { const s = window.getSelection()!; return s.rangeCount ? s.getRangeAt(0).toString() : ''; });
+  const seedBothLists = (page: Page) => seedPlayer(page, 'volt', 'Ada', { ks2: { facts: {}, checks: [], words: { address: 'w', answer: 'w', accommodate: 'w', accompany: 'w' } } });
+
+  test('Spelling word lists: each "Copy these words" button copies its own list and says Copied (#1289)', async ({ page }) => {
+    await page.addInitScript(() => { (window as any).__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { (window as any).__copied.push(t); } }, configurable: true }); });
+    await seedBothLists(page);
+    await openGrownUps(page);
+    await page.locator('button[data-words="0"]').click();
+    await expect(page.locator('#words-msg')).toContainText('Copied');
+    await page.locator('button[data-words="1"]').click();
+    expect(await page.evaluate(() => (window as any).__copied as string[])).toEqual(['address, answer', 'accommodate, accompany']);
+  });
+
+  test('Spelling word lists: with no clipboard, or one that refuses, the words are selected and the by-hand message shows (#1289)', async ({ page }) => {
+    await page.addInitScript(() => { Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }); });
+    await seedBothLists(page);
+    await openGrownUps(page);
+    await page.locator('button[data-words="1"]').click();
+    await expect(page.locator('#words-msg')).toContainText('by hand');
+    expect(await selectedWords(page)).toBe('accommodate, accompany');
+    await page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('no')) }, configurable: true }); document.getElementById('words-msg')!.hidden = true; window.getSelection()!.removeAllRanges(); });
+    await page.locator('button[data-words="0"]').click();
+    await expect(page.locator('#words-msg')).toContainText('by hand');
+    expect(await selectedWords(page)).toBe('address, answer');
+  });
+
   test('Calm motion: On calms a wrong-answer card with no OS preference, Auto leaves it, and the row fits a phone (#906)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });
     await seedPlayer(page);
