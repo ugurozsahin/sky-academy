@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const save = vi.hoisted(() => ({ timeX: 1 }));
 vi.mock('../../src/audio', () => ({ say: vi.fn() }));
-vi.mock('../../src/storage', () => ({ load: () => ({ settings: { timeX: save.timeX }, progress: { 'y2-tables-5': { sprint: 2 } } }) }));
+vi.mock('../../src/storage', () => ({ load: () => ({ settings: { timeX: save.timeX }, progress: { 'y2-tables-5': { sprint: 2 }, 'zz-unregistered': { sprint: 2 } } }) }));
 import { say } from '../../src/audio';
 import { BEAT_LINE, createGhost, passedBest } from '../../src/ui/ghost';
 
@@ -27,7 +27,7 @@ describe('createGhost (#914)', () => {
     expect(say).toHaveBeenCalledTimes(1);
   });
   it('has no ghost outside a one-topic Sprint', () => {
-    for (const bad of [{ mode: 'mission', topic: { id: 'y2-tables' } }, { mode: 'sprint' }, { mode: 'sprint', topic: { id: 'y2-tables' }, deck: [] }]) {
+    for (const bad of [{ mode: 'mission', topic: { id: 'y2-tables-5' } }, { mode: 'endless', topic: { id: 'y2-tables-5' } }, { mode: 'sprint' }]) {
       const g = createGhost(bad as never);
       expect([1, 5, 50].map(s => g.beat(s))).toEqual([null, null, null]);
     }
@@ -46,5 +46,7 @@ describe('ghostBest gates, each failing alone (#914)', () => {
     save.timeX = 1;
     expect(run({ practice: true })).toEqual([null, null, null]);
     expect(run({ deck: [] })).toEqual([null, null, null]);
+    expect(run({ mode: 'mission' })).toEqual([null, null, null]);                     // Sky Storm, Boss, missions never toast
+    expect(run({ topic: { id: 'zz-unregistered' } })).toEqual([null, null, null]);   // a stored best, but no registry row
   });
 });
