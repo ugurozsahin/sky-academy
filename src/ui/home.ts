@@ -250,10 +250,9 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <div><b>${year.title} Island</b><small>${ageLabel(year, d.ks2.schoolYear)} · ${year.blurb}${trophyCount(year, progress)}</small></div>
     </div>
     <div class="tabs" role="tablist">
-      <button class="tab${subject === 'maths' ? ' on' : ''}" data-s="maths" role="tab">🔢 Maths</button>
-      <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
+      ${subjectTab('maths', subject, '🔢 Maths')}${subjectTab('writing', subject, '✍️ Writing')}
     </div>
-    <div class="topics" id="topics"></div>
+    <div class="topics" id="topics" role="tabpanel" aria-labelledby="tab-${subject}"></div>
     <div class="mode-grid">
       ${menu.map(m =>
         `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`
@@ -271,9 +270,17 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
   $$('.tab').forEach(b => b.addEventListener('click', () => {
     subject = b.dataset.s as 'maths' | 'writing';
-    $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics();
+    $$('.tab').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', String(x === b)); });
+    $('#topics').setAttribute('aria-labelledby', b.id); sfx.tap(); drawTopics();
   }));
   menu.forEach(m => $(`#${m.id}`).addEventListener('click', () => { sfx.tap(); m.go(); }));
+}
+
+/** #901: a Maths/Writing tab that announces whether it is selected and which panel it controls. */
+function subjectTab(id: 'maths' | 'writing', current: string, label: string): string {
+  const on = id === current;
+  return `<button class="tab${on ? ' on' : ''}" id="tab-${id}" data-s="${id}" role="tab"` +
+    ` aria-selected="${on}" aria-controls="topics">${label}</button>`;
 }
 
 /** #894: a locked sticker shows only "???" and a small-print hint, so tapping it reads how it is earned aloud. */
