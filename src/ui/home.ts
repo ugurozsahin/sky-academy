@@ -10,7 +10,9 @@ import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, ty
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
 import { ageLabel, isWarmUp } from './year-label';
-import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, today, type TopicProgress } from '../storage';
+import {
+  ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, isWhiteboard, load, safeRecord, save, STICKER_IDS, STICKER_COST, today, type TopicProgress,
+} from '../storage';
 import type { Ks2Fact } from '../save-records';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
@@ -60,6 +62,8 @@ function topbar(nav: Nav, rerender: () => void) {
 function playMixed(nav: Nav, year: YearInfo, mode: 'endless' | 'sprint' | 'boss' | 'relaxed', pool: Topic[], progress: Record<string, TopicProgress>) {
   nav.play({ year, mode, pool, weights: poolWeights(pool, progress) });
 }
+/** #949: a topic tap is a Mission, or Relaxed practice (no lives) while Whiteboard mode is on. */
+export const topicTapMode = (whiteboard: boolean): 'mission' | 'relaxed' => whiteboard ? 'relaxed' : 'mission';
 /** #910/#937: Sprint and Relaxed practice open a chooser first — "🎲 Mixed" or one topic from the open subject. */
 function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', mode: 'sprint' | 'relaxed', pool: Topic[], progress: Record<string, TopicProgress>) {
   openChooser($('#island-overlay'), chooserTopics(year.id, subject), topic => {
@@ -286,7 +290,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const drawTopics = () => {
     const list = topicsFor(year.id, subject);
     $('#topics').innerHTML = topicsHTML(groupTopics(list), progress);
-    $$('.topic').forEach(b => b.addEventListener('click', () => { const t = list.find(x => x.id === b.dataset.id)!; sfx.tap(); nav.play({ year, topic: t, mode: 'mission' }); }));
+    $$('.topic').forEach(b => b.onclick = () => { sfx.tap(); nav.play({ year, topic: list.find(t => t.id === b.dataset.id)!, mode: topicTapMode(isWhiteboard()) }); });
   };
   drawTopics();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { activeProfile, addCoins, addProfile, buyItem, endGuest, importSave, isGuest, isReadOnlySave, load, recordEndless, recordGameEnd, recordSprint, recordTopic, reset, save, saveKeyFor, saveKept, startGuest, touchStreak, SAVE_VERSION } from '../../src/storage';
+import { activeProfile, addCoins, addProfile, buyItem, endGuest, importSave, isGuest, isReadOnlySave, isWhiteboard, load, recordEndless, recordGameEnd, recordSprint, recordTopic, reset, save, saveKeyFor, saveKept, startGuest, touchStreak, SAVE_VERSION } from '../../src/storage';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -36,5 +36,23 @@ describe('guest play (#948)', () => {
     load(); expect(isReadOnlySave()).toBe(true);
     startGuest('reception', 'volt'); endGuest();
     load(); expect(isReadOnlySave(), 'and it is still latched afterwards').toBe(true);
+  });
+  // #949: Whiteboard mode is a guest session with slower bubbles, speech and sound forced on, writing nothing.
+  it('Whiteboard mode is slow, spoken and unsaved, and ends with the guest', () => {
+    save({ name: 'Ada', avatar: 'volt', onboarded: true, speech: false, sound: false });
+    const before = snap();
+    startGuest('year1', 'volt', true);
+    expect(isWhiteboard()).toBe(true);
+    expect(load().settings.slow).toBe(true);
+    expect(load().speech).toBe(true);
+    expect(load().sound).toBe(true);
+    save({ coins: 5 }); addCoins(9);
+    expect(snap()).toBe(before);
+    endGuest();
+    expect(isWhiteboard()).toBe(false);
+    expect(load().speech, "the family's own save keeps its speech setting").toBe(false);
+    startGuest('year1', 'volt');
+    expect(isWhiteboard(), 'plain guest play is not Whiteboard mode').toBe(false);
+    expect(load().settings.slow).toBe(false);
   });
 });

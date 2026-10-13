@@ -36,8 +36,10 @@ interface SessionState {
   /** Set while a deliberate guest session (#948) plays on an in-memory save: `save()` writes nothing, and every other
    *  writer in this folder refuses. Cleared by `dropSessionState()`, so any switch of profile ends it too. */
   guest: boolean;
+  /** Set with `guest` when the grown-up chose Whiteboard mode (#949): topic taps open Relaxed practice. */
+  whiteboard: boolean;
 }
-export const state: SessionState = { cache: null, cacheProfile: null, readOnly: false, writeFailed: false, guest: false };
+export const state: SessionState = { cache: null, cacheProfile: null, readOnly: false, writeFailed: false, guest: false, whiteboard: false };
 /**
  * Whether this session is running on defaults over a stored save it refused to touch (#232).
  *
@@ -49,6 +51,7 @@ export const state: SessionState = { cache: null, cacheProfile: null, readOnly: 
 export const isReadOnlySave = () => state.readOnly;
 export const isWriteFailing = () => state.writeFailed;
 export const isGuest = () => state.guest;
+export const isWhiteboard = () => state.guest && state.whiteboard;
 /** Whether what was just earned reached this device's store: false under the browser's refusal, the newer-build latch or guest play. */
 export const saveKept = () => !state.writeFailed && !state.readOnly && !state.guest;
 /**
@@ -69,7 +72,7 @@ export function sessionProfile(): ProfileId { return state.cacheProfile ?? (stat
 /** Forget the cached save and both write latches — they describe one blob (#232's read-only latch and #151's
  *  failed-write flag), and it is about to be a different one. The profile stays: a fresh start is the same
  *  child. */
-export function dropSessionState() { state.cache = null; state.readOnly = false; state.writeFailed = false; state.guest = false; }
+export function dropSessionState() { state.cache = null; state.readOnly = false; state.writeFailed = false; state.guest = false; state.whiteboard = false; }
 /**
  * The above, **and** the session's profile: only a switch makes this a different child's session.
  *

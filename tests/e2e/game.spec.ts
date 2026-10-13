@@ -987,6 +987,23 @@ test.describe('Sky Ninja Academy', () => {
     expect(await keys()).toBe(before);
   });
 
+  test('Whiteboard mode: a topic tap is Relaxed practice, nothing is saved (#949)', async ({ page }) => {
+    await seedPlayer(page);
+    await openGrownUps(page);
+    const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+    const before = await keys();
+    await page.click('#whiteboard-start');
+    await expect(page.locator('.home')).toBeVisible();
+    await startTopic(page, 'reception', 'r-count');
+    const lives = await page.evaluate(() => window.__sna.state().lives);
+    await waitForWrongOrEnd(page);
+    const asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
+    expect(await page.evaluate(() => window.__sna.state().lives), 'Relaxed practice loses no life').toBe(lives);
+    expect(await keys(), 'localStorage is byte-identical').toBe(before);
+  });
+
   test('Relaxed practice: wrong slices cost nothing, ten questions, one coin each right, no stars and no Storm best (#937)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

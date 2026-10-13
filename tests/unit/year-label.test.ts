@@ -4,7 +4,7 @@ import { YEARS } from '../../src/curriculum/types';
 import type { YearId } from '../../src/curriculum/types';
 import { isKs2 } from '../../src/curriculum/key-stage';
 import { islandsHTML } from '../../src/ui/map-layout';
-import { senseiTrainLine } from '../../src/ui/home';
+import { senseiTrainLine, topicTapMode } from '../../src/ui/home';
 import type { Topic } from '../../src/curriculum';
 
 const years = YEARS.filter(y => !isKs2(y.id));
@@ -45,5 +45,12 @@ describe('senseiTrainLine (#1288)', () => {
   });
   it('a KS2 island is never a warm-up', () => {
     expect(senseiTrainLine(y3, 'year5' as YearId, weakest)).toBe("Sensei says: let's train Counting, Shapes");
+  });
+});
+
+describe('topicTapMode (#949)', () => {
+  it('opens Relaxed practice in Whiteboard mode, a Mission otherwise', () => {
+    expect(topicTapMode(true)).toBe('relaxed');
+    expect(topicTapMode(false)).toBe('mission');
   });
 });
