@@ -73,6 +73,7 @@ Writing:
 - y1-spelling — 45 CEW
 - y1-spellrules — Spelling Rules: the word is spoken, slice the right spelling of two non-word decoys; d1 ff/ll/ss/zz/ck, d2 adds nk and -ve, d3 adds -tch; hand-curated bank (Y1_SPELL_RULES), no real-word decoys
 - y1-plurals — -s/-es
+- y1-compound — Join the Words: "foot + ball = ?" slice the compound spelt as its two parts; d1 two decoys with emoji, d2 three, d3 three without emoji; hand-curated bank (Y1_COMPOUNDS), decoys are non-words
 - y1-suffix — -ing -ed -er -est
 - y1-prefix — Un- Words: un- changes the meaning ("means not kind" → unkind); d3 half "opposite of lock" → unlock; hand-curated bank, root spelling unchanged
 - y1-punct — capital letters, . ? !

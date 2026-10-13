@@ -14,6 +14,7 @@ import {
 } from './util';
 import { syllableQ } from './syllables';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
+import { y1Compound } from './year1-compound';
 
 // ---------- Year 1 maths ----------
 /** One bond card for a fixed `total`: a + ? = T or ? + a = T (#917). */
@@ -580,6 +581,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', sequenceFrom: 3, gen: y1Spelling },
   { id: 'y1-spellrules', title: 'Spelling Rules', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: ff, ll, ss, zz, ck; n before k; -tch; -ve', gen: y1SpellRules },
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },
+  { id: 'y1-compound', title: 'Join the Words', icon: '🧩', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: compound words', gen: y1Compound },
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },
   { id: 'y1-prefix', title: 'Un- Words', icon: '🚫', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: the prefix un-', gen: y1Prefix },
   { id: 'y1-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year1', nc: 'Y1 Grammar: capitals, . ? !', gen: y1Punct },

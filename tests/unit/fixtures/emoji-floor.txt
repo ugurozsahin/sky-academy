@@ -222,6 +222,7 @@
 🧣	5.0	scarf
 🧥	5.0	coat
 🧦	5.0	socks
+🧩	11.0	puzzle piece
 🧭	11.0	compass
 🧮	11.0	abacus
 🧱	11.0	brick
