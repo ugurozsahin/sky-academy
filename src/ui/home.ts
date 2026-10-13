@@ -32,7 +32,7 @@ import type { PlayOpts } from './play';
 export type StartPlay = (o: PlayOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
-  memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string) => void; rewards: () => void; shop: () => void; parents: () => void;
+  memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string, labels?: 'players' | 'teams') => void; rewards: () => void; shop: () => void; parents: () => void;
   pickYear: (year: YearInfo) => void;   // #1055: the school-year tap on a new child's map (a mission after "Let's go!", else the island)
   profiles: () => void;   // #20 slice 2: "Who is playing?"
   up: () => void;
@@ -265,7 +265,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => nav.memory(year) }] : []),
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
-      go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject), topic => { sfx.tap(); topic ? nav.duel(year, topic.id) : nav.duel(year); }, { mixed: true, mixedLabel: 'Random' }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
+      go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject), (topic, teams) => { sfx.tap(); nav.duel(year, topic?.id, teams ? 'teams' : undefined); }, { mixed: true, mixedLabel: 'Random', teams: true }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
   ], year.id);
   render(`
   <section class="screen home island-screen">

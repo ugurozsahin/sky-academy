@@ -26,9 +26,9 @@ import { renderVisual } from './visuals';
 import { duelTopic } from '../game/duel-topic'; import { fontReady } from './font'; import { calmReduced } from '../device-settings';
 import type { DuelHooks } from './hooks';
 
-export interface DuelScreenOpts { year: YearInfo; topic?: string }
+export interface DuelScreenOpts { year: YearInfo; topic?: string; labels?: 'players' | 'teams' }   // #958: 'teams' names the seats Team A / Team B
 const PLAYERS = DUEL_PLAYERS;
-const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
+const NAMES: Record<'players' | 'teams', Record<DuelPlayer, string>> = { players: { a: 'Player 1', b: 'Player 2' }, teams: { a: 'Team A', b: 'Team B' } };
 /** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
  *  wrong-slice toast, which holds nothing back — the round keeps running — but is scaled with the other two so
  *  `setGameSpeed` stretches every verdict on this screen rather than all but one (PR #428 review, note 3). */
@@ -50,7 +50,7 @@ const HOLD = { won: 1000, draw: 900, miss: 900 } as const;
 export const DUEL_TOAST_LONGEST = 'Nobody sliced it — no point';
 
 export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
-  const d = load(); const av = avatarById(d.avatar);
+  const d = load(); const av = avatarById(d.avatar); const NAME = NAMES[o.labels ?? 'players'];
   const difficulty = o.year.diffs[0] ?? 1;          // the year's gentlest stage, for the pool AND the match
   const pool = duelPool(topicsFor(o.year.id), difficulty);
   if (!pool.length) throw new Error(`Ninja Duel: ${o.year.id} has no bubble topic to duel on`);   // before anything is built to leak
@@ -58,7 +58,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   render(`
   <section class="screen play duel-screen" style="--glow:${av.glow}">
     <div class="duel-half b" id="half-b">
-      <canvas class="duel-arena" id="arena-b" aria-label="Player 2 arena"></canvas>
+      <canvas class="duel-arena" id="arena-b" aria-label="${NAME.b} arena"></canvas>
       <div class="duel-tag"><b>${NAME.b}</b><span class="duel-score" id="score-b">0</span></div>
     </div>
     <div class="duel-strip" id="strip">
@@ -73,7 +73,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       <button class="icon-btn" id="speak" aria-label="Read the question aloud">🔊</button>
     </div>
     <div class="duel-half a" id="half-a">
-      <canvas class="duel-arena" id="arena-a" aria-label="Player 1 arena"></canvas>
+      <canvas class="duel-arena" id="arena-a" aria-label="${NAME.a} arena"></canvas>
       <div class="duel-tag"><b>${NAME.a}</b><span class="duel-score" id="score-a">0</span></div>
     </div>
     <div class="toast" id="toast" aria-live="polite"></div>
@@ -349,7 +349,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // #444 review (PR #502 round 2), B1: an incomplete match has no winner worth announcing — `duelHeadline()`
     // would read a scoreline nobody decided as if the match had run its course. Everything already earned
     // (the coins/dojo/Sensei writes above) still shows; only the winner framing and the certificate are withheld.
-    const headline = r.incomplete ? 'That question broke — here is what you earned so far!' : duelHeadline(r);
+    const headline = r.incomplete ? 'That question broke — here is what you earned so far!' : duelHeadline(r, NAME);
     say(headline);
     // Captured, not read back off `cert`: this handler is async and fires long after this frame, and it must
     // draw the certificate *this* match earned, so it binds the value the `if` tested. The `certificate()` hook

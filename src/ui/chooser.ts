@@ -18,6 +18,8 @@ export interface ChooserOpts {
   mixedLabel?: string;
   /** Text drawn after a topic's name (its trophy, #912); empty for none. */
   badge?: (t: Topic) => string;
+  /** #958: draw the `👥 Class teams` toggle after the first card; `onPick`'s second argument reads its state when a card is tapped. Not saved: it opens Off every time. */
+  teams?: boolean;
 }
 
 /** Topics the chooser can offer — every topic a bubble pool can ask (#1065: no tracing, no keypad). Shared with the island's trophy count (#912) so the count and the list cannot drift. */
@@ -34,21 +36,28 @@ export const duelChooserTopics = (year: YearInfo, subject: Topic['subject']): To
 
 /** Opens a topic chooser inside `overlay` (a hidden `.overlay` element already in the DOM, the pattern
  *  `src/ui/profiles.ts`'s `#profile-overlay` uses). Back, or picking a card, hides and empties it again. */
-export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topic: Topic | null) => void, opts: ChooserOpts): void {
+export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topic: Topic | null, teams: boolean) => void, opts: ChooserOpts): void {
   const mixedCard = opts.mixed ? `<button class="topic" data-mixed><span class="ic">🎲</span><b>${opts.mixedLabel ?? 'Mixed'}</b></button>` : '';
+  const teamsCard = opts.teams ? `<button class="topic" data-teams aria-pressed="false"><span class="ic">👥</span><b>Class teams: Off</b></button>` : '';
   const cards = topics.map(t => `<button class="topic" data-id="${t.id}"><span class="ic">${t.icon}</span><b>${t.title}</b>${opts.badge?.(t) ?? ''}</button>`).join('');
   overlay.hidden = false;
   overlay.innerHTML = `
     <div class="modal">
       <h2>Choose a topic</h2>
-      <div class="topics">${mixedCard}${cards}</div>
+      <div class="topics">${mixedCard}${teamsCard}${cards}</div>
       <div class="row"><button class="btn big" id="chooser-back">Back</button></div>
     </div>`;
   const close = () => { overlay.hidden = true; overlay.innerHTML = ''; };
-  $$('.topic', overlay).forEach(b => b.addEventListener('click', () => {
+  const teamsBtn = overlay.querySelector<HTMLElement>('[data-teams]');
+  teamsBtn?.addEventListener('click', () => {   // #958: flips itself, starts nothing
+    const on = teamsBtn.getAttribute('aria-pressed') !== 'true';
+    teamsBtn.setAttribute('aria-pressed', String(on)); teamsBtn.querySelector('b')!.textContent = `Class teams: ${on ? 'On' : 'Off'}`;
+  });
+  $$('.topic:not([data-teams])', overlay).forEach(b => b.addEventListener('click', () => {
     const picked = b.hasAttribute('data-mixed') ? null : topics.find(t => t.id === b.dataset.id) ?? null;
+    const teams = teamsBtn?.getAttribute('aria-pressed') === 'true';
     close();
-    onPick(picked);
+    onPick(picked, teams);
   }));
   $('#chooser-back', overlay).addEventListener('click', close);
 }
