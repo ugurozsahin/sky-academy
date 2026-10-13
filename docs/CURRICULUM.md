@@ -56,6 +56,7 @@ Maths:
 - y1-time — o'clock, half past
 - y1-timewords — quicker/slower, earlier/later, and the sensible unit (seconds, minutes, hours)
 - y1-order — order to 20
+- y1-compare — more / fewer / equal for two groups; most / least of 3–4 numbers to 20
 - y1-line — number line, hidden number
 - y1-shapes — 2-D shapes, sides
 - y1-shapes3d — name common 3-D shapes: cube, cuboid, pyramid, sphere — names only, both directions

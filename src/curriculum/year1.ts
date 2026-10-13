@@ -16,6 +16,7 @@ import { syllableQ } from './syllables';
 import { storyQ } from './story';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
 import { y1Compound } from './year1-compound';
+import { y1Compare } from './year1-compare';
 import { y1Punct } from './year1-punct';
 
 // ---------- Year 1 maths ----------
@@ -554,6 +555,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-time', title: "O'clock & Half Past", icon: '🕐', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time', gen: y1Time },
   { id: 'y1-timewords', title: 'Time Words', icon: '⏳', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time words, hours/minutes/seconds', gen: y1TimeWords },
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', sequenceFrom: 1, gen: y1Order },
+  { id: 'y1-compare', title: 'More, Fewer, Equal', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 NPV: equal to, more than, less than (fewer), most, least', gen: y1Compare },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },
   { id: 'y1-shapes3d', title: '3-D Shapes', icon: '🧊', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: name common 3-D shapes', gen: y1Shapes3d },

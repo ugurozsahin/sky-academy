@@ -43,7 +43,7 @@
     "tests/unit/guardrails.test.ts": 3504,
     "tests/unit/hooks.test.ts": 1200,
     "tests/unit/play-session.test.ts": 629,
-    "tests/unit/session.test.ts": 1284,
+    "tests/unit/session.test.ts": 1282,
     "tests/unit/sim.test.ts": 1641,
     "tests/unit/storage.test.ts": 3024,
     "tests/unit/workflows.test.ts": 620
