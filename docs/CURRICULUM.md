@@ -31,6 +31,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-build | Writing: spell by sounds | slice letters in order (CVC); word and decoy letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-read | Word Reading: read words by sound-blending | Read It!: a CVC word is shown, never spoken — slice its picture; word and decoys follow the phase pools (d1 phase 2, d2–3 all single-letter sounds); d3 always includes a same-first-letter decoy, so the first sound alone cannot answer |
 | r-sentence | Writing: simple sentences | Story Sentences: sentence shown + read aloud, slice the words in order (3 → 6 words, 1–2 decoys) |
+| r-storyorder | Comprehension: anticipate key events in stories | Story Order: a three-event story (hand-keyed, 8 stories) is shown and read aloud; slice the event emoji in order; d1 no decoys, d2 one, d3 two |
 | r-trace | Writing: form letters | trace on canvas; d1–2 follow the phase order, d3 is the whole alphabet — formation covers all 26 whatever phase the sound is in |
 | r-initial | Word Reading: words with the same initial sound | A spoken keyword (snake) and pictures from the CVC bank; slice the one whose first sound matches, by phoneme family so `c` and `k` are one sound. d1 3 pictures, d2 4, d3 5 with 2–3 matches in any order (`sequenceFrom: 3`); d3 only uses sounds with 3+ CVC pictures |
 
@@ -80,6 +81,7 @@ Writing:
 - y1-days
 - y1-syllables — How Many Beats?: same generator as r-syllables, hand-keyed 1–3 beat words; d1 words of 1–2 beats, d2 1–3, d3 adds a 4 option
 - y1-sentence — Story Sentences: 4–7 words, `and`/`or`/`but`, d1 shown, d2–3 listen & build
+- y1-storyorder — Story Order: same generator as r-storyorder; d1 story shown, d2–3 listen & build (peek); d1 no decoys, d2 one, d3 two
 - y1-trace
 - y1-tracenum — Trace Numbers: one digit to trace on the tracing pad; d1 1–5, d2 0 and 6–9, d3 all ten digits
 
