@@ -14,8 +14,8 @@ import { PRIORITIES } from './board-sync.mjs';
 
 export const REPO = 'ugurozsahin/sky-academy';
 export const CREATOR = 'ugurozsahin';
-/** Rule 1: dropped outright. */
-export const DROP_LABELS = ['later', 'owner-session', 'epic'];
+/** Rule 1: dropped outright. `done-on-main` is finished work the reviewer routine has yet to close (#1803). */
+export const DROP_LABELS = ['later', 'owner-session', 'epic', 'done-on-main'];
 /** Rule 1: dropped unless a non-visual part is separable, which only a reader can judge, so they are listed. */
 export const HELD_LABELS = ['owner-input', 'owner-approval'];
 

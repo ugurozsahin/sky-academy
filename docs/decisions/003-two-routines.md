@@ -29,7 +29,9 @@ two), and the heartbeat. Three things followed from that:
    `REVIEW: CHANGES REQUESTED` comment — and has a commit, or a `Pushed <sha>, addressing …` comment, newer
    than that block. (b) is how a fixed pull request is looked at again without anyone undrafting it: the run
    reviews it from scratch under the #161 rule in the `review-pr` skill §6. A pull request the session opened
-   or pushed to is never its own to review.
+   or pushed to is never its own to review. Amended 2026-10-12 (#1803): the idle run still stops before `npm ci`
+   unless the `done-on-main` queue is non-empty — then it installs, verifies and closes those issues, and writes
+   the idle pulse with its `- closed:` lines.
 3. **The health checks and the heartbeat stay with the developer**: one pulse for the watchdog to read is
    enough, and the developer's own STEP 1 is what watches the reviewer (item 4).
 4. **The review-queue alarm.** The developer's STEP 1 gains a fourth check. A pull request counts there as
