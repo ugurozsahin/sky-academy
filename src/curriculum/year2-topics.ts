@@ -11,6 +11,7 @@ import {
 } from './year2';
 import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
+import { y2MeasureCompare } from './year2-measure-compare';
 import { y2Equiv } from './year2-equiv';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
@@ -62,6 +63,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
   { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },
   { id: 'y2-capacity', title: 'Capacity: ml & l', icon: '🥤', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: capacity (ml/l)', gen: y2Capacity },
+  { id: 'y2-measure-compare', title: 'Compare Measures < > =', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare measures and record using >, < and =', gen: y2MeasureCompare },
   { id: 'y2-temp', title: 'Temperature', icon: '🌡️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: temperature (°C)', gen: y2Temp },
   { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare and sequence intervals of time', gen: y2Duration },
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },

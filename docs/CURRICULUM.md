@@ -123,6 +123,7 @@ Maths:
 - y2-length — compare in cm or m, sensible unit cm/m, add & subtract in cm
 - y2-mass — compare in g or kg, sensible unit g/kg, add & subtract in g
 - y2-capacity — compare in ml or l, sensible unit ml/l, add & subtract in ml
+- y2-measure-compare — compare two lengths, masses or capacities in the same unit and record with < > = (d1 cm/m, values 10+ apart; d2 adds g/kg and ml/l; d3 close values, digit swaps and equal pairs)
 - y2-temp — compare warmer/colder, read °C
 - y2-duration — compare and sequence intervals of time: minutes in an hour / hours in a day and the half- and quarter-hour, which takes longer, start time + duration on the o'clock / quarter grid
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
