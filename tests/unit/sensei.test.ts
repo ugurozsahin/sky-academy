@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accuracy, weakestTopics, TRAIN_TOPICS, poolWeights, weightedPick, nextIsland, nextIslandLine } from '../../src/game/sensei';
+import { accuracy, weakestTopics, TRAIN_TOPICS, poolWeights, weightedPick, nextIsland, nextIslandLine, mapLine } from '../../src/game/sensei';
 import { evaluateStickers } from '../../src/storage/stickers';
 import { load, type SaveData } from '../../src/storage';
 import { seededRng } from '../../src/game/rng';
@@ -149,5 +149,27 @@ describe('nextIsland (#935)', () => {
     const save = { ...load(), progress: starAll(a.id) } as SaveData;
     expect(evaluateStickers(save)).toContain('hammer');
     expect(evaluateStickers({ ...save, progress: {} } as SaveData)).not.toContain('hammer');
+  });
+});
+
+describe('mapLine: the daily spoken map line (#955)', () => {
+  const Y = shownYears()[0];
+  const base = (over: Partial<SaveData> = {}): SaveData => ({ ...structuredClone(load()), progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, stickers: [], streak: { ...load().streak, days: 0 }, ...over });
+  it('names the nearest unearned sticker with the avatar name', () => {
+    const d = base({ streak: { ...load().streak, days: 2 } });
+    expect(mapLine(d, Y)).toBe('Frost sticker: 3-day streak. 2 of 3 done.');
+  });
+  it('ties go to ACHIEVEMENTS order', () => {
+    const d = base({ streak: { ...load().streak, days: 1 }, sprint: { [Y.id]: 50 } });   // frost 1/3 and bolt 50/150: both a third
+    expect(mapLine(d, Y)).toBe('Frost sticker: 3-day streak. 1 of 3 done.');
+  });
+  it('falls back to Sky Storm, then Ninja Sprint, then null', () => {
+    expect(mapLine(base({ endless: { [Y.id]: 180 } }), Y)).toBe('Your Sky Storm best is 180. Can you beat it?');
+    expect(mapLine(base({ sprint: { [Y.id]: 200 } }), Y)).toBe('Your Ninja Sprint best is 200. Can you beat it?');   // bolt is earned at 150
+    expect(mapLine(base(), Y)).toBeNull();
+  });
+  it('never uses loss or urgency wording', () => {
+    const lines = [mapLine(base({ streak: { ...load().streak, days: 2 } }), Y), mapLine(base({ endless: { [Y.id]: 180 } }), Y)];
+    for (const l of lines) if (l) expect(l).not.toMatch(/lose|miss|gone|hurry|before/i);
   });
 });

@@ -1,13 +1,35 @@
 // Train with Sensei: adaptive practice picks the topics a child finds hardest. Pure so it can be unit-tested.
 import type { Topic, YearInfo } from '../curriculum';
 import { answerableBy } from './pools';
-import type { TopicProgress } from '../storage';
+import type { SaveData, TopicProgress } from '../storage';
+import { ACHIEVEMENTS } from '../storage/stickers';
+import { avatarById, VILLAIN } from '../avatars';
 import { islandComplete } from '../storage/stickers';
 
 export const TRAIN_TOPICS = 3;
 
 /** Sensei's spoken nudge toward an unstarted island (#935). */
 export const nextIslandLine = (y: YearInfo): string => `Sensei says: ${y.title} Island is waiting for you!`;
+
+/**
+ * The one neutral line Sensei speaks on the map once a day (#955): the unearned sticker nearest to done, else a
+ * best to beat, else `null`. Never says what a child could lose, miss or hurry for (ICO Children's Code, Standard 5).
+ */
+export function mapLine(d: SaveData, year: YearInfo): string | null {
+  let pick: { id: string; title: string; done: number; goal: number } | null = null;
+  for (const a of ACHIEVEMENTS) {
+    const { done, goal } = a.progress(d);
+    if (done <= 0 || done >= goal) continue;
+    if (!pick || done / goal > pick.done / pick.goal) pick = { id: a.id, title: a.title, done, goal };
+  }
+  if (pick) {
+    const name = pick.id === VILLAIN.id ? VILLAIN.name : avatarById(pick.id).name;
+    return `${name} sticker: ${pick.title}. ${pick.done} of ${pick.goal} done.`;
+  }
+  if ((d.endless[year.id] ?? 0) > 0) return `Your Sky Storm best is ${d.endless[year.id]}. Can you beat it?`;
+  if ((d.sprint[year.id] ?? 0) > 0) return `Your Ninja Sprint best is ${d.sprint[year.id]}. Can you beat it?`;
+  return null;
+}
 
 /**
  * Where to send a child who has starred every topic on `current` (#935): the first island after it, in `years`
