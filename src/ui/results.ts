@@ -218,6 +218,13 @@ export function islandCertInfo(base: Pick<CertInfo, 'name' | 'avatar' | 'date'>,
 /** The `island` results line (#952); only offered once the certificate write landed (#470). */
 export const islandCandidate = (yearTitle: string): ResultCandidate => ({ kind: 'island', text: `You starred every topic on ${yearTitle} Island! Island Master certificate saved.` });
 
+/** The belt certificate (#953): the island template with the belt reason; `score` is the total stars, shown as `★ n stars across the islands`. */
+const fileBeltCert = (who: IslandWho, belt: { n: number; name: string }, stars: number): boolean => {
+  const c: CertInfo = { name: who.name, avatar: who.avatar, year: who.year.title, title: `${belt.name} belt`, stars: 3, score: stars, correct: 0, attempts: 0, date: new Date(), belt: true };
+  recordCert(certToStored(c, { id: `${who.year.id}:belt-${belt.n}` }));
+  return !isWriteFailing() && !isReadOnlySave();
+};
+
 /**
  * Record a Mission's result and work out its announcements (#933 best, #951 belt, #952 island), so `commitResult()`
  * stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. A *won* Legend run also
@@ -229,7 +236,10 @@ export function recordMissionOutcome(topic: Topic, r: { stars: number; score: nu
   const total = () => totalStarsOf(load().progress, listedTopics()), before = beltFor(total()), wasDone = islandComplete(load().progress, topic.year);
   const candidates = missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)), after = beltFor(total());
   if (legend && r.won) recordCrown(topic.id);
-  if (after.n > before.n) candidates.unshift({ kind: 'belt', text: `🥋 You earned the ${after.name} belt!`, spoken: `You earned the ${after.name} belt!` });
+  if (after.n > before.n) {
+    const spoken = `You earned the ${after.name} belt!`, filed = !!who && fileBeltCert(who, after, total());   // #953: one album entry per belt, announced only if the write landed (#470)
+    candidates.unshift({ kind: 'belt', text: `🥋 ${spoken}${filed ? ' Your certificate is in the album.' : ''}`, spoken });
+  }
   if (who && !wasDone && islandComplete(load().progress, topic.year)) {
     recordCert(certToStored(islandCertInfo({ name: who.name, avatar: who.avatar, date: new Date() }, who.year), { id: `${who.year.id}:island` }));
     if (!isWriteFailing() && !isReadOnlySave()) candidates.unshift(islandCandidate(who.year.title));

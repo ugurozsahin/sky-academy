@@ -13,7 +13,7 @@ export { certKind };   // moved to cert-kind.ts (#952, the #714 ratchet): import
 // read one fixed instant, decided once by the caller that earned it — a live `new Date()` default here would
 // let `certificateText()` and `certToStored()` each read the clock at a different moment (or, before #410,
 // read the same instant in two different calendars) and disagree about which day it is.
-export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date: Date; training?: boolean; duel?: boolean; island?: true }
+export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date: Date; training?: boolean; duel?: boolean; island?: true; belt?: true }
 
 /**
  * Rebuild a drawable certificate from what the save keeps (#205). Certificates are stored as data, not as a
@@ -29,7 +29,7 @@ export function certFromStored(c: StoredCert): CertInfo {
   return {
     name: c.name, avatar: avatarById(c.avatar), year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-    date: new Date(`${c.date}T12:00:00`), training: c.training, duel: c.duel, island: c.island,
+    date: new Date(`${c.date}T12:00:00`), training: c.training, duel: c.duel, island: c.island, belt: c.belt,
   };
 }
 /**
@@ -57,7 +57,7 @@ export function certToStored(c: CertInfo, o: { id: string }): StoredCert {
   return {
     id: o.id, name: c.name, avatar: c.avatar.id, year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-    date: isoDay(c.date), training: c.training, duel: c.duel, island: c.island,
+    date: isoDay(c.date), training: c.training, duel: c.duel, island: c.island, belt: c.belt,
   };
 }
 /** The award day as the album stores it. Mirrors `storage/progress.ts`'s `today()`; kept here so `certToStored`/
@@ -114,14 +114,14 @@ export function certificateText(i: CertInfo): CertText {
   // one device, and "completed the Counting mission" would be the wrong claim on a printed, kept record.
   const reason = {
     duel: `won a Ninja Duel on ${i.year} Island`,
-    island: `starred every topic on ${i.year} Island`,
+    belt: `earned the ${i.title} at Sky Ninja Academy`, island: `starred every topic on ${i.year} Island`,
     sensei: `completed Sensei training on ${i.year} Island`,
     mission: `completed the ${i.title} mission on ${i.year} Island`,
   }[certKind(i)];
   return {
     heading: 'Sky Ninja Academy', awarded: 'Certificate of Achievement', child: i.name.trim() || 'Ninja',
     reason,
-    detail: certKind(i) === 'island' ? `${i.attempts} topics · ★ ${i.score}/${i.attempts * 3}` : `${i.correct}/${i.attempts} correct (${acc}%) · score ${i.score}`,
+    detail: certKind(i) === 'belt' ? `★ ${i.score} stars across the islands` : certKind(i) === 'island' ? `${i.attempts} topics · ★ ${i.score}/${i.attempts * 3}` : `${i.correct}/${i.attempts} correct (${acc}%) · score ${i.score}`,
     stars: '★'.repeat(Math.max(0, Math.min(3, i.stars))) + '☆'.repeat(3 - Math.max(0, Math.min(3, i.stars))),
     date, signed: `Sensei · with ${i.avatar.name} the ${i.avatar.element}`,
   };
