@@ -843,6 +843,48 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#timer')).toContainText(/⏱ (90|89|88)/);
   });
 
+  test('Easy-read card: the switch turns it on and survives a reload, a refused write says so, and the prompt and hint get 1.5 / 0.12em (#907)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await expect(page.locator('button[data-easy="off"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('button[data-easy="on"]')).toHaveAttribute('aria-checked', 'false');
+    await page.evaluate(() => { const real = Storage.prototype.setItem; Storage.prototype.setItem = function (k: string, v: string) { if (k === 'sna:easyread') throw new Error('quota'); return real.call(this, k, v); }; });
+    await page.click('button[data-easy="on"]');
+    await expect(page.locator('#easy-msg')).toBeVisible();
+    await expect(page.locator('button[data-easy="off"]')).toHaveAttribute('aria-checked', 'true');
+    await page.reload();
+    await seedPlayer(page);
+    await openGrownUps(page);
+    expect(await page.evaluate(() => localStorage.getItem('sna:easyread'))).toBeNull();
+    await page.click('button[data-easy="on"]');
+    expect(await page.evaluate(() => localStorage.getItem('sna:easyread'))).toBe('on');
+    await expect(page.locator('button[data-easy="on"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('button[data-easy="off"]')).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#easy-msg')).toBeHidden();
+    await page.reload();
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await expect(page.locator('button[data-easy="on"]')).toHaveAttribute('aria-checked', 'true');
+    const ratios = (sel: string) => page.locator(sel).evaluate(el => { const c = getComputedStyle(el), fs = parseFloat(c.fontSize); return { ls: parseFloat(c.letterSpacing) / fs, lhr: parseFloat(c.lineHeight) / fs }; });
+    for (const [year, id] of [['year2', 'y2-sentence'], ['reception', 'r-build']] as const) {   // a long sentence prompt and a sequence prompt
+      await page.reload();
+      await seedPlayer(page);
+      await startTopic(page, year, id);
+      for (const sel of ['#prompt', '#hint']) { const r = await ratios(sel); expect(r.lhr, `${id} ${sel} line height`).toBeCloseTo(1.5, 2); expect(r.ls, `${id} ${sel} letter spacing`).toBeCloseTo(0.12, 2); }
+      expect(await page.evaluate(() => { const q = document.querySelector('#qcard') as HTMLElement, p = document.querySelector('#prompt') as HTMLElement; return q.scrollWidth <= q.clientWidth && p.scrollWidth <= p.clientWidth; }), `${id} fits the card`).toBe(true);
+    }
+  });
+
+  test('Easy-read card: off keeps today\'s prompt and hint spacing (#907)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    const prompt = await page.locator('#prompt').evaluate(el => { const c = getComputedStyle(el); return { lh: c.lineHeight, ls: parseFloat(c.letterSpacing) / parseFloat(c.fontSize) }; });
+    expect(prompt.lh).toBe('normal');
+    expect(prompt.ls).toBeCloseTo(0.02, 2);
+    expect(await page.locator('#hint').evaluate(el => getComputedStyle(el).lineHeight)).toBe('normal');
+  });
+
   test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
     await page.clock.install();
     await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));

@@ -251,11 +251,11 @@
   }
 }
 /* phones: the title needs the room; the name stays in the aria-label */
-.prompt { font-size: clamp(28px, 7vw, 44px); font-weight: 700; margin: 4px 0 2px; text-shadow: 0 2px 0 #0008; letter-spacing: .02em; }
+.prompt { font-size: clamp(28px, 7vw, 44px); font-weight: 700; margin: 4px 0 2px; text-shadow: 0 2px 0 #0008; letter-spacing: var(--q-ls, .02em); line-height: var(--q-lh); }
 .prompt .seq span { display: inline-block; min-width: .8em; margin: 0 .06em; border-bottom: 3px solid #ffffff55; }
 .prompt .seq .got { color: var(--good); border-color: var(--good); }
 .prompt .seq.reveal .todo { opacity: .6; }   /* #65: no voice — the letters still to come are shown to copy, dimmer than the ones earned */
-.hint { color: var(--muted); font-size: 14px; font-weight: 600; }
+.hint { color: var(--muted); font-size: 14px; font-weight: 600; letter-spacing: var(--q-ls-hint); line-height: var(--q-lh); }
 .toast {
   margin-top: 10px;
   padding: 10px 18px;

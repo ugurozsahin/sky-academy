@@ -1,6 +1,6 @@
 // The grown-ups Settings section (#904): the 3-D pictures control plus the per-ninja "Slower bubbles" row
 // (#905), under one "Settings" heading so #906/#907/#940 each have room to add their own row.
-import { beepSetting, CALM_SETTINGS, calmSetting, applyCalm, setCalmSetting, type CalmSetting, REST_SETTINGS, restSetting, setBeepSetting, setRestSetting, setThreeSetting, THREE_SETTINGS, threeSetting, type RestSetting, type ThreeSetting } from '../device-settings';
+import { beepSetting, easyRead, setEasyRead, CALM_SETTINGS, calmSetting, applyCalm, setCalmSetting, type CalmSetting, REST_SETTINGS, restSetting, setBeepSetting, setRestSetting, setThreeSetting, THREE_SETTINGS, threeSetting, type RestSetting, type ThreeSetting } from '../device-settings';
 import { sfx } from '../audio';
 import { isWriteFailing, load, save } from '../storage';
 import { $, $$ } from './dom';
@@ -52,6 +52,12 @@ export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean
       <div class="tabs p-calm-pick" role="radiogroup" aria-label="Calm motion">${CALM_SETTINGS.map(v =>
         `<button class="tab${v === calm ? ' on' : ''}" data-calm="${v}" role="radio" aria-checked="${v === calm}">${CALM_LABEL[v]}</button>`).join('')}</div>
       <p class="p-three-msg" id="calm-msg" role="status" hidden></p>
+    </div>
+    <div class="p-three p-easy">
+      <p class="p-three-say">Wider letter spacing and 1.5 line spacing can make the question card easier to read. <b>On</b> changes only the spacing on the card; <b>Off</b> leaves it as it is.</p>
+      <div class="tabs p-easy-pick" role="radiogroup" aria-label="Easy-read question card">${(['off', 'on'] as const).map(v =>
+        `<button class="tab${(v === 'on') === easyRead() ? ' on' : ''}" data-easy="${v}" role="radio" aria-checked="${(v === 'on') === easyRead()}">${SLOW_LABEL[v]}</button>`).join('')}</div>
+      <p class="p-three-msg" id="easy-msg" role="status" hidden></p>
     </div>
     <div class="p-three p-year">
       <p class="p-three-say">Set the school year so a new ninja starts on the right island. A birthday can help work it out; it is never saved.</p>
@@ -117,6 +123,7 @@ export function bindSettings(): void {
     msg.hidden = stored;
     if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays on ${CALM_LABEL[now]}.`; }
   }));
+  bindEasyRead();
   bindTimeSettings();
   // #1055: stored in `ks2.schoolYear` only. The birthday is read once to fill the select and is never saved.
   const pick = $('#school-year') as HTMLSelectElement;
@@ -154,5 +161,17 @@ function bindTimeSettings(): void {
     msg.hidden = stored;
     if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so the beep stays ${now ? 'on' : 'off'}.`; }
     else if (now) sfx.alert();
+  }));
+}
+
+/** #907: device-wide, painted from what the store holds after the write; the play screen reads it when it opens. */
+function bindEasyRead(): void {
+  $$('button[data-easy]').forEach(b => b.addEventListener('click', () => {
+    sfx.tap();
+    const stored = setEasyRead(b.dataset.easy === 'on'), now = easyRead();
+    $$('button[data-easy]').forEach(o => { const on = (o.dataset.easy === 'on') === now; o.classList.toggle('on', on); o.setAttribute('aria-checked', String(on)); });
+    const msg = $('#easy-msg');
+    msg.hidden = stored;
+    if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays ${now ? 'on' : 'off'}.`; }
   }));
 }
