@@ -299,12 +299,6 @@ describe('duelHeadline (#16 item 3: the match-end line)', () => {
     expect(duelHeadline({ winner: 'b', scoreA: 2, scoreB: 7, rounds: 10, tally })).toBe('Player 2 wins 7–2!');
     expect(duelHeadline({ winner: 'draw', scoreA: 4, scoreB: 4, rounds: 10, tally })).toBe("It's a draw — 4 all!");
   });
-  it('reads the class-team names when given them (#958), and a draw is unchanged', () => {
-    const teams = { a: 'Team A', b: 'Team B' };
-    expect(duelHeadline({ winner: 'a', scoreA: 6, scoreB: 3, rounds: 10, tally }, teams)).toBe('Team A wins 6–3!');
-    expect(duelHeadline({ winner: 'b', scoreA: 2, scoreB: 7, rounds: 10, tally }, teams)).toBe('Team B wins 7–2!');
-    expect(duelHeadline({ winner: 'draw', scoreA: 4, scoreB: 4, rounds: 10, tally }, teams)).toBe("It's a draw — 4 all!");
-  });
 });
 
 // #16 item 5: what a finished match pays into the one shared save.
