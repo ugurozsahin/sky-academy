@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { clockEmoji, gridFor, hasMemoryDecks, BOND_POOL, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
+import { clockEmoji, FRACTION_POOL, HALF_FORMS, gridFor, hasMemoryDecks, BOND_POOL, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS, isKs2, type YearId } from '../../src/curriculum';
 import { clockPhrase } from '../../src/curriculum/year2';
+import { sameFraction } from '../../src/curriculum/year2/number';
 import { CVC, DIGRAPHS, SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -42,7 +43,7 @@ describe('memory decks', () => {
         const solidsLost = Math.max(0, SHAPES_3D.filter(r => SAME_SOLID.has(r[1])).length - 1);
         const asked = y.id === 'reception' ? 4 : 6;
         const want = y.id === 'year2' && theme.id === 'shapes' ? Math.min(asked, SHAPES_3D.length - solidsLost)
-          : y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'words' ? 6 : 8;
+          : y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'words' ? 6 : theme.id === 'fractions' ? 4 : 8;
         expect(pairs.length, `${y.id}/${theme.id}`).toBe(want);
         expect(new Set(pairs.map(p => faceKey(p.a))).size, `${y.id}/${theme.id} left faces`).toBe(pairs.length);
         expect(new Set(pairs.map(p => faceKey(p.b))).size, `${y.id}/${theme.id} right faces`).toBe(pairs.length);
@@ -283,5 +284,36 @@ describe('year 1 clocks deck', () => {
       }
     }
     expect(kinds.size).toBe(2);
+  });
+});
+
+describe('Year 2 Fraction names deck (#963)', () => {
+  const deck = THEMES.year2!.find(t => t.id === 'fractions')!;
+  const value = (t: string) => t.split('/').map(Number) as [number, number];
+  it('exists, and is Year 2 only', () => {
+    expect(deck).toBeDefined();
+    for (const y of ['reception', 'year1'] as const) expect(THEMES[y]!.some(t => t.id === 'fractions')).toBe(false);
+  });
+  it('every face has exactly one partner by value, and 1/2 and 2/4 never share a board (seeds 1–200)', () => {
+    const halves = new Set<string>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const pairs = deck.pairs(rng(seed));
+      expect(pairs.length).toBe(4);
+      const syms = pairs.map(p => p.b.text);
+      for (const s of syms) expect(/^\d\/\d$/.test(s), s).toBe(true);
+      for (const p of pairs) {
+        const [n, d] = value(p.b.text);
+        expect(syms.filter(s => sameFraction(s, n, d)).length, `${p.b.text} seed ${seed}`).toBe(1);
+        expect(p.b.say).toBe(p.a.say);
+      }
+      const h = pairs.filter(p => HALF_FORMS.some(([w]) => w === p.a.text));
+      expect(h.length).toBe(1);
+      halves.add(h[0].a.text);
+      expect(pairs.filter(p => FRACTION_POOL.some(([w]) => w === p.a.text)).length).toBe(3);
+    }
+    expect(halves.size).toBe(2);
+  });
+  it('long words are drawn small', () => {
+    for (const p of deck.pairs(rng(3))) expect(!!p.a.small).toBe(p.a.text.length > 6);
   });
 });
