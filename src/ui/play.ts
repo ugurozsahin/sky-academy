@@ -6,7 +6,7 @@ import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed'; import { calmReduced, playStyleAttr } from '../device-settings';   // #32: test-only time compression; #906; #907
 import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools'; import { createHud, heartCount } from './hud';   // #1065: one pool rule
 import {
-  isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
+  load, saveKept, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
 } from '../storage';
 import { equippedItem } from '../game/shop'; import { tickWithBeep } from './check-beep';
 import { canHear, haptic, say, sfx, sliceFx } from '../audio';
@@ -205,7 +205,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
       stars: r.stars, score: r.score, training, ...factsOf(playSession, o, r),   // #1122
       mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'), slips: missSlips(r.misses), topics: Object.keys(session.byTopic),   // #938, #939
     }, r.coins);
-    const dojoSaved = !isWriteFailing() && !isReadOnlySave(); const streak = touchStreak();   // #518: read before this write overwrites the flag
+    const dojoSaved = saveKept(); const streak = touchStreak();   // #518: read before this write overwrites the flag
     const cert = certInfo(r); lastCert = cert;
     // #205: filed when it is *earned*, not when the button works. `certSaved` (#470) is read the instant
     // after that write, per `isWriteFailing()`'s own contract of reflecting only the last attempt — a refusal
@@ -229,7 +229,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     recordCert(certToStored(c, { id: `${o.year.id}:${training ? 'sensei' : o.topic?.id ?? 'mission'}` }));
     // Both refusal paths (#470 review round 1): `isWriteFailing()` alone missed a write `save()` skipped
     // deliberately under `isReadOnlySave()`'s latch (#232) — the row was offered though the album never got it.
-    return !isWriteFailing() && !isReadOnlySave();
+    return saveKept();
   }
   /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). `date`
    *  is fixed here, at the moment it is earned (#410), rather than left for `certificateText()` to default —

@@ -960,6 +960,26 @@ test.describe('Sky Ninja Academy', () => {
     expect(spoken, `Sprint must stay silent on the correction; got ${JSON.stringify(spoken)}`).not.toContain(`It's ${wrongAnswer}.`);
   });
 
+  test('guest play saves nothing and ends cleanly, from behind the gate only (#948)', async ({ page }) => {
+    await seedPlayer(page);
+    await openGrownUps(page);
+    const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+    const before = await keys();
+    await page.click('#guest-start');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="year1"]');
+    await page.click('#relaxed');
+    await page.click('.topic[data-mixed]');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 10; i++) await solveCurrent(page);
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results .cert-row, .results .sticker-row, .results .dojo-row')).toHaveCount(0);
+    expect(await keys(), 'localStorage is byte-identical after a full guest mission').toBe(before);
+    await page.reload();
+    await expect(page.locator('.home')).toBeVisible();
+    expect(await keys()).toBe(before);
+  });
+
   test('Relaxed practice: wrong slices cost nothing, ten questions, one coin each right, no stars and no Storm best (#937)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

@@ -33,8 +33,11 @@ interface SessionState {
    * write again.
    */
   writeFailed: boolean;
+  /** Set while a deliberate guest session (#948) plays on an in-memory save: `save()` writes nothing, and every other
+   *  writer in this folder refuses. Cleared by `dropSessionState()`, so any switch of profile ends it too. */
+  guest: boolean;
 }
-export const state: SessionState = { cache: null, cacheProfile: null, readOnly: false, writeFailed: false };
+export const state: SessionState = { cache: null, cacheProfile: null, readOnly: false, writeFailed: false, guest: false };
 /**
  * Whether this session is running on defaults over a stored save it refused to touch (#232).
  *
@@ -45,6 +48,9 @@ export const state: SessionState = { cache: null, cacheProfile: null, readOnly: 
  */
 export const isReadOnlySave = () => state.readOnly;
 export const isWriteFailing = () => state.writeFailed;
+export const isGuest = () => state.guest;
+/** Whether what was just earned reached this device's store: false under the browser's refusal, the newer-build latch or guest play. */
+export const saveKept = () => !state.writeFailed && !state.readOnly && !state.guest;
 /**
  * The profile **this session is playing as** — resolved once, from the index, when the save is first read.
  *
@@ -63,7 +69,7 @@ export function sessionProfile(): ProfileId { return state.cacheProfile ?? (stat
 /** Forget the cached save and both write latches — they describe one blob (#232's read-only latch and #151's
  *  failed-write flag), and it is about to be a different one. The profile stays: a fresh start is the same
  *  child. */
-export function dropSessionState() { state.cache = null; state.readOnly = false; state.writeFailed = false; }
+export function dropSessionState() { state.cache = null; state.readOnly = false; state.writeFailed = false; state.guest = false; }
 /**
  * The above, **and** the session's profile: only a switch makes this a different child's session.
  *
@@ -99,6 +105,6 @@ export function leaveProfile() { dropSessionState(); state.cacheProfile = null; 
  * the grown-ups screen forget a real fault every time a child tapped their own card.
  */
 export function rereadProfile(id: ProfileId) {
-  if (state.cacheProfile !== id) { leaveProfile(); return; }
+  if (state.cacheProfile !== id || state.guest) { leaveProfile(); return; }   // a guest cache is no child's blob (#948)
   if (!state.writeFailed && !state.readOnly) state.cache = null;
 }
