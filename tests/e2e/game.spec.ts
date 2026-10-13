@@ -4262,6 +4262,20 @@ test.describe('Sky Ninja Academy', () => {
     expect(text).not.toMatch(/NaN|undefined|—%|sna:v1/);
   });
 
+  test('For grown-ups: "Progress picture" is delivered by the certificate route and names no NaN (#943)', async ({ page }) => {
+    await page.addInitScript(() => { (navigator as any).canShare = undefined; });
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    const btn = page.locator('#share-picture');
+    await btn.scrollIntoViewIfNeeded();
+    await expectFitsViewport(page, 'grown-ups share section with the picture button');
+    const download = page.waitForEvent('download');
+    await btn.click();
+    expect((await download).suggestedFilename()).toMatch(/^sky-ninja-progress-\d{4}-\d{2}-\d{2}\.png$/);
+    await expect(page.locator('#share-msg')).toContainText('downloads');
+    await expect(btn).toBeEnabled();
+  });
+
   test('For grown-ups: a cancelled share sheet is silent, a failed one leaves the text to copy by hand (#942)', async ({ page }) => {
     const stub = (err: string) => page.addInitScript(e => { Object.defineProperty(navigator, 'share', { value: () => Promise.reject(Object.assign(new Error(e), { name: e })), configurable: true }); }, err);
     await stub('AbortError');
