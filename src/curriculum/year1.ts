@@ -3,6 +3,7 @@
 // Year 1 generator so a reviewer checking "is Year 1 right" reads one file. Generators shared with
 // Reception/Year 2 live in util.ts.
 import type { Generator, Topic, Difficulty } from './types';
+import { y1PositionRow } from './y1-position-row';
 import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, isNote, NOTES,
@@ -314,7 +315,8 @@ const y1Shapes3d: Generator = (d, rng) => name3dQ(rng, d === 3 ? SHAPES_3D : Y1_
 
 const TURNS_Y1: [string, number][] = [['a quarter turn', 1], ['a half turn', 2], ['a whole turn', 4]];
 const y1Position: Generator = (d, rng) => {
-  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  const kind = d === 1 ? pick(rng, [0, 1, 3]) : ri(rng, 0, 3);
+  if (kind === 3) return y1PositionRow(d, rng);
   if (kind === 0) {                                              // name the way an arrow points
     const [word, arrow] = pick(rng, DIRS);
     return wordQ(rng, `Which way does ${arrow} point?`, word, DIRS.map(x => x[0]).filter(w => w !== word), { say: 'Which way does the arrow point? Up, down, left or right?', hint: 'Slice the word', hintIsData: false });
@@ -559,7 +561,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },
   { id: 'y1-shapes3d', title: '3-D Shapes', icon: '🧊', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: name common 3-D shapes', gen: y1Shapes3d },
-  { id: 'y1-position', title: 'Left, Right & Turns', icon: '🧭', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: position, direction, turns', gen: y1Position },
+  { id: 'y1-position', title: 'Left, Right & Turns', icon: '🧭', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: position (between, next to, first, last), direction, turns', gen: y1Position },
   { id: 'y1-length', title: 'Long & Tall', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: length & height', gen: y1Length },
   { id: 'y1-mass', title: 'Heavy & Light', icon: '🏋️', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: mass/weight', gen: y1Mass },
   { id: 'y1-capacity', title: 'Full & Empty', icon: '🥤', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: capacity & volume', gen: y1Capacity },

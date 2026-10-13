@@ -60,7 +60,7 @@ Maths:
 - y1-line — number line, hidden number
 - y1-shapes — 2-D shapes, sides
 - y1-shapes3d — name common 3-D shapes: cube, cuboid, pyramid, sphere — names only, both directions
-- y1-position — direction of an arrow, pick the arrow, whole/half/quarter turns clockwise & anti-clockwise
+- y1-position — direction of an arrow, pick the arrow, whole/half/quarter turns clockwise & anti-clockwise; a row of five animals: first, last, between, next to (an end animal only)
 - y1-length — compare length & height, cm read from the hint
 - y1-mass — heavier/lighter, g
 - y1-capacity — holds more/less, ml within 100
