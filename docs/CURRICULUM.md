@@ -77,7 +77,7 @@ Writing:
 - y1-compound — Join the Words: "foot + ball = ?" slice the compound spelt as its two parts; d1 two decoys with emoji, d2 three, d3 three without emoji; hand-curated bank (Y1_COMPOUNDS), decoys are non-words
 - y1-suffix — -ing -ed -er -est
 - y1-prefix — Un- Words: un- changes the meaning ("means not kind" → unkind); d3 half "opposite of lock" → unlock; hand-curated bank, root spelling unchanged
-- y1-punct — capital letters, . ? !
+- y1-punct — capital letters (sentence start; names, days, places and I), . ? !
 - y1-alphabet — Alphabet Order: which letter comes after/before; d3 half slice the next three letters in order (letter names, never after z or before a)
 - y1-days
 - y1-syllables — How Many Beats?: same generator as r-syllables, hand-keyed 1–3 beat words; d1 words of 1–2 beats, d2 1–3, d3 adds a 4 option

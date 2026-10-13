@@ -9,13 +9,14 @@ import {
   SHAPES_2D, SHAPES_3D, sameShape,
   orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitQ,
   DIRS, ARROWS, TURNS_ALL, turnEnd, DAYS,
-  gapLetters, gapQ, spellQ, sentGen, type Sent, PUNCT_SENTS, LETTERS, CVC, DIGRAPHS, Y1_CEW,
+  gapLetters, gapQ, spellQ, sentGen, type Sent, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
 } from './util';
 import { syllableQ } from './syllables';
 import { storyQ } from './story';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
 import { y1Compound } from './year1-compound';
+import { y1Punct } from './year1-punct';
 
 // ---------- Year 1 maths ----------
 /** One bond card for a fixed `total`: a + ? = T or ? + a = T (#917). */
@@ -488,18 +489,6 @@ const y1Prefix: Generator = (d, rng) => {
   return wordQ(rng, prompt, answer, [root, ...others].slice(0, d === 1 ? 2 : 3), {
     visual: { type: 'word', text: root }, say: prompt, hint: 'Add un- to the front', hintIsData: false,
   });
-};
-const y1Punct: Generator = (d, rng) => {
-  if (d === 1 || (d === 2 && rng() < 0.5)) {
-    const [s, p] = pick(rng, PUNCT_SENTS);
-    const words = s.split(' ');
-    const lower = words[0].toLowerCase() + (words.length > 1 ? ' ' + words.slice(1).join(' ') : '') + p;
-    const ans = words[0];
-    const ds = shuffle(rng, [words[0].toLowerCase(), words[0].toUpperCase(), (words[1] ?? 'It')]).filter(x => x !== ans).slice(0, 2);
-    return wordQ(rng, `_${lower.slice(words[0].length)}`, ans, ds, { visual: { type: 'sentence', text: lower }, say: `Which word starts the sentence: ${s}?`, hint: 'Sentences start with a capital letter', hintIsData: false });
-  }
-  const [s, p] = pick(rng, PUNCT_SENTS);
-  return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Full stop, question mark or exclamation mark?`, hint: 'Slice the missing punctuation', hintIsData: false });
 };
 // Letter names in order (#976). Oracle: the answer is the shown letter's alphabet neighbour; never "after z" / "before a".
 const y1Alphabet: Generator = (d, rng) => {
