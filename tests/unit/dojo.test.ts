@@ -132,4 +132,14 @@ describe('a fix round pays through the dojo only (#954)', () => {
     expect(load().coins - before).toBe(p.dojo!.coins);                       // only a completed challenge's bonus, never the round's own coins
     for (const c of dailyChallenges(dojoToday().date)) if (c.id !== 'fix3') expect(dojoToday().progress[c.id] ?? 0).toBe(0);
   });
+  it('keeps nothing for a guest, and moves nothing for an incomplete round', async () => {
+    const { fixRoundPayout, PRACTICE_PAYOUT } = await import('../../src/ui/play-results');
+    reset();
+    expect(fixRoundPayout({ correct: 2, attempts: 3, incomplete: true })).toBe(PRACTICE_PAYOUT);   // #522
+    expect(dojoToday().progress.fix3 ?? 0).toBe(0);
+    const { startGuest, endGuest } = await import('../../src/storage');
+    startGuest('year1', 'ninja');
+    expect(fixRoundPayout({ correct: 2, attempts: 3 }).dojoSaved).toBe(false);   // #518
+    endGuest();
+  });
 });
