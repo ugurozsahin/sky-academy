@@ -106,6 +106,7 @@ export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: '
  * there.
  */
 export function addProfile(): AddProfileResult {
+  if (state.guest) return { ok: false, why: 'store' };   // #948: guest play changes nothing on the device
   forgetDailyLine();   // #925: a new child never inherits a line kept by another tab or an earlier one
   const idx = currentIndex();
   const tombstoned = readTombstones();
