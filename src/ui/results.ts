@@ -203,9 +203,9 @@ export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: bo
   isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
 
 /** Record a Mission's result and work out its announcements (#933 best, #951 belt), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. A *won* Legend run also crowns the topic (#932); a lost one changes nothing more. */
-export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false): { candidates: ResultCandidate[] } {
+export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false): { candidates: ResultCandidate[]; topicBest: boolean } {
   const total = () => totalStarsOf(load().progress, listedTopics()), before = beltFor(total());
-  const candidates = missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)), after = beltFor(total());
+  const topicBest = recordTopic(topic.id, r.stars, r.score), candidates = missionBestCandidates(topic, topicBest), after = beltFor(total());
   if (legend && r.won) recordCrown(topic.id);
-  return { candidates: after.n > before.n ? [{ kind: 'belt', text: `🥋 You earned the ${after.name} belt!`, spoken: `You earned the ${after.name} belt!` }, ...candidates] : candidates };
+  return { topicBest, candidates: after.n > before.n ? [{ kind: 'belt', text: `🥋 You earned the ${after.name} belt!`, spoken: `You earned the ${after.name} belt!` }, ...candidates] : candidates };
 }

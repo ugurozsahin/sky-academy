@@ -9,7 +9,7 @@ import { paperRowsFor } from './paper-view';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { say, sfx } from '../audio';
 import { topicsFor, type Topic, type YearInfo } from '../curriculum';
-import { load, safeRecord, type TopicProgress } from '../storage';
+import { isReadOnlySave, isWriteFailing, load, recordGameEnd, safeRecord, type TopicProgress } from '../storage';
 import { $ } from './dom';
 import { resultsHTML } from './overlays';
 import { restClock } from '../game/rest';
@@ -23,6 +23,11 @@ import type { ResultPayout } from './play-session';
 /** The payout a practice ("Fix my mistakes", #930) run commits — nothing at all: no dojo outcome was ever
  *  computed, so `dojo: null` says that outright rather than a placeholder value pretending one exists. */
 export const PRACTICE_PAYOUT: ResultPayout = { newBest: false, dojo: null, fresh: [], streak: 0, cert: null, certSaved: false, dojoSaved: false, candidates: [] };
+/** A finished fix round (#954): one dojo event that advances "Fix 3 mistakes" only (`measure()` ignores it for every other challenge), 0 game coins — a completed challenge still pays its ordinary bonus. */
+export function fixRoundPayout(r: { correct: number; attempts: number }): ResultPayout {
+  const { dojo, fresh } = recordGameEnd({ mode: 'mission', fix: true, won: false, correct: r.correct, attempts: r.attempts, bestCombo: 0, stars: 0, score: 0 }, 0);
+  return { ...PRACTICE_PAYOUT, dojo, fresh, dojoSaved: !isWriteFailing() && !isReadOnlySave() };
+}
 
 /** Everything the results overlay needs from the screen around it. Function-valued where the screen owns the state. */
 export interface ResultsScreenDeps {
