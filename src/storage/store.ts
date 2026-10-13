@@ -4,6 +4,7 @@ import { saveKeyFor } from './profile-index'; import { forgetDailyLine } from '.
 import { dropSessionState, sessionProfile, state } from './state';
 import { isFutureSave, migrate } from './migrate';
 export function load(): SaveData {
+  if (state.guest) return state.cache!;
   const id = sessionProfile();
   if (state.cache) return state.cache;
   try {
@@ -23,9 +24,9 @@ export function save(patch: Partial<SaveData> = {}): SaveData {
   // working against `cache`; writing would relabel it as our shape and make the loss permanent. Not an
   // attempted write, so it does not touch `writeFailed` either way (#151) — this function only ever sets that
   // flag from an actual `setItem` call, immediately below (`writeIndex`'s callers set it their own way, #384).
-  if (state.readOnly) return state.cache;
+  if (state.readOnly || state.guest) return state.cache;   // guest play (#948) is memory only, like the newer-build latch
   try { localStorage.setItem(saveKeyFor(sessionProfile()), JSON.stringify(state.cache)); state.writeFailed = false; }
   catch { state.writeFailed = true; /* private mode, WebView storage disabled, full quota (#151) */ }
   return state.cache;
 }
-export function reset() { const id = sessionProfile(); dropSessionState(); forgetDailyLine(); try { localStorage.removeItem(saveKeyFor(id)); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232); writeFailed is a last-attempt signal, not a diagnosis, so a deliberate fresh start gives it the same benefit of the doubt — the very next save() call sets it again if the browser still refuses (#151)
+export function reset() { if (state.guest) return; const id = sessionProfile(); dropSessionState(); forgetDailyLine(); try { localStorage.removeItem(saveKeyFor(id)); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232); writeFailed is a last-attempt signal, not a diagnosis, so a deliberate fresh start gives it the same benefit of the doubt — the very next save() call sets it again if the browser still refuses (#151)

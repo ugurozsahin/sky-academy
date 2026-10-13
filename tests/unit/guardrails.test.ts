@@ -3135,7 +3135,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
     'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a

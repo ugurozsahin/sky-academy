@@ -11,6 +11,7 @@ import { load } from './store'; import { forgetDailyLine } from '../game/daily-l
  * survives a reinstall, and it is the same code #20's profiles and #16's second player would move about.
  */
 export function exportSave(): string {
+  if (state.guest) return '';   // the guest's save is nobody's (#948)
   load();   // settles the latch against what is actually on disk before we decide what to hand over
   // #232 review: under the latch `load()` is a fresh default, so exporting it would hand the grown-up a
   // **valid** code carrying no progress — and `parents.ts` invites them to paste it into Restore on the
@@ -33,6 +34,7 @@ export function exportSave(): string {
  * replacement, and a merge would leave the old device's keys sitting under the new ones.
  */
 export function importSave(text: string): boolean {
+  if (state.guest) return false;
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { return false; }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;

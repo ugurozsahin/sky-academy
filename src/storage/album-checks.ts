@@ -20,7 +20,7 @@ export const CERT_CAP = 60;
 // `training`/`duel` are the two fields that stay deliberately unchecked — see `certKind()`'s comment in
 // `ui/certificate.ts`: rejecting a malformed flag here would drop a certificate a child genuinely earned,
 // which is worse than `certKind()` misreading which kind it was earned for.
-type CheckedCertFields = Omit<StoredCert, 'training' | 'duel'>;
+type CheckedCertFields = Omit<StoredCert, 'training' | 'duel' | 'island'>;
 const CERT_FIELDS: Fields<CheckedCertFields> = {
   id: str, name: str, avatar: strOrNull, year: str, title: str,
   stars: fin, score: fin, correct: fin, attempts: fin, date: str,

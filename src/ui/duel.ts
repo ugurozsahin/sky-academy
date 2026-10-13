@@ -13,7 +13,7 @@ import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { Duel, DUEL_PLAYERS, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { isReadOnlySave, isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, touchStreak, type GameEndOutcome, type StoredDuel } from '../storage';
+import { load, saveKept, recordAccuracy, recordCert, recordDuel, recordGameEnd, touchStreak, type GameEndOutcome, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, hush, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -307,7 +307,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd({ ...duelDojoEvent(r, topic.subject), topics: [topic.id] }, paid);
     dojoPaid = dojo.coins;
-    dojoSaved = !isWriteFailing() && !isReadOnlySave();   // #518: read before touchStreak() below overwrites the flag
+    dojoSaved = saveKept();   // #518: read before touchStreak() below overwrites the flag
     // #355 (owner decision, 2026-09-24): a finished duel marks the daily streak, the same as every other
     // finished game (`play.ts`, `memory.ts`) — ten real questions answered at the same coin rate is real
     // practice, whichever seat took the round. `touchStreak()` is idempotent within a day, so a rematch on
@@ -328,7 +328,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // is now the only writer, so the e2e's stored assertions cover the drawn object too.
     // Both refusal paths (#470 review round 1): `isWriteFailing()` alone missed a write `save()` skipped
     // deliberately under `isReadOnlySave()`'s latch (#232) — the row was offered though the album never got it.
-    if (cert) { recordCert(certToStored(cert, { id: `${o.year.id}:duel:${topic.id}` })); certSaved = !isWriteFailing() && !isReadOnlySave(); }   // #670: per topic, not per year
+    if (cert) { recordCert(certToStored(cert, { id: `${o.year.id}:duel:${topic.id}` })); certSaved = saveKept(); }   // #670: per topic, not per year
     // The last piece of item 5: the match itself, so it outlives this overlay. Filed for every finished match
     // — a loss and a draw are as much a thing that happened as a win, which is the one place this parts
     // company with the certificate above (that is an award; only a Player 1 win earns one, `duelEarnsCertificate`)

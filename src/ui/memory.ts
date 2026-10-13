@@ -2,7 +2,7 @@
 import { avatarById, cheerLine, praiseLine, voiced } from '../avatars';
 import type { YearInfo } from '../curriculum';
 import { gridFor, Memory, pickTheme, spokenOnFlip, type Face } from '../game/memory';
-import { isReadOnlySave, isWriteFailing, load, recordGameEnd, recordMemory, touchStreak } from '../storage';
+import { load, saveKept, recordGameEnd, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
 import { $, $$, esc, render } from './dom';
 import { resultsModal, screenScope, stickersHTML } from './screen';
@@ -80,7 +80,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     const boards = recordMemory(o.year.id);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score }, game.coins);
-    const dojoSaved = !isWriteFailing() && !isReadOnlySave(); const streak = touchStreak();   // #518: read before this write overwrites the flag
+    const dojoSaved = saveKept(); const streak = touchStreak();   // #518: read before this write overwrites the flag
     return { boards, dojo, fresh, streak, dojoSaved };
   }
   function finish(payout: ReturnType<typeof commit>) {

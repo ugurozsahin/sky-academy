@@ -229,6 +229,7 @@ export type DeleteRefusal = Extract<DeleteProfileResult, { ok: false }>['why'];
  * this one did not.
  */
 export function deleteProfile(id: ProfileId): DeleteProfileResult {
+  if (state.guest) return { ok: false, why: 'store' };   // #948
   const idx = currentIndex();
   if (!idx.ids.includes(id)) return { ok: false, why: 'unknown' };
   const rest = idx.ids.filter(x => x !== id);
