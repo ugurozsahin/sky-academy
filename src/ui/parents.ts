@@ -338,7 +338,7 @@ export function parentsScreen(nav: Nav) {
     // back button (main.ts's popstate handler reads `isPendingReset()` directly) — must land on onboarding,
     // never on the map with an empty profile (#115). "Undo" is the only way out of that state.
     $('#back').addEventListener('click', () => { sfx.tap(); if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else nav.map(); });
-    wireMove(() => drawDash()); bindShare(sm, load().name); bindDaily(); bindWords();
+    wireMove(() => drawDash()); bindShare(sm, load().name, load().avatar ?? ''); bindDaily(); bindWords();
     bindSettings(); bindReady(); bindGuest(nav.map);
 
     const overlay = $('#reset-overlay');

@@ -11,4 +11,4 @@ export function startGuest(year: YearId, avatar: string) {
   state.cache = { ...DEFAULT, name: 'Guest', avatar, onboarded: true, year };
 }
 /** Drop the guest save; the next `load()` reads the active profile from disk, untouched. */
-export function endGuest() { dropSessionState(); }
+export function endGuest() { if (state.guest) dropSessionState(); }

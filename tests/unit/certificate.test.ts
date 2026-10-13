@@ -1,5 +1,10 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import { certAlbumHTML, certFromStored, certificateText, certKind, certRoute, certToStored, deliverCertificate, hasCapacitorShare, isNativeShell } from '../../src/ui/certificate';
+import { reportText } from '../../src/ui/report';
+import { parentSummary, progressText } from '../../src/game/parents';
+import { listedTopics, shownYears } from '../../src/curriculum';
+import { STICKER_IDS, type SaveData } from '../../src/storage';
+import { DEFAULT } from '../../src/storage/shape';
 import { AVATARS } from '../../src/avatars';
 import type { StoredCert } from '../../src/storage';
 
@@ -524,5 +529,35 @@ describe('deliverCertificate, actually run (#205)', () => {
     expect(how).toBe('shown');
     expect(dom.downloadClicks(), 'a failed native share must still never fall through to <a download>').toBe(0);
     expect(dom.shownFullscreen()).toBe(true);
+  });
+});
+
+describe('reportText() — the progress picture (#943)', () => {
+  const now = new Date('2026-10-03T12:00:00');
+  const sm = (d: SaveData = DEFAULT) => parentSummary(d, listedTopics(), shownYears(), STICKER_IDS.length, now, listedTopics());
+  const info = (name: string, d?: SaveData) => ({ sm: sm(d), name, avatar: AVATARS[0], date: now });
+  it('an empty save reads sensibly: no NaN, no undefined, no blank lists', () => {
+    const t = reportText(info('Ada'));
+    expect(JSON.stringify(t)).not.toMatch(/NaN|undefined|null/);
+    expect(t.week).toBe('This week: no play yet');
+    expect(t.going).toBe('not enough play yet');
+    expect(t.help).toBe('not enough play yet');
+    expect(t.date).toBe('3 October 2026');
+  });
+  it('shows the same island stars as the text note', () => {
+    const r = reportText(info('Ada')), note = progressText(sm(), 'Ada', now);
+    for (const i of r.islands) expect(note).toContain(`${i.label} ${i.stars}/${i.max}`);
+    expect(r.islands.length).toBe(sm().years.length);
+  });
+  it('a blank name falls back and a long name is kept whole for the canvas to shrink', () => {
+    expect(reportText(info('  ')).child).toBe('Your ninja');
+    const long = 'A'.repeat(40);
+    expect(reportText(info(long)).child).toBe(long);
+  });
+  it('lists at most four titles each', () => {
+    const base = sm(), mk = (n: number) => Array.from({ length: n }, (_, k) => ({ title: `T${k}` })) as any;
+    const t = reportText({ ...info('Ada'), sm: { ...base, strongest: mk(6), weakest: mk(2) } });
+    expect(t.going).toBe('T0, T1, T2, T3');
+    expect(t.help).toBe('T0, T1');
   });
 });
