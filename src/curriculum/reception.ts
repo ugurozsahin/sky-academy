@@ -7,7 +7,7 @@ import type { Generator, Rng, Topic } from './types';
 import { rInitial } from './reception-initial';
 import { rRhyme } from './reception-rhyme';
 import {
-  ri, pick, shuffle, numQ, wordQ, OBJECTS,
+  ri, pick, shuffle, numQ, wordQ, OBJECTS, SHAPES_2D, sameShape,
   orderQ, balanceQ,
   gapQ, spellQ, soundQ, sentGen, type Sent,
   PHASE2, PHASE2B, PHASE3, VOWELS, LETTERS, CVC, DIGRAPHS,
@@ -131,6 +131,24 @@ const rDoubles: Generator = (d, rng) => {
   const n = d === 1 ? ri(rng, 1, 4) : d === 2 ? ri(rng, 1, 5) : ri(rng, 2, 5);
   if (d === 3 && rng() < 0.5) return numQ(rng, `Double ? = ${n * 2}`, n, { min: 0, max: 10, say: `Double what makes ${n * 2}?` });
   return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 10, visual: { type: 'tenframe', n, n2: n }, say: `What is double ${n}?` });
+};
+/**
+ * Reception shapes (#969) — naming circle, square, triangle and rectangle, in both directions.
+ *
+ * The first four `SHAPES_2D` rows are the Reception set. A decoy never satisfies `sameShape` with the
+ * asked shape, so ■ is never a wrong "rectangle" and "rectangle" is never a wrong name for ■ (a square
+ * is a rectangle). All four are asked at every stage (the suite's variety floor needs more than three cards at d1);
+ * d1 offers two decoys, d2 every legal decoy; d3 shows the glyph and the bubbles are the names. Counting sides
+ * is Year 1 (`y1-shapes`).
+ */
+const rShapes: Generator = (d, rng) => {
+  const set = SHAPES_2D.slice(0, 4);
+  const [g, name] = pick(rng, set);
+  const decoys = shuffle(rng, set.filter(s => !sameShape(s[1], name)));
+  const ds = d === 1 ? decoys.slice(0, 2) : decoys;
+  const hint = { hint: 'Slice the shape', hintIsData: false };
+  if (d === 3) return wordQ(rng, 'What is this shape called?', name, ds.map(s => s[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?', ...hint });
+  return wordQ(rng, `Which is a ${name}?`, g, ds.map(s => s[0]), { say: `Which one is a ${name}?`, ...hint });
 };
 /**
  * Reception sharing (#299 slice 1) — "how quantities can be distributed equally", between two.
@@ -358,6 +376,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-patterns', title: 'Pattern Party', icon: '🔁', subject: 'maths', year: 'reception', nc: 'Development Matters: continue repeating patterns', gen: rPatterns },
   { id: 'r-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'reception', nc: 'ELG Number: composition, equal amounts', gen: rBalance },
   { id: 'r-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'reception', nc: 'ELG Patterns: double facts within 10', gen: rDoubles },
+  { id: 'r-shapes', title: 'Shape Spotter', icon: '🔷', subject: 'maths', year: 'reception', nc: 'EYFS Spatial reasoning: circle, square, triangle, rectangle', gen: rShapes },
   { id: 'r-share', title: 'Share It Out', icon: '🤝', subject: 'maths', year: 'reception', nc: 'ELG Patterns: distribute equally between two', gen: rShare },
   { id: 'r-oddeven', title: 'Partners', icon: '🐾', subject: 'maths', year: 'reception', nc: 'ELG Patterns: evens and odds', gen: rOddEven },
   // Reception writing
