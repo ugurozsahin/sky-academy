@@ -3981,6 +3981,30 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForTimeout(300);
     expect(await heard(cards[w3].text), 'a missed word card is not read out').toBe(0);
   });
+  // #966: Year 2's Past tense deck deals 16 cards; every word must sit whole inside its card on a phone.
+  test('Memory Match Past tense: 16 cards, every word whole, no page overflow (#966)', async ({ page }) => {
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="year2"]');
+    for (let tries = 0; tries < 60 && (await page.evaluate(() => window.__sna?.theme)) !== 'past'; tries++) {
+      if (await page.locator('.memory').count()) {
+        await page.click('#back');
+        await page.locator('#memory, .island[data-year="year2"]').first().waitFor();
+        if (!(await page.locator('#memory').count())) await page.click('.island[data-year="year2"]');
+      }
+      await expect(page.locator('#memory')).toBeVisible();
+      await page.click('#memory');
+      await expect(page.locator('.memory')).toBeVisible();
+    }
+    expect(await page.evaluate(() => window.__sna.theme)).toBe('past');
+    await expect(page.locator('.card')).toHaveCount(16);
+    const vw = page.viewportSize()!.width;
+    const clipped = await page.evaluate((w) => [...document.querySelectorAll('.card')].filter(c => {
+      const r = c.getBoundingClientRect();
+      return r.left < 0 || r.right > w || c.scrollWidth > c.clientWidth + 1;
+    }).length, vw);
+    expect(clipped, 'cards clipped or past the viewport edge').toBe(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="reception"]');

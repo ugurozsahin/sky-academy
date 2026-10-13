@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { clockEmoji, FRACTION_POOL, HALF_FORMS, gridFor, hasMemoryDecks, BOND_POOL, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
+import { clockEmoji, FRACTION_POOL, HALF_FORMS, TENSE_POOL, gridFor, hasMemoryDecks, BOND_POOL, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS, isKs2, type YearId } from '../../src/curriculum';
 import { clockPhrase } from '../../src/curriculum/year2';
 import { sameFraction } from '../../src/curriculum/year2/number';
-import { CVC, DIGRAPHS, SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
+import { AVOID, CVC, DIGRAPHS, SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const faceKey = (f: { text: string; coin?: number }) => `${f.coin ? 'coin:' : ''}${f.text}`;
@@ -315,5 +315,30 @@ describe('Year 2 Fraction names deck (#963)', () => {
   });
   it('long words are drawn small', () => {
     for (const p of deck.pairs(rng(3))) expect(!!p.a.small).toBe(p.a.text.length > 6);
+  });
+});
+
+describe('Year 2 Past tense deck (#966)', () => {
+  const deck = THEMES.year2!.find(t => t.id === 'past')!;
+  it('exists, and is Year 2 only', () => {
+    expect(deck).toBeDefined();
+    for (const y of ['reception', 'year1'] as const) expect(THEMES[y]!.some(t => t.id === 'past')).toBe(false);
+  });
+  it('the bank has 16 pairs, none identical, no word repeated or used as both tenses, and all pass AVOID', () => {
+    expect(TENSE_POOL.length).toBe(16);
+    const all = TENSE_POOL.flat();
+    expect(new Set(all).size).toBe(32);
+    for (const [now, then] of TENSE_POOL) expect(now).not.toBe(then);
+    for (const w of all) expect(AVOID.has(w), w).toBe(false);
+  });
+  it('every board is 8 pairs and every face has exactly one partner (seeds 1–200)', () => {
+    const partner = new Map(TENSE_POOL);
+    for (let seed = 1; seed <= 200; seed++) {
+      const pairs = deck.pairs(rng(seed));
+      expect(pairs.length).toBe(8);
+      const faces = pairs.flatMap(p => [p.a.text, p.b.text]);
+      expect(new Set(faces).size, `seed ${seed}`).toBe(16);
+      for (const p of pairs) { expect(partner.get(p.a.text)).toBe(p.b.text); expect(p.a.say).toBe(p.a.text); expect(p.b.say).toBe(p.b.text); }
+    }
   });
 });
