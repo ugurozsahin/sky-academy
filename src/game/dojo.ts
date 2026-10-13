@@ -12,6 +12,8 @@ export interface Challenge { id: string; group: DojoGroup; icon: string; title: 
 export interface DojoEvent {
   mode: Mode | 'memory' | 'duel';   // #1117: follows `Mode`, so a new mode needs no second edit
   won: boolean; correct: number; attempts: number; bestCombo: number; stars: number; score: number;
+  topicBest?: boolean;             // #954: a Mission that beat a real previous best (`recordTopic()`'s own answer)
+  fix?: boolean;                   // #954: a "Fix my mistakes" round — advances `fix3` and nothing else
   training?: boolean;              // Sensei session (a mission over a pool)
   mathsCorrect?: number; writingCorrect?: number;   // per-subject hits (from the session's per-topic tally)
 }
@@ -36,11 +38,14 @@ const POOL: Challenge[] = [
   { id: 'storm80', group: 'mode', icon: '⛈️', title: 'Score 80 in Sky Storm', goal: 80, bonus: CHALLENGE_BONUS },
   { id: 'memory1', group: 'mode', icon: '🃏', title: 'Finish a Memory Match board', goal: 1, bonus: CHALLENGE_BONUS },
   { id: 'sensei1', group: 'mode', icon: '🥋', title: 'Train with Sensei', goal: 1, bonus: CHALLENGE_BONUS },
+  { id: 'relaxed1', group: 'mode', icon: '🌿', title: 'Play Relaxed practice', goal: 1, bonus: CHALLENGE_BONUS },
   { id: 'combo5', group: 'focus', icon: '🔥', title: 'Get a 5-slice combo', goal: 5, bonus: CHALLENGE_BONUS },
   { id: 'stars3', group: 'focus', icon: '⭐', title: 'Earn 3 stars in a mission', goal: 1, bonus: CHALLENGE_BONUS },
   { id: 'perfect', group: 'focus', icon: '💎', title: 'Finish a mission with no slips', goal: 1, bonus: CHALLENGE_BONUS },
   { id: 'writing6', group: 'focus', icon: '✍️', title: 'Get 6 writing answers right', goal: 6, bonus: CHALLENGE_BONUS },
   { id: 'maths10', group: 'focus', icon: '🔢', title: 'Get 10 maths answers right', goal: 10, bonus: CHALLENGE_BONUS },
+  { id: 'topicbest', group: 'focus', icon: '🏆', title: 'Beat a topic best', goal: 1, bonus: CHALLENGE_BONUS },
+  { id: 'fix3', group: 'focus', icon: '🔁', title: 'Fix 3 mistakes', goal: 3, bonus: CHALLENGE_BONUS },
 ];
 export const challengeById = (id: string) => POOL.find(c => c.id === id);
 
@@ -69,24 +74,28 @@ export function carriedStreak(s: DojoState, date: string): number {
 /** Streak multiplier for today's bonuses: ×1, then +0.25 per carried day up to ×2. */
 export const multiplier = (carried: number) => 1 + 0.25 * Math.min(4, carried);
 
+/** How each challenge reads one event (absolute progress from the current value `cur`, never below it). */
+type Reader = (cur: number, e: DojoEvent, mission: boolean) => number;
+const READERS: Record<string, Reader> = {
+  correct15: (cur, e) => cur + e.correct, correct20: (cur, e) => cur + e.correct, correct25: (cur, e) => cur + e.correct,
+  mission2: (cur, e, m) => cur + Number(m && e.won),
+  sprint1: (cur, e) => cur + Number(e.mode === 'sprint'),
+  boss1: (cur, e) => cur + Number(e.mode === 'boss' && e.won),
+  storm80: (cur, e) => (e.mode === 'endless' ? Math.max(cur, e.score) : cur),
+  memory1: (cur, e) => cur + Number(e.mode === 'memory'),
+  sensei1: (cur, e) => cur + Number(e.mode === 'mission' && !!e.training && e.won),
+  relaxed1: (cur, e) => cur + Number(e.mode === 'relaxed'),   // #954
+  topicbest: (cur, e) => cur + Number(!!e.topicBest),
+  combo5: (cur, e) => Math.max(cur, e.bestCombo),
+  stars3: (cur, e, m) => cur + Number(m && e.won && e.stars === 3),
+  perfect: (cur, e, m) => cur + Number(m && e.won && e.attempts > 0 && e.correct === e.attempts),
+  writing6: (cur, e) => cur + (e.writingCorrect ?? 0),
+  maths10: (cur, e) => cur + (e.mathsCorrect ?? 0),
+};
 /** How far one event moves a challenge (absolute progress, never below the current value). */
 function measure(c: Challenge, cur: number, e: DojoEvent): number {
-  const mission = e.mode === 'mission' && !e.training;
-  switch (c.id) {
-    case 'correct15': case 'correct20': case 'correct25': return cur + e.correct;
-    case 'mission2': return cur + (mission && e.won ? 1 : 0);
-    case 'sprint1': return cur + (e.mode === 'sprint' ? 1 : 0);
-    case 'boss1': return cur + (e.mode === 'boss' && e.won ? 1 : 0);
-    case 'storm80': return e.mode === 'endless' ? Math.max(cur, e.score) : cur;
-    case 'memory1': return cur + (e.mode === 'memory' ? 1 : 0);
-    case 'sensei1': return cur + (e.mode === 'mission' && e.training && e.won ? 1 : 0);
-    case 'combo5': return Math.max(cur, e.bestCombo);
-    case 'stars3': return cur + (mission && e.won && e.stars === 3 ? 1 : 0);
-    case 'perfect': return cur + (mission && e.won && e.attempts > 0 && e.correct === e.attempts ? 1 : 0);
-    case 'writing6': return cur + (e.writingCorrect ?? 0);
-    case 'maths10': return cur + (e.mathsCorrect ?? 0);
-  }
-  return cur;
+  if (e.fix) return c.id === 'fix3' ? cur + e.correct : cur;   // #954: a fix round advances only "Fix 3 mistakes", so a replay flatters nothing else
+  return READERS[c.id]?.(cur, e, e.mode === 'mission' && !e.training) ?? cur;
 }
 export interface DojoOutcome { state: DojoState; completed: Challenge[]; setDone: boolean; coins: number; multiplier: number }
 /** Apply a finished game to the day's state. Returns the new state, what was just completed and the bonus coins earned. */

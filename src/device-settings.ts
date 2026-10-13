@@ -84,3 +84,14 @@ export function setEasyRead(on: boolean): boolean {
 /** The play root's `style` attribute: the glow, plus the three spacing properties when the switch is on. Off leaves it exactly as it was. */
 export const playStyleAttr = (glow: string): string => (easyRead()
   ? `style="--glow:${glow};--q-ls:.12em;--q-ls-hint:.12em;--q-lh:1.5"` : `style="--glow:${glow}"`);
+
+/* ─── Map line: the day Sensei last spoke one on a profile's map (#955) ───────────────────────────────────────
+ * Device-wide, one key per profile, so the line is spoken at most once a day for each child. A refused read or
+ * write only means the line may repeat; nothing here throws. */
+const mapLineKey = (profile: string): string => `sna:mapline:${profile}`;
+export const mapLineDay = (profile: string): string | null => readItem(mapLineKey(profile));
+/** Returns whether the store now holds `day`. */
+export function setMapLineDay(profile: string, day: string): boolean {
+  try { localStorage.setItem(mapLineKey(profile), day); } catch { /* fall through to the read */ }
+  return mapLineDay(profile) === day;
+}

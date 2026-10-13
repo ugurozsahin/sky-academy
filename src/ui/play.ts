@@ -14,7 +14,7 @@ import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './play-input'; import { seedRng } from '../game/daily-sprint';   // #1064: how a child answers
 import { BOMB, createPlaySession, type ResultPayout } from './play-session'; import { factsOf, speedCandidates } from './play-facts';   // #36
-import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
+import { createResultsScreen, fixRoundPayout } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
 import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
@@ -183,14 +183,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
    * recomputed there, so the overlay can never pay the game a second time.
    */
   function commitResult(r: SessionResult): ResultPayout {
-    if (o.practice) return PRACTICE_PAYOUT; let newBest = false, candidates: ResultCandidate[] = [];   // #930: a fix round writes nothing at all
+    if (o.practice) return fixRoundPayout(r); let newBest = false, topicBest = false, candidates: ResultCandidate[] = [];   // #930/#954: a fix round moves only "Fix 3 mistakes"
     // #522 review (silent-failure-hunter): a generator throw is not a genuine finished play of this topic/mode
     // — `recordTopic`'s `plays`/`best` and `recordSprint`/`recordEndless`'s "new best" are permanent per-topic/
     // per-year history, the same kind of record `duel.ts` withholds with its own `!r.incomplete` gate on
     // `recordDuel`. A phantom `plays` increment or an unearned best score would otherwise stick around forever
     // and skew `parents.ts`'s "topics tried" count and `sensei.ts`'s weakest-topic ranking.
     if (!r.incomplete) {
-      if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r, !!o.legend, { name: d.name, avatar: av, year: o.year }));   // #933, #932
+      if (o.mode === 'mission' && o.topic) ({ candidates, topicBest } = recordMissionOutcome(o.topic, r, !!o.legend, { name: d.name, avatar: av, year: o.year }));   // #933, #932
       else if (training) { if (r.won) recordTraining(o.year.id); }
       else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed));   // #911/#912, #925
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
@@ -202,7 +202,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh, prevSpeed } = recordGameEnd({
       mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo,
-      stars: r.stars, score: r.score, training, ...factsOf(playSession, o, r),   // #1122
+      stars: r.stars, score: r.score, training, topicBest, ...factsOf(playSession, o, r),   // #1122
       mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'), slips: missSlips(r.misses), topics: Object.keys(session.byTopic),   // #938, #939
     }, r.coins);
     const dojoSaved = saveKept(); const streak = touchStreak();   // #518: read before this write overwrites the flag
