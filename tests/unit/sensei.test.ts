@@ -163,6 +163,12 @@ describe('mapLine: the daily spoken map line (#955)', () => {
     const d = base({ streak: { ...load().streak, days: 1 }, sprint: { [Y.id]: 50 } });   // frost 1/3 and bolt 50/150: both a third
     expect(mapLine(d, Y)).toBe('Frost sticker: 3-day streak. 1 of 3 done.');
   });
+  it('skips a sticker the child already holds, even when its stat has fallen', () => {
+    const d = base({ stickers: ['frost', 'sol'], streak: { ...load().streak, days: 1 }, endless: { [Y.id]: 90 } });
+    expect(mapLine(d, Y)).toBe('Your Sky Storm best is 90. Can you beat it?');
+    expect(mapLine({ ...d, endless: {} }, Y)).toBeNull();
+    expect(mapLine({ ...d, sprint: { [Y.id]: 50 } }, Y)).toBe('Bolt sticker: Score 150+ in Ninja Sprint. 50 of 150 done.');
+  });
   it('falls back to Sky Storm, then Ninja Sprint, then null', () => {
     expect(mapLine(base({ endless: { [Y.id]: 180 } }), Y)).toBe('Your Sky Storm best is 180. Can you beat it?');
     expect(mapLine(base({ sprint: { [Y.id]: 200 } }), Y)).toBe('Your Ninja Sprint best is 200. Can you beat it?');   // bolt is earned at 150

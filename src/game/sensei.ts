@@ -19,7 +19,7 @@ export function mapLine(d: SaveData, year: YearInfo): string | null {
   let pick: { id: string; title: string; done: number; goal: number } | null = null;
   for (const a of ACHIEVEMENTS) {
     const { done, goal } = a.progress(d);
-    if (done <= 0 || done >= goal) continue;
+    if (done <= 0 || done >= goal || d.stickers.includes(a.id)) continue;   // an earned sticker stays earned (#114)
     if (!pick || done / goal > pick.done / pick.goal) pick = { id: a.id, title: a.title, done, goal };
   }
   if (pick) {
