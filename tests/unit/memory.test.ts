@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clockEmoji, gridFor, hasMemoryDecks, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
+import { clockEmoji, gridFor, hasMemoryDecks, BOND_POOL, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS, isKs2, type YearId } from '../../src/curriculum';
 import { clockPhrase } from '../../src/curriculum/year2';
 import { CVC, DIGRAPHS, SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
@@ -142,6 +142,27 @@ describe('memory decks', () => {
     expect(LETTER_POOL).not.toContain('i');
     expect(LETTER_POOL).not.toContain('l');
   });
+  // #960: each `n + ?` has exactly one `b` face making 10 with it, computed from the face text, not the pair list.
+  it('Year 1 Make 10: every n + ? has exactly one partner, 5 is never dealt, faces are small', () => {
+    const theme = pickTheme('year1', rng(1), 'bonds10');
+    expect(theme.id).toBe('bonds10');
+    expect(theme.hintIsData).toBe(true);
+    expect(BOND_POOL).not.toContain(5);
+    for (let seed = 1; seed <= 200; seed++) {
+      const pairs = theme.pairs(rng(seed));
+      expect(pairs.length).toBe(6);
+      const faces = pairs.flatMap(p => [p.a, p.b]);
+      expect(new Set(faces.map(f => f.text)).size, `seed ${seed} distinct`).toBe(12);
+      const as = faces.filter(f => f.text.endsWith(' + ?')), bs = faces.filter(f => !f.text.endsWith(' + ?'));
+      for (const a of as) {
+        const n = Number(a.text.split(' ')[0]);
+        expect(a.small).toBe(true);
+        expect(n).not.toBe(5);
+        expect(bs.filter(b => n + Number(b.text) === 10).length, `seed ${seed} ${a.text}`).toBe(1);
+      }
+      for (const b of bs) expect(b.text).not.toBe('5');
+    }
+  });
   it('pickTheme falls back to a random theme of the year when the id is unknown', () => {
     expect(THEMES.year1!.map(t => t.id)).toContain(pickTheme('year1', rng(9), 'nope').id);
   });
@@ -155,7 +176,7 @@ describe('memory decks', () => {
   // a check that today's NINE existing themes are classified as the issue says, not a guard against a new
   // one shipping unclassified — `tsc` is that guard now.
   it('only doubles and tables mark their hint as the sole statement of the matching rule', () => {
-    const dataThemes = new Set(['doubles', 'tables']);
+    const dataThemes = new Set(['doubles', 'tables', 'bonds10']);
     for (const y of YEARS) for (const theme of THEMES[y.id] ?? []) {
       expect(theme.hintIsData, `${y.id}/${theme.id}`).toBe(dataThemes.has(theme.id));
     }

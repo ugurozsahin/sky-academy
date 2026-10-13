@@ -65,6 +65,9 @@ const clockPairs = (rng: Rng): Pair[] => {
 /** Big & Small Letters: four letters from a–z, capital beside small. `i` and `l` are left out — capital I and small l are the same upright stroke in most fonts, so a face could have two partners (#959). */
 export const LETTER_POOL = 'abcdefghjkmnopqrstuvwxyz'.split('');
 const letterPairs = (rng: Rng): Pair[] => shuffle(rng, LETTER_POOL).slice(0, 4).map(l => ({ a: txt(l.toUpperCase(), `capital ${l}`), b: txt(l, `small ${l}`) }));
+/** Make 10: six `n + ?` cards beside their partner `10 − n`. 5 is never dealt — its partner is another plain 5, which reads as "match the same number" (#960). */
+export const BOND_POOL = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10];
+const bondPairs = (rng: Rng): Pair[] => shuffle(rng, BOND_POOL).slice(0, 6).map(n => ({ a: txt(`${n} + ?`, `${numberWord(n)} and what make ten?`, true), b: txt(String(10 - n), numberWord(10 - n)) }));
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
@@ -82,6 +85,7 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
     { id: 'shapes', title: '2-D shapes', hint: 'Match each shape to its name', hintIsData: false, pairs: rng => shapes(rng, SHAPES_2D, 6) },
     { id: 'doubles', title: 'Doubles', hint: 'Match each double to its answer', hintIsData: true, pairs: rng => shuffle(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).slice(0, 6).map(n => ({ a: txt(`double ${n}`, `double ${n}`, true), b: txt(String(n * 2), numberWord(n * 2)) })) },
     { id: 'clocks', title: "O'clock & Half Past", hint: 'Match each clock to its time', hintIsData: false, pairs: clockPairs },
+    { id: 'bonds10', title: 'Make 10', hint: 'Match each card to the number that makes 10', hintIsData: true, pairs: bondPairs },
   ],
   year2: [
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 21, 99, 6) },
