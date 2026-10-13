@@ -3,7 +3,7 @@ import { SAVE_VERSION, type RawSave } from './shape';
 import { saveKeyFor } from './profile-index';
 import { sessionProfile, state } from './state';
 import { migrate } from './migrate';
-import { load } from './store';
+import { load } from './store'; import { forgetDailyLine } from '../game/daily-line';
 /**
  * The save as a code the grown-up can copy to another device (#64). Every APK the workflow builds is signed
  * with a fresh debug key, so an update has to be installed over an uninstall — which takes localStorage, and
@@ -42,6 +42,7 @@ export function importSave(text: string): boolean {
   const id = sessionProfile();
   let wrote = false;
   try { localStorage.setItem(saveKeyFor(id), JSON.stringify(next)); wrote = true; } catch { /* private mode etc. */ }
+  forgetDailyLine();   // #925: a restored save is not the child who played the kept Daily Sprint
   state.cache = next;   // `sessionProfile()` above has already latched `cacheProfile` to `id`
   // #232 review: only lift the protection if the replacement actually landed. If setItem threw, the newer
   // blob is still on disk — clearing the latch here would let the next ordinary save() relabel it, which is

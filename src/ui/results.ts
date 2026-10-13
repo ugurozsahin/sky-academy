@@ -6,10 +6,11 @@ import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
 import { REST_LINE, restDue, type RestClock } from '../game/rest';
 import type { RestSetting } from '../device-settings';
-import { load, recordCrown, recordSprint, recordTopic, recordTopicSprint } from '../storage';
+import { activeProfile, load, recordCrown, recordSprint, recordTopic, recordTopicSprint, today } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import { listedTopics, topicById, type YearInfo } from '../curriculum';
 import { beltFor, totalStarsOf } from '../game/belts';
+import { dailyLine, keepDailyLine } from '../game/daily-line';
 
 /** How a finished run scored — the fields the medal reads. */
 export interface RunOutcome {
@@ -187,7 +188,8 @@ export const spokenLine = (l: ResultCandidate): string => l.spoken ?? l.text;
  * best and may announce a raised trophy; a mixed Sprint writes the year's best. Returns `newBest` and the
  * results candidates, so `commitResult()` stays one line for it.
  */
-export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r: { correct: number; score: number }, pooled = false): { newBest: boolean; candidates: ResultCandidate[] } {
+export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r: { correct: number; score: number; stars?: number }, pooled = false, daily = false): { newBest: boolean; candidates: ResultCandidate[] } {
+  if (daily) { const day = today(); keepDailyLine(activeProfile(), day, dailyLine({ correct: r.correct, stars: r.stars ?? 0 }, year.title, day)); }   // #925: for the grown-ups' copy row, in memory only
   if (pooled || load().settings.timeX !== 1) return { newBest: false, candidates: [] };   // #1121: a best is always a 60-second run; #1234: a titled pool (Grammar mix) keeps no year record
   if (!topic) return { newBest: recordSprint(year.id, r.score), candidates: [] };
   if (!topicById(topic.id)) return { newBest: false, candidates: [] };   // #1124: a drill built for one run (Tricky Facts) has no row to keep a best on

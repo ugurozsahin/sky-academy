@@ -843,6 +843,48 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#timer')).toContainText(/⏱ (90|89|88)/);
   });
 
+  test('Easy-read card: the switch turns it on and survives a reload, a refused write says so, and the prompt and hint get 1.5 / 0.12em (#907)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await expect(page.locator('button[data-easy="off"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('button[data-easy="on"]')).toHaveAttribute('aria-checked', 'false');
+    await page.evaluate(() => { const real = Storage.prototype.setItem; Storage.prototype.setItem = function (k: string, v: string) { if (k === 'sna:easyread') throw new Error('quota'); return real.call(this, k, v); }; });
+    await page.click('button[data-easy="on"]');
+    await expect(page.locator('#easy-msg')).toBeVisible();
+    await expect(page.locator('button[data-easy="off"]')).toHaveAttribute('aria-checked', 'true');
+    await page.reload();
+    await seedPlayer(page);
+    await openGrownUps(page);
+    expect(await page.evaluate(() => localStorage.getItem('sna:easyread'))).toBeNull();
+    await page.click('button[data-easy="on"]');
+    expect(await page.evaluate(() => localStorage.getItem('sna:easyread'))).toBe('on');
+    await expect(page.locator('button[data-easy="on"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('button[data-easy="off"]')).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#easy-msg')).toBeHidden();
+    await page.reload();
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await expect(page.locator('button[data-easy="on"]')).toHaveAttribute('aria-checked', 'true');
+    const ratios = (sel: string) => page.locator(sel).evaluate(el => { const c = getComputedStyle(el), fs = parseFloat(c.fontSize); return { ls: parseFloat(c.letterSpacing) / fs, lhr: parseFloat(c.lineHeight) / fs }; });
+    for (const [year, id] of [['year2', 'y2-sentence'], ['reception', 'r-build']] as const) {   // a long sentence prompt and a sequence prompt
+      await page.reload();
+      await seedPlayer(page);
+      await startTopic(page, year, id);
+      for (const sel of ['#prompt', '#hint']) { const r = await ratios(sel); expect(r.lhr, `${id} ${sel} line height`).toBeCloseTo(1.5, 2); expect(r.ls, `${id} ${sel} letter spacing`).toBeCloseTo(0.12, 2); }
+      expect(await page.evaluate(() => { const q = document.querySelector('#qcard') as HTMLElement, p = document.querySelector('#prompt') as HTMLElement; return q.scrollWidth <= q.clientWidth && p.scrollWidth <= p.clientWidth; }), `${id} fits the card`).toBe(true);
+    }
+  });
+
+  test('Easy-read card: off keeps today\'s prompt and hint spacing (#907)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    const prompt = await page.locator('#prompt').evaluate(el => { const c = getComputedStyle(el); return { lh: c.lineHeight, ls: parseFloat(c.letterSpacing) / parseFloat(c.fontSize) }; });
+    expect(prompt.lh).toBe('normal');
+    expect(prompt.ls).toBeCloseTo(0.02, 2);
+    expect(await page.locator('#hint').evaluate(el => getComputedStyle(el).lineHeight)).toBe('normal');
+  });
+
   test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
     await page.clock.install();
     await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));
@@ -3317,6 +3359,30 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.coin-gain')).toContainText('+6');         // 1 correct + 1 star × 5
     await page.click('#home');
     await expect(page.locator('#sprint small')).toContainText('best 10');
+  });
+
+  // #925: the Daily Sprint's one-line result is copyable only behind the grown-ups gate, and never carries the child's name.
+  test('Daily Sprint result line: absent before a Daily Sprint, then on the grown-ups dashboard with Copy and no name (#925)', async ({ page }) => {
+    await page.addInitScript(() => { (window as any).__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { (window as any).__copied.push(t); } }, configurable: true }); });
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await expect(page.locator('#daily-copy')).toHaveCount(0);
+    await page.click('#back');
+    await page.click('.island[data-year="year1"]');
+    await page.click('#daily');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results')).not.toContainText(/copy|share|send/i);   // no child-facing share or copy
+    await page.click('#home');
+    await page.click('#back');
+    await openGrownUps(page);
+    const line = await page.locator('#daily-text').inputValue();
+    expect(line).toMatch(/^Sky Ninja Academy · Daily Sprint · Year 1 · \d{4}-\d{2}-\d{2} · 0 correct$/);
+    expect(line).not.toContain('Ada');
+    await page.click('#daily-copy');
+    await expect(page.locator('#daily-msg')).toContainText('Copied');
+    expect(await page.evaluate(() => (window as any).__copied)).toEqual([line]);
   });
 
   test('Ninja Sprint topic chooser (#910): 🎲 Mixed first, then the open subject\'s topics', async ({ page }) => {

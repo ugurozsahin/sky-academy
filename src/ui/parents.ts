@@ -3,7 +3,7 @@ import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { hush, sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, untriedLine, type ParentSummary } from '../game/parents';
-import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words'; import { noTrophyHTML, showPct, topicRow } from './parents-trophies';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
+import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { bindDaily, dailyHTML } from './parents-daily'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words'; import { noTrophyHTML, showPct, topicRow } from './parents-trophies';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
 import { $, $$, esc, render } from './dom'; import { chooserEligible } from './chooser';
 
 /** `launch` is where a grown-up lands after removing the ninja this session was playing (#20 slice 3): the
@@ -184,7 +184,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
     <h3 class="p-h">Where to help ${sm.weakest.length ? '(trickiest topics)' : ''}</h3>
     ${weak}${readyHTML()}
 
-    ${strong ? `<h3 class="p-h">Going well</h3>${strong}` : ''}${wordsHTML(sm.words)}${factsHTML(sm.facts)}${slipsHTML(sm.slips)}${noTrophyHTML(sm.noTrophy)}${shareHTML()}
+    ${strong ? `<h3 class="p-h">Going well</h3>${strong}` : ''}${wordsHTML(sm.words)}${factsHTML(sm.facts)}${slipsHTML(sm.slips)}${noTrophyHTML(sm.noTrophy)}${dailyHTML()}${shareHTML()}
 
     <h3 class="p-h">Game modes — personal bests</h3>
     <div class="p-table-wrap"><table class="p-table">
@@ -337,7 +337,7 @@ export function parentsScreen(nav: Nav) {
     // back button (main.ts's popstate handler reads `isPendingReset()` directly) — must land on onboarding,
     // never on the map with an empty profile (#115). "Undo" is the only way out of that state.
     $('#back').addEventListener('click', () => { sfx.tap(); if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else nav.map(); });
-    wireMove(() => drawDash()); bindShare(sm, load().name, load().avatar ?? ''); bindWords();
+    wireMove(() => drawDash()); bindShare(sm, load().name, load().avatar ?? ''); bindDaily(); bindWords();
     bindSettings(); bindReady();
 
     const overlay = $('#reset-overlay');

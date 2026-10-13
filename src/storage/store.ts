@@ -1,6 +1,6 @@
 // Reading and writing the active profile's save: load, save, reset.
 import { DEFAULT, type RawSave, type SaveData } from './shape';
-import { saveKeyFor } from './profile-index';
+import { saveKeyFor } from './profile-index'; import { forgetDailyLine } from '../game/daily-line';
 import { dropSessionState, sessionProfile, state } from './state';
 import { isFutureSave, migrate } from './migrate';
 export function load(): SaveData {
@@ -28,4 +28,4 @@ export function save(patch: Partial<SaveData> = {}): SaveData {
   catch { state.writeFailed = true; /* private mode, WebView storage disabled, full quota (#151) */ }
   return state.cache;
 }
-export function reset() { const id = sessionProfile(); dropSessionState(); try { localStorage.removeItem(saveKeyFor(id)); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232); writeFailed is a last-attempt signal, not a diagnosis, so a deliberate fresh start gives it the same benefit of the doubt — the very next save() call sets it again if the browser still refuses (#151)
+export function reset() { const id = sessionProfile(); dropSessionState(); forgetDailyLine(); try { localStorage.removeItem(saveKeyFor(id)); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232); writeFailed is a last-attempt signal, not a diagnosis, so a deliberate fresh start gives it the same benefit of the doubt — the very next save() call sets it again if the browser still refuses (#151)

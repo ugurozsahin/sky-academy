@@ -3,7 +3,7 @@ import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
 import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options'; import { playTitle } from '../game/sprint-pools';
-import { gameSpeed, scaled, setGameSpeed } from '../game/speed'; import { calmReduced } from '../device-settings';   // #32: test-only time compression; #906
+import { gameSpeed, scaled, setGameSpeed } from '../game/speed'; import { calmReduced, playStyleAttr } from '../device-settings';   // #32: test-only time compression; #906; #907
 import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools'; import { createHud, heartCount } from './hud';   // #1065: one pool rule
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
@@ -34,7 +34,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   const villainMode = spec.villain;                     // Hammer Man on screen, TNT bubbles in the mix
   const title = playTitle(o, spec.staged, training, spec.title);
   render(`
-  <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
+  <section class="screen play ${tracing ? 'tracing' : ''}" ${playStyleAttr(av.glow)}>
     ${bubbles ? inputMarkup(input) : ''}
     <div class="hud">
       <div class="hud-top">
@@ -192,7 +192,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     if (!r.incomplete) {
       if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r, !!o.legend));   // #933, #932
       else if (training) { if (r.won) recordTraining(o.year.id); }
-      else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r, !!o.title));   // #911/#912
+      else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed));   // #911/#912, #925
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else if (o.mode === 'endless') recordEndless(o.year.id, r.score);   // #1117: no catch-all writer — a new mode records nothing until it names its own
     }

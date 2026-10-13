@@ -4,7 +4,7 @@ import { currentIndex, readItem, readTombstones, saveKeyFor, writeIndex, writeTo
 import { leaveProfile, sessionProfile, state } from './state';
 import { load, save } from './store';
 import { isMigratable } from './migrate';
-import { cleanName } from './name';
+import { cleanName } from './name'; import { forgetDailyLine } from '../game/daily-line';
 import { futureSaveIn } from './profile-card';
 /**
  * Why a rename was refused, as a value the grown-ups screen can turn into a sentence (#20 slice 3, the
@@ -262,5 +262,6 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
   // child, so their writes still land in their own slot. This is `rereadProfile`'s rule (#380 round 5, B2)
   // asked of `cacheProfile` rather than of the index, for the same reason.
   if (self) leaveProfile();
+  forgetDailyLine();   // #925: the slot is reused, and its old child's Daily Sprint line must not outlive it
   return { ok: true, self };
 }
