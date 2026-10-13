@@ -480,9 +480,9 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
   it('moves the volume challenge through the real dojo, and completes it exactly once across four matches', () => {
     // A day whose focus challenge is neither maths10 nor writing6, so the volume challenge is the only thing
     // a maths duel can complete and the exact figures below are knowable rather than a matter of the draw.
-    const date = '2026-09-20';
+    const date = '2026-01-01';
     const cs = dailyChallenges(date);
-    expect(cs.map(c => c.id)).toEqual(['correct15', 'memory1', 'perfect']);
+    expect(cs.map(c => c.id)).toEqual(['correct15', 'memory1', 'fix3']);
     const volume = cs.find(c => c.group === 'volume')!;
     let s: DojoState = freshDojo(date);
     let paid = 0; let completed = 0;
@@ -538,7 +538,7 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
       }
     }
     expect(seen.has('combo5'), 'the un-gated challenge was never drawn — this rail proved nothing').toBe(true);
-    expect(seen.size, 'these 28 days draw nine such challenges; fewer means some dropped out of the pool unnoticed').toBe(9);
+    expect(seen.size, 'these 28 days draw twelve such challenges; fewer means some dropped out of the pool unnoticed').toBe(12);
   });
 });
 

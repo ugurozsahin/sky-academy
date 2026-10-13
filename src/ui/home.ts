@@ -12,14 +12,16 @@ import { islandsHTML, mapLayout } from './map-layout';
 import { ageLabel, isWarmUp } from './year-label';
 import {
   ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, isWhiteboard, load, safeRecord, save, STICKER_IDS, STICKER_COST, today, type TopicProgress,
+  type SaveData, activeProfile,
 } from '../storage';
+import { mapLineDay, setMapLineDay } from '../device-settings';
 import type { Ks2Fact } from '../save-records';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
 import { needsSchoolYear } from '../school-year';
 import { SPRINT_SECONDS } from '../game/session';
 import { MODES } from '../game/modes';
-import { senseiTopics, poolWeights, nextIsland, nextIslandLine } from '../game/sensei';
+import { senseiTopics, poolWeights, nextIsland, nextIslandLine, mapLine } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
@@ -32,7 +34,7 @@ import type { PlayOpts } from './play';
 export type StartPlay = (o: PlayOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
-  memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string) => void; rewards: () => void; shop: () => void; parents: () => void;
+  memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string, labels?: 'players' | 'teams') => void; rewards: () => void; shop: () => void; parents: () => void;
   pickYear: (year: YearInfo) => void;   // #1055: the school-year tap on a new child's map (a mission after "Let's go!", else the island)
   profiles: () => void;   // #20 slice 2: "Who is playing?"
   up: () => void;
@@ -102,9 +104,18 @@ function unstartedNext(progress: Record<string, TopicProgress>, shown: YearInfo[
   return next && stars(next) === 0 ? next : null;
 }
 /** Speak only once a tap has happened (the browser drops earlier speech), and spend the flag only when it did. */
-function sayNextIsland(y: YearInfo, speechOn: boolean) {
-  if (!speechOn || islandNudged || navigator.userActivation?.hasBeenActive === false) return;
-  islandNudged = true; say(nextIslandLine(y));
+function sayNextIsland(y: YearInfo, speechOn: boolean): boolean {
+  if (!speechOn || islandNudged || navigator.userActivation?.hasBeenActive === false) return false;
+  islandNudged = true; say(nextIslandLine(y)); return true;
+}
+const localDay = (n: Date) => `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+/** #955: the day's map line, once per profile, and only when it is really spoken (so a cold boot does not spend it). */
+function sayMapLine(d: SaveData, year: YearInfo) {
+  if (!d.speech || navigator.userActivation?.hasBeenActive === false) return;
+  const day = localDay(new Date()); const profile = activeProfile();
+  if (mapLineDay(profile) === day) return;
+  const line = mapLine(d, year);
+  if (line) { say(line); setMapLineDay(profile, day); }
 }
 let yearAsked = false;   // #1055: spoken once per page load, not on every redraw
 /** Sky Map: one decision — which island (year group). */
@@ -140,7 +151,8 @@ export function mapScreen(nav: Nav) {
       </div></footer>
   </section>`, 'bg-sky');
   tb.bind();
-  if (nudge && !ask) sayNextIsland(nudge, d.speech);
+  const nudged = !!nudge && !ask && sayNextIsland(nudge, d.speech);
+  if (!nudged && !ask) sayMapLine(d, shown.find(y => y.id === d.year) ?? shown[0]);
   if (ask && !yearAsked) { yearAsked = true; say('Tap your school year'); }
   $$('.island').forEach(b => b.addEventListener('click', () => {
     const y = shown.find(x => x.id === b.dataset.year)!;
@@ -265,7 +277,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => nav.memory(year) }] : []),
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
-      go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject), topic => { sfx.tap(); topic ? nav.duel(year, topic.id) : nav.duel(year); }, { mixed: true, mixedLabel: 'Random' }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
+      go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject), (topic, teams) => { sfx.tap(); nav.duel(year, topic?.id, teams ? 'teams' : undefined); }, { mixed: true, mixedLabel: 'Random', teams: true }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
   ], year.id);
   render(`
   <section class="screen home island-screen">

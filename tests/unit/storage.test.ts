@@ -2693,7 +2693,7 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
     // assertion could not tell a dropped bonus from a kept one. Pinned to a date where the bonus is real, and
     // seeded so the game's own coins alone fall SHORT of the threshold: the crossing is the bonus's doing or
     // it does not happen.
-    const BONUS_DAY = new Date('2026-01-13T12:00:00Z');    // `memory1` is that day's mode challenge
+    const BONUS_DAY = new Date('2026-01-01T12:00:00Z');    // `memory1` is that day's mode challenge
     const gameCoins = 1;
     const seed = STICKER_COST[0] - gameCoins - 4;          // 25: short of 30 without the bonus, past it with
 
@@ -2730,7 +2730,7 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
     // Pinned to a bonus-paying date (the same BONUS_DAY as the sticker test above) rather than `new Date()`:
     // `memoryWin` only pays a dojo bonus on 68/400 dates, and on the rest `out.dojo.coins` is 0 — which would
     // let this test pass even if the dojo addend were dropped from `total` entirely, not just the NaN term.
-    const BONUS_DAY = new Date('2026-01-13T12:00:00Z');
+    const BONUS_DAY = new Date('2026-01-01T12:00:00Z');
     save({ coins: 4 });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const out = recordGameEnd(memoryWin, NaN, BONUS_DAY);

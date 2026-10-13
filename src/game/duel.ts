@@ -363,9 +363,9 @@ export function duelStars(t: DuelTally): 1 | 2 | 3 {
  */
 export const duelEarnsCertificate = (r: DuelResult): boolean => r.winner === 'a' && !r.incomplete;
 
-/** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
-export function duelHeadline(r: DuelResult): string {
-  return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `Player ${r.winner === 'a' ? 1 : 2} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;
+/** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b` unless `names` says otherwise (#958's class teams). */
+export function duelHeadline(r: DuelResult, names: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' }): string {
+  return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `${names[r.winner]} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;
 }
 
 /**

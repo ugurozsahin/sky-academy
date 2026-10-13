@@ -161,6 +161,22 @@ async function reachLastRound(page: Page) {
 }
 
 test.describe('Ninja Duel', () => {
+  test('Class teams in the chooser names both seats Team A and Team B at round 1 (#958)', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' })));
+    await page.goto('/');
+    await page.click('.island[data-year="year1"]');
+    await page.click('#duel');
+    const btn = page.locator('#island-overlay .topic[data-teams]');
+    await expect(btn).toHaveAttribute('aria-pressed', 'false'); await expect(btn).toContainText('Class teams: Off');
+    await btn.click();
+    await expect(btn).toHaveAttribute('aria-pressed', 'true'); await expect(btn).toContainText('Class teams: On');   // starts nothing
+    await expect(page.locator('.duel-screen')).toHaveCount(0);
+    await page.click('#island-overlay .topic[data-mixed]');
+    await expect(page.locator('.duel-screen')).toBeVisible();
+    await expect(page.locator('.duel-tag b')).toHaveText(['Team B', 'Team A']);
+    await expect(page.locator('#arena-a')).toHaveAttribute('aria-label', 'Team A arena');
+    await expect(page.locator('#arena-b')).toHaveAttribute('aria-label', 'Team B arena');
+  });
   /**
    * guard rail (#389), found in play by the owner and his child. Each arena used to lay its own wave out from
    * `Math.random` and its own `performance.now()`, so the answer took a different launch slot on each side: a

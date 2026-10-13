@@ -232,9 +232,9 @@ const fileBeltCert = (who: IslandWho, belt: { n: number; name: string }, stars: 
  * topic's island, the Island Master certificate is filed here (date fixed now, #410) and announced only if the
  * write landed (#470).
  */
-export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false, who?: IslandWho): { candidates: ResultCandidate[] } {
+export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false, who?: IslandWho): { candidates: ResultCandidate[]; topicBest: boolean } {
   const total = () => totalStarsOf(load().progress, listedTopics()), before = beltFor(total()), wasDone = islandComplete(load().progress, topic.year);
-  const candidates = missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)), after = beltFor(total());
+  const topicBest = recordTopic(topic.id, r.stars, r.score), candidates = missionBestCandidates(topic, topicBest), after = beltFor(total());
   if (legend && r.won) recordCrown(topic.id);
   if (after.n > before.n) {
     const spoken = `You earned the ${after.name} belt!`, filed = !!who && fileBeltCert(who, after, total());   // #953: one album entry per belt, announced only if the write landed (#470)
@@ -244,5 +244,5 @@ export function recordMissionOutcome(topic: Topic, r: { stars: number; score: nu
     recordCert(certToStored(islandCertInfo({ name: who.name, avatar: who.avatar, date: new Date() }, who.year), { id: `${who.year.id}:island` }));
     if (!isWriteFailing() && !isReadOnlySave()) candidates.unshift(islandCandidate(who.year.title));
   }
-  return { candidates };
+  return { candidates, topicBest };
 }
