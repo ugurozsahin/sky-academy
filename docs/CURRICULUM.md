@@ -16,6 +16,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-sub | Number: composition | within 10, pictorial |
 | r-counton | Numerical Patterns: count beyond 20 | what comes next |
 | r-order | Numerical Patterns: compare/order | slice 3 numbers smallest→biggest |
+| r-patterns | Patterns: continue AB, ABB, ABBC | slice what comes next in a repeating strip |
 | r-balance | Number: composition, equal amounts | balance scales: objects on one pan, ? on the other (d3: `a = b + ?`) |
 | r-doubles | Numerical Patterns: double facts within 10 | doubles to 5 + 5 on a two-colour ten-frame — five facts in all, so d1 is 1–4 and d2 adds the fifth; d3 is the top half (2–5) and adds the inverse (`Double ? = 8`), which drops the frame because it would otherwise answer it |
 | r-share | Numerical Patterns: distribute equally | share 2–10 objects equally **between two**; totals are always even, and the total itself is a decoy. Sharing between three or four is Year 2 division (y2-tables) |

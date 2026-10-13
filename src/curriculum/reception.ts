@@ -2,6 +2,7 @@
 // #325 stage 4: the curriculum used to be split by subject (maths.ts/writing.ts); this file holds every
 // Reception generator, maths and writing alike, so a reviewer checking "is Reception right" reads one file.
 // Generators shared with Year 1/Year 2 live in util.ts (#325 stage 4).
+import { PATTERN_OBJECTS } from './patterns';
 import type { Generator, Rng, Topic } from './types';
 import { rInitial } from './reception-initial';
 import { rRhyme } from './reception-rhyme';
@@ -167,6 +168,26 @@ const rOddEven: Generator = (d, rng) => {
   return wordQ(rng, 'Can they all find a partner?', even ? '✅' : '❌', ['✅', '❌'], { visual, hint: 'Put them in twos', hintIsData: false, say: `There are ${n}. Can they all find a partner?` });
 };
 const rOrder: Generator = (d, rng) => orderQ(rng, d === 1 ? 5 : 10, 3);
+/** Continue a repeating pattern (#970): two whole repeats show, the gap is always the last cell. */
+const R_PATTERNS = [
+  { unit: 'AB', cells: 'ABABA', next: 'B', decoys: 2 },
+  { unit: 'ABB', cells: 'ABBABBAB', next: 'B', decoys: 3 },
+  { unit: 'ABBC', cells: 'ABBCABBC', next: 'A', decoys: 3 },
+] as const;
+const rPatterns: Generator = (d, rng) => {
+  const p = R_PATTERNS[d - 1];
+  const letters = [...new Set([...p.unit])];
+  const chosen = shuffle(rng, PATTERN_OBJECTS.map(([g]) => g)).slice(0, letters.length);
+  const glyph = (ch: string) => chosen[letters.indexOf(ch)];
+  const answer = glyph(p.next);
+  // Near decoys first: the pattern's own other objects, then the rest of the pool.
+  const decoys = [...chosen.filter(o => o !== answer), ...PATTERN_OBJECTS.map(([g]) => g).filter(o => !chosen.includes(o))].slice(0, p.decoys);
+  return wordQ(rng, 'What comes next?', answer, decoys, {
+    visual: { type: 'strip', text: [...[...p.cells].map(glyph), '_'].join(' ') },
+    say: 'Look at the pattern. What comes next?',
+    hint: 'Slice what comes next', hintIsData: false,
+  });
+};
 const rBalance: Generator = (d, rng) => {
   const emoji = pick(rng, OBJECTS);
   if (d < 3) {
@@ -334,6 +355,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-sub', title: 'Taking Away', icon: '✂️', subject: 'maths', year: 'reception', nc: 'ELG Number: subtraction facts', gen: rSub },
   { id: 'r-counton', title: 'What Comes Next?', icon: '🔢', subject: 'maths', year: 'reception', nc: 'ELG Patterns: count beyond 20', gen: rCountOn },
   { id: 'r-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'reception', nc: 'ELG Patterns: compare and order to 10', sequenceFrom: 1, gen: rOrder },
+  { id: 'r-patterns', title: 'Pattern Party', icon: '🔁', subject: 'maths', year: 'reception', nc: 'Development Matters: continue repeating patterns', gen: rPatterns },
   { id: 'r-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'reception', nc: 'ELG Number: composition, equal amounts', gen: rBalance },
   { id: 'r-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'reception', nc: 'ELG Patterns: double facts within 10', gen: rDoubles },
   { id: 'r-share', title: 'Share It Out', icon: '🤝', subject: 'maths', year: 'reception', nc: 'ELG Patterns: distribute equally between two', gen: rShare },

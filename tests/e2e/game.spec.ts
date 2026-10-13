@@ -1240,6 +1240,18 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index > 0);
   });
 
+  // #970: the Reception ABBC strip (9 cells at difficulty 3) must also stay on one line on a phone.
+  test('r-patterns: the ABBC strip fits on one line on a phone (#970)', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-patterns');
+    await skipToStage(page, 4);
+    const strip = page.locator('.vis.strip');
+    await expect(strip).toBeVisible();
+    const w = await strip.evaluate(el => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(w.scroll, 'the strip does not overflow its box').toBeLessThanOrEqual(w.client + 1);
+  });
+
   test('completing stage 1 shows the avatar celebrating with a praise line', async ({ page }) => {
     await seedPlayer(page, 'kai', 'Sam');
     await startTopic(page, 'year1', 'y1-bonds');

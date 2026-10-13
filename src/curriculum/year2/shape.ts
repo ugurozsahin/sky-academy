@@ -1,6 +1,7 @@
 // Year 2 shape, position, symmetry and repeating patterns. Split out of year2.ts (#1416); index.ts re-exports every name.
 import { type Generator, type Rng } from '../types';
 import { ri, pick, shuffle, numQ, wordQ, SHAPES_3D, name3dQ, balanceQ, DIRS, ARROWS, TURNS_ALL, turnEnd } from '../util';
+import { PATTERN_OBJECTS } from '../patterns';
 
 /** Year 2: "identify and describe the properties of 3-D shapes, including the number of edges, vertices and faces". */
 export const y2Shapes: Generator = (d, rng) => {
@@ -106,23 +107,6 @@ export const y2Symmetry: Generator = (d, rng) => {
  * exactly one object fits — the acceptance bar for this issue is one defensible answer with the voice off,
  * and a pattern showing only one period leaves "what comes next" genuinely open.
  */
-/**
- * The objects a pattern is built from: **one silhouette each** (#299 review B4).
- *
- * The first pool here was eight coloured circles. Six of them differed by hue alone, and because the near
- * decoy is always another object from the same card, 54% of d1 cards put two of those six in front of the
- * child at once — 🔴/🟢, 🔵/🟣 and the rest of the standard confusions. To a colour-blind child the sequence
- * then reads as one repeated circle and the two bubbles are identical: not a hard card, a card with **no**
- * answer, which fails #299's own "exactly one defensible answer with the voice off" the same way a card that
- * answers itself does.
- *
- * So every object carries a different shape, and the name beside each glyph is what the rail in
- * `tests/unit/curriculum.test.ts` holds unique — colour is decoration here, never the thing being read.
- */
-const PATTERN_OBJECTS: readonly (readonly [string, string])[] = [
-  ['🔴', 'circle'], ['🟦', 'square'], ['🔺', 'triangle'], ['⭐', 'star'],
-  ['❤️', 'heart'], ['🌙', 'crescent'], ['🔶', 'diamond'], ['🐟', 'fish'],
-];
 const PATTERN_GLYPHS = PATTERN_OBJECTS.map(([g]) => g);
 /** Unit shapes as letters: which positions repeat, filled with objects at generation time. */
 const UNITS_D1 = ['AB'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
