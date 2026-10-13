@@ -2250,6 +2250,17 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#score')).not.toHaveText('0');
   });
 
+  test('Story Order: the three-sentence card fits the phone and the pictures are sliced in order (#975)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-storyorder');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    await expectFitsViewport(page, 'Story Order three-sentence card and bubbles');
+    for (let i = 0; i < 3; i++) {
+      await waitForTarget(page);
+      expect(await answer(page)).toBe(true);
+    }
+  });
+
   test('guard rail: a pause inside the outcome hold holds the question — nothing advances behind the overlay (#301)', async ({ page }) => {
     // #301, the play-screen half of the same defect the duel carries. `hold(true)` paused the ARENA and left
     // the beats scheduled through `later()` running, so a pause pressed inside the ~1 s outcome hold let

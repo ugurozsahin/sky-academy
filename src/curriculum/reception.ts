@@ -13,6 +13,7 @@ import {
   PHASE2, PHASE2B, PHASE3, VOWELS, LETTERS, CVC, DIGRAPHS,
 } from './util';
 import { syllableQ } from './syllables';
+import { storyQ } from './story';
 
 // ---------- Reception maths ----------
 const rCount: Generator = (d, rng) => {
@@ -389,6 +390,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-build', title: 'Build a Word', icon: '🧱', subject: 'writing', year: 'reception', nc: 'ELG Writing: spell by sounds (CVC)', sequenceFrom: 1, gen: rBuild },
   { id: 'r-read', title: 'Read It!', icon: '📗', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: read words by sound-blending', gen: rRead },
   { id: 'r-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'reception', nc: 'ELG Writing: simple sentences', sequenceFrom: 1, gen: rSentence },
+  { id: 'r-storyorder', title: 'Story Order', icon: '🎬', subject: 'writing', year: 'reception', nc: 'ELG Comprehension: anticipate key events in stories', sequenceFrom: 1, gen: (d, rng) => storyQ(rng, d, true) },
   { id: 'r-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'reception', nc: 'ELG Writing: form letters', input: 'tracing', gen: rTrace },
   { id: 'r-initial', title: 'Starts Like', icon: '🔔', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: words with the same initial sound (Development Matters)', sequenceFrom: 3, gen: rInitial },
 ];

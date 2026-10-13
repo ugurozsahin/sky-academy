@@ -82,6 +82,7 @@ export const NO_REPEATED_SET = new Set([
   'y1-alphabet d1', 'y1-alphabet d3', // #976: the bubble sets are drawn from 26 letters, so no two cards offer the same set at these seeds; d2 does compare
   'y1-moreless d3', // #983: count-back cards spread d3 over 0-100, so no option set recurs with a different answer at this seed; the options are all numerals, never wide
   'y1-spellrules d1', 'y1-spellrules d2', 'y1-spellrules d3', // #990: each bank word carries its own two decoys, so an option set never recurs with a different answer
+  'r-storyorder d1', 'r-storyorder d2', 'r-storyorder d3', 'y1-storyorder d1', 'y1-storyorder d2', 'y1-storyorder d3', // #975: a story's emoji have one keyed order, so an option set never recurs with a different answer; the bubbles are emoji, never wide
 'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
 'y2-related d1', 'y2-related d2', 'y2-related d3', 'y2-add d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
