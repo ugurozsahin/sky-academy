@@ -12,7 +12,7 @@ export { type SetActiveResult, setActiveProfile, type AddProfileResult, addProfi
 export { recordTopic, recordCrown, recordAccuracy, recordTraining, recordEndless, recordSprint, recordTopicSprint, recordBossWin, recordMemory, today, touchStreak } from './progress';
 export { addCoins, dojoToday, recordDojo, type GameEndOutcome, recordGameEnd } from './rewards';
 export { type AnswerTally, type TopicProgress, type StoredCert, type StoredDuel, type SaveData, SAVE_VERSION } from './shape';
-export { isReadOnlySave, isWriteFailing, isGuest, saveKept } from './state';
+export { isReadOnlySave, isWriteFailing, isGuest, isWhiteboard, saveKept } from './state';
 export { startGuest, endGuest } from './guest';
 export { STICKER_IDS, STICKER_COST, stickersFor, safeRecord, TOPICS_STARRED_GOAL, SPRINT_STICKER_SCORE, type Achievement, ACHIEVEMENTS, evaluateStickers } from './stickers';
 export { load, save, reset } from './store';

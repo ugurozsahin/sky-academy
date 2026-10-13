@@ -45,7 +45,7 @@ export interface StoredCert {
   stars: number; score: number; correct: number; attempts: number;
   date: string;           // ISO day (yyyy-mm-dd), drawn as the award date
   training?: boolean;
-  island?: true;          // Island Master: every topic on the island starred (#952); certKind() decides precedence
+  island?: true; belt?: true;   // Island Master: every topic on the island starred (#952); a new ninja belt (#953); certKind() decides precedence
   duel?: boolean;         // won a Ninja Duel rather than a mission (#16 item 5) — see certKind() for why it is a
                           // second optional flag and not a `kind` union: `training` is already on disk.
 }

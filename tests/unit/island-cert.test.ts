@@ -21,7 +21,7 @@ describe('Island Master certificate (#952)', () => {
 
   const who = { name: 'Ada', avatar: AVATARS[0], year };
   const win = (t: (typeof topics)[number], stars: number) => recordMissionOutcome(t, { stars, score: 10, won: true }, false, who).candidates.some(c => c.kind === 'island');
-  const albumIds = () => certificates().map(c => c.id);
+  const albumIds = () => certificates().map(c => c.id).filter(id => !id.includes(':belt-'));   // belts (#953) file their own entries
 
   it('the win that completes the island files and announces it once; replays and earlier wins do neither', () => {
     reset();

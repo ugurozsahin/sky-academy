@@ -14,7 +14,8 @@
  * entry in `isCert()` instead would drop a certificate a child genuinely earned, which is the worse of the two
  * and the opposite of what that guard exists for.
  *
- * `island` (#952, the Island Master certificate) is the same optional-flag shape; `play.ts` is its only writer.
+ * `island` (#952, the Island Master certificate) and `belt` (#953, a new ninja belt) are the same optional-flag
+ * shape, unchecked by `isCert()` for the same reason; `ui/results.ts` is their only writer.
  */
-export const certKind = (i: { training?: boolean; duel?: boolean; island?: true }): 'island' | 'duel' | 'sensei' | 'mission' =>
-  i.island === true ? 'island' : i.duel === true ? 'duel' : i.training === true ? 'sensei' : 'mission';
+export const certKind = (i: { training?: boolean; duel?: boolean; island?: true; belt?: true }): 'island' | 'belt' | 'duel' | 'sensei' | 'mission' =>
+  i.island === true ? 'island' : i.belt === true ? 'belt' : i.duel === true ? 'duel' : i.training === true ? 'sensei' : 'mission';

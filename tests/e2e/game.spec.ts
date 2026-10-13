@@ -987,6 +987,23 @@ test.describe('Sky Ninja Academy', () => {
     expect(await keys()).toBe(before);
   });
 
+  test('Whiteboard mode: a topic tap is Relaxed practice, nothing is saved (#949)', async ({ page }) => {
+    await seedPlayer(page);
+    await openGrownUps(page);
+    const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+    const before = await keys();
+    await page.click('#whiteboard-start');
+    await expect(page.locator('.home')).toBeVisible();
+    await startTopic(page, 'reception', 'r-count');
+    const lives = await page.evaluate(() => window.__sna.state().lives);
+    await waitForWrongOrEnd(page);
+    const asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
+    expect(await page.evaluate(() => window.__sna.state().lives), 'Relaxed practice loses no life').toBe(lives);
+    expect(await keys(), 'localStorage is byte-identical').toBe(before);
+  });
+
   test('Relaxed practice: wrong slices cost nothing, ten questions, one coin each right, no stars and no Storm best (#937)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
@@ -1322,8 +1339,11 @@ test.describe('Sky Ninja Academy', () => {
     // Android tablet that button does nothing at all, and that is exactly the child whose certificate has
     // to survive the results overlay closing. Asserted here, above the delivery routes, so a regression
     // that only files on a successful save cannot hide behind the two that work.
-    const album = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
+    const filed = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
+    const album = filed.filter((c: { belt?: true }) => !c.belt);
     expect(album).toHaveLength(1);
+    // #953: the three stars cross the Yellow belt, which files its own certificate beside the mission's.
+    expect(filed.filter((c: { belt?: true }) => c.belt)).toMatchObject([{ id: 'reception:belt-2', title: 'Yellow belt' }]);
     // `name` and `avatar` are the two fields the caller supplies to `certToStored()` rather than copying out
     // of `CertInfo` (#544) — the wiring nothing else checks. This test's seeded avatar id does not resolve, so
     // `avatar: 'volt'` here is the fallback `avatarById` draws, not the raw seed — proving the album row is a
@@ -1818,8 +1838,9 @@ test.describe('Sky Ninja Academy', () => {
     expect(saved.progress['r-count'], 'the topic star and best score reached the save').toMatchObject({ stars: 3, plays: 1 });
     expect(saved.progress['r-count'].best).toBeGreaterThan(0);
     expect(saved.coins, 'coins were paid though neither overlay ever opened').toBeGreaterThan(0);
-    expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
-    expect(saved.certs[0]).toMatchObject({ id: 'reception:r-count', name: 'Ada', avatar: 'terra' });
+    const missionCerts = saved.certs.filter((c: { belt?: true }) => !c.belt);   // #953: the 3 stars also cross the Yellow belt, filed beside it
+    expect(missionCerts, 'and the win filed its certificate').toHaveLength(1);
+    expect(missionCerts[0]).toMatchObject({ id: 'reception:r-count', name: 'Ada', avatar: 'terra' });
   });
 
   test('"My certificates" (#110): an earned certificate lists on the rewards screen, and View opens it full-screen with tap-to-zoom', async ({ page }) => {
