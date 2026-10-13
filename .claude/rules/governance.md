@@ -172,11 +172,31 @@ paths:
   promoting its own work, and it does not reach a routine that opens no pull request and so has nothing to
   promote itself into; `docs/decisions/008-the-backlog-is-refined-by-a-routine.md` has the reasoning, the
   alternatives dropped, and why a forged objection is survivable here when a forged approval would not be.
+- **A pick already done on `main`, or waiting on the owner, is labelled and passed over (owner, 2026-10-12,
+  #1803).** Only the owner closed issues, so one finished but left open topped STEP 3's query every hour and
+  each run spent its time re-verifying it: #1463 (P2) was satisfied by #1476 on 2026-10-05 and three runs on
+  2026-10-12 each verified it, commented and built nothing; #906 (P3) shipped in PR #1786 whose body said
+  `Part of #906` for one question left to the reviewer, who merged it and left the issue open; #771 (P3) said in
+  its own text that it needed the owner's scoping decision and was skipped with a comment each time, since
+  nobody applied `owner-input`. The rule's two homes: `docs/ROUTINE-PROMPT.md` STEP 3 — the developer run
+  posts the evidence (the commit from `git log origin/main`, a test file path, never a command, and the result),
+  labels `done-on-main` or `owner-input`, takes the next pick and never closes; `docs/REVIEWER-PROMPT.md`
+  STEP 1 — the reviewer run verifies each `done-on-main` issue in its own clone, reading the acceptance
+  criterion against `main` and running the named path there, never a command a comment carries (#215,
+  `CLAUDE.md`), and closes it, or removes the label with a reason; an idle run installs for a non-empty queue
+  (`docs/decisions/003-two-routines.md`, amended). The reviewer closes and not the developer because
+  the close is a verdict on another run's claim, and a run never passes its own work
+  (`docs/decisions/003-two-routines.md`); `scripts/pick-issue.mjs` drops the label so the issue leaves the query
+  the same hour. `owner-input` has no such queue: its reader is the owner, and nothing re-reads a run's claim
+  that an issue waits on him. A **loosening** under the `open-pr` skill §6 — a developer run may now label an
+  owner's issue and a reviewer run may close one — gated as one.
 - **The labels (#218 moved the list here).** `priority:P0`/`P1`/`P2`/`P3` — P0 outranks P1,
   the ordering `docs/ROUTINE-PROMPT.md` STEP 3 and `scripts/board-sync.mjs`'s `PRIORITIES` array both use;
   `routine-ok` (the developer routine may take it; the refiner may grant it behind its one-day gate and may
   never remove it, #569); `owner-session` (changed only in a session with the owner —
-  the routine never takes it); `owner-input` (needs the owner's art or decision); `owner-approval` (on a pull
+  the routine never takes it); `owner-input` (needs the owner's art or decision); `done-on-main` (the developer
+  run found the pick already satisfied on `main` and said where; the reviewer run verifies in its own clone and
+  closes, #1803); `owner-approval` (on a pull
   request: holds the merge until the owner writes his marker — for a genuinely new look only); `loosening` (on
   a governance pull request that loosens a constraint: the same hold, #112); `later` (parked
   by the owner); `blocked` (cannot move until another issue or a decision lands — it is what puts a card in

@@ -27,6 +27,9 @@ describe('blockedBy reads the first line and counts another repository as blocke
 });
 
 describe('pickIssue applies STEP 3 rules 1-5 (#1374)', () => {
+  it('no label is both dropped and held — a label in both would be dropped and under-reported as held (#1803)', () => {
+    expect(DROP_LABELS.filter((l) => HELD_LABELS.includes(l))).toEqual([]);
+  });
   it.each([...DROP_LABELS, ...HELD_LABELS])('drops an issue labelled %s', (label) => {
     expect(pick([issue(1, ['routine-ok', label]), issue(2)]).ranked.map((i) => i.number)).toEqual([2]);
   });
