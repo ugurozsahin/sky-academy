@@ -62,6 +62,9 @@ const clockPairs = (rng: Rng): Pair[] => {
   const all = Array.from({ length: 24 }, (_, i) => ({ h: i % 12 + 1, half: i >= 12 }));
   return shuffle(rng, all).slice(0, 6).map(({ h, half }) => { const say = clockPhrase(h, half ? 30 : 0); return { a: txt(clockEmoji(h, half), say), b: txt(say, say, say.length > 6) }; });
 };
+/** Big & Small Letters: four letters from a–z, capital beside small. `i` and `l` are left out — capital I and small l are the same upright stroke in most fonts, so a face could have two partners (#959). */
+export const LETTER_POOL = 'abcdefghjkmnopqrstuvwxyz'.split('');
+const letterPairs = (rng: Rng): Pair[] => shuffle(rng, LETTER_POOL).slice(0, 4).map(l => ({ a: txt(l.toUpperCase(), `capital ${l}`), b: txt(l, `small ${l}`) }));
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
@@ -71,6 +74,7 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
     { id: 'shapes', title: 'Shapes', hint: 'Match each shape to its name', hintIsData: false, pairs: rng => shapes(rng, SHAPES_2D.slice(0, 4), 4) },
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 1, 5, 4) },
     { id: 'read', title: 'Read & Match', hint: 'Read the word and find its picture', hintIsData: false, pairs: readPairs },
+    { id: 'letters', title: 'Big & Small Letters', hint: 'Match each capital letter to its small letter', hintIsData: false, pairs: letterPairs },
   ],
   year1: [
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 1, 20, 6) },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clockEmoji, gridFor, hasMemoryDecks, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
+import { clockEmoji, gridFor, hasMemoryDecks, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS, isKs2, type YearId } from '../../src/curriculum';
 import { clockPhrase } from '../../src/curriculum/year2';
 import { CVC, DIGRAPHS, SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
@@ -125,6 +125,22 @@ describe('memory decks', () => {
     expect(pairs.length).toBe(8);
     for (const p of pairs) { expect(p.a.coin).toBeGreaterThan(0); expect(p.b.coin).toBeUndefined(); expect(p.b.text).toBe(p.a.text); }
     expect(pairs.some(p => p.a.text.startsWith('£'))).toBe(true);
+  });
+  // #959: a face with two valid partners scores a correct match as a miss (#372/#476), and capital I / small l
+  // are one upright stroke in most fonts, so neither letter is ever dealt.
+  it('Reception letters: each face has exactly one partner, and i / l are never dealt', () => {
+    const theme = pickTheme('reception', rng(1), 'letters');
+    expect(theme.id).toBe('letters');
+    for (let seed = 1; seed <= 200; seed++) {
+      const faces = theme.pairs(rng(seed)).flatMap(p => [p.a, p.b]);
+      expect(faces.length).toBe(8);
+      for (const f of faces) {
+        expect(faces.filter(g => g !== f && g.text.toLowerCase() === f.text.toLowerCase()).length, `seed ${seed} ${f.text}`).toBe(1);
+        expect('il').not.toContain(f.text.toLowerCase());
+      }
+    }
+    expect(LETTER_POOL).not.toContain('i');
+    expect(LETTER_POOL).not.toContain('l');
   });
   it('pickTheme falls back to a random theme of the year when the id is unknown', () => {
     expect(THEMES.year1!.map(t => t.id)).toContain(pickTheme('year1', rng(9), 'nope').id);
