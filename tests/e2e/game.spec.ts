@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { TOPICS, shownYears, STRANDS, YEARS, type Strand, type Topic, type YearInfo } from '../../src/curriculum';
+import { TOPICS, listedTopics, shownYears, STRANDS, YEARS, type Strand, type Topic, type YearInfo } from '../../src/curriculum';
 import { groupTopics, topicsHTML } from '../../src/ui/topic-groups';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
@@ -1490,6 +1490,26 @@ test.describe('Sky Ninja Academy', () => {
     await action.click();
     await expect(page.locator('.play')).toBeVisible();
     await expect(page.locator('.ttl')).toHaveText('Quick Dots');   // r-subitise, wrapped past the end of the list
+  });
+
+  /** #952: the win that stars the last unstarred topic on an island files `<year>:island` and announces it; a replay does neither. */
+  test('Island Master (#952): completing Reception files the certificate and announces it once', async ({ page }) => {
+    test.setTimeout(150_000);
+    const progress = Object.fromEntries(listedTopics().filter(t => t.year === 'reception' && t.id !== 'r-count').map(t => [t.id, { stars: 1, best: 5, plays: 1 }]));
+    await seedPlayer(page, 'volt', 'Ada', { progress });
+    await startTopic(page, 'reception', 'r-count');
+    await winMission(page);
+    const line = page.locator('.results .best-pill', { hasText: 'Island Master certificate saved' });
+    await expect(line).toBeVisible();
+    await expect(line).toContainText('You starred every topic on Reception Island!');
+    const ids = () => page.evaluate(() => (JSON.parse(localStorage.getItem('sna:v1')!).certs as { id: string; island?: boolean }[]).map(c => c.id + (c.island ? '*' : '')));
+    expect(await ids()).toContain('reception:island*');
+    await page.goto('/');
+    await startTopic(page, 'reception', 'r-count');
+    await winMission(page);
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results .best-pill', { hasText: 'Island Master' })).toHaveCount(0);
+    expect((await ids()).filter(i => i === 'reception:island*')).toHaveLength(1);
   });
 
   test('results screen (#929): no "Next topic →" once every topic in the subject is already starred', async ({ page }) => {

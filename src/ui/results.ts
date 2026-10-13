@@ -6,7 +6,9 @@ import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
 import { REST_LINE, restDue, type RestClock } from '../game/rest';
 import type { RestSetting } from '../device-settings';
-import { activeProfile, load, recordCrown, recordSprint, recordTopic, recordTopicSprint, today } from '../storage';
+import { islandComplete } from '../storage/stickers';
+import { certToStored, type CertInfo } from './certificate';
+import { activeProfile, isReadOnlySave, isWriteFailing, load, recordCert, recordCrown, recordSprint, recordTopic, recordTopicSprint, today } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import { listedTopics, topicById, type YearInfo } from '../curriculum';
 import { beltFor, totalStarsOf } from '../game/belts';
@@ -202,10 +204,35 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
 export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: boolean): ResultCandidate[] =>
   isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
 
-/** Record a Mission's result and work out its announcements (#933 best, #951 belt), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. A *won* Legend run also crowns the topic (#932); a lost one changes nothing more. */
-export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false): { candidates: ResultCandidate[] } {
-  const total = () => totalStarsOf(load().progress, listedTopics()), before = beltFor(total());
+/**
+ * The Island Master certificate (#952), built when a won Mission completes its island: three stars, one
+ * "correct"/"attempt" per topic, the island's own star total as the score, so `certificateText()` can print
+ * `<n> topics · ★ <score>/<n × 3>`. `base` carries the child and the instant (#410), fixed once by the caller.
+ */
+export interface IslandWho { name: string; avatar: CertInfo['avatar']; year: Pick<YearInfo, 'id' | 'title'> }
+export function islandCertInfo(base: Pick<CertInfo, 'name' | 'avatar' | 'date'>, year: Pick<YearInfo, 'id' | 'title'>): CertInfo {
+  const ts = listedTopics().filter(t => t.year === year.id), p = load().progress;
+  return { ...base, year: year.title, title: `${year.title} Island`, stars: 3, correct: ts.length, attempts: ts.length, score: ts.reduce((n, t) => n + (p[t.id]?.stars ?? 0), 0), island: true };
+}
+
+/** The `island` results line (#952); only offered once the certificate write landed (#470). */
+export const islandCandidate = (yearTitle: string): ResultCandidate => ({ kind: 'island', text: `You starred every topic on ${yearTitle} Island! Island Master certificate saved.` });
+
+/**
+ * Record a Mission's result and work out its announcements (#933 best, #951 belt, #952 island), so `commitResult()`
+ * stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. A *won* Legend run also
+ * crowns the topic (#932); a lost one changes nothing more. When `who` is given and this very result completed the
+ * topic's island, the Island Master certificate is filed here (date fixed now, #410) and announced only if the
+ * write landed (#470).
+ */
+export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false, who?: IslandWho): { candidates: ResultCandidate[] } {
+  const total = () => totalStarsOf(load().progress, listedTopics()), before = beltFor(total()), wasDone = islandComplete(load().progress, topic.year);
   const candidates = missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)), after = beltFor(total());
   if (legend && r.won) recordCrown(topic.id);
-  return { candidates: after.n > before.n ? [{ kind: 'belt', text: `🥋 You earned the ${after.name} belt!`, spoken: `You earned the ${after.name} belt!` }, ...candidates] : candidates };
+  if (after.n > before.n) candidates.unshift({ kind: 'belt', text: `🥋 You earned the ${after.name} belt!`, spoken: `You earned the ${after.name} belt!` });
+  if (who && !wasDone && islandComplete(load().progress, topic.year)) {
+    recordCert(certToStored(islandCertInfo({ name: who.name, avatar: who.avatar, date: new Date() }, who.year), { id: `${who.year.id}:island` }));
+    if (!isWriteFailing() && !isReadOnlySave()) candidates.unshift(islandCandidate(who.year.title));
+  }
+  return { candidates };
 }

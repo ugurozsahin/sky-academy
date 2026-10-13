@@ -4,31 +4,16 @@ import { avatarById, type Avatar } from '../avatars';
 import { esc } from './dom';
 import { isNativeShell, plugin } from '../native';
 import type { StoredCert } from '../storage';
+import { certKind } from './cert-kind';
 
 export { isNativeShell };
+export { certKind };   // moved to cert-kind.ts (#952, the #714 ratchet): importers keep this path
 
 // `date` is required, not defaulted (#410): the printed certificate and the album row it files alongside must
 // read one fixed instant, decided once by the caller that earned it — a live `new Date()` default here would
 // let `certificateText()` and `certToStored()` each read the clock at a different moment (or, before #410,
 // read the same instant in two different calendars) and disagree about which day it is.
-export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date: Date; training?: boolean; duel?: boolean }
-
-/**
- * Which of the three things a certificate was earned for (#16 item 5). `training` and `duel` are separate
- * optional flags rather than one `kind` field because `training` is already **on disk** in every save that has
- * ever filed a certificate, and a discriminated union would need a `SAVE_VERSION` bump and a migration step to
- * earn nothing a reader can see. The cost is that `{ training: true, duel: true }` is expressible; no caller
- * constructs it (`play.ts` never sets `duel`, `ui/duel.ts` never sets `training`), and this function is the one
- * place the precedence is decided, so a hand-edited save reads as a duel rather than as undefined behaviour.
- *
- * Both flags are compared against `true` rather than read for truthiness, and that is the deliberate half:
- * `isCert()` does not type-check either one (it never did for `training`), so a hand-edited `"duel": "yes"`
- * reaches here. Falling back to `'mission'` prints a slightly wrong reason on a junk entry; **rejecting** the
- * entry in `isCert()` instead would drop a certificate a child genuinely earned, which is the worse of the two
- * and the opposite of what that guard exists for.
- */
-export const certKind = (i: { training?: boolean; duel?: boolean }): 'duel' | 'sensei' | 'mission' =>
-  i.duel === true ? 'duel' : i.training === true ? 'sensei' : 'mission';
+export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date: Date; training?: boolean; duel?: boolean; island?: true }
 
 /**
  * Rebuild a drawable certificate from what the save keeps (#205). Certificates are stored as data, not as a
@@ -44,7 +29,7 @@ export function certFromStored(c: StoredCert): CertInfo {
   return {
     name: c.name, avatar: avatarById(c.avatar), year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-    date: new Date(`${c.date}T12:00:00`), training: c.training, duel: c.duel,
+    date: new Date(`${c.date}T12:00:00`), training: c.training, duel: c.duel, island: c.island,
   };
 }
 /**
@@ -72,7 +57,7 @@ export function certToStored(c: CertInfo, o: { id: string }): StoredCert {
   return {
     id: o.id, name: c.name, avatar: c.avatar.id, year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-    date: isoDay(c.date), training: c.training, duel: c.duel,
+    date: isoDay(c.date), training: c.training, duel: c.duel, island: c.island,
   };
 }
 /** The award day as the album stores it. Mirrors `storage/progress.ts`'s `today()`; kept here so `certToStored`/
@@ -129,13 +114,14 @@ export function certificateText(i: CertInfo): CertText {
   // one device, and "completed the Counting mission" would be the wrong claim on a printed, kept record.
   const reason = {
     duel: `won a Ninja Duel on ${i.year} Island`,
+    island: `starred every topic on ${i.year} Island`,
     sensei: `completed Sensei training on ${i.year} Island`,
     mission: `completed the ${i.title} mission on ${i.year} Island`,
   }[certKind(i)];
   return {
     heading: 'Sky Ninja Academy', awarded: 'Certificate of Achievement', child: i.name.trim() || 'Ninja',
     reason,
-    detail: `${i.correct}/${i.attempts} correct (${acc}%) · score ${i.score}`,
+    detail: certKind(i) === 'island' ? `${i.attempts} topics · ★ ${i.score}/${i.attempts * 3}` : `${i.correct}/${i.attempts} correct (${acc}%) · score ${i.score}`,
     stars: '★'.repeat(Math.max(0, Math.min(3, i.stars))) + '☆'.repeat(3 - Math.max(0, Math.min(3, i.stars))),
     date, signed: `Sensei · with ${i.avatar.name} the ${i.avatar.element}`,
   };

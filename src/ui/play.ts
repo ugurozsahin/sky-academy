@@ -190,7 +190,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     // `recordDuel`. A phantom `plays` increment or an unearned best score would otherwise stick around forever
     // and skew `parents.ts`'s "topics tried" count and `sensei.ts`'s weakest-topic ranking.
     if (!r.incomplete) {
-      if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r, !!o.legend));   // #933, #932
+      if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r, !!o.legend, { name: d.name, avatar: av, year: o.year }));   // #933, #932
       else if (training) { if (r.won) recordTraining(o.year.id); }
       else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed));   // #911/#912, #925
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
