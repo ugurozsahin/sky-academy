@@ -605,6 +605,9 @@ test.describe('tablet viewports (#116)', () => {
    *
    * Nightly 2026-10-04 re-measure: the Reception topics grid gained topics (#971, #973, #974 …) and needs one
    * more row at 1280×800, so that island is now 969px (was 845px); 1024×768 is unchanged at 951px.
+   *
+   * Nightly 2026-10-14 re-measure (#1852): 1280×800 is unchanged at 969px, but 1024×768 is now 1086px — more
+   * Reception content since 2026-10-04, same mode grid.
    */
   const ISLAND_TOLERANCE = 20;
   // One array, not a separate w/h loop plus a target keyed by width: two literals that had to stay in sync
@@ -613,7 +616,7 @@ test.describe('tablet viewports (#116)', () => {
   // comparison instead of a clear "no target for this viewport" error (type-design-analyzer, #563 review).
   const ISLAND_CASES = [
     { w: 1280, h: 800, target: 969 },
-    { w: 1024, h: 768, target: 951 },
+    { w: 1024, h: 768, target: 1086 },
   ] as const;
 
   for (const { w, h, target } of ISLAND_CASES) {
