@@ -27,7 +27,7 @@ describe('y1-spellrules2 "Find the right spelling" (#991)', () => {
     expect(Y1_SPELL_RULES2.length).toBeGreaterThanOrEqual(25);
     for (const f of Object.keys(RULE)) expect(Y1_SPELL_RULES2.filter(e => e[1] === f).length, f).toBeGreaterThanOrEqual(5);
     for (const [w, , ds] of Y1_SPELL_RULES2) expect(new Set(ds).size, w).toBe(2);
-    expect(bank.has('kent')).toBe(false);
+    for (const w of bank.keys()) expect(w, 'a lowercase common word, never a proper noun').toMatch(/^[a-z]+$/);
   });
 
   it('oracle: the answer is the bank word and the options are exactly the word plus its 2 decoys', () => {
@@ -46,6 +46,13 @@ describe('y1-spellrules2 "Find the right spelling" (#991)', () => {
       expect(words.has(x) || GAP_WORDS.has(x), `${x} is a real word`).toBe(false);
       expect(AVOID.has(x), `${x} is in AVOID`).toBe(false);
     }
+  });
+
+  // Real English words said like a bank word (#1837 review): the bank and GAP_WORDS cannot catch these, so
+  // they are named. A child who hears "tail" and slices *tael* has spelt the sound correctly.
+  const HOMOPHONES = ['tael', 'dey', 'wych', 'wen', 'rein', 'reign', 'whin', 'wail', 'wale', 'weigh', 'whey', 'wear', 'ware', 'witch', 'tale', 'trey', 'sleigh'];
+  it('no decoy is a known real-word homophone (tael, dey, wych, …)', () => {
+    expect(Y1_SPELL_RULES2.flatMap(e => e[2]).filter(x => HOMOPHONES.includes(x))).toEqual([]);
   });
 
   it('every card speaks the whole word and peeks with no voice, and never prints it', () => {

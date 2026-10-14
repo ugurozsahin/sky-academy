@@ -12,14 +12,14 @@ export const spellChoiceQ = (rng: () => number, word: string, decoys: string[]) 
  */
 export type SpellRule2Family = 'ai' | 'ay' | 'oi' | 'oy' | 'y' | 'k' | 'ph' | 'wh';
 export const Y1_SPELL_RULES2: [string, SpellRule2Family, [string, string]][] = [
-  ['rain', 'ai', ['rayn', 'raen']], ['wait', 'ai', ['wayt', 'waet']], ['train', 'ai', ['trayn', 'traen']], ['snail', 'ai', ['snayl', 'snael']], ['tail', 'ai', ['tayl', 'tael']],
-  ['day', 'ay', ['dai', 'dey']], ['play', 'ay', ['plai', 'pley']], ['say', 'ay', ['sey', 'sai']], ['stay', 'ay', ['stai', 'stey']], ['tray', 'ay', ['trai', 'trae']],
+  ['rain', 'ai', ['rayn', 'raen']], ['wait', 'ai', ['wayt', 'waet']], ['train', 'ai', ['trayn', 'traen']], ['snail', 'ai', ['snayl', 'snael']], ['tail', 'ai', ['tayl', 'teyl']],
+  ['day', 'ay', ['dai', 'daye']], ['play', 'ay', ['plai', 'pley']], ['say', 'ay', ['sey', 'sai']], ['stay', 'ay', ['stai', 'stey']], ['tray', 'ay', ['trai', 'trae']],
   ['oil', 'oi', ['oyl', 'oel']], ['boil', 'oi', ['boyl', 'boel']], ['coin', 'oi', ['coyn', 'coen']], ['join', 'oi', ['joyn', 'joen']], ['point', 'oi', ['poynt', 'poent']],
   ['boy', 'oy', ['boi', 'boye']], ['toy', 'oy', ['toi', 'toye']], ['joy', 'oy', ['joi', 'joye']], ['enjoy', 'oy', ['enjoi', 'enjoye']], ['annoy', 'oy', ['annoi', 'annoye']],
   ['very', 'y', ['veree', 'veri']], ['happy', 'y', ['happee', 'happi']], ['funny', 'y', ['funnee', 'funni']], ['party', 'y', ['partee', 'parti']], ['family', 'y', ['familee', 'familie']],
   ['kit', 'k', ['cit', 'qit']], ['king', 'k', ['cing', 'qing']], ['keep', 'k', ['ceep', 'qeep']], ['kind', 'k', ['cind', 'qind']], ['skin', 'k', ['scin', 'sqin']],
   ['dolphin', 'ph', ['dolfin', 'dolfen']], ['alphabet', 'ph', ['alfabet', 'alfabit']], ['elephant', 'ph', ['elefant', 'elefent']], ['phone', 'ph', ['fone', 'foan']], ['photo', 'ph', ['foto', 'fotoe']],
-  ['when', 'wh', ['wenn', 'wehn']], ['where', 'wh', ['wehre', 'waire']], ['which', 'wh', ['wihch', 'wych']], ['wheel', 'wh', ['weel', 'wehel']], ['whale', 'wh', ['wayl', 'waehl']],
+  ['when', 'wh', ['wenn', 'wehn']], ['where', 'wh', ['wehre', 'waire']], ['which', 'wh', ['wihch', 'wich']], ['wheel', 'wh', ['weel', 'wehel']], ['whale', 'wh', ['wayl', 'waehl']],
 ];
 export const y1SpellRules2: Generator = (d, rng) => {
   const families: SpellRule2Family[] = d === 1 ? ['ai', 'ay', 'oi', 'oy'] : d === 2 ? ['ai', 'ay', 'oi', 'oy', 'y', 'k'] : ['ai', 'ay', 'oi', 'oy', 'y', 'k', 'ph', 'wh'];
