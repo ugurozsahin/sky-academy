@@ -69,6 +69,7 @@ Maths:
 - y1-balance — = as balance: `a + b = ? + c`, `a − b = ? + c`, `a + b = ? − c` within 20
 
 Writing:
+- y1-contractions — Joined-up Words (reading): the contraction shown, slice the two words it stands for; one-expansion bank only (no he's/she's/it's/I'd/we'd); d3 shows it in a sentence
 - y1-digraphs
 - y1-alien — Real or Alien?: decode a printed word (not by ear), phonics screening check practice; d1 phase 3, d2 phase 4 adjacent consonants, d3 phase 5 alternatives, half "slice the alien 👾"
 - y1-soundhunt — Sound Hunt by ear: d1 phase 3, d2 phase 5 alternatives ay/ou/ie/ea/oy/ir/ue/aw/wh/ph/ew/oe/au, d3 adds split digraphs a-e/i-e/o-e/u-e
@@ -123,6 +124,7 @@ Maths:
 - y2-length — compare in cm or m, sensible unit cm/m, add & subtract in cm
 - y2-mass — compare in g or kg, sensible unit g/kg, add & subtract in g
 - y2-capacity — compare in ml or l, sensible unit ml/l, add & subtract in ml
+- y2-measure-compare — compare two lengths, masses or capacities in the same unit and record with < > = (d1 cm/m, values 10+ apart; d2 adds g/kg and ml/l; d3 close values, digit swaps and equal pairs)
 - y2-temp — compare warmer/colder, read °C
 - y2-duration — compare and sequence intervals of time: minutes in an hour / hours in a day and the half- and quarter-hour, which takes longer, start time + duration on the o'clock / quarter grid
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
