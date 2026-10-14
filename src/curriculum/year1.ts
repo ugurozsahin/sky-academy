@@ -18,6 +18,7 @@ import { syllableQ } from './syllables';
 import { storyQ } from './story';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
 import { y1Compound } from './year1-compound';
+import { y1Contractions } from './year1-contractions';
 import { y1Compare } from './year1-compare';
 import { y1Punct } from './year1-punct';
 
@@ -568,6 +569,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-when', title: 'My Day', icon: '🌅', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: sequence events (morning, afternoon, evening; yesterday, today, tomorrow; before, after)', gen: y1When },
   { id: 'y1-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 A&S: equals sign, missing number', gen: y1Balance },
   // Year 1 writing
+  { id: 'y1-contractions', title: 'Joined-up Words', icon: '✂️', subject: 'writing', year: 'year1', nc: "Y1 Word Reading: contractions (I'm, I'll, we'll)", gen: y1Contractions },
   { id: 'y1-digraphs', title: 'Sound Pairs', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: digraphs', gen: y1Digraphs },
   { id: 'y1-alien', title: 'Real or Alien?', icon: '👾', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: decode words containing taught GPCs, including some pseudo-words', gen: y1Alien },
   { id: 'y1-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: respond speedily to graphemes; phase 3 & 5 alternatives, split digraphs', gen: y1SoundHunt },

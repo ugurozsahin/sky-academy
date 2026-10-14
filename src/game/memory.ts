@@ -1,6 +1,6 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
-import { clockPhrase } from '../curriculum/year2';
+import { clockPhrase, CONTRACTIONS } from '../curriculum/year2';
 import { coinLabel, CVC, DIGRAPHS, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean; quiet?: true }  // coin = pence, drawn as a coin; quiet = not spoken when turned over (#964)
@@ -107,6 +107,7 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
     } },
     { id: 'fractions', title: 'Fraction names', hint: 'Match each fraction to its name', hintIsData: false, pairs: fractionPairs },
     { id: 'past', title: 'Past tense', hint: 'Match each word to its past tense', hintIsData: false, pairs: tensePairs },
+    { id: 'contractions', title: 'Short forms', hint: 'Match each short form to its full form', hintIsData: false, pairs: rng => shuffle(rng, CONTRACTIONS).slice(0, 8).map(([long, short]) => ({ a: txt(long, long, long.length > 6), b: txt(short) })) },
   ],
 };
 
