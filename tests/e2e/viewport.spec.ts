@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { expectFitsViewport, gateProduct, outsideItsBox, overrideSafeAreaInsets } from './viewport';
 import { AVATARS, VILLAIN } from '../../src/avatars';
+import { INFER_BANK } from '../../src/curriculum/year2-infer';
 import type { StoredCert, StoredDuel } from '../../src/storage';
 
 /**
@@ -170,6 +171,22 @@ test.describe('tablet viewports (#116)', () => {
     expect(box.lLeft, 'the line starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
     expect(box.lRight, 'the line ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
     await expectFitsViewport(page, 'estimate number line');
+  });
+
+  /** #1015: the longest `y2-infer` sentence (up to 60 characters) shows whole on its question card at 390x664. */
+  test('the longest inference sentence fits the question card at 390x664 (#1015)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-infer', 'writing');
+    const longest = INFER_BANK.map(i => i[0]).sort((a, b) => b.length - a.length)[0];
+    await page.evaluate(text => { document.querySelector('.vis.sentence')!.textContent = text; }, longest);
+    const box = await page.evaluate(() => {
+      const l = document.querySelector('.vis.sentence')!.getBoundingClientRect(), c = document.querySelector('.qcard')!.getBoundingClientRect();
+      return { lLeft: l.left, lRight: l.right, cLeft: c.left, cRight: c.right };
+    });
+    expect(box.lLeft, 'the sentence starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
+    expect(box.lRight, 'the sentence ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    await expectFitsViewport(page, 'inference sentence');
   });
 
   /**
