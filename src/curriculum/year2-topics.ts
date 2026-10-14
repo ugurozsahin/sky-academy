@@ -27,6 +27,7 @@ import { y2SpellKn } from './year2-spell-kn';
 import { y2SpellLe } from './year2-spell-le';
 import { y2SpellDge } from './year2-spell-dge';
 import { y2Conjunction } from './year2-conjunction';
+import { y2Nouns } from './year2-nouns';
 import { tableDrill } from './tables';
 
 export const YEAR2_TOPICS: Topic[] = [
@@ -76,6 +77,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year2', nc: 'Y2 common exception words', sequenceFrom: 3, gen: y2Spelling },
   { id: 'y2-contractions', title: "Contractions don't", icon: '✂️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: contractions', gen: y2Contractions },
   { id: 'y2-suffix', title: 'Endings -ful -ly', icon: '🎀', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes', gen: y2Suffix },
+  { id: 'y2-nouns', title: 'Naming Words', icon: '🦋', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns formed with -er and by compounding', gen: y2Nouns },
   { id: 'y2-suffix-root', title: 'Changing Endings', icon: '🔁', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes that change the root (drop e, double, y→i)', gen: y2SuffixRoot },
   { id: 'y2-homophones', title: 'Sound-alike Words', icon: '👂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: homophones', gen: y2Homophones },
   { id: 'y2-spell-kn', title: 'Silent Letters', icon: '🤫', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: /n/ spelt kn and gn, /r/ spelt wr at the start of words', gen: y2SpellKn },

@@ -137,6 +137,7 @@ Writing:
 - y2-spelling — 64 CEW
 - y2-contractions
 - y2-suffix — -ful -less -ness -ly -ment, root unchanged
+- y2-nouns — Naming Words: gap sentence; d1 -er nouns (3 bubbles), d2 -er nouns (4), d3 -er nouns and compounds (4); decoys hand-keyed per row
 - y2-suffix-root — endings that change the root: drop the `e` at d1, double the last letter at d2, `y → i` at d3
 - y2-homophones
 - y2-spell-kn — silent first letters, hand-banked: kn at d1 (3 bubbles), adds wr at d2 (4 bubbles), adds gn at d3; every wrong bubble is an invented non-word and no answer has a common homophone
