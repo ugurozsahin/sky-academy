@@ -132,6 +132,7 @@ Maths:
 - y2-duration — compare and sequence intervals of time: minutes in an hour / hours in a day and the half- and quarter-hour, which takes longer, start time + duration on the o'clock / quarter grid
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
 - y2-stats — statistics: read a tally chart, a pictogram with a key of 2 or 5, and a block diagram; totalling, comparing and "which was most"
+- y2-stats-order — statistics: read a chart (tally, pictogram with a key of 2 or 5, block diagram) and slice the categories from most to least; no ties
 
 Writing:
 - y2-spelling — 64 CEW
