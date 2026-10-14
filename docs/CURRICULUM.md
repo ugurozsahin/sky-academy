@@ -117,12 +117,14 @@ Maths:
 - y2-line — number line in steps
 - y2-shapes — 3-D shapes: name them, count flat faces, and — for the cube, cuboid and square-based pyramid, the only ones KS1 can state without argument — edges and vertices at d2–d3
 - y2-objects3d — everyday objects and the solid each is: a drum is a cylinder, an orange a sphere (d1 object → name, d2 name → object, d3 both); no `SHAPES_3D` glyphs, and cube and cuboid never share a card
+- y2-faces — the 2-D shape on a face of a 3-D shape: a circle on a cylinder, a triangle on a pyramid (d1 solid → face, d2 adds face → solid, d3 adds the sides of a named face); a square is a rectangle, so ■ and ▬ never share a card
 - y2-symmetry — line symmetry in a vertical line: is the dotted line a mirror line for this picture — a half drawn beside its own reflection, with one, two or three squares moved when the answer is no — and which capital letter reads the same folded down the middle
 - y2-patterns — order and arrange objects in patterns and sequences: a unit of two or three repeated three times with one object hidden — the last one, or, at d3, one inside the pattern; two whole repeats are always visible, so exactly one object fits
 - y2-position — turns clockwise & anti-clockwise, rotation as right angles, name the turn from start→end
 - y2-length — compare in cm or m, sensible unit cm/m, add & subtract in cm
 - y2-mass — compare in g or kg, sensible unit g/kg, add & subtract in g
 - y2-capacity — compare in ml or l, sensible unit ml/l, add & subtract in ml
+- y2-measure-compare — compare two lengths, masses or capacities in the same unit and record with < > = (d1 cm/m, values 10+ apart; d2 adds g/kg and ml/l; d3 close values, digit swaps and equal pairs)
 - y2-temp — compare warmer/colder, read °C
 - y2-duration — compare and sequence intervals of time: minutes in an hour / hours in a day and the half- and quarter-hour, which takes longer, start time + duration on the o'clock / quarter grid
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
