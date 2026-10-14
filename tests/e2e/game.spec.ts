@@ -3159,6 +3159,7 @@ test.describe('Sky Ninja Academy', () => {
       await seedPlayer(page);
       await page.click('.island[data-year="year2"]');
       await page.click('#boss');
+      await page.click('.topic[data-mixed]');   // #1071: Boss Battle opens the chooser on an island with table drills
       await expect(page.locator('.villain.boss img')).toBeVisible();
       const got = await page.evaluate(() => ['hit', 'heal'].map((k) => {
         const v = document.querySelector('#villain')!;
@@ -3371,6 +3372,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.island-screen')).toBeVisible();
     await page.click('.tab[data-s="maths"]');
     await page.click('#boss');
+    await page.click('.topic[data-mixed]');   // #1071: Boss Battle opens the chooser on an island with table drills
     for (let i = 0; i < 5; i++) {
       const topic = (await state(page)).topic;
       expect(TOPICS.find(t => t.id === topic)?.subject).toBe('maths');
@@ -3877,6 +3879,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('.island[data-year="year2"]');
     await expect(page.locator('#boss small')).toContainText('KOs 0');
     await page.click('#boss');
+    await page.click('.topic[data-mixed]');   // #1071: Boss Battle opens the chooser on an island with table drills
     await expect(page.locator('.villain.boss img')).toBeVisible();
     await expect(page.locator('#hp')).toHaveCSS('width', /px/);
     const full = (await state(page)).bossHp; expect(full).toBe(8);
@@ -3898,6 +3901,22 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#boss small')).toContainText('KOs 1');
   });
 
+  test('Boss Battle: picking the 5× table fights Hammer Man on that table and counts a KO, not a Storm (#1071)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year2"]');
+    await page.click('#boss');
+    await expect(page.locator('#island-overlay .topic').first()).toHaveAttribute('data-mixed', '');
+    await page.click('.topic[data-id="y2-tables-5"]');
+    await expect(page.locator('.villain.boss img')).toBeVisible();
+    expect((await state(page)).prompt).toContain('5');
+    await page.evaluate(() => { window.__sna.session.bossHp = 1; });
+    await solveCurrent(page);
+    await expect(page.locator('.results h2')).toHaveText('Knock-out!');
+    const save = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(save.boss.year2).toBe(1);
+    expect(save.endless?.year2).toBeUndefined();
+  });
+
   /**
    * guard rail (#398 round 3, B1). `.ko` is `position: absolute`, and its containing block moved when the
    * overlay became a `.modal.results` > `.scroll` > (content) shell (round 2): `.scroll` declared no
@@ -3911,6 +3930,7 @@ test.describe('Sky Ninja Academy', () => {
     await seedPlayer(page, 'volt', 'Ada', { coins: 118 });
     await page.click('.island[data-year="year2"]');
     await page.click('#boss');
+    await page.click('.topic[data-mixed]');   // #1071: Boss Battle opens the chooser on an island with table drills
     await expect(page.locator('.villain.boss img')).toBeVisible();
     await page.waitForFunction(() => window.__sna.state().bossHp === 8);
     await page.evaluate(() => { window.__sna.session.bossHp = 1; });   // skip straight to the final blow

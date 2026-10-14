@@ -6,7 +6,7 @@ import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
 import { leastSecure } from '../fact-record';
 import { beltFor, totalStarsOf } from '../game/belts';
-import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
+import { drillsFor, isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
 import { ageLabel, isWarmUp } from './year-label';
@@ -72,6 +72,15 @@ function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', 
     sfx.tap();
     topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
   }, { mixed: true, badge: trophyBadge(year, progress) });
+}
+/** #1071: Boss Battle opens the same chooser on an island with table drills ("🎲 Mixed" or one table); with none it starts the mixed fight at once. */
+function bossThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', pool: Topic[], progress: Record<string, TopicProgress>) {
+  const drills = drillsFor(year.id, subject);
+  if (!drills.length) return playMixed(nav, year, 'boss', pool, progress);
+  openChooser($('#island-overlay'), drills, topic => {
+    sfx.tap();
+    topic ? nav.play({ year, mode: 'boss', topic }) : playMixed(nav, year, 'boss', pool, progress);
+  }, { mixed: true });
 }
 /** #1288: Sensei's spoken line before training; on a warm-up island he calls it one. */
 export function senseiTrainLine(year: YearInfo, schoolYear: YearId | undefined, weakest: Topic[]): string {
@@ -269,7 +278,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => chooseThenPlay(nav, year, subject, 'relaxed', mixedPool(), progress) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'boss', mixedPool(), progress) },
+      go: () => bossThenPlay(nav, year, subject, mixedPool(), progress) },
     // #1049: Memory Match used to fall back to Reception's decks for a year with none of its own — hidden
     // instead, since `pickTheme` now throws rather than hand a KS2 child a Reception board.
     ...(hasMemoryDecks(year.id) ? [{ id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,

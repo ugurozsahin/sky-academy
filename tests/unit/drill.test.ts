@@ -55,4 +55,10 @@ describe('a drill topic stays out of everything but the chooser (#915)', () => {
     expect(ids(maths.filter(t => !t.drill))).toEqual(ids(subjectTopics(topicsFor('year2'), 'maths')));   // #1325: the chooser's own predicate, not a copy of it
     expect(ids(chooserTopics('year2', 'writing'))).not.toContain(FX);
   });
+
+  it('Boss Battle lists exactly an island\'s drills, and none where there are none (#1071)', () => {
+    expect(ids(drillsFor('year2', 'maths'))).toContain(FX);
+    expect(drillsFor('year2', 'writing')).toEqual([]);   // the Writing tab starts the mixed fight directly
+    expect(drillsFor('reception', 'maths')).toEqual([]);
+  });
 });
