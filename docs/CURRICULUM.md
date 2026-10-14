@@ -128,6 +128,7 @@ Maths:
 - y2-capacity — compare in ml or l, sensible unit ml/l, add & subtract in ml
 - y2-measure-compare — compare two lengths, masses or capacities in the same unit and record with < > = (d1 cm/m, values 10+ apart; d2 adds g/kg and ml/l; d3 close values, digit swaps and equal pairs)
 - y2-temp — compare warmer/colder, read °C
+- y2-scales — read a ruler, kitchen scale, jug or thermometer drawn as a 6-tick line from 0 (d1 cm ruler in 1s or 2s; d2 g/ml in 5s or 10s; d3 all four instruments incl. °C in 2s, 5s or 10s); from d2 only the two ends are numbered, so the child works out the interval
 - y2-duration — compare and sequence intervals of time: minutes in an hour / hours in a day and the half- and quarter-hour, which takes longer, start time + duration on the o'clock / quarter grid
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
 - y2-stats — statistics: read a tally chart, a pictogram with a key of 2 or 5, and a block diagram; totalling, comparing and "which was most"

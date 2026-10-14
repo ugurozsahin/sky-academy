@@ -14,6 +14,7 @@ import { y2OddEven } from './year2-oddeven';
 import { y2MeasureCompare } from './year2-measure-compare';
 import { y2Equiv } from './year2-equiv';
 import { y2Estimate } from './year2-estimate';
+import { y2Scales } from './year2-scales';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2AnyOrder } from './year2-anyorder';
@@ -67,6 +68,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-capacity', title: 'Capacity: ml & l', icon: '🥤', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: capacity (ml/l)', gen: y2Capacity },
   { id: 'y2-measure-compare', title: 'Compare Measures < > =', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare measures and record using >, < and =', gen: y2MeasureCompare },
   { id: 'y2-temp', title: 'Temperature', icon: '🌡️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: temperature (°C)', gen: y2Temp },
+  { id: 'y2-scales', title: 'Read the Scale', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: read a ruler, scale, thermometer or jug', gen: y2Scales },
   { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare and sequence intervals of time', gen: y2Duration },
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
   { id: 'y2-stats', title: 'Charts & Tallies', icon: '📊', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: pictograms, tally charts, block diagrams', gen: y2Stats },
