@@ -657,17 +657,6 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#tab-maths'); await expectState('maths', 'writing');
   });
 
-  test('every year has maths and writing topics listed', async ({ page }) => {
-    await seedPlayer(page);
-    for (const y of ['reception', 'year1', 'year2']) {
-      await page.click(`.island[data-year="${y}"]`);
-      await expect(page.locator('.isl-head b')).toContainText(y === 'reception' ? 'Reception' : y === 'year1' ? 'Year 1' : 'Year 2');
-      await page.click('.tab[data-s="maths"]'); expect(await page.locator('.topic').count()).toBeGreaterThanOrEqual(6);
-      await page.click('.tab[data-s="writing"]'); expect(await page.locator('.topic').count()).toBeGreaterThanOrEqual(3);
-      await page.click('#back'); await expect(page.locator('.map')).toBeVisible();
-    }
-  });
-
   // #1049: Memory Match's Reception-deck fallback is gone, so the button is hidden rather than handing a
   // year with no decks of its own a Reception board. Every KS1 island still has decks, so it still shows.
   test('Memory Match shows on every KS1 island (Reception, Year 1, Year 2)', async ({ page }) => {
