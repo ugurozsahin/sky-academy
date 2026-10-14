@@ -28,6 +28,7 @@ import { y2SpellLe } from './year2-spell-le';
 import { y2SpellDge } from './year2-spell-dge';
 import { y2SpellC } from './year2-spell-c';
 import { y2SpellTion } from './year2-spell-tion';
+import { y2SpellMore } from './year2-spell-more';
 import { y2Conjunction } from './year2-conjunction';
 import { y2Nouns } from './year2-nouns';
 import { tableDrill } from './tables';
@@ -87,6 +88,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-spell-dge', title: 'Badge or Cage?', icon: '🏅', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /dʒ/ sound spelt -dge and -ge at the end of words, and g before e, i and y', gen: y2SpellDge },
   { id: 'y2-spell-c', title: 'City or Sity?', icon: '🏠', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /s/ sound spelt c before e, i and y', gen: y2SpellC },
   { id: 'y2-spell-tion', title: 'Station or Stashin?', icon: '🚂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: words ending in -tion', gen: y2SpellTion },
+  { id: 'y2-spell-more', title: 'Walk or Wawk?', icon: '🐒', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: a before l, o for /ʌ/, -ey, a after w and qu, or and ar after w, s for /ʒ/', gen: y2SpellMore },
   { id: 'y2-wordclass', title: 'Word Detective', icon: '🔍', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns, verbs, adjectives, adverbs', sequenceFrom: 2, gen: y2WordClass },
   { id: 'y2-sentencetype', title: 'Sentence Types', icon: '💬', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: statements, questions, commands and exclamations', gen: y2SentenceType },
   { id: 'y2-tense', title: 'Then & Now', icon: '⏳', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: present and past tense, including the progressive', gen: y2Tense },

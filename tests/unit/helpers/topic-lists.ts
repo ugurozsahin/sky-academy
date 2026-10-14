@@ -23,6 +23,7 @@ import { y2SpellLe } from '../../../src/curriculum/year2-spell-le';
 import { y2SpellDge } from '../../../src/curriculum/year2-spell-dge';
 import { y2SpellC } from '../../../src/curriculum/year2-spell-c';
 import { y2SpellTion } from '../../../src/curriculum/year2-spell-tion';
+import { y2SpellMore } from '../../../src/curriculum/year2-spell-more';
 import { y2Conjunction } from '../../../src/curriculum/year2-conjunction';
 import { y2Nouns } from '../../../src/curriculum/year2-nouns';
 
@@ -35,7 +36,7 @@ export const Y2_IDS = [
   'y2-pv', 'y2-compare', 'y2-skip', 'y2-add', 'y2-sub', 'y2-related', 'y2-three', 'y2-inverse', 'y2-story-add', 'y2-anyorder', 'y2-tables', 'y2-story-times', 'y2-oddeven',
   'y2-fractions', 'y2-equiv', 'y2-money', 'y2-story-money', 'y2-coincombo', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-estimate', 'y2-shapes', 'y2-objects3d', 'y2-faces', 'y2-symmetry',
   'y2-patterns', 'y2-position', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-measure-compare', 'y2-temp', 'y2-duration', 'y2-balance',
-  'y2-stats', 'y2-stats-order', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-nouns', 'y2-suffix-root', 'y2-homophones', 'y2-spell-kn', 'y2-spell-le', 'y2-spell-dge', 'y2-spell-c', 'y2-spell-tion', 'y2-wordclass',
+  'y2-stats', 'y2-stats-order', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-nouns', 'y2-suffix-root', 'y2-homophones', 'y2-spell-kn', 'y2-spell-le', 'y2-spell-dge', 'y2-spell-c', 'y2-spell-tion', 'y2-spell-more', 'y2-wordclass',
   'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-conjunction', 'y2-trace',
 ];
 
@@ -50,7 +51,7 @@ export const Y2_GENS: Record<string, Topic['gen']> = {
   'y2-shapes': y2Shapes, 'y2-objects3d': y2Objects3d, 'y2-faces': y2Faces, 'y2-symmetry': y2Symmetry, 'y2-patterns': y2Patterns, 'y2-position': y2Position, 'y2-length': y2Length,
   'y2-mass': y2Mass, 'y2-capacity': y2Capacity, 'y2-measure-compare': y2MeasureCompare, 'y2-temp': y2Temp, 'y2-duration': y2Duration, 'y2-balance': y2Balance,
   'y2-stats': y2Stats, 'y2-stats-order': y2StatsOrder, 'y2-spelling': y2Spelling, 'y2-contractions': y2Contractions, 'y2-suffix': y2Suffix, 'y2-suffix-root': y2SuffixRoot,
-  'y2-homophones': y2Homophones, 'y2-spell-kn': y2SpellKn, 'y2-spell-le': y2SpellLe, 'y2-spell-dge': y2SpellDge, 'y2-spell-c': y2SpellC, 'y2-spell-tion': y2SpellTion, 'y2-wordclass': y2WordClass, 'y2-sentencetype': y2SentenceType, 'y2-tense': y2Tense, 'y2-punct': y2Punct,
+  'y2-homophones': y2Homophones, 'y2-spell-kn': y2SpellKn, 'y2-spell-le': y2SpellLe, 'y2-spell-dge': y2SpellDge, 'y2-spell-c': y2SpellC, 'y2-spell-tion': y2SpellTion, 'y2-spell-more': y2SpellMore, 'y2-wordclass': y2WordClass, 'y2-sentencetype': y2SentenceType, 'y2-tense': y2Tense, 'y2-punct': y2Punct,
   'y2-sentence': y2Sentence, 'y2-conjunction': y2Conjunction, 'y2-nouns': y2Nouns, 'y2-trace': y2Trace,
 };
 
@@ -109,5 +110,6 @@ export const NO_REPEATED_SET = new Set([
   'y2-spell-dge d1', 'y2-spell-dge d2', 'y2-spell-dge d3', // #1011: same bank shape as y2-spell-le, each word carries its own decoys
   'y2-spell-c d1', 'y2-spell-c d2', 'y2-spell-c d3', // #1012: same bank shape as y2-spell-dge, each word carries its own decoys
   'y2-spell-tion d1', 'y2-spell-tion d2', 'y2-spell-tion d3', // #1013: same bank shape as y2-spell-c, each word carries its own decoys
+  'y2-spell-more d1', 'y2-spell-more d2', 'y2-spell-more d3', // #1014: same bank shape as y2-spell-tion, each word carries its own decoys
   'y3-count d2', 'y3-count d3', // #1050/#1448: moreOrLess's decoys (otherPower/wrongDirection/both/sameLead) are all derived from base/answer, the same structural reason as every other entry above
 ]);
