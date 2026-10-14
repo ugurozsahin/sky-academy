@@ -12,12 +12,13 @@ import { y3Wordlist } from './wordlist-y3';
 import { y3Prefix } from './year3-prefix';
 import { y3Suffix } from './year3-suffix';
 import { y3Homophones } from './year3-homophones';
+import { y3Double } from './year3-double';
 
 export const Y3_SPELLING: Topic[] = [
   { id: 'y3-wordlist', title: 'Year 3–4 Word List', icon: '📝', subject: 'writing', year: 'year3', nc: 'Y3–4 Spelling: words often misspelt, Appendix 1 words 1–50', sequenceFrom: 1, gen: y3Wordlist },
   { id: 'y3-prefix', title: 'More Prefixes', icon: '🔤', subject: 'writing', year: 'year3', nc: 'Y3–4 Spelling: further prefixes dis–, mis–, re–, sub–, inter–, super–, anti–, auto–', sequenceFrom: 3, gen: y3Prefix },
   { id: 'y3-suffix', title: 'Suffixes -ly and -ation', icon: '🔤', subject: 'writing', year: 'year3', nc: 'Y3–4 Spelling: the suffixes -ly (and its exceptions) and -ation', gen: y3Suffix },
-  // slot: y3-double
+  { id: 'y3-double', title: 'Doubling Letters', icon: '🔤', subject: 'writing', year: 'year3', strand: 'spelling', nc: 'Y3–4 Spelling: doubling the last consonant when the last syllable is stressed (forgetting, gardening)', gen: y3Double },
   // slot: y3-sounds
   { id: 'y3-homophones', title: 'Homophones, Part 1', icon: '👂', subject: 'writing', year: 'year3', nc: 'Y3–4 Spelling: further homophones and near-homophones, accept/except to knot/not', gen: y3Homophones },
   // slot: y3-dictionary
