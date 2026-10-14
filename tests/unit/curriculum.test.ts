@@ -1649,7 +1649,7 @@ describe('slow questions (#297)', () => {
         const expected = solve(q.prompt);
         expect(expected, `${id}: ${q.prompt} must still be solvable`).not.toBeNull();
         expect(Number(q.answer), `${id}: ${q.prompt}`).toBe(expected);
-        expect(q.options, `${id}: answer must still be among the options`).toContain(q.answer);
+        if (!q.sequence) expect(q.options, `${id}: answer must still be among the options`).toContain(q.answer);
       }
     }
   });

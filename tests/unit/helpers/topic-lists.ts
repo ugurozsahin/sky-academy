@@ -91,7 +91,7 @@ export const NO_REPEATED_SET = new Set([
   'y1-spellrules2 d1', 'y1-spellrules2 d2', 'y1-spellrules2 d3', // #991: as y1-spellrules, each bank word carries its own two decoys
   'r-storyorder d1', 'r-storyorder d2', 'r-storyorder d3', 'y1-storyorder d1', 'y1-storyorder d2', 'y1-storyorder d3', // #975: a story's emoji have one keyed order, so an option set never recurs with a different answer; the bubbles are emoji, never wide
 'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
-'y2-related d1', 'y2-related d2', 'y2-related d3', 'y2-add d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
+'y2-related d1', 'y2-related d2', 'y2-related d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
 'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
 'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
