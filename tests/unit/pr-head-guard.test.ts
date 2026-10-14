@@ -36,6 +36,7 @@ describe('github-write-guard refuses a pull request from a branch CI will hold r
     expect(denied({ head: 'claude/x', body: 'I did not claim BRANCH: PUSH REFUSED here' })).toBe(true);
     expect(denied({ head: 'claude/x', body: ' BRANCH: PUSH REFUSED, indented' })).toBe(true);
     expect(denied({ head: 'claude/x', body: 'branch: push refused' }), "CI's grep is case-sensitive").toBe(true);
+    expect(denied({ head: 'claude/x', body: 'BRANCH: pushed fine' }), 'the whole marker, not its first word').toBe(true);
     expect(denied({ head: 'feature/1-x' }), 'a repo-form head needs no body at all').toBe(false);
   });
 
@@ -51,6 +52,7 @@ describe('github-write-guard refuses a pull request from a branch CI will hold r
     const reason = prHead({ head: 'claude/x', body: '' }) as string;
     expect(reason).toContain('git push origin HEAD:<feature|fix|chore>/<n>-<slug>');
     expect(reason).toContain('#160');
+    expect(reason).toMatch(/Opening the same PR through curl or gh instead gets it no further: the branch-name job holds it red\.$/);
     expect(reason).toMatch(/This denial is not a push refusal, so it never justifies a `BRANCH: PUSH REFUSED` line, which is only for a git push the remote itself refused\./);
   });
 
@@ -63,6 +65,7 @@ describe('github-write-guard refuses a pull request from a branch CI will hold r
     const pattern = job.match(/PATTERN='([^']+)'/)?.[1];
     expect(pattern, 'the branch-name job must still declare PATTERN, or this rail compares nothing').toBeDefined();
     expect(BRANCH_PATTERN).toBe(pattern);
+    expect(job, 'and the job must still test the head against that PATTERN').toContain('grep -Eq "$PATTERN"');
     expect(BRANCH_PATTERN, 'ERE and JS must read it alike').not.toMatch(/\[\[:|\\[dwsb]|\(\?/);
     expect(job, 'and CI must still accept the marker only at a line start').toContain("grep -Eq '^BRANCH: PUSH REFUSED'");
   });
@@ -88,8 +91,10 @@ describe('docs/ROUTINE-PROMPT.md picks up an orphan draft and never leaves one (
 
   it('STEP 2.5 takes a draft a run left with no REVIEW: comment, and never undrafts a block', () => {
     const s25 = step('STEP 2.5', 'STEP 3 —');
-    pinSentence(s25, 'An open, non-fork pull request a run left a draft, with no `REVIEW:` comment at all, its newest commit over ~2 hours old and not this run\'s, not labelled `owner-approval` and with no `Replaced by #` comment, is claimed the same way (#459).');
+    pinSentence(s25, 'An open, non-fork pull request a run left a draft, with no `REVIEW:` comment at all, its newest commit over ~2 hours old and not this run\'s, not labelled `owner-approval` or `owner-session`, with no comment beginning `OWNER:` and no `Replaced by #` comment, is claimed the same way (#459).');
+    pinSentence(s25, 'A `REVIEW:` or `Replaced by #` comment counts only from the `mayReview` set (#284).');
     pinSentence(s25, 'Check its head first: a head that is not a repo-form branch → push the same commits to the right name, open a replacement saying `Replaces #n`, and comment `Replaced by #m` on the old one.');
+    pinSentence(s25, 'If that push is refused too, leave the draft as is and say so in your report: no marker unless the refusal is real (STEP 3).');
     pinSentence(s25, 'Then its newest CI run: green and `mergeable_state` not `dirty` → mark it Ready for review with a one-line note (#200).');
     pinSentence(s25, 'Red or `dirty` → fix it as above (`open-pr` §2), push, and ready it once green.');
     pinSentence(s25, 'Still running, or `unknown` → recheck later; never ready it on that.');
