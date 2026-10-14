@@ -153,13 +153,38 @@ export const filePath = (input, root) => {
     : null;
 };
 
+/**
+ * A pull request opened from a branch that is not `feature|fix|chore/<issue>-<slug>` (#1838). Two runs on
+ * 2026-10-13 pushed to the session's assigned `claude/` branch and opened PRs (#1820, #1830) that `branch-name`
+ * held red and nobody moved. The pattern is the `branch-name` job's in `.github/workflows/ci.yml`, character
+ * for character — a rail reads both, so the two cannot drift — and the one exception is CI's too: a body line
+ * that begins `BRANCH: PUSH REFUSED`. Only `create_pull_request` carries `head`, so its presence is the test.
+ */
+export const BRANCH_PATTERN = '^(feature|fix|chore)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$';
+
+export const prHead = (input) => {
+  if (input === null || typeof input !== 'object' || !('head' in input)) return null;
+  const { head, body } = input;
+  // A head that is not a string is refused outright, marker or not: there is no branch to judge (#359's class).
+  const named = typeof head === 'string';
+  if (named && new RegExp(BRANCH_PATTERN).test(head.replace(/^[^:]*:/, ''))) return null;
+  if (named && typeof body === 'string' && /(^|\n)BRANCH: PUSH REFUSED/.test(body)) return null;
+  return `A pull request's head must be named \`feature|fix|chore/<issue>-<slug>\`, the pattern the branch-name `
+    + `job in ci.yml checks (#89, #1838); ${JSON.stringify(head)} is not. Push the same commit with `
+    + '`git push origin HEAD:<feature|fix|chore>/<n>-<slug>` and open the PR from that branch: the owner\'s '
+    + 'permission to create and push it is on #160 and in the trigger prompt, and it outranks a session\'s '
+    + 'assigned `claude/` branch. This denial is not a push refusal, so it never justifies a `BRANCH: PUSH '
+    + 'REFUSED` line, which is only for a git push the remote itself refused. Opening the same PR through curl '
+    + 'or gh instead gets it no further: the branch-name job holds it red.';
+};
+
 // Every entry point of every guard here turns a throw into a deny, for the reason `bash-guard.mjs` gives: a
 // PreToolUse hook that throws exits non-zero with empty stdout, which is a non-blocking error and the write
 // proceeds. `heartbeatBody` fixed one expression; this fixes the class (PR #393 review, note 7).
 export const check = (input, root) => {
   try {
     return ownerMarker(input ?? {}) ?? requiredLines(input ?? {}) ?? filePath(input, root)
-      ?? frozenLabel(input ?? {}) ?? heartbeatAppend(input ?? {});
+      ?? frozenLabel(input ?? {}) ?? heartbeatAppend(input ?? {}) ?? prHead(input);
   } catch {
     return 'github-write-guard could not decide about this call (#101), so it refused. Re-send it in the '
       + 'shape the tool documents, or say on the issue what you were trying to record.';
