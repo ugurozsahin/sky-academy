@@ -29,6 +29,7 @@ import { y2SpellDge } from './year2-spell-dge';
 import { y2SpellC } from './year2-spell-c';
 import { y2SpellTion } from './year2-spell-tion';
 import { y2Conjunction } from './year2-conjunction';
+import { y2Infer } from './year2-infer';
 import { y2Nouns } from './year2-nouns';
 import { tableDrill } from './tables';
 
@@ -93,5 +94,6 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: commas, apostrophes', gen: y2Punct },
   { id: 'y2-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year2', nc: 'Y2 Writing: word order, conjunctions, noun phrases', sequenceFrom: 1, gen: y2Sentence },
   { id: 'y2-conjunction', title: 'Joining Words', icon: '🔗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: co-ordination (and, or, but) and subordination (because, when, if, that)', gen: y2Conjunction },
+  { id: 'y2-infer', title: 'What Happened?', icon: '🔎', subject: 'writing', year: 'year2', nc: 'Y2 Reading: making inferences on the basis of what is being said and done', gen: y2Infer },
   { id: 'y2-trace', title: 'Trace Words', icon: '✍️', subject: 'writing', year: 'year2', nc: 'Y2 Handwriting', input: 'tracing', gen: y2Trace },
 ];

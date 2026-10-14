@@ -24,6 +24,7 @@ import { y2SpellDge } from '../../../src/curriculum/year2-spell-dge';
 import { y2SpellC } from '../../../src/curriculum/year2-spell-c';
 import { y2SpellTion } from '../../../src/curriculum/year2-spell-tion';
 import { y2Conjunction } from '../../../src/curriculum/year2-conjunction';
+import { y2Infer } from '../../../src/curriculum/year2-infer';
 import { y2Nouns } from '../../../src/curriculum/year2-nouns';
 
 // The per-topic lists a new topic adds itself to (#1411). They live here, not in `curriculum.test.ts`, because that
@@ -36,7 +37,7 @@ export const Y2_IDS = [
   'y2-fractions', 'y2-equiv', 'y2-money', 'y2-story-money', 'y2-coincombo', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-estimate', 'y2-shapes', 'y2-objects3d', 'y2-faces', 'y2-symmetry',
   'y2-patterns', 'y2-position', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-measure-compare', 'y2-temp', 'y2-duration', 'y2-balance',
   'y2-stats', 'y2-stats-order', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-nouns', 'y2-suffix-root', 'y2-homophones', 'y2-spell-kn', 'y2-spell-le', 'y2-spell-dge', 'y2-spell-c', 'y2-spell-tion', 'y2-wordclass',
-  'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-conjunction', 'y2-trace',
+  'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-conjunction', 'y2-infer', 'y2-trace',
 ];
 
 /**
@@ -51,7 +52,7 @@ export const Y2_GENS: Record<string, Topic['gen']> = {
   'y2-mass': y2Mass, 'y2-capacity': y2Capacity, 'y2-measure-compare': y2MeasureCompare, 'y2-temp': y2Temp, 'y2-duration': y2Duration, 'y2-balance': y2Balance,
   'y2-stats': y2Stats, 'y2-stats-order': y2StatsOrder, 'y2-spelling': y2Spelling, 'y2-contractions': y2Contractions, 'y2-suffix': y2Suffix, 'y2-suffix-root': y2SuffixRoot,
   'y2-homophones': y2Homophones, 'y2-spell-kn': y2SpellKn, 'y2-spell-le': y2SpellLe, 'y2-spell-dge': y2SpellDge, 'y2-spell-c': y2SpellC, 'y2-spell-tion': y2SpellTion, 'y2-wordclass': y2WordClass, 'y2-sentencetype': y2SentenceType, 'y2-tense': y2Tense, 'y2-punct': y2Punct,
-  'y2-sentence': y2Sentence, 'y2-conjunction': y2Conjunction, 'y2-nouns': y2Nouns, 'y2-trace': y2Trace,
+  'y2-sentence': y2Sentence, 'y2-conjunction': y2Conjunction, 'y2-infer': y2Infer, 'y2-nouns': y2Nouns, 'y2-trace': y2Trace,
 };
 
 /**
