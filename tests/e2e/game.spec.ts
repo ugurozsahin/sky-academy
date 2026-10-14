@@ -6429,3 +6429,34 @@ test('Play again after a Daily Sprint re-deals the same deck (#924)', async ({ p
   await page.waitForFunction(() => window.__sna?.state().prompt);
   expect(await firstThree()).toEqual(first);
 });
+
+// #1074: desktop keys slice the matching bubble — digits on a build card, A–D on a lettered card, nothing on a spelling card.
+test.describe('keyboard answers (#1074)', () => {
+  const score = (page: Page) => page.evaluate(() => window.__sna.state().score);
+  const seen = (page: Page, label: string) => page.waitForFunction(l => window.__sna.bubbles().some(b => b.label === l), label);
+  test('on a build card, typing the answer\'s digits marks it right', async ({ page }) => {
+    await seedPreview(page); await seedPlayer(page);
+    await startTopic(page, 'year3', 'y3-column');
+    const { answer, build } = await page.evaluate(() => ({ answer: window.__sna.state().answer!, build: !!window.__sna.session.current?.build }));
+    expect(build, 'y3-column stage 1 is a build card').toBe(true);
+    const before = await score(page);
+    for (const ch of answer.replace(/[^0-9.]/g, '')) { await seen(page, ch); await page.keyboard.press(ch); }
+    await page.waitForFunction(s => window.__sna.state().score > s, before);
+  });
+  test('on a lettered card, the answer\'s letter marks it right', async ({ page }) => {
+    await seedPreview(page); await seedPlayer(page);
+    await startTopic(page, 'year3', 'y3-speech');
+    const letter = await page.evaluate(() => window.__sna.state().answer!);
+    expect(letter).toMatch(/^[A-D]$/);
+    const before = await score(page);
+    await seen(page, letter); await page.keyboard.press(letter.toLowerCase());
+    await page.waitForFunction(s => window.__sna.state().score > s, before);
+  });
+  test('on a spelling card, a letter key changes nothing', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-spellrules');
+    const before = await page.evaluate(() => { const s = window.__sna.state(); return { score: s.score, lives: s.lives, index: s.index }; });
+    for (const k of ['a', 'b', 'c', 'd']) await page.keyboard.press(k);
+    expect(await page.evaluate(() => { const s = window.__sna.state(); return { score: s.score, lives: s.lives, index: s.index }; })).toEqual(before);
+  });
+});

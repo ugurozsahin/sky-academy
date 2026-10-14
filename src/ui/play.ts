@@ -16,7 +16,7 @@ import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './
 import { BOMB, createPlaySession, type ResultPayout } from './play-session'; import { factsOf, speedCandidates } from './play-facts';   // #36
 import { createResultsScreen, fixRoundPayout } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
-import { pauseHTML, stageClearHTML } from './overlays';
+import { pressKey } from './key-answer'; import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
@@ -250,8 +250,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   }
   // #884: opens Pause on a live game (no overlay up, not yet ended); a stage-clear/results overlay stays as it is.
   function pauseIfLive(): boolean { if (!els.overlay.hidden || session.ended) return false; showPause(); return true; }
-  $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
-  $('#speak').addEventListener('click', repeatPrompt); scope.onKeys({ pause: pauseIfLive, repeat: () => els.overlay.hidden && (repeatPrompt(), true) });   // #902
+  $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); }); $('#speak').addEventListener('click', repeatPrompt);
+  scope.onKeys({ pause: pauseIfLive, repeat: () => els.overlay.hidden && (repeatPrompt(), true), key: k => pressKey(k, session, arena, !els.overlay.hidden || pad.on) }); // #1074
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
   // #35: dispose() stops timers, cancels speech and drops window.__sna.
   function cleanup() {

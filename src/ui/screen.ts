@@ -83,7 +83,8 @@ type Beat = { fn: () => void; id: number; dueAt: number } | { fn: () => void; le
  *  `clear()` — never left running against a screen that is gone. Space is `preventDefault`ed only when
  *  `repeat()` reported it used the press (`true`): otherwise a focused Resume/Replay button would lose its
  *  Space activation. The keyup of a used press, and any auto-repeat of it, are swallowed with it. */
-export interface KeyHandlers { pause: () => unknown; repeat: () => boolean }
+export interface KeyHandlers { pause: () => unknown; repeat: () => boolean; key?: (key: string) => unknown }   // #1074: any other key, offered to the play screen
+const isPauseKey = (e: KeyboardEvent) => e.key === 'Escape' || e.key?.toLowerCase() === 'p';
 function keyBinding() {
   let fns: KeyHandlers | null = null;
   let used = false;   // the Space currently held down was consumed by repeat()
@@ -91,7 +92,7 @@ function keyBinding() {
   const down = (e: KeyboardEvent) => {
     if (!fns || e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
     if (e.code === 'Space') { if (e.repeat ? used : (used = fns.repeat())) e.preventDefault(); }
-    else if (!e.repeat && (e.key === 'Escape' || e.key?.toLowerCase() === 'p')) fns.pause();
+    else if (!e.repeat) { if (isPauseKey(e)) fns.pause(); else if (e.key) fns.key?.(e.key); }
   };
   const up = (e: KeyboardEvent) => { if (e.code === 'Space' && used) { used = false; e.preventDefault(); } };
   return {
