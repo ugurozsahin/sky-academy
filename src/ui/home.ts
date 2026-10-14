@@ -25,8 +25,9 @@ import { senseiTopics, poolWeights, nextIsland, nextIslandLine, mapLine } from '
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
-import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, trophyBadge, trophyCount } from './chooser';
-import { subjectPool } from '../game/pools';
+import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEntryChooser, type ChooserEntry, trophyBadge, trophyCount } from './chooser';
+import { subjectPool, subjectTopics } from '../game/pools';
+import { strandPools } from '../game/strand-pools';
 import { $, $$, capDigits, render } from './dom';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
@@ -73,13 +74,22 @@ function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', 
     topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
   }, { mixed: true, badge: trophyBadge(year, progress) });
 }
-/** #1071: Boss Battle opens the same chooser on an island with table drills ("🎲 Mixed" or one table); with none it starts the mixed fight at once. */
+/** #1071/#1072: Boss Battle opens the chooser on an island with strands or table drills
+ *  ("🎲 Mixed", strands, then tables); with neither it starts the mixed fight at once. */
 function bossThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', pool: Topic[], progress: Record<string, TopicProgress>) {
   const drills = drillsFor(year.id, subject);
-  if (!drills.length) return playMixed(nav, year, 'boss', pool, progress);
-  openChooser($('#island-overlay'), drills, topic => {
+  const strands = strandPools(subjectTopics(topicsFor(year.id), subject));
+  if (!drills.length && !strands.length) return playMixed(nav, year, 'boss', pool, progress);
+  const entries: ChooserEntry[] = [
+    ...strands.map(s => ({ id: `strand:${s.strand}`, icon: s.topics[0].icon, title: s.title })),
+    ...drills.map(t => ({ id: t.id, icon: t.icon, title: t.title })),
+  ];
+  openEntryChooser($('#island-overlay'), entries, id => {
     sfx.tap();
-    topic ? nav.play({ year, mode: 'boss', topic }) : playMixed(nav, year, 'boss', pool, progress);
+    const strand = strands.find(s => `strand:${s.strand}` === id), drill = drills.find(t => t.id === id);
+    if (strand) nav.play({ year, mode: 'boss', pool: strand.topics, weights: poolWeights(strand.topics, progress) });
+    else if (drill) nav.play({ year, mode: 'boss', topic: drill });
+    else playMixed(nav, year, 'boss', pool, progress);
   }, { mixed: true });
 }
 /** #1288: Sensei's spoken line before training; on a warm-up island he calls it one. */

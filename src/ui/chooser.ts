@@ -34,19 +34,27 @@ export const duelChooserTopics = (year: YearInfo, subject: Topic['subject']): To
   return chooserTopics(year.id, subject).filter(t => playable.has(t.id));
 };
 
-/** Opens a topic chooser inside `overlay` (a hidden `.overlay` element already in the DOM, the pattern
- *  `src/ui/profiles.ts`'s `#profile-overlay` uses). Back, or picking a card, hides and empties it again. */
-export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topic: Topic | null, teams: boolean) => void, opts: ChooserOpts): void {
+/** One card in a chooser: a topic, or (#1072) a strand. `badge` is drawn after the title. */
+export interface ChooserEntry { id: string; icon: string; title: string; badge?: string }
+
+/** The chooser's markup: Mixed first, an optional teams toggle, then one existing `.topic` card per entry (#1072). Pure, so a unit test can read it. */
+export function chooserHTML(entries: ChooserEntry[], opts: ChooserOpts): string {
   const mixedCard = opts.mixed ? `<button class="topic" data-mixed><span class="ic">🎲</span><b>${opts.mixedLabel ?? 'Mixed'}</b></button>` : '';
   const teamsCard = opts.teams ? `<button class="topic" data-teams aria-pressed="false"><span class="ic">👥</span><b>Class teams: Off</b></button>` : '';
-  const cards = topics.map(t => `<button class="topic" data-id="${t.id}"><span class="ic">${t.icon}</span><b>${t.title}</b>${opts.badge?.(t) ?? ''}</button>`).join('');
-  overlay.hidden = false;
-  overlay.innerHTML = `
+  const cards = entries.map(e => `<button class="topic" data-id="${e.id}"><span class="ic">${e.icon}</span><b>${e.title}</b>${e.badge ?? ''}</button>`).join('');
+  return `
     <div class="modal">
       <h2>Choose a topic</h2>
       <div class="topics">${mixedCard}${teamsCard}${cards}</div>
       <div class="row"><button class="btn big" id="chooser-back">Back</button></div>
     </div>`;
+}
+
+/** Opens a chooser of `entries` inside `overlay` (a hidden `.overlay` element already in the DOM, the pattern
+ *  `src/ui/profiles.ts`'s `#profile-overlay` uses). Back, or picking a card, hides and empties it again. `onPick` gets the entry id, or null for Mixed. */
+export function openEntryChooser(overlay: HTMLElement, entries: ChooserEntry[], onPick: (id: string | null, teams: boolean) => void, opts: ChooserOpts): void {
+  overlay.hidden = false;
+  overlay.innerHTML = chooserHTML(entries, opts);
   const close = () => { overlay.hidden = true; overlay.innerHTML = ''; };
   const teamsBtn = overlay.querySelector<HTMLElement>('[data-teams]');
   teamsBtn?.addEventListener('click', () => {   // #958: flips itself, starts nothing
@@ -54,12 +62,17 @@ export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topi
     teamsBtn.setAttribute('aria-pressed', String(on)); teamsBtn.querySelector('b')!.textContent = `Class teams: ${on ? 'On' : 'Off'}`;
   });
   $$('.topic:not([data-teams])', overlay).forEach(b => b.addEventListener('click', () => {
-    const picked = b.hasAttribute('data-mixed') ? null : topics.find(t => t.id === b.dataset.id) ?? null;
+    const picked = b.hasAttribute('data-mixed') ? null : entries.find(e => e.id === b.dataset.id)?.id ?? null;
     const teams = teamsBtn?.getAttribute('aria-pressed') === 'true';
     close();
     onPick(picked, teams);
   }));
   $('#chooser-back', overlay).addEventListener('click', close);
+}
+
+/** The topic chooser: the entry builder over topics. */
+export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topic: Topic | null, teams: boolean) => void, opts: ChooserOpts): void {
+  openEntryChooser(overlay, topics.map(t => ({ id: t.id, icon: t.icon, title: t.title, badge: opts.badge?.(t) })), (id, teams) => onPick(topics.find(t => t.id === id) ?? null, teams), opts);
 }
 
 type Progress = Record<string, TopicProgress>;

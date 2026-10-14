@@ -6126,6 +6126,49 @@ test.describe('hidden KS2 years (preview)', () => {
   });
 });
 
+// #1072: Boss Battle on a KS2 island offers Mixed and one entry per strand; a strand Boss asks only that strand.
+test.describe('strand Boss Battle (#1072)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  });
+  test('Year 3: pick Fractions, every question is that strand, a KO counts as a Boss win and not a Storm', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    await page.click('.island[data-year="year3"]');
+    await page.click('#boss');
+    await expect(page.locator('#island-overlay .topic').first()).toHaveAttribute('data-mixed', '');
+    await expect(page.locator('#island-overlay .topic[data-id="strand:fractions"]')).toBeVisible();
+    await page.click('#island-overlay .topic[data-id="strand:fractions"]');
+    await expect(page.locator('.villain.boss img')).toBeVisible();
+    for (let i = 0; i < 5; i++) {
+      await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+      expect(await page.evaluate(() => window.__sna.session.currentTopic?.strand)).toBe('fractions');
+      const before = await page.evaluate(() => window.__sna.state());
+      await expect.poll(() => answer(page)).toBe(true);
+      await page.waitForFunction(b => window.__sna.state().index !== b.index || window.__sna.state().score !== b.score, before);
+    }
+    await page.evaluate(() => { window.__sna.session.bossHp = 1; });
+    await solveCurrent(page);
+    await expect(page.locator('.results h2')).toHaveText('Knock-out!');
+    const save = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(save.boss.year3).toBe(1);
+    expect(save.endless?.year3).toBeUndefined();
+  });
+  test('Reception starts Boss Battle at once: no chooser', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="reception"]');
+    await page.click('#boss');
+    await expect(page.locator('.villain.boss img')).toBeVisible();
+  });
+  test('Year 1 keeps #1071\'s drill chooser with no strand entry', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#boss');
+    await expect(page.locator('#island-overlay .topic[data-mixed]')).toBeVisible();
+    await expect(page.locator('#island-overlay .topic[data-id^="strand:"]')).toHaveCount(0);
+  });
+});
+
 // The on-screen number pad (#1073): the module's own markup, injected into the play screen's input region.
 test.describe('number pad (#1073)', () => {
   test('every key is a 44 px target, readable, and the pad fits the phone', async ({ page }) => {
