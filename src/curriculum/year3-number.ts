@@ -5,6 +5,7 @@ import type { Difficulty, Generator, Question, Topic } from './types';
 import { ri, pick, shuffle, wordQ, numberWord, NUM_WORDS } from './util';
 import { dec, fmt } from './ks2num';
 import { swappedDigits } from './mistakes';
+import { y3Line } from './year3-line';
 
 // #1050: this topic hand-builds its `Question`s instead of using `numQ()` because its options must be
 // comma-formatted via `fmt()` ("1,005"), never `numQ`'s bare `String(answer)`.
@@ -258,6 +259,6 @@ export const Y3_NUMBER: Topic[] = [
   { id: 'y3-count', title: 'Count in 4s, 8s, 50s and 100s', icon: '🔢', subject: 'maths', year: 'year3', nc: 'Y3 NPV: count in 4s, 8s, 50s, 100s; 10 or 100 more or less', gen: y3Count },
   { id: 'y3-pv', title: 'Hundreds, Tens and Ones', icon: '💯', subject: 'maths', year: 'year3', nc: 'Y3 NPV: place value of each digit, partitioning (3M2)', gen: y3PlaceValue },
   { id: 'y3-compare', title: 'Compare and Order to 1,000', icon: '⚖️', subject: 'maths', year: 'year3', nc: 'Y3 NPV: compare and order numbers to 1,000 (3M3)', sequenceFrom: 3, gen: y3Compare },
-  // slot: y3-line
+  { id: 'y3-line', title: 'Number Line to 1,000', icon: '📏', subject: 'maths', year: 'year3', nc: 'Y3 NPV: identify, represent and estimate numbers (3M4)', gen: y3Line },
   { id: 'y3-words', title: 'Numbers to 1,000 in Words', icon: '🔤', subject: 'maths', year: 'year3', nc: 'Y3 NPV: read and write numbers to 1,000 in numerals and words (3M5)', gen: y3Words },
 ];

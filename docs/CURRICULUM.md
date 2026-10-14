@@ -175,6 +175,7 @@ Maths:
 - y3-count — count on and back in 4s, 8s, 50s and 100s; 10 or 100 more or less
 - y3-pv — place value of each digit in a 3-digit number (d1), building it from hundreds, tens and ones (d2), partitioning it (d3)
 - y3-compare — compare 3-digit numbers with <, > and = (d1), the trickier pairs: reordered digits, 2-digit against 3-digit, 1,000, equal (d2), ordering three numbers (d3)
+- y3-line — estimate where the `?` sits on a 0–1,000 line that prints only its two ends (d1, 3 bubbles), the same with closer options (d2), then on a 100-wide stretch such as 300–400 (d3)
 - y3-words — numbers to 1,000 in words: the words on the card and the numeral in the bubbles (d1, no zero digit), with a zero digit and 1,000 (d2), then write the tens word of "346 is three hundred and ___-six" (d3)
 - y3-mental — a 3-digit number ± ones (no crossing a ten) or hundreds (d1), ± tens with hundred crossings (d2), all three forms with crossings and `slow` (d3)
 - y3-column — build a 3-digit + 3-digit sum with at most one exchange, or 3-digit − 2-digit with none (d1), two exchanges to 1,998 and subtraction across a zero (d2), then find a missing digit in a column sum (d3)

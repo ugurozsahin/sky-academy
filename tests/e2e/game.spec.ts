@@ -2452,6 +2452,21 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'four-bar fraction stack');
   });
 
+  test('y3-line: the ends-only 11-tick 0 to 1,000 line fits the question card at 390x664 (#1082)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year3', 'y3-line');
+    await expect(page.locator('.nline span')).toHaveCount(11);
+    const box = await page.evaluate(() => {
+      const l = document.querySelector('.nline')!.getBoundingClientRect(), c = document.querySelector('.qcard')!.getBoundingClientRect();
+      return { lLeft: l.left, lRight: l.right, cLeft: c.left, cRight: c.right };
+    });
+    expect(box.lLeft, 'the line starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
+    expect(box.lRight, 'the line ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    await expectFitsViewport(page, 'y3-line number line');
+  });
+
   test('y3-angles: a four-line geometry drawing sits inside the question card on a short phone (#1075)', async ({ page }) => {
     await seedPreview(page);
     await seedPlayer(page);

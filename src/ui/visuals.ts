@@ -24,7 +24,7 @@ const NL_MAX_LABELS = 6;
 /** A number line with optional per-tick labels and lettered markers; one it cannot draw correctly draws nothing, as `symmetry` does (#1061). */
 function numberlineHTML(v: Extract<Visual, { type: 'numberline' }>): string {
   const ticks = numberlineTicks(v), marks = v.marks ?? [];
-  if ((v.labels && (v.labels.length !== ticks.length || ticks.length > NL_MAX_LABELS)) || marks.some(m => !ticks.includes(m.at))) {
+  if ((v.labels && (v.labels.length !== ticks.length || (v.ends ? 2 : ticks.length) > NL_MAX_LABELS)) || marks.some(m => !ticks.includes(m.at))) {
     console.warn('numberline visual: labels or markers do not fit the ticks — nothing drawn');
     return '';
   }
