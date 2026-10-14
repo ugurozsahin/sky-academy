@@ -26,6 +26,7 @@ import { y2Faces } from './year2-faces';
 import { y2SpellKn } from './year2-spell-kn';
 import { y2SpellLe } from './year2-spell-le';
 import { y2SpellDge } from './year2-spell-dge';
+import { y2SpellC } from './year2-spell-c';
 import { y2Conjunction } from './year2-conjunction';
 import { y2Nouns } from './year2-nouns';
 import { tableDrill } from './tables';
@@ -83,6 +84,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-spell-kn', title: 'Silent Letters', icon: '🤫', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: /n/ spelt kn and gn, /r/ spelt wr at the start of words', gen: y2SpellKn },
   { id: 'y2-spell-le', title: 'Word Endings', icon: '🕯️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /l/ or /əl/ sound spelt -le, -el, -al and -il at the end of words', gen: y2SpellLe },
   { id: 'y2-spell-dge', title: 'Badge or Cage?', icon: '🏅', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /dʒ/ sound spelt -dge and -ge at the end of words, and g before e, i and y', gen: y2SpellDge },
+  { id: 'y2-spell-c', title: 'City or Sity?', icon: '🏠', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /s/ sound spelt c before e, i and y', gen: y2SpellC },
   { id: 'y2-wordclass', title: 'Word Detective', icon: '🔍', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns, verbs, adjectives, adverbs', sequenceFrom: 2, gen: y2WordClass },
   { id: 'y2-sentencetype', title: 'Sentence Types', icon: '💬', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: statements, questions, commands and exclamations', gen: y2SentenceType },
   { id: 'y2-tense', title: 'Then & Now', icon: '⏳', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: present and past tense, including the progressive', gen: y2Tense },
