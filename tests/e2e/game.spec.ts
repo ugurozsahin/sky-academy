@@ -2418,6 +2418,14 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'labelled number line');
   });
 
+  test('a Roman-numeral clock face fits the question card on the phone (#1078)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, renderVisual({ type: 'clock', h: 10, m: 10, roman: true }));
+    await expect(page.locator('#vis .clock text')).toHaveCount(12);
+    await expectFitsViewport(page, 'Roman-numeral clock face');
+  });
+
   test('y3-fracline: a lettered fraction line and a past-one line fit the question card on the phone (#1093)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');

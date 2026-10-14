@@ -77,6 +77,7 @@ describe('y3-time (#1077)', () => {
   it('d3 conversions: every answer is the same instant as the prompt time, incl. 00:00, 12:00', () => {
     const answers = new Set<string>();
     for (const q of draws(3, 1077_300)) {
+      if (q.visual) continue; // the Roman-face clock cards are checked below
       answers.add(q.answer);
       const w = q.prompt.match(/^(Noon|Midnight) on a 24-hour clock\?$/);
       const a = q.prompt.match(/^(.+) on a 24-hour clock\?$/), b = q.prompt.match(/^(.+) in 12-hour time\?$/);
@@ -102,6 +103,20 @@ describe('y3-time (#1077)', () => {
       expect(q.say, q.prompt).toBeTruthy();
       expect(q.say, q.prompt).not.toMatch(/\d ?: ?\d|minus|[=?]/);
       expect(q.say, q.prompt).not.toMatch(/\b(am|pm)\b/);
+    }
+  });
+
+  it('the Roman clock face is a d3-only form that keeps the clock oracle (#1078)', () => {
+    let roman = 0;
+    for (const q of draws(3, 1078_300)) {
+      if (!q.visual) continue;
+      const v = q.visual as { type: 'clock'; h: number; m: number; roman?: true };
+      expect(v.roman, q.prompt).toBe(true); roman++;
+      expect(q.answer, q.prompt).toBe(`${v.h}:${String(v.m).padStart(2, '0')}`);
+    }
+    expect(roman).toBeGreaterThan(DRAWS * 0.15);
+    for (const d of [1, 2] as Difficulty[]) for (const q of draws(d, 1078_100 + d)) {
+      expect((q.visual as { roman?: true } | undefined)?.roman, q.prompt).toBeUndefined();
     }
   });
 });

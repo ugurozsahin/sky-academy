@@ -5,6 +5,7 @@ import { esc } from './dom';
 import { barChartSVG } from './vis-axis-chart';
 import { geometrySVG } from './vis-geometry';
 import { coordsSVG } from './vis-coords';
+import { romanClockSVG } from './vis-roman-clock';
 
 /** `n` objects in rows of five; slots past `keep` are crossed out ("take away"); at least one full row of slots is always shown. */
 export function fiveFrames(n: number, emoji: string, keep = n): string {
@@ -93,7 +94,7 @@ export function renderVisual(v: Visual | undefined): string {
       return `<div class="vis"><div class="arr" style="grid-template-columns:repeat(${v.cols},1fr)">${cells}</div></div>`;
     }
     case 'coins': return `<div class="vis coins">${v.coins.map(coinSVG).join('')}</div>`;
-    case 'clock': return `<div class="vis">${clockSVG(v.h, v.m)}</div>`;
+    case 'clock': return `<div class="vis">${clockFace(v)}</div>`;
     case 'fraction': return v.stack ? fractionStackHTML(v) : fractionHTML(v);
     case 'numberline': return numberlineHTML(v);
     case 'scales': {
@@ -248,6 +249,9 @@ export function coinSVG(p: number): string {
     : `<circle cx="32" cy="32" r="${r}"/>`;
   return `<svg viewBox="0 0 64 64" class="coin" style="width:${r * 2.2}px"><g fill="${gold[0]}" stroke="${gold[1]}" stroke-width="2.5">${shape}</g>${p === 200 ? `<circle cx="32" cy="32" r="18" fill="#e6c250" stroke="#8a6d1f" stroke-width="2"/>` : ''}<text x="32" y="37" text-anchor="middle" font-size="${label.length > 2 ? 15 : 18}" font-weight="700" fill="${gold[1]}">${label}</text></svg>`;
 }
+
+/** The clock card's face: Arabic numerals, or Roman ones when `roman` is set (#1078). */
+const clockFace = (v: { h: number; m: number; roman?: true }) => (v.roman ? romanClockSVG : clockSVG)(v.h, v.m);
 
 export function clockSVG(h: number, m: number): string {
   const ha = ((h % 12) + m / 60) * 30, ma = m * 6;

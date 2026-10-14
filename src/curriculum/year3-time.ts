@@ -38,13 +38,13 @@ function clockDecoys(h: number, m: number, sfx?: Sfx): { named: string[]; spare:
 }
 
 /** d1/d2 clock cards: the visual shows h:m; d2 also names the part of the day and adds am/pm. */
-function clockCard(d: Difficulty, rng: () => number): Question {
+function clockCard(d: Difficulty, rng: () => number, roman = false): Question {
   const h = d === 1 ? ri(rng, 1, 12) : ri(rng, 1, 11); // d2 keeps off 12, where am/pm is noon or midnight
   const m = ri(rng, 0, 59);
   const sfx: Sfx | undefined = d === 2 ? pick(rng, ['am', 'pm'] as const) : undefined;
   const answer = t12(h, m, sfx), { named, spare } = clockDecoys(h, m, sfx);
   const prompt = sfx ? `It is the ${partOfDay(h, sfx)}. What time is it?` : 'What time is it?';
-  return { prompt, say: speak(prompt), answer, options: build(answer, named, spare, rng), visual: { type: 'clock', h, m } };
+  return { prompt, say: speak(prompt), answer, options: build(answer, named, spare, rng), visual: roman ? { type: 'clock', h, m, roman: true } : { type: 'clock', h, m } };
 }
 
 /** d2 vocabulary: "Which time is just after noon?" — the same four labels, so the answer is the whole question. */
@@ -80,4 +80,4 @@ function convertCard(rng: () => number): Question {
 }
 
 export const y3Time: Generator = (d, rng) =>
-  d === 3 ? convertCard(rng) : d === 2 && rng() < 0.4 ? vocabCard(rng) : clockCard(d, rng);
+  d === 3 ? rng() < 0.25 ? clockCard(1, rng, true) : convertCard(rng) : d === 2 && rng() < 0.4 ? vocabCard(rng) : clockCard(d, rng);

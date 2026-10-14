@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { clockSVG, coinSVG, fiveFrames, renderVisual } from '../../src/ui/visuals';
+import { romanClockSVG } from '../../src/ui/vis-roman-clock';
 
 const count = (html: string, re: RegExp) => (html.match(re) ?? []).length;
 describe('five-frames for object visuals (#54)', () => {
@@ -62,6 +63,38 @@ describe('renderVisual — a builder for every Visual.type (#43)', () => {
     expect(h).toContain('class="clock"');
     expect(count(h, /<text/g)).toBe(12);
     expect(h).toContain('class="hour"');
+  });
+
+  it('the Arabic clock face is unchanged by the roman option (#1078)', () => {
+    expect(renderVisual({ type: 'clock', h: 4, m: 37 })).toBe(`<div class="vis">${clockSVG(4, 37)}</div>`);
+    expect(clockSVG(10, 10)).toContain('>10</text>');
+  });
+
+  it('a roman clock face shows I–XII (IV at 4), reuses the .clock classes and matches the Arabic hands', () => {
+    const h = renderVisual({ type: 'clock', h: 10, m: 10, roman: true });
+    const nums = [...h.matchAll(/<text [^>]*>([^<]+)<\/text>/g)].map(x => x[1]);
+    expect(nums).toEqual(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']);
+    expect(h).toContain('class="clock"');
+    expect(h).not.toMatch(/#[0-9a-f]{3,8}\b|fill=|stroke=/i);
+    const lines = (x: string) => x.match(/<line [^>]*>/g);
+    expect(lines(romanClockSVG(10, 10))).toEqual(lines(clockSVG(10, 10)));
+    expect(lines(romanClockSVG(12, 59))).toEqual(lines(clockSVG(12, 59)));
+  });
+
+  it('every roman numeral renders at 13 px or more on the 120 px face, and no two boxes overlap', () => {
+    const svg = romanClockSVG(3, 0);
+    const texts = [...svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)"[^>]*font-size="(\d+)"[^>]*>([^<]+)</g)];
+    expect(texts).toHaveLength(12);
+    const em: Record<string, number> = { I: 0.4, V: 0.75, X: 0.75 }; // generous bold-sans advance widths
+    const boxes = texts.map(t => {
+      const fs = Number(t[3]), w = [...t[4]].reduce((a, c) => a + em[c], 0) * fs;
+      expect(fs * 120 / 100, t[4]).toBeGreaterThanOrEqual(13);
+      return { l: Number(t[1]) - w / 2, r: Number(t[1]) + w / 2, t: Number(t[2]) - fs * 0.75, b: Number(t[2]) };
+    });
+    for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) {
+      const a = boxes[i], b = boxes[j];
+      expect(a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b, `${i + 1} vs ${j + 1}`).toBe(false);
+    }
   });
 
   it('a circle fraction draws one wedge per part and shades `shaded` of them', () => {
