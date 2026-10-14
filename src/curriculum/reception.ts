@@ -2,16 +2,18 @@
 // #325 stage 4: the curriculum used to be split by subject (maths.ts/writing.ts); this file holds every
 // Reception generator, maths and writing alike, so a reviewer checking "is Reception right" reads one file.
 // Generators shared with Year 1/Year 2 live in util.ts (#325 stage 4).
+import { PATTERN_OBJECTS } from './patterns';
 import type { Generator, Rng, Topic } from './types';
 import { rInitial } from './reception-initial';
 import { rRhyme } from './reception-rhyme';
 import {
-  ri, pick, shuffle, numQ, wordQ, OBJECTS,
+  ri, pick, shuffle, numQ, wordQ, OBJECTS, SHAPES_2D, sameShape,
   orderQ, balanceQ,
   gapQ, spellQ, soundQ, sentGen, type Sent,
   PHASE2, PHASE2B, PHASE3, VOWELS, LETTERS, CVC, DIGRAPHS,
 } from './util';
 import { syllableQ } from './syllables';
+import { storyQ } from './story';
 
 // ---------- Reception maths ----------
 const rCount: Generator = (d, rng) => {
@@ -132,6 +134,24 @@ const rDoubles: Generator = (d, rng) => {
   return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 10, visual: { type: 'tenframe', n, n2: n }, say: `What is double ${n}?` });
 };
 /**
+ * Reception shapes (#969) — naming circle, square, triangle and rectangle, in both directions.
+ *
+ * The first four `SHAPES_2D` rows are the Reception set. A decoy never satisfies `sameShape` with the
+ * asked shape, so ■ is never a wrong "rectangle" and "rectangle" is never a wrong name for ■ (a square
+ * is a rectangle). All four are asked at every stage (the suite's variety floor needs more than three cards at d1);
+ * d1 offers two decoys, d2 every legal decoy; d3 shows the glyph and the bubbles are the names. Counting sides
+ * is Year 1 (`y1-shapes`).
+ */
+const rShapes: Generator = (d, rng) => {
+  const set = SHAPES_2D.slice(0, 4);
+  const [g, name] = pick(rng, set);
+  const decoys = shuffle(rng, set.filter(s => !sameShape(s[1], name)));
+  const ds = d === 1 ? decoys.slice(0, 2) : decoys;
+  const hint = { hint: 'Slice the shape', hintIsData: false };
+  if (d === 3) return wordQ(rng, 'What is this shape called?', name, ds.map(s => s[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?', ...hint });
+  return wordQ(rng, `Which is a ${name}?`, g, ds.map(s => s[0]), { say: `Which one is a ${name}?`, ...hint });
+};
+/**
  * Reception sharing (#299 slice 1) — "how quantities can be distributed equally", between two.
  *
  * Between *two* throughout, which is what the ELG's own examples and the issue ask for; sharing between
@@ -167,6 +187,26 @@ const rOddEven: Generator = (d, rng) => {
   return wordQ(rng, 'Can they all find a partner?', even ? '✅' : '❌', ['✅', '❌'], { visual, hint: 'Put them in twos', hintIsData: false, say: `There are ${n}. Can they all find a partner?` });
 };
 const rOrder: Generator = (d, rng) => orderQ(rng, d === 1 ? 5 : 10, 3);
+/** Continue a repeating pattern (#970): two whole repeats show, the gap is always the last cell. */
+const R_PATTERNS = [
+  { unit: 'AB', cells: 'ABABA', next: 'B', decoys: 2 },
+  { unit: 'ABB', cells: 'ABBABBAB', next: 'B', decoys: 3 },
+  { unit: 'ABBC', cells: 'ABBCABBC', next: 'A', decoys: 3 },
+] as const;
+const rPatterns: Generator = (d, rng) => {
+  const p = R_PATTERNS[d - 1];
+  const letters = [...new Set([...p.unit])];
+  const chosen = shuffle(rng, PATTERN_OBJECTS.map(([g]) => g)).slice(0, letters.length);
+  const glyph = (ch: string) => chosen[letters.indexOf(ch)];
+  const answer = glyph(p.next);
+  // Near decoys first: the pattern's own other objects, then the rest of the pool.
+  const decoys = [...chosen.filter(o => o !== answer), ...PATTERN_OBJECTS.map(([g]) => g).filter(o => !chosen.includes(o))].slice(0, p.decoys);
+  return wordQ(rng, 'What comes next?', answer, decoys, {
+    visual: { type: 'strip', text: [...[...p.cells].map(glyph), '_'].join(' ') },
+    say: 'Look at the pattern. What comes next?',
+    hint: 'Slice what comes next', hintIsData: false,
+  });
+};
 const rBalance: Generator = (d, rng) => {
   const emoji = pick(rng, OBJECTS);
   if (d < 3) {
@@ -334,8 +374,10 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-sub', title: 'Taking Away', icon: '✂️', subject: 'maths', year: 'reception', nc: 'ELG Number: subtraction facts', gen: rSub },
   { id: 'r-counton', title: 'What Comes Next?', icon: '🔢', subject: 'maths', year: 'reception', nc: 'ELG Patterns: count beyond 20', gen: rCountOn },
   { id: 'r-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'reception', nc: 'ELG Patterns: compare and order to 10', sequenceFrom: 1, gen: rOrder },
+  { id: 'r-patterns', title: 'Pattern Party', icon: '🔁', subject: 'maths', year: 'reception', nc: 'Development Matters: continue repeating patterns', gen: rPatterns },
   { id: 'r-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'reception', nc: 'ELG Number: composition, equal amounts', gen: rBalance },
   { id: 'r-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'reception', nc: 'ELG Patterns: double facts within 10', gen: rDoubles },
+  { id: 'r-shapes', title: 'Shape Spotter', icon: '🔷', subject: 'maths', year: 'reception', nc: 'EYFS Spatial reasoning: circle, square, triangle, rectangle', gen: rShapes },
   { id: 'r-share', title: 'Share It Out', icon: '🤝', subject: 'maths', year: 'reception', nc: 'ELG Patterns: distribute equally between two', gen: rShare },
   { id: 'r-oddeven', title: 'Partners', icon: '🐾', subject: 'maths', year: 'reception', nc: 'ELG Patterns: evens and odds', gen: rOddEven },
   // Reception writing
@@ -348,6 +390,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-build', title: 'Build a Word', icon: '🧱', subject: 'writing', year: 'reception', nc: 'ELG Writing: spell by sounds (CVC)', sequenceFrom: 1, gen: rBuild },
   { id: 'r-read', title: 'Read It!', icon: '📗', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: read words by sound-blending', gen: rRead },
   { id: 'r-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'reception', nc: 'ELG Writing: simple sentences', sequenceFrom: 1, gen: rSentence },
+  { id: 'r-storyorder', title: 'Story Order', icon: '🎬', subject: 'writing', year: 'reception', nc: 'ELG Comprehension: anticipate key events in stories', sequenceFrom: 1, gen: (d, rng) => storyQ(rng, d, true) },
   { id: 'r-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'reception', nc: 'ELG Writing: form letters', input: 'tracing', gen: rTrace },
   { id: 'r-initial', title: 'Starts Like', icon: '🔔', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: words with the same initial sound (Development Matters)', sequenceFrom: 3, gen: rInitial },
 ];

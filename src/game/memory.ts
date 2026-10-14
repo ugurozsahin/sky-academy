@@ -70,6 +70,15 @@ export const BOND_POOL = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10];
 const bondPairs = (rng: Rng): Pair[] => shuffle(rng, BOND_POOL).slice(0, 6).map(n => ({ a: txt(`${n} + ?`, `${numberWord(n)} and what make ten?`, true), b: txt(String(10 - n), numberWord(10 - n)) }));
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
+/** Fraction names (#963): the Year 2 NC list. `1/2` and `2/4` are equal in value, so one board carries only one of "a half" / "two quarters". */
+export const FRACTION_POOL: readonly (readonly [string, string])[] = [['a third', '1/3'], ['a quarter', '1/4'], ['three quarters', '3/4']];
+export const HALF_FORMS: readonly (readonly [string, string])[] = [['a half', '1/2'], ['two quarters', '2/4']];
+const fractionPairs = (rng: Rng): Pair[] => [...FRACTION_POOL, pick(rng, HALF_FORMS)].map(([w, s]) => ({ a: txt(w, w, w.length > 6), b: txt(s, w) }));
+
+/** Irregular past tenses (#966): a form a Year 2 child remembers rather than builds with a rule. No pair is identical, and no word is both a present and a past (`saw` is never a present), so every face has exactly one partner. */
+export const TENSE_POOL: readonly (readonly [string, string])[] = [['go', 'went'], ['see', 'saw'], ['run', 'ran'], ['eat', 'ate'], ['come', 'came'], ['take', 'took'], ['give', 'gave'], ['write', 'wrote'], ['sit', 'sat'], ['swim', 'swam'], ['sing', 'sang'], ['fly', 'flew'], ['find', 'found'], ['make', 'made'], ['hide', 'hid'], ['sleep', 'slept']];
+const tensePairs = (rng: Rng): Pair[] => shuffle(rng, TENSE_POOL).slice(0, 8).map(([now, then]) => ({ a: txt(now), b: txt(then) }));
+
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
 export const THEMES: Partial<Record<YearId, Theme[]>> = {
   reception: [
@@ -96,6 +105,8 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
       for (let guard = 0; facts.length < 8 && guard < 80; guard++) { const t = pick(rng, [2, 5, 10]), k = ri(rng, 2, 10); if (!seen.has(t * k)) { seen.add(t * k); facts.push([t, k]); } }
       return facts.map(([t, k]) => ({ a: txt(`${k} × ${t}`, `${k} times ${t}`), b: txt(String(t * k), numberWord(t * k)) }));
     } },
+    { id: 'fractions', title: 'Fraction names', hint: 'Match each fraction to its name', hintIsData: false, pairs: fractionPairs },
+    { id: 'past', title: 'Past tense', hint: 'Match each word to its past tense', hintIsData: false, pairs: tensePairs },
     { id: 'contractions', title: 'Short forms', hint: 'Match each short form to its full form', hintIsData: false, pairs: rng => shuffle(rng, CONTRACTIONS).slice(0, 8).map(([long, short]) => ({ a: txt(long, long, long.length > 6), b: txt(short) })) },
   ],
 };

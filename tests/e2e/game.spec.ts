@@ -1240,6 +1240,18 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index > 0);
   });
 
+  // #970: the Reception ABBC strip (9 cells at difficulty 3) must also stay on one line on a phone.
+  test('r-patterns: the ABBC strip fits on one line on a phone (#970)', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-patterns');
+    await skipToStage(page, 4);
+    const strip = page.locator('.vis.strip');
+    await expect(strip).toBeVisible();
+    const w = await strip.evaluate(el => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(w.scroll, 'the strip does not overflow its box').toBeLessThanOrEqual(w.client + 1);
+  });
+
   test('completing stage 1 shows the avatar celebrating with a praise line', async ({ page }) => {
     await seedPlayer(page, 'kai', 'Sam');
     await startTopic(page, 'year1', 'y1-bonds');
@@ -2236,6 +2248,17 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
     await solveCurrent(page);                                                          // whole sentence, word by word
     await expect(page.locator('#score')).not.toHaveText('0');
+  });
+
+  test('Story Order: the three-sentence card fits the phone and the pictures are sliced in order (#975)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-storyorder');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    await expectFitsViewport(page, 'Story Order three-sentence card and bubbles');
+    for (let i = 0; i < 3; i++) {
+      await waitForTarget(page);
+      expect(await answer(page)).toBe(true);
+    }
   });
 
   test('guard rail: a pause inside the outcome hold holds the question — nothing advances behind the overlay (#301)', async ({ page }) => {
@@ -3980,6 +4003,30 @@ test.describe('Sky Ninja Academy', () => {
     await flip(other); await flip(w3);
     await page.waitForTimeout(300);
     expect(await heard(cards[w3].text), 'a missed word card is not read out').toBe(0);
+  });
+  // #966: Year 2's Past tense deck deals 16 cards; every word must sit whole inside its card on a phone.
+  test('Memory Match Past tense: 16 cards, every word whole, no page overflow (#966)', async ({ page }) => {
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="year2"]');
+    for (let tries = 0; tries < 60 && (await page.evaluate(() => window.__sna?.theme)) !== 'past'; tries++) {
+      if (await page.locator('.memory').count()) {
+        await page.click('#back');
+        await page.locator('#memory, .island[data-year="year2"]').first().waitFor();
+        if (!(await page.locator('#memory').count())) await page.click('.island[data-year="year2"]');
+      }
+      await expect(page.locator('#memory')).toBeVisible();
+      await page.click('#memory');
+      await expect(page.locator('.memory')).toBeVisible();
+    }
+    expect(await page.evaluate(() => window.__sna.theme)).toBe('past');
+    await expect(page.locator('.card')).toHaveCount(16);
+    const vw = page.viewportSize()!.width;
+    const clipped = await page.evaluate((w) => [...document.querySelectorAll('.card')].filter(c => {
+      const r = c.getBoundingClientRect();
+      return r.left < 0 || r.right > w || c.scrollWidth > c.clientWidth + 1;
+    }).length, vw);
+    expect(clipped, 'cards clipped or past the viewport edge').toBe(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');

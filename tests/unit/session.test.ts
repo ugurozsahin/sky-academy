@@ -1,3 +1,4 @@
+import { visualAsked } from './helpers/visual-asked';
 import { describe, it, expect, vi } from 'vitest';
 import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss } from '../../src/game/session';
 import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum'; import { ks1Pinned } from './helpers/ks1-pin';
@@ -1011,10 +1012,7 @@ describe('the repeat key holds the whole question (#412)', () => {
     // table above notes, left uncovered by the `constantPromptBinary` band rail too for `strip` specifically
     // (#391) — `y2-patterns` does not have that rail's binary-options shape.
     const v = q.visual;
-    const visual = v?.type === 'coins' ? [...new Set(v.coins)].sort((a, b) => a - b).join('/')
-      : v?.type === 'numberline' ? `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`
-      : v?.type === 'chart' ? `${v.kind}/${v.rows.map(r => r.n).join(',')}`
-      : v?.type === 'coords' ? `${v.size}/${v.points.map(c => `${c.x},${c.y}`).sort().join(';')}` : '';   // #1129: where the points are, not their letters
+    const visual = visualAsked(v);   // #1129, #985: see helpers/visual-asked.ts
     // #451: the same opt-in the key reads — `options` is a re-shuffled decoy pool everywhere else, so folding
     // it in unconditionally would make this oracle too fine, the B1 direction #412's own review already found.
     const options = q.optionsAreContent ? [...q.options].sort().join('\u0001') : '';
@@ -1173,7 +1171,7 @@ describe('the repeat key holds the whole question (#412)', () => {
    * deliberate edit to this list, not a number that still happens to clear a floor.
    */
   const MEASURABLE_TOPICS = [
-    'r-soundhunt', 'r-syllables', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-soundhunt',
+    'r-compare', 'r-soundhunt', 'r-syllables', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-compare', 'y1-length', 'y1-mass', 'y1-missing', 'y1-soundhunt',
     'y1-spelling', 'y1-story', 'y1-sub', 'y1-syllables', 'y2-anyorder', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
     'y2-oddeven', 'y2-punct', 'y2-pv', 'y2-related', 'y2-spelling', 'y2-stats', 'y2-story-times', 'y2-temp', 'y2-three',
   ];
@@ -1217,7 +1215,7 @@ describe('the repeat key holds the whole question (#412)', () => {
   /** Pinned exactly, for the same reason as `MEASURABLE_TOPICS` above (#453 item 3): a count cannot distinguish
    *  "these twenty-eight" from "twenty-eight, several of them not the ones B1 was measured on". */
   const BIG_ENOUGH_TOPICS = [
-    'r-soundhunt', 'y1-add', 'y1-alphabet', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
+    'r-soundhunt', 'y1-add', 'y1-alphabet', 'y1-balance', 'y1-capacity', 'y1-compare', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
     'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-story', 'y1-sub', 'y2-add', 'y2-anyorder', 'y2-balance', 'y2-capacity', 'y2-compare',
     'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats', 'y2-story-add', 'y2-story-money',
     'y2-sub', 'y2-temp', 'y2-three',

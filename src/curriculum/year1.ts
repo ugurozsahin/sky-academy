@@ -3,17 +3,22 @@
 // Year 1 generator so a reviewer checking "is Year 1 right" reads one file. Generators shared with
 // Reception/Year 2 live in util.ts.
 import type { Generator, Topic, Difficulty } from './types';
+import { y1PositionRow } from './y1-position-row';
 import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, isNote, NOTES,
   SHAPES_2D, SHAPES_3D, sameShape,
   orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitQ,
   DIRS, ARROWS, TURNS_ALL, turnEnd, DAYS,
-  gapLetters, gapQ, spellQ, sentGen, type Sent, PUNCT_SENTS, LETTERS, CVC, DIGRAPHS, Y1_CEW,
+  gapLetters, gapQ, spellQ, sentGen, type Sent, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
 } from './util';
 import { syllableQ } from './syllables';
+import { storyQ } from './story';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
+import { y1Compound } from './year1-compound';
+import { y1Compare } from './year1-compare';
+import { y1Punct } from './year1-punct';
 
 // ---------- Year 1 maths ----------
 /** One bond card for a fixed `total`: a + ? = T or ? + a = T (#917). */
@@ -310,7 +315,8 @@ const y1Shapes3d: Generator = (d, rng) => name3dQ(rng, d === 3 ? SHAPES_3D : Y1_
 
 const TURNS_Y1: [string, number][] = [['a quarter turn', 1], ['a half turn', 2], ['a whole turn', 4]];
 const y1Position: Generator = (d, rng) => {
-  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  const kind = d === 1 ? pick(rng, [0, 1, 3]) : ri(rng, 0, 3);
+  if (kind === 3) return y1PositionRow(d, rng);
   if (kind === 0) {                                              // name the way an arrow points
     const [word, arrow] = pick(rng, DIRS);
     return wordQ(rng, `Which way does ${arrow} point?`, word, DIRS.map(x => x[0]).filter(w => w !== word), { say: 'Which way does the arrow point? Up, down, left or right?', hint: 'Slice the word', hintIsData: false });
@@ -487,18 +493,6 @@ const y1Prefix: Generator = (d, rng) => {
     visual: { type: 'word', text: root }, say: prompt, hint: 'Add un- to the front', hintIsData: false,
   });
 };
-const y1Punct: Generator = (d, rng) => {
-  if (d === 1 || (d === 2 && rng() < 0.5)) {
-    const [s, p] = pick(rng, PUNCT_SENTS);
-    const words = s.split(' ');
-    const lower = words[0].toLowerCase() + (words.length > 1 ? ' ' + words.slice(1).join(' ') : '') + p;
-    const ans = words[0];
-    const ds = shuffle(rng, [words[0].toLowerCase(), words[0].toUpperCase(), (words[1] ?? 'It')]).filter(x => x !== ans).slice(0, 2);
-    return wordQ(rng, `_${lower.slice(words[0].length)}`, ans, ds, { visual: { type: 'sentence', text: lower }, say: `Which word starts the sentence: ${s}?`, hint: 'Sentences start with a capital letter', hintIsData: false });
-  }
-  const [s, p] = pick(rng, PUNCT_SENTS);
-  return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Full stop, question mark or exclamation mark?`, hint: 'Slice the missing punctuation', hintIsData: false });
-};
 // Letter names in order (#976). Oracle: the answer is the shown letter's alphabet neighbour; never "after z" / "before a".
 const y1Alphabet: Generator = (d, rng) => {
   const seq = d === 3 && rng() < 0.5;
@@ -563,10 +557,11 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-time', title: "O'clock & Half Past", icon: '🕐', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time', gen: y1Time },
   { id: 'y1-timewords', title: 'Time Words', icon: '⏳', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time words, hours/minutes/seconds', gen: y1TimeWords },
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', sequenceFrom: 1, gen: y1Order },
+  { id: 'y1-compare', title: 'More, Fewer, Equal', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 NPV: equal to, more than, less than (fewer), most, least', gen: y1Compare },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },
   { id: 'y1-shapes3d', title: '3-D Shapes', icon: '🧊', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: name common 3-D shapes', gen: y1Shapes3d },
-  { id: 'y1-position', title: 'Left, Right & Turns', icon: '🧭', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: position, direction, turns', gen: y1Position },
+  { id: 'y1-position', title: 'Left, Right & Turns', icon: '🧭', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: position (between, next to, first, last), direction, turns', gen: y1Position },
   { id: 'y1-length', title: 'Long & Tall', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: length & height', gen: y1Length },
   { id: 'y1-mass', title: 'Heavy & Light', icon: '🏋️', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: mass/weight', gen: y1Mass },
   { id: 'y1-capacity', title: 'Full & Empty', icon: '🥤', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: capacity & volume', gen: y1Capacity },
@@ -580,6 +575,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', sequenceFrom: 3, gen: y1Spelling },
   { id: 'y1-spellrules', title: 'Spelling Rules', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: ff, ll, ss, zz, ck; n before k; -tch; -ve', gen: y1SpellRules },
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },
+  { id: 'y1-compound', title: 'Join the Words', icon: '🧩', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: compound words', gen: y1Compound },
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },
   { id: 'y1-prefix', title: 'Un- Words', icon: '🚫', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: the prefix un-', gen: y1Prefix },
   { id: 'y1-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year1', nc: 'Y1 Grammar: capitals, . ? !', gen: y1Punct },
@@ -587,6 +583,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-days', title: 'Days of the Week', icon: '📅', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: days', sequenceFrom: 3, gen: y1Days },
   { id: 'y1-syllables', title: 'How Many Beats?', icon: '👏', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: division of words into syllables', gen: (d, rng) => syllableQ(rng, d, 3) },
   { id: 'y1-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year1', nc: 'Y1 Writing: sequence words into sentences, and', sequenceFrom: 1, gen: y1Sentence },
+  { id: 'y1-storyorder', title: 'Story Order', icon: '🎬', subject: 'writing', year: 'year1', nc: 'Y1 Writing: sequence sentences to form short narratives', sequenceFrom: 1, gen: (d, rng) => storyQ(rng, d, d === 1) },
   { id: 'y1-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting', input: 'tracing', gen: y1Trace },
   { id: 'y1-tracenum', title: 'Trace Numbers', icon: '✏️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting: form digits 0-9', input: 'tracing', gen: y1TraceNum },
 ];

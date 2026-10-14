@@ -2,10 +2,12 @@
 ⏰	0.6	alarm clock
 ⏳	0.6	hourglass not done
 ☀	0.6	sun
+☁	0.6	cloud
 ☂	0.7	umbrella
 ☕	0.6	hot beverage
 ⚖	1.0	balance scale
 ⚽	0.6	soccer ball
+⛄	0.6	snowman without snow
 ⛵	0.6	sailboat
 ✂	0.6	scissors
 ✅	0.6	check mark button
@@ -33,11 +35,13 @@
 🌙	0.6	crescent moon
 🌡	0.7	thermometer
 🌧	0.7	cloud with rain
+🌱	0.6	seedling
 🌳	1.0	deciduous tree
 🌷	0.6	tulip
 🌹	0.6	rose
 🌻	0.6	sunflower
 🌼	0.6	blossom
+🌾	0.6	sheaf of rice
 🍅	0.6	tomato
 🍊	0.6	tangerine
 🍌	0.6	banana
@@ -53,13 +57,16 @@
 🍳	0.6	cooking
 🍴	0.6	fork and knife
 🍼	1.0	baby bottle
+🍽	0.7	fork and knife with plate
 🎀	0.6	ribbon
 🎁	0.6	wrapped gift
 🎂	0.6	birthday cake
 🎈	0.6	balloon
+🎉	0.6	party popper
 🎤	0.6	microphone
 🎨	0.6	artist palette
 🎩	0.6	top hat
+🎬	0.6	clapper board
 🎮	0.6	video game
 🎯	0.6	bullseye
 🎲	0.6	game die
@@ -97,6 +104,7 @@
 🐝	0.6	honeybee
 🐟	0.6	fish
 🐢	1.0	turtle
+🐣	0.6	hatching chick
 🐤	0.6	baby chick
 🐦	0.6	bird
 🐧	0.6	penguin
@@ -123,7 +131,9 @@
 👴	0.6	old man
 👾	0.6	alien monster
 💍	0.6	ring
+💐	0.6	bouquet
 💡	0.6	light bulb
+💧	0.6	droplet
 💬	0.6	speech balloon
 💭	0.6	thought balloon
 💯	0.6	hundred points
@@ -214,6 +224,7 @@
 🦕	5.0	sauropod
 🦘	11.0	kangaroo
 🦵	11.0	leg
+🦷	11.0	tooth
 🧁	11.0	cupcake
 🧊	12.0	ice
 🧐	5.0	face with monocle
@@ -222,6 +233,7 @@
 🧣	5.0	scarf
 🧥	5.0	coat
 🧦	5.0	socks
+🧩	11.0	puzzle piece
 🧭	11.0	compass
 🧮	11.0	abacus
 🧱	11.0	brick

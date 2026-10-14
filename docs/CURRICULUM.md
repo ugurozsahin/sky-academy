@@ -16,8 +16,10 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-sub | Number: composition | within 10, pictorial |
 | r-counton | Numerical Patterns: count beyond 20 | what comes next |
 | r-order | Numerical Patterns: compare/order | slice 3 numbers smallest→biggest |
+| r-patterns | Patterns: continue AB, ABB, ABBC | slice what comes next in a repeating strip |
 | r-balance | Number: composition, equal amounts | balance scales: objects on one pan, ? on the other (d3: `a = b + ?`) |
 | r-doubles | Numerical Patterns: double facts within 10 | doubles to 5 + 5 on a two-colour ten-frame — five facts in all, so d1 is 1–4 and d2 adds the fifth; d3 is the top half (2–5) and adds the inverse (`Double ? = 8`), which drops the frame because it would otherwise answer it |
+| r-shapes | EYFS spatial reasoning: circle, square, triangle, rectangle | "Which is a …?" with glyph bubbles (all four asked; d1 offers two decoys, d2 every legal decoy); d3 shows the glyph and the bubbles are the names. A decoy never shares a `sameShape` group with the answer, so ■ is never a wrong "rectangle" |
 | r-share | Numerical Patterns: distribute equally | share 2–10 objects equally **between two**; totals are always even, and the total itself is a decoy. Sharing between three or four is Year 2 division (y2-tables) |
 | r-oddeven | Numerical Patterns: evens and odds | pairing, not the ×2 rule: d1–d2 ask "can they all find a partner?" (✅/❌), d3 names it (odd/even) — the vocabulary y2-oddeven then assumes. Numbers ≤ 10, ≤ 6 at d1 |
 | r-rhyme | Word Reading: spot a rhyme (phonological awareness) | The word is spoken and shown; slice the one picture that rhymes (cat → hat). Hand-keyed rimes, d1 2 pictures, d2 3, d3 4; a decoy never half-rhymes (shares neither the vowel nor the final sound with the rime) and never rhymes with another |
@@ -29,6 +31,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-build | Writing: spell by sounds | slice letters in order (CVC); word and decoy letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-read | Word Reading: read words by sound-blending | Read It!: a CVC word is shown, never spoken — slice its picture; word and decoys follow the phase pools (d1 phase 2, d2–3 all single-letter sounds); d3 always includes a same-first-letter decoy, so the first sound alone cannot answer |
 | r-sentence | Writing: simple sentences | Story Sentences: sentence shown + read aloud, slice the words in order (3 → 6 words, 1–2 decoys) |
+| r-storyorder | Comprehension: anticipate key events in stories | Story Order: a three-event story (hand-keyed, 8 stories) is shown and read aloud; slice the event emoji in order; d1 no decoys, d2 one, d3 two |
 | r-trace | Writing: form letters | trace on canvas; d1–2 follow the phase order, d3 is the whole alphabet — formation covers all 26 whatever phase the sound is in |
 | r-initial | Word Reading: words with the same initial sound | A spoken keyword (snake) and pictures from the CVC bank; slice the one whose first sound matches, by phoneme family so `c` and `k` are one sound. d1 3 pictures, d2 4, d3 5 with 2–3 matches in any order (`sequenceFrom: 3`); d3 only uses sounds with 3+ CVC pictures |
 
@@ -53,10 +56,11 @@ Maths:
 - y1-time — o'clock, half past
 - y1-timewords — quicker/slower, earlier/later, and the sensible unit (seconds, minutes, hours)
 - y1-order — order to 20
+- y1-compare — more / fewer / equal for two groups; most / least of 3–4 numbers to 20
 - y1-line — number line, hidden number
 - y1-shapes — 2-D shapes, sides
 - y1-shapes3d — name common 3-D shapes: cube, cuboid, pyramid, sphere — names only, both directions
-- y1-position — direction of an arrow, pick the arrow, whole/half/quarter turns clockwise & anti-clockwise
+- y1-position — direction of an arrow, pick the arrow, whole/half/quarter turns clockwise & anti-clockwise; a row of five animals: first, last, between, next to (an end animal only)
 - y1-length — compare length & height, cm read from the hint
 - y1-mass — heavier/lighter, g
 - y1-capacity — holds more/less, ml within 100
@@ -71,13 +75,15 @@ Writing:
 - y1-spelling — 45 CEW
 - y1-spellrules — Spelling Rules: the word is spoken, slice the right spelling of two non-word decoys; d1 ff/ll/ss/zz/ck, d2 adds nk and -ve, d3 adds -tch; hand-curated bank (Y1_SPELL_RULES), no real-word decoys
 - y1-plurals — -s/-es
+- y1-compound — Join the Words: "foot + ball = ?" slice the compound spelt as its two parts; d1 two decoys with emoji, d2 three, d3 three without emoji; hand-curated bank (Y1_COMPOUNDS), decoys are non-words
 - y1-suffix — -ing -ed -er -est
 - y1-prefix — Un- Words: un- changes the meaning ("means not kind" → unkind); d3 half "opposite of lock" → unlock; hand-curated bank, root spelling unchanged
-- y1-punct — capital letters, . ? !
+- y1-punct — capital letters (sentence start; names, days, places and I), . ? !
 - y1-alphabet — Alphabet Order: which letter comes after/before; d3 half slice the next three letters in order (letter names, never after z or before a)
 - y1-days
 - y1-syllables — How Many Beats?: same generator as r-syllables, hand-keyed 1–3 beat words; d1 words of 1–2 beats, d2 1–3, d3 adds a 4 option
 - y1-sentence — Story Sentences: 4–7 words, `and`/`or`/`but`, d1 shown, d2–3 listen & build
+- y1-storyorder — Story Order: same generator as r-storyorder; d1 story shown, d2–3 listen & build (peek); d1 no decoys, d2 one, d3 two
 - y1-trace
 - y1-tracenum — Trace Numbers: one digit to trace on the tracing pad; d1 1–5, d2 0 and 6–9, d3 all ten digits
 
@@ -110,6 +116,7 @@ Maths:
 - y2-line — number line in steps
 - y2-shapes — 3-D shapes: name them, count flat faces, and — for the cube, cuboid and square-based pyramid, the only ones KS1 can state without argument — edges and vertices at d2–d3
 - y2-objects3d — everyday objects and the solid each is: a drum is a cylinder, an orange a sphere (d1 object → name, d2 name → object, d3 both); no `SHAPES_3D` glyphs, and cube and cuboid never share a card
+- y2-faces — the 2-D shape on a face of a 3-D shape: a circle on a cylinder, a triangle on a pyramid (d1 solid → face, d2 adds face → solid, d3 adds the sides of a named face); a square is a rectangle, so ■ and ▬ never share a card
 - y2-symmetry — line symmetry in a vertical line: is the dotted line a mirror line for this picture — a half drawn beside its own reflection, with one, two or three squares moved when the answer is no — and which capital letter reads the same folded down the middle
 - y2-patterns — order and arrange objects in patterns and sequences: a unit of two or three repeated three times with one object hidden — the last one, or, at d3, one inside the pattern; two whole repeats are always visible, so exactly one object fits
 - y2-position — turns clockwise & anti-clockwise, rotation as right angles, name the turn from start→end
