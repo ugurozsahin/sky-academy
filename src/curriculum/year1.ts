@@ -4,6 +4,7 @@
 // Reception/Year 2 live in util.ts.
 import type { Generator, Topic, Difficulty } from './types';
 import { y1PositionRow } from './y1-position-row';
+import { spellChoiceQ, y1SpellRules2 } from './year1-spell';
 import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, isNote, NOTES,
@@ -17,6 +18,7 @@ import { syllableQ } from './syllables';
 import { storyQ } from './story';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
 import { y1Compound } from './year1-compound';
+import { y1Contractions } from './year1-contractions';
 import { y1Compare } from './year1-compare';
 import { y1Punct } from './year1-punct';
 
@@ -448,10 +450,8 @@ const y1Spelling: Generator = (d, rng) => {
  * (English Appendix 1, Year 1). The word is spoken, never printed (`listen`/`peek: true`, the no-voice path of
  * Find the word you hear): the child slices the right spelling from two curated non-word misspellings, each
  * breaking exactly its entry's rule. No decoy is a real word or a real word's homophone, and the App. 1
- * exceptions and the heteronym *live* are left out. `spellChoiceQ` is exported for #991 to reuse.
+ * exceptions and the heteronym *live* are left out. `spellChoiceQ` lives in `year1-spell.ts` with #991's bank.
  */
-export const spellChoiceQ = (rng: () => number, word: string, decoys: string[]) =>
-  wordQ(rng, 'Find the right spelling', word, decoys, { say: `Which is the right spelling of ${word}?`, listen: word, peek: true, hint: 'Slice the right spelling', hintIsData: false });
 export type SpellRuleFamily = 'double' | 'nk' | 'tch' | 've';
 export const Y1_SPELL_RULES: [string, SpellRuleFamily, [string, string]][] = [
   ['puff', 'double', ['puf', 'puph']], ['huff', 'double', ['huf', 'hufe']], ['bell', 'double', ['belh', 'behl']], ['well', 'double', ['welh', 'wehl']],
@@ -569,11 +569,13 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-when', title: 'My Day', icon: '🌅', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: sequence events (morning, afternoon, evening; yesterday, today, tomorrow; before, after)', gen: y1When },
   { id: 'y1-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 A&S: equals sign, missing number', gen: y1Balance },
   // Year 1 writing
+  { id: 'y1-contractions', title: 'Joined-up Words', icon: '✂️', subject: 'writing', year: 'year1', nc: "Y1 Word Reading: contractions (I'm, I'll, we'll)", gen: y1Contractions },
   { id: 'y1-digraphs', title: 'Sound Pairs', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: digraphs', gen: y1Digraphs },
   { id: 'y1-alien', title: 'Real or Alien?', icon: '👾', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: decode words containing taught GPCs, including some pseudo-words', gen: y1Alien },
   { id: 'y1-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: respond speedily to graphemes; phase 3 & 5 alternatives, split digraphs', gen: y1SoundHunt },
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', sequenceFrom: 3, gen: y1Spelling },
   { id: 'y1-spellrules', title: 'Spelling Rules', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: ff, ll, ss, zz, ck; n before k; -tch; -ve', gen: y1SpellRules },
+  { id: 'y1-spellrules2', title: 'More Spelling Rules', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: ai/ay, oi/oy, -y endings, k before e/i/y, ph, wh', gen: y1SpellRules2 },
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },
   { id: 'y1-compound', title: 'Join the Words', icon: '🧩', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: compound words', gen: y1Compound },
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },
