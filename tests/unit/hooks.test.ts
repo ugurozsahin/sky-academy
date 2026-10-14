@@ -818,8 +818,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     const noLines = { method: 'update', issue_number: 62, body: 'no lines' };
     const appended = { method: 'update', issue_number: 62,
       body: '2026-01-01T00:00Z — a\n2026-01-02T00:00Z — b\n- second item: no\n- query top pick: #1 — taken' };
-    // Keyed by module, because `ownerMarker` exists in two of them and takes a different shape in each.
-    // `rule` is what the exported function is called with; `input` is what `check` is called with.
+    // Keyed by module (`ownerMarker` is in two, shaped differently); `rule` is the export's arguments, `input` check's.
     const wired: Record<string, { rule: unknown[]; input: unknown; reason: RegExp }> = {
       'bash-guard.forcePush': { rule: [force], input: { command: force }, reason: /Force-push denied/ },
       'bash-guard.ownerMarker': { rule: [forge], input: { command: forge }, reason: /only the human owner writes these/ },
@@ -831,6 +830,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
       'github-write-guard.filePath': { rule: [{ path: '.claude/rules/governance.md' }, clone], input: { path: '.claude/rules/governance.md' }, reason: /not a way round/ },
       'github-write-guard.frozenLabel': { rule: [{ labels: ['frozen'] }], input: { labels: ['frozen'] }, reason: /frozen label is retired/ },
       'github-write-guard.heartbeatAppend': { rule: [appended], input: appended, reason: /never appended to/ },
+      'github-write-guard.prHead': { rule: [{ head: 'claude/x', body: 'b' }], input: { head: 'claude/x', body: 'b' }, reason: /not a push refusal/ },
     };
     for (const name of scripts) {
       const mod = await import(`../../.claude/hooks/${name}.mjs`) as Record<string, any>;
