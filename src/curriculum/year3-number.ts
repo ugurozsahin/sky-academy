@@ -2,7 +2,7 @@
 // see the `// slot:`/`// import:` comments below. Keep this file ≤300 lines (#1050): a generator that would
 // push it past that moves to its own `year3-<slug>.ts` and this file keeps only its row/import.
 import type { Difficulty, Generator, Question, Topic } from './types';
-import { ri, pick, shuffle, wordQ } from './util';
+import { ri, pick, shuffle, wordQ, numberWord, NUM_WORDS } from './util';
 import { dec, fmt } from './ks2num';
 import { swappedDigits } from './mistakes';
 
@@ -205,10 +205,59 @@ export const y3Compare: Generator = (d, rng) => {
   return wordQ(rng, `${fmtN(a)} ? ${fmtN(b)}`, a < b ? '<' : a > b ? '>' : '=', ['<', '>', '='], { say: `${fmtN(a)} compared with ${fmtN(b)}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
 };
 
+// ---- y3-words (#1081): numbers to 1,000 in words. Long words stay on the card; bubbles are numerals ----
+const TENS_WORDS = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+/** British words for 100-1,000: "three hundred and forty-six", "one thousand". Below 100 is `numberWord`'s. */
+export function wordsTo1000(n: number): string {
+  if (n === 1000) return 'one thousand';
+  const h = Math.floor(n / 100), r = n % 100;
+  return r ? `${NUM_WORDS[h]} hundred and ${numberWord(r)}` : `${NUM_WORDS[h]} hundred`;
+}
+
+/** Misconceptions first: written as heard (215 -> 20,015, always sharing the answer's lead and last digit), the
+ *  teen/ty swap, then swapped digits. Never a misspelling: every decoy is a numeral. `nearby`-style fill tops up. */
+function wordsDecoys(n: number, rng: () => number): number[] {
+  if (n === 1000) return [10000, 100, 1100, 1010];
+  const h = Math.floor(n / 100), t = Math.floor(n / 10) % 10, o = n % 10, r = n % 100;
+  const heard = r ? Number(`${h * 100}${r}`) : h * 1000;
+  const teenSwap = t === 1 ? h * 100 + o * 10 : h * 100 + 10 + o;
+  const named = [heard, teenSwap, h * 100 + o * 10 + t, o * 100 + t * 10 + h];
+  const pool = new Set(named.filter(v => v !== n && v > 0));
+  while (pool.size < 3) { const v = n + 10 * ri(rng, -9, 9); if (v !== n && v > 99) pool.add(v); }
+  return [...pool].slice(0, 3);
+}
+
+/** d1: no zero digit. d2: a zero in the tens or ones place, or 1,000. */
+function wordsNumber(d: Difficulty, rng: () => number): number {
+  const h = ri(rng, 1, 9), t = ri(rng, 1, 9), o = ri(rng, 1, 9);
+  if (d === 1) return h * 100 + t * 10 + o;
+  const form = rng();
+  return form < 0.12 ? 1000 : form < 0.4 ? h * 100 + t * 10 : form < 0.8 ? h * 100 + o : h * 100;
+}
+
+/** d3: the tens word of "346 is three hundred and ___-six". Options are single words of 8 letters or fewer. */
+function tensGap(rng: () => number): Question {
+  const t = ri(rng, 2, 9), o = ri(rng, 0, 9), h = ri(rng, 1, 9), n = h * 100 + t * 10 + o;
+  const answer = TENS_WORDS[t - 2];
+  const teen = NUM_WORDS[10 + t], short = (w: string) => w.length <= 8;
+  const named = [teen, NUM_WORDS[t], TENS_WORDS[t - 1] ?? TENS_WORDS[t - 3]].filter(w => short(w) && w !== answer && w !== 'zero');
+  const fill = shuffle(rng, [...NUM_WORDS.slice(11, 20), ...TENS_WORDS].filter(short));
+  const ds = [...new Set([...named, ...fill.filter(w => w !== answer)])].slice(0, 3);
+  const prompt = `${n} is ${NUM_WORDS[h]} hundred and ___${o ? `-${NUM_WORDS[o]}` : ''}`;
+  return wordQ(rng, prompt, answer, ds, { say: `${n} is ${NUM_WORDS[h]} hundred and what${o ? `, ${NUM_WORDS[o]}` : ''}?`, hint: 'Slice the tens word', hintIsData: false });
+}
+
+export const y3Words: Generator = (d, rng) => {
+  if (d === 3) return tensGap(rng);
+  const n = wordsNumber(d, rng), words = wordsTo1000(n);
+  return wordQ(rng, words, fmtN(n), wordsDecoys(n, rng).map(fmtN), { say: `Which number is ${words}?`, visual: { type: 'word', text: words } });
+};
+
 export const Y3_NUMBER: Topic[] = [
   { id: 'y3-count', title: 'Count in 4s, 8s, 50s and 100s', icon: '🔢', subject: 'maths', year: 'year3', nc: 'Y3 NPV: count in 4s, 8s, 50s, 100s; 10 or 100 more or less', gen: y3Count },
   { id: 'y3-pv', title: 'Hundreds, Tens and Ones', icon: '💯', subject: 'maths', year: 'year3', nc: 'Y3 NPV: place value of each digit, partitioning (3M2)', gen: y3PlaceValue },
   { id: 'y3-compare', title: 'Compare and Order to 1,000', icon: '⚖️', subject: 'maths', year: 'year3', nc: 'Y3 NPV: compare and order numbers to 1,000 (3M3)', sequenceFrom: 3, gen: y3Compare },
   // slot: y3-line
-  // slot: y3-words
+  { id: 'y3-words', title: 'Numbers to 1,000 in Words', icon: '🔤', subject: 'maths', year: 'year3', nc: 'Y3 NPV: read and write numbers to 1,000 in numerals and words (3M5)', gen: y3Words },
 ];
