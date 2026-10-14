@@ -9,10 +9,12 @@ import {
   y2Mass, y2Capacity, y2Temp, y2Duration, y2Balance, y2Stats, y2Spelling, y2Contractions, y2Suffix,
   y2SuffixRoot, y2Homophones, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
 } from './year2';
+import { y2StatsOrder } from './year2-stats-order';
 import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
 import { y2MeasureCompare } from './year2-measure-compare';
 import { y2Equiv } from './year2-equiv';
+import { y2Estimate } from './year2-estimate';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2AnyOrder } from './year2-anyorder';
@@ -24,7 +26,9 @@ import { y2Faces } from './year2-faces';
 import { y2SpellKn } from './year2-spell-kn';
 import { y2SpellLe } from './year2-spell-le';
 import { y2SpellDge } from './year2-spell-dge';
+import { y2SpellC } from './year2-spell-c';
 import { y2Conjunction } from './year2-conjunction';
+import { y2Nouns } from './year2-nouns';
 import { tableDrill } from './tables';
 
 export const YEAR2_TOPICS: Topic[] = [
@@ -54,6 +58,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year2', nc: 'Y2 NPV: numbers to 100 in words', gen: y2Words },
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', sequenceFrom: 1, gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
+  { id: 'y2-estimate', title: 'Estimate the Number', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 NPV: estimate numbers on a number line', gen: y2Estimate },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
   { id: 'y2-objects3d', title: 'Shapes Around Us', icon: '🥁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: compare and sort common 3-D shapes and everyday objects', gen: y2Objects3d },
   { id: 'y2-faces', title: 'Faces of Shapes', icon: '🔺', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: identify 2-D shapes on the surface of 3-D shapes', gen: y2Faces },
@@ -68,15 +73,18 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare and sequence intervals of time', gen: y2Duration },
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
   { id: 'y2-stats', title: 'Charts & Tallies', icon: '📊', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: pictograms, tally charts, block diagrams', gen: y2Stats },
+  { id: 'y2-stats-order', title: 'Most to Least', icon: '📈', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: sort the categories by quantity', sequenceFrom: 1, gen: y2StatsOrder },
   // Year 2 writing
   { id: 'y2-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year2', nc: 'Y2 common exception words', sequenceFrom: 3, gen: y2Spelling },
   { id: 'y2-contractions', title: "Contractions don't", icon: '✂️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: contractions', gen: y2Contractions },
   { id: 'y2-suffix', title: 'Endings -ful -ly', icon: '🎀', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes', gen: y2Suffix },
+  { id: 'y2-nouns', title: 'Naming Words', icon: '🦋', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns formed with -er and by compounding', gen: y2Nouns },
   { id: 'y2-suffix-root', title: 'Changing Endings', icon: '🔁', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes that change the root (drop e, double, y→i)', gen: y2SuffixRoot },
   { id: 'y2-homophones', title: 'Sound-alike Words', icon: '👂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: homophones', gen: y2Homophones },
   { id: 'y2-spell-kn', title: 'Silent Letters', icon: '🤫', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: /n/ spelt kn and gn, /r/ spelt wr at the start of words', gen: y2SpellKn },
   { id: 'y2-spell-le', title: 'Word Endings', icon: '🕯️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /l/ or /əl/ sound spelt -le, -el, -al and -il at the end of words', gen: y2SpellLe },
   { id: 'y2-spell-dge', title: 'Badge or Cage?', icon: '🏅', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /dʒ/ sound spelt -dge and -ge at the end of words, and g before e, i and y', gen: y2SpellDge },
+  { id: 'y2-spell-c', title: 'City or Sity?', icon: '🏠', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: the /s/ sound spelt c before e, i and y', gen: y2SpellC },
   { id: 'y2-wordclass', title: 'Word Detective', icon: '🔍', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns, verbs, adjectives, adverbs', sequenceFrom: 2, gen: y2WordClass },
   { id: 'y2-sentencetype', title: 'Sentence Types', icon: '💬', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: statements, questions, commands and exclamations', gen: y2SentenceType },
   { id: 'y2-tense', title: 'Then & Now', icon: '⏳', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: present and past tense, including the progressive', gen: y2Tense },

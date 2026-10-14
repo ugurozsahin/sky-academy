@@ -29,7 +29,9 @@ function numberlineHTML(v: Extract<Visual, { type: 'numberline' }>): string {
   }
   const cell = (n: number, i: number) => {
     const m = marks.find(x => x.at === n);
-    return `<span class="${n === v.mark || m ? 'mark' : ''}">${n === v.mark ? '?' : esc(m?.label ?? v.labels?.[i] ?? String(n))}</span>`;
+    // `ends`: only the two end ticks and the `?` print a number, so an interior value must be estimated (#1004).
+    const text = v.ends && i > 0 && i < ticks.length - 1 && !m ? '' : esc(m?.label ?? v.labels?.[i] ?? String(n));
+    return `<span class="${n === v.mark || m ? 'mark' : ''}">${n === v.mark ? '?' : text}</span>`;
   };
   return `<div class="vis"><div class="nline">${ticks.map(cell).join('')}</div></div>`;
 }

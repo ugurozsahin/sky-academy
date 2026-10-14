@@ -69,11 +69,13 @@ Maths:
 - y1-balance — = as balance: `a + b = ? + c`, `a − b = ? + c`, `a + b = ? − c` within 20
 
 Writing:
+- y1-contractions — Joined-up Words (reading): the contraction shown, slice the two words it stands for; one-expansion bank only (no he's/she's/it's/I'd/we'd); d3 shows it in a sentence
 - y1-digraphs
 - y1-alien — Real or Alien?: decode a printed word (not by ear), phonics screening check practice; d1 phase 3, d2 phase 4 adjacent consonants, d3 phase 5 alternatives, half "slice the alien 👾"
 - y1-soundhunt — Sound Hunt by ear: d1 phase 3, d2 phase 5 alternatives ay/ou/ie/ea/oy/ir/ue/aw/wh/ph/ew/oe/au, d3 adds split digraphs a-e/i-e/o-e/u-e
 - y1-spelling — 45 CEW
 - y1-spellrules — Spelling Rules: the word is spoken, slice the right spelling of two non-word decoys; d1 ff/ll/ss/zz/ck, d2 adds nk and -ve, d3 adds -tch; hand-curated bank (Y1_SPELL_RULES), no real-word decoys
+- y1-spellrules2 — More Spelling Rules: the word is spoken, slice the right spelling of two non-word decoys; d1 ai/ay and oi/oy, d2 adds -y endings and k before e/i/y, d3 adds ph and wh; hand-curated bank (Y1_SPELL_RULES2), no real-word decoys
 - y1-plurals — -s/-es
 - y1-compound — Join the Words: "foot + ball = ?" slice the compound spelt as its two parts; d1 two decoys with emoji, d2 three, d3 three without emoji; hand-curated bank (Y1_COMPOUNDS), decoys are non-words
 - y1-suffix — -ing -ed -er -est
@@ -114,6 +116,7 @@ Maths:
 - y2-words — to 100
 - y2-order — order to 100
 - y2-line — number line in steps
+- y2-estimate — estimate where a number sits on an ends-only 0–10 or 0–100 line
 - y2-shapes — 3-D shapes: name them, count flat faces, and — for the cube, cuboid and square-based pyramid, the only ones KS1 can state without argument — edges and vertices at d2–d3
 - y2-objects3d — everyday objects and the solid each is: a drum is a cylinder, an orange a sphere (d1 object → name, d2 name → object, d3 both); no `SHAPES_3D` glyphs, and cube and cuboid never share a card
 - y2-faces — the 2-D shape on a face of a 3-D shape: a circle on a cylinder, a triangle on a pyramid (d1 solid → face, d2 adds face → solid, d3 adds the sides of a named face); a square is a rectangle, so ■ and ▬ never share a card
@@ -128,16 +131,19 @@ Maths:
 - y2-duration — compare and sequence intervals of time: minutes in an hour / hours in a day and the half- and quarter-hour, which takes longer, start time + duration on the o'clock / quarter grid
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
 - y2-stats — statistics: read a tally chart, a pictogram with a key of 2 or 5, and a block diagram; totalling, comparing and "which was most"
+- y2-stats-order — statistics: read a chart (tally, pictogram with a key of 2 or 5, block diagram) and slice the categories from most to least; no ties
 
 Writing:
 - y2-spelling — 64 CEW
 - y2-contractions
 - y2-suffix — -ful -less -ness -ly -ment, root unchanged
+- y2-nouns — Naming Words: gap sentence; d1 -er nouns (3 bubbles), d2 -er nouns (4), d3 -er nouns and compounds (4); decoys hand-keyed per row
 - y2-suffix-root — endings that change the root: drop the `e` at d1, double the last letter at d2, `y → i` at d3
 - y2-homophones
 - y2-spell-kn — silent first letters, hand-banked: kn at d1 (3 bubbles), adds wr at d2 (4 bubbles), adds gn at d3; every wrong bubble is an invented non-word and no answer has a common homophone
 - y2-spell-le — word endings, hand-banked: -le at d1 (3 bubbles), adds -el at d2 (4 bubbles), adds -al and -il at d3; every wrong bubble is the same stem with another ending, an invented non-word, and homophone words (pedal, medal, metal, petal) stay out
 - y2-spell-dge — the /dʒ/ sound, hand-banked (3 bubbles throughout): -dge after a short vowel at d1, adds -ge at d2, adds g before e, i and y at d3; every wrong bubble is an invented non-word (the -j spelling is never right at the end of a word) and no answer has a common homophone
+- y2-spell-c — the /s/ sound spelt c, hand-banked: c before e at d1 (3 bubbles), adds c before i at d2 (4 bubbles), adds c before y at d3; every wrong bubble is an invented non-word spelling the /s/ with s, ss or sc, and no answer has a common homophone (cell, cent, cite, ceiling and cellar stay out)
 - y2-wordclass — name the noun, verb, adjective or adverb in a sentence: noun & verb at d1, adjective at d2, adverb at d3; from d2 about one card in three is "Slice every noun" (d3: or "every verb") over a sentence's content words
 - y2-sentencetype — statement, question, command or exclamation: statement & question at d1, command at d2, the `What …!`/`How …!` exclamation at d3
 - y2-tense — present and past: name the tense of a finished sentence at d1, with the progressive at d2, and fill the gap with the form the sentence needs at d3
