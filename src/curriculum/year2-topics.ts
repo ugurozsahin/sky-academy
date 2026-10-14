@@ -13,6 +13,7 @@ import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
 import { y2MeasureCompare } from './year2-measure-compare';
 import { y2Equiv } from './year2-equiv';
+import { y2Estimate } from './year2-estimate';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2AnyOrder } from './year2-anyorder';
@@ -54,6 +55,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year2', nc: 'Y2 NPV: numbers to 100 in words', gen: y2Words },
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', sequenceFrom: 1, gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
+  { id: 'y2-estimate', title: 'Estimate the Number', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 NPV: estimate numbers on a number line', gen: y2Estimate },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
   { id: 'y2-objects3d', title: 'Shapes Around Us', icon: '🥁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: compare and sort common 3-D shapes and everyday objects', gen: y2Objects3d },
   { id: 'y2-faces', title: 'Faces of Shapes', icon: '🔺', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: identify 2-D shapes on the surface of 3-D shapes', gen: y2Faces },

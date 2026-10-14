@@ -114,6 +114,7 @@ Maths:
 - y2-words — to 100
 - y2-order — order to 100
 - y2-line — number line in steps
+- y2-estimate — estimate where a number sits on an ends-only 0–10 or 0–100 line
 - y2-shapes — 3-D shapes: name them, count flat faces, and — for the cube, cuboid and square-based pyramid, the only ones KS1 can state without argument — edges and vertices at d2–d3
 - y2-objects3d — everyday objects and the solid each is: a drum is a cylinder, an orange a sphere (d1 object → name, d2 name → object, d3 both); no `SHAPES_3D` glyphs, and cube and cuboid never share a card
 - y2-faces — the 2-D shape on a face of a 3-D shape: a circle on a cylinder, a triangle on a pyramid (d1 solid → face, d2 adds face → solid, d3 adds the sides of a named face); a square is a rectangle, so ■ and ▬ never share a card
