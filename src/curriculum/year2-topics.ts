@@ -11,6 +11,7 @@ import {
 } from './year2';
 import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
+import { y2MeasureCompare } from './year2-measure-compare';
 import { y2Equiv } from './year2-equiv';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
@@ -19,6 +20,7 @@ import { y2StoryMoney } from './year2-story-money';
 import { y2CoinCombo } from './year2-coincombo';
 import { y2StoryTimes } from './year2-story-times';
 import { y2Objects3d } from './year2-objects3d';
+import { y2Faces } from './year2-faces';
 import { y2SpellKn } from './year2-spell-kn';
 import { y2SpellLe } from './year2-spell-le';
 import { y2SpellDge } from './year2-spell-dge';
@@ -54,12 +56,14 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
   { id: 'y2-objects3d', title: 'Shapes Around Us', icon: '🥁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: compare and sort common 3-D shapes and everyday objects', gen: y2Objects3d },
+  { id: 'y2-faces', title: 'Faces of Shapes', icon: '🔺', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: identify 2-D shapes on the surface of 3-D shapes', gen: y2Faces },
   { id: 'y2-symmetry', title: 'Mirror Lines', icon: '🦋', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: line symmetry in a vertical line', gen: y2Symmetry },
   { id: 'y2-patterns', title: 'What Comes Next?', icon: '🔁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: order and arrange objects in patterns and sequences', gen: y2Patterns },
   { id: 'y2-position', title: 'Turns & Right Angles', icon: '🧭', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: position, direction, rotation as right angles', gen: y2Position },
   { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
   { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },
   { id: 'y2-capacity', title: 'Capacity: ml & l', icon: '🥤', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: capacity (ml/l)', gen: y2Capacity },
+  { id: 'y2-measure-compare', title: 'Compare Measures < > =', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare measures and record using >, < and =', gen: y2MeasureCompare },
   { id: 'y2-temp', title: 'Temperature', icon: '🌡️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: temperature (°C)', gen: y2Temp },
   { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare and sequence intervals of time', gen: y2Duration },
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
