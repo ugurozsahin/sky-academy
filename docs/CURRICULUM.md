@@ -180,6 +180,7 @@ Maths:
 - y3-mental — a 3-digit number ± ones (no crossing a ten) or hundreds (d1), ± tens with hundred crossings (d2), all three forms with crossings and `slow` (d3)
 - y3-column — build a 3-digit + 3-digit sum with at most one exchange, or 3-digit − 2-digit with none (d1), two exchanges to 1,998 and subtraction across a zero (d2), then find a missing digit in a column sum (d3)
 - y3-check — estimate a sum or difference of numbers within 4 of a hundred (d1), which calculation checks a subtraction (d2), checks of additions and subtractions with exchanges, plus estimates (d3)
+- y3-measures — read a 6-tick scale in mm, g or ml (d1), compare or add and subtract in one unit (d2), then mixed units and equivalents such as 1 kg and 200 g = 1,200 g (d3)
 - y3-perimeter — perimeter by counting the unit edges round a shape on squared paper: small rectangles (d1), rectangles up to 6 × 4 and L-shapes (d2), two corner notches on up to 8 × 8 or a length and width in words (d3); the area is always among the decoys
 - y3-money — how much money from 2–4 coins or notes (d1), add or subtract two amounts crossing a pound (d2), change from £5 or £10 (d3); £ and p always written separately, never a decimal
 - y3-missing — the gap in `a + ? = c` or `a − ? = c`, a multiple of 10 or 100 (d1), the gap in any position with a 2-digit number (d2), 3-digit numbers with exchanges and the equals sign on the left half the time, with `slow` (d3)
