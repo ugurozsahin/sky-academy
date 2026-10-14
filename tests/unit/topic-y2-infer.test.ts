@@ -38,9 +38,9 @@ describe('y2-infer (#1015)', () => {
       expect(decoyPool(item).length, item[0]).toBeGreaterThanOrEqual(3);
     }
   });
-  it('the bank is big enough: 40 items, 8 per category, short sentences and answers', () => {
+  it('the bank is big enough: 40 items, 10 per category, short sentences and answers', () => {
     expect(INFER_BANK.length).toBeGreaterThanOrEqual(40);
-    for (const c of cats) expect(INFER_BANK.filter(i => i[2] === c).length, c).toBeGreaterThanOrEqual(8);
+    for (const c of cats) expect(INFER_BANK.filter(i => i[2] === c).length, c).toBeGreaterThanOrEqual(10);
     for (const [s, , c] of INFER_BANK) {
       expect(s.length, s).toBeLessThanOrEqual(60);
       for (const a of Object.keys(CATEGORIES[c])) expect(a.length, a).toBeLessThanOrEqual(20);
@@ -72,6 +72,12 @@ describe('y2-infer (#1015)', () => {
         for (const o of q.options) expect(o === q.answer || decoyPool(item).includes(o), `${o} is not a legal decoy for "${item[0]}"`).toBe(true);
       }
       expect([...seen].sort()).toEqual([...LADDER[d]].sort());
+    }
+  });
+  it('every notDecoys entry is a real answer of the category and never the card\'s own answer', () => {
+    for (const [s, , c, a, not = []] of INFER_BANK) for (const n of not) {
+      expect(Object.keys(CATEGORIES[c]), s).toContain(n);
+      expect(n, s).not.toBe(a);
     }
   });
   it('never offers a notDecoys answer as a bubble', () => {

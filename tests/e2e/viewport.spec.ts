@@ -186,6 +186,7 @@ test.describe('tablet viewports (#116)', () => {
     });
     expect(box.lLeft, 'the sentence starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
     expect(box.lRight, 'the sentence ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    expect(await page.evaluate(() => { const e = document.querySelector('.vis.sentence')!; return e.scrollWidth <= e.clientWidth + 1; }), 'the sentence does not scroll sideways').toBe(true);
     await expectFitsViewport(page, 'inference sentence');
   });
 

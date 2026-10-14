@@ -46,12 +46,12 @@ export type InferItem = [sentence: string, question: string, category: InferCate
 
 export const INFER_BANK: InferItem[] = [
   // feeling
-  ['Mia was crying and hugging her teddy.', 'How did Mia feel?', 'feeling', 'sad'],
+  ['Mia was crying and hugging her teddy.', 'How did Mia feel?', 'feeling', 'sad', ['scared']],
   ['Ben was smiling and clapping his hands.', 'How did Ben feel?', 'feeling', 'happy'],
   ['Zara stamped her foot and shouted loudly.', 'How did Zara feel?', 'feeling', 'cross'],
   ['Leo hid under the bed, trembling.', 'How did Leo feel?', 'feeling', 'scared'],
   ['Ava yawned and rubbed her eyes.', 'How did Ava feel?', 'feeling', 'tired'],
-  ['Tom had tears running down his face.', 'How did Tom feel?', 'feeling', 'sad'],
+  ['Tom had tears running down his face.', 'How did Tom feel?', 'feeling', 'sad', ['happy']],
   ['Ruby laughed and danced round the room.', 'How did Ruby feel?', 'feeling', 'happy'],
   ['Sam slammed the door and scowled.', 'How did Sam feel?', 'feeling', 'cross'],
   ['Ali screamed and ran from the spider.', 'How did Ali feel?', 'feeling', 'scared'],
@@ -65,8 +65,8 @@ export const INFER_BANK: InferItem[] = [
   ['Tom jumped in the puddles in his raincoat.', 'What is the weather like?', 'weather', 'rainy'],
   ['The sledge slid down the white hill.', 'What is the weather like?', 'weather', 'snowy'],
   ['Dad wore sunglasses and the ice cream melted.', 'What is the weather like?', 'weather', 'sunny'],
-  ['The washing flapped on the line and the trees swayed.', 'What is the weather like?', 'weather', 'windy'],
-  ['Gran could hardly see the road ahead.', 'What is the weather like?', 'weather', 'foggy'],
+  ['The washing flapped on the line and the trees swayed.', 'What is the weather like?', 'weather', 'windy', ['sunny']],
+  ['Gran could hardly see the road through the thick grey mist.', 'What is the weather like?', 'weather', 'foggy'],
   // place
   ['Zoe built a sandcastle and heard the waves.', 'Where is Zoe?', 'place', 'at the beach'],
   ['Lily dug in the sand next to the sea.', 'Where is Lily?', 'place', 'at the beach'],
@@ -88,7 +88,7 @@ export const INFER_BANK: InferItem[] = [
   ['Dad swept the pieces into the dustpan.', 'What happened just before?', 'before', 'broke a cup'],
   ['Mum got the broom to sweep up the china.', 'What happened just before?', 'before', 'broke a cup'],
   ['Leo\'s hair was dripping and he needed a towel.', 'What happened just before?', 'before', 'got wet'],
-  ['Mia\'s clothes were soaked through.', 'What happened just before?', 'before', 'got wet'],
+  ['Mia\'s clothes were soaked through.', 'What happened just before?', 'before', 'got wet', ['fell over']],
 ];
 
 const LADDER: Record<Difficulty, InferCategory[]> = { 1: ['feeling'], 2: ['feeling', 'weather', 'place'], 3: ['feeling', 'weather', 'place', 'before'] };
