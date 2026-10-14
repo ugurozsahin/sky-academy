@@ -157,6 +157,21 @@ test.describe('tablet viewports (#116)', () => {
     await expectFitsViewport(page, 'grown-ups dashboard with untried lists');
   });
 
+  /** #1004: the ends-only 11-tick number line of `y2-estimate` fits its question card on a 390x664 phone. */
+  test('the estimate number line fits the question card at 390x664 (#1004)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-estimate');
+    await expect(page.locator('.nline span')).toHaveCount(11);
+    const box = await page.evaluate(() => {
+      const l = document.querySelector('.nline')!.getBoundingClientRect(), c = document.querySelector('.qcard')!.getBoundingClientRect();
+      return { lLeft: l.left, lRight: l.right, cLeft: c.left, cRight: c.right };
+    });
+    expect(box.lLeft, 'the line starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
+    expect(box.lRight, 'the line ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    await expectFitsViewport(page, 'estimate number line');
+  });
+
   /**
    * The other two portrait-tablet geometries the issue names (#109). They are one test rather than two
    * projects on purpose: a project costs a whole sequential leg of the nightly (see `playwright.config.ts`),

@@ -9,6 +9,7 @@ import { y2StatsOrder } from '../../../src/curriculum/year2-stats-order';
 import { y2OddEven } from '../../../src/curriculum/year2-oddeven';
 import { y2MeasureCompare } from '../../../src/curriculum/year2-measure-compare';
 import { y2Equiv } from '../../../src/curriculum/year2-equiv';
+import { y2Estimate } from '../../../src/curriculum/year2-estimate';
 import { y2WordClass } from '../../../src/curriculum/year2-wordclass';
 import { y2StoryAdd } from '../../../src/curriculum/year2-story-add';
 import { y2AnyOrder } from '../../../src/curriculum/year2-anyorder';
@@ -29,7 +30,7 @@ import { y2Conjunction } from '../../../src/curriculum/year2-conjunction';
 /** `YEAR2_TOPICS`'s ids, in order (#889): a move or a reorder of the registry cannot pass silently. */
 export const Y2_IDS = [
   'y2-pv', 'y2-compare', 'y2-skip', 'y2-add', 'y2-sub', 'y2-related', 'y2-three', 'y2-inverse', 'y2-story-add', 'y2-anyorder', 'y2-tables', 'y2-story-times', 'y2-oddeven',
-  'y2-fractions', 'y2-equiv', 'y2-money', 'y2-story-money', 'y2-coincombo', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-shapes', 'y2-objects3d', 'y2-faces', 'y2-symmetry',
+  'y2-fractions', 'y2-equiv', 'y2-money', 'y2-story-money', 'y2-coincombo', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-estimate', 'y2-shapes', 'y2-objects3d', 'y2-faces', 'y2-symmetry',
   'y2-patterns', 'y2-position', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-measure-compare', 'y2-temp', 'y2-duration', 'y2-balance',
   'y2-stats', 'y2-stats-order', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-suffix-root', 'y2-homophones', 'y2-spell-kn', 'y2-spell-le', 'y2-spell-dge', 'y2-wordclass',
   'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-conjunction', 'y2-trace',
@@ -41,7 +42,7 @@ export const Y2_IDS = [
  */
 export const Y2_GENS: Record<string, Topic['gen']> = {
   'y2-pv': y2PlaceValue, 'y2-compare': y2Compare, 'y2-skip': y2Skip, 'y2-add': y2Add, 'y2-sub': y2Sub, 'y2-related': y2Related,
-  'y2-three': y2Three, 'y2-inverse': y2Inverse, 'y2-story-add': y2StoryAdd, 'y2-anyorder': y2AnyOrder, 'y2-story-times': y2StoryTimes, 'y2-tables': y2Tables, 'y2-oddeven': y2OddEven, 'y2-fractions': y2Fractions, 'y2-equiv': y2Equiv,
+  'y2-three': y2Three, 'y2-inverse': y2Inverse, 'y2-story-add': y2StoryAdd, 'y2-anyorder': y2AnyOrder, 'y2-story-times': y2StoryTimes, 'y2-tables': y2Tables, 'y2-oddeven': y2OddEven, 'y2-fractions': y2Fractions, 'y2-equiv': y2Equiv, 'y2-estimate': y2Estimate,
   'y2-money': y2Money, 'y2-story-money': y2StoryMoney, 'y2-coincombo': y2CoinCombo, 'y2-time': y2Time, 'y2-words': y2Words, 'y2-order': y2Order, 'y2-line': y2Line,
   'y2-shapes': y2Shapes, 'y2-objects3d': y2Objects3d, 'y2-faces': y2Faces, 'y2-symmetry': y2Symmetry, 'y2-patterns': y2Patterns, 'y2-position': y2Position, 'y2-length': y2Length,
   'y2-mass': y2Mass, 'y2-capacity': y2Capacity, 'y2-measure-compare': y2MeasureCompare, 'y2-temp': y2Temp, 'y2-duration': y2Duration, 'y2-balance': y2Balance,
@@ -85,6 +86,7 @@ export const NO_REPEATED_SET = new Set([
   'y1-alphabet d1', 'y1-alphabet d3', // #976: the bubble sets are drawn from 26 letters, so no two cards offer the same set at these seeds; d2 does compare
   'y1-moreless d3', // #983: count-back cards spread d3 over 0-100, so no option set recurs with a different answer at this seed; the options are all numerals, never wide
   'y1-spellrules d1', 'y1-spellrules d2', 'y1-spellrules d3', // #990: each bank word carries its own two decoys, so an option set never recurs with a different answer
+  'y1-spellrules2 d1', 'y1-spellrules2 d2', 'y1-spellrules2 d3', // #991: as y1-spellrules, each bank word carries its own two decoys
   'r-storyorder d1', 'r-storyorder d2', 'r-storyorder d3', 'y1-storyorder d1', 'y1-storyorder d2', 'y1-storyorder d3', // #975: a story's emoji have one keyed order, so an option set never recurs with a different answer; the bubbles are emoji, never wide
 'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
 'y2-related d1', 'y2-related d2', 'y2-related d3', 'y2-add d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
