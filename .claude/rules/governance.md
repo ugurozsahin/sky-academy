@@ -47,6 +47,14 @@ paths:
   The owner's own checkout carries the marker; he creates it by hand, once, and nothing else does.
   That is the same answer the bullet below already gives for the one-home reduction; this makes it true of
   everything under `.claude/`, and enforces it.
+- **A pull request is opened from a `feature|fix|chore/<issue>-<slug>` branch, never a session's assigned
+  `claude/` one (#1838).** Two runs on 2026-10-13 weighed the harness's "develop on this branch" against
+  STEP 3's "do not use it", chose the harness, and opened #1820 and #1830, which `branch-name` held red and
+  nobody moved. Enforced in code: `prHead()` in `.claude/hooks/github-write-guard.mjs` denies a
+  `create_pull_request` whose head fails CI's pattern unless the body has a line beginning
+  `BRANCH: PUSH REFUSED`, the one exception CI accepts; `tests/unit/pr-head-guard.test.ts` holds the two
+  patterns equal. The denial is not a push refusal and never justifies that marker. A push to a `claude/`
+  branch is not refused: a bare `git push` names no branch a hook can see, and the PR is the gate.
 - **A `REVIEW: CLEARED` comment that supersedes another reviewer's block (#161)
   carries its own session URL too (#191)** — the same footer every comment carries (#199), so a later reader
   is not left guessing which session cleared a stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s

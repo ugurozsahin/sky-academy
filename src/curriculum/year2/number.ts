@@ -1,5 +1,6 @@
 // Year 2 number: place value, the four operations, tables, fractions, money, clocks, skip counting. Split out of year2.ts (#1416); index.ts re-exports every name.
-import { type Difficulty, type Generator, type Question } from '../types';
+import { type Difficulty, type Generator, type Question, type Rng } from '../types';
+import { buildQ } from '../build';
 import { ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, orderQ, lineQ, unitQ } from '../util';
 
 // ---------- Year 2 maths ----------
@@ -39,6 +40,9 @@ export const y2Compare: Generator = (d, rng) => {
   const ans = a < b ? '<' : a > b ? '>' : '=';
   return wordQ(rng, `${a} ? ${b}`, ans, ['<', '>', '='], { say: `${a} compared with ${b}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
 };
+/** "Build the answer" card (#1016): slice the digits of the result in order. Five bubbles whatever the answer's length (#481). */
+const digitsQ = (rng: Rng, p: string, n: number): Question =>
+  buildQ(rng, { prompt: p, say: `${q(p).say} Slice the digits of the answer.`, answer: String(n), total: 5, hint: 'Slice the digits in order' });
 export const y2Add: Generator = (d, rng) => {
   let a: number, b: number;
   if (d === 1) { a = ri(rng, 10, 89); b = ri(rng, 1, 9); }          // 2-digit + ones
@@ -46,6 +50,7 @@ export const y2Add: Generator = (d, rng) => {
   else { a = ri(rng, 10, 60); b = ri(rng, 10, 99 - a); }             // 2-digit + 2-digit
   if (a + b > 100) return y2Add(d, rng);
   const p = `${a} + ${b} = ?`;
+  if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a + b));
   return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p) }));
 };
 export const y2Sub: Generator = (d, rng) => {
@@ -54,6 +59,7 @@ export const y2Sub: Generator = (d, rng) => {
   else if (d === 2) { a = ri(rng, 30, 99); b = 10 * ri(rng, 1, 2); }
   else { a = ri(rng, 30, 99); b = ri(rng, 10, a - 1); }
   const p = `${a} − ${b} = ?`;
+  if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a - b));
   return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p) }));
 };
 export const y2Three: Generator = (d, rng) => {

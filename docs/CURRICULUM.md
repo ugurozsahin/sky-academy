@@ -94,8 +94,8 @@ Maths:
 - y2-pv — tens/ones
 - y2-compare — < > =
 - y2-skip — 2,3,5,10 incl. backwards
-- y2-add — 2-digit ± ones/tens/2-digit
-- y2-sub — 2-digit ± ones/tens/2-digit
+- y2-add — 2-digit ± ones/tens/2-digit; d3 half the cards are "build the answer" (slice the digits)
+- y2-sub — 2-digit ± ones/tens/2-digit; d3 half the cards are "build the answer" (slice the digits)
 - y2-related — related facts: 3 + 4 = 7, so 30 + 40 = ?; d1 adds, d2 subtracts, d3 hides the second number or the result
 - y2-three — three 1-digit
 - y2-inverse — missing number
@@ -133,22 +133,28 @@ Maths:
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
 - y2-stats — statistics: read a tally chart, a pictogram with a key of 2 or 5, and a block diagram; totalling, comparing and "which was most"
 - y2-stats-order — statistics: read a chart (tally, pictogram with a key of 2 or 5, block diagram) and slice the categories from most to least; no ties
+- y2-stats-table — statistics: read a simple table (category and count) — how many chose one, how many altogether, how many more, which most; no ties
 
 Writing:
 - y2-spelling — 64 CEW
 - y2-contractions
 - y2-suffix — -ful -less -ness -ly -ment, root unchanged
+- y2-nouns — Naming Words: gap sentence; d1 -er nouns (3 bubbles), d2 -er nouns (4), d3 -er nouns and compounds (4); decoys hand-keyed per row
 - y2-suffix-root — endings that change the root: drop the `e` at d1, double the last letter at d2, `y → i` at d3
 - y2-homophones
 - y2-spell-kn — silent first letters, hand-banked: kn at d1 (3 bubbles), adds wr at d2 (4 bubbles), adds gn at d3; every wrong bubble is an invented non-word and no answer has a common homophone
 - y2-spell-le — word endings, hand-banked: -le at d1 (3 bubbles), adds -el at d2 (4 bubbles), adds -al and -il at d3; every wrong bubble is the same stem with another ending, an invented non-word, and homophone words (pedal, medal, metal, petal) stay out
 - y2-spell-dge — the /dʒ/ sound, hand-banked (3 bubbles throughout): -dge after a short vowel at d1, adds -ge at d2, adds g before e, i and y at d3; every wrong bubble is an invented non-word (the -j spelling is never right at the end of a word) and no answer has a common homophone
+- y2-spell-c — the /s/ sound spelt c, hand-banked: c before e at d1 (3 bubbles), adds c before i at d2 (4 bubbles), adds c before y at d3; every wrong bubble is an invented non-word spelling the /s/ with s, ss or sc, and no answer has a common homophone (cell, cent, cite, ceiling and cellar stay out)
+- y2-spell-tion — words ending in -tion, hand-banked: two-syllable words at d1 (3 bubbles: -tion, -sion, -shin), 4 bubbles at d2 (adds -shon), adds the longer words (fraction, mention, caption, fiction) at d3; every wrong bubble is an invented non-word and no answer has a common homophone (section and nation stay out)
+- y2-spell-more — the remaining statutory spelling rules, hand-banked: a before l and o for /ʌ/ at d1 (3 bubbles), adds -ey and a after w/qu at d2 (4 bubbles), adds or and ar after w and s for /ʒ/ at d3; every wrong bubble is an invented non-word and no answer has a common homophone (ball, all, key, talk and war stay out)
 - y2-wordclass — name the noun, verb, adjective or adverb in a sentence: noun & verb at d1, adjective at d2, adverb at d3; from d2 about one card in three is "Slice every noun" (d3: or "every verb") over a sentence's content words
 - y2-sentencetype — statement, question, command or exclamation: statement & question at d1, command at d2, the `What …!`/`How …!` exclamation at d3
 - y2-tense — present and past: name the tense of a finished sentence at d1, with the progressive at d2, and fill the gap with the form the sentence needs at d3
 - y2-punct — commas in lists, possessive apostrophe
 - y2-sentence — Story Sentences: 5–7 words, expanded noun phrases, `because`/`when`/`if`/`that`, commands & exclamations; d1 shown, d2–3 listen & build
 - y2-conjunction — Joining Words: gap sentence, slice the joining word; d1 and/or/but (3 bubbles), d2 because/when/if/that (3), d3 any (4); decoys hand-keyed per sentence so only one word fits
+- y2-infer — What Happened?: one sentence and a question, slice the answer the clues point to (no emoji, so a picture never gives it away); d1 how someone feels (3 bubbles), d2 adds weather and place (4), d3 adds what happened just before (4); every sentence holds a clue word for its answer and none for another
 - y2-trace — words
 
 Unit conversion (`1 m = 100 cm`, `1 kg = 1000 g`, `1 l = 1000 ml`) is **not** a KS1 topic and the three Year 2

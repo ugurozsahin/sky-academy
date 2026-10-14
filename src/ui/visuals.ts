@@ -113,6 +113,10 @@ export function renderVisual(v: Visual | undefined): string {
 /** The bar chart is `vis-axis-chart.ts`'s; the other chart kinds are `chartHTML`'s. */
 const chartOrBar = (v: Extract<Visual, { type: 'chart' }>): string => v.kind === 'bar' ? barChartSVG(v) : chartHTML(v);
 
+/** A table's heading row (#1021): the same grid row as the data rows, holding the two heading strings. */
+const tableHead = (head: [string, string] | undefined): string => head
+  ? `<div class="chart-row"><span class="cat">${esc(head[0])}</span><span class="data">${esc(head[1])}</span></div>` : '';
+
 /** Tally, block diagram and pictogram (Y2, #8) — the bar chart is `vis-axis-chart.ts`'s. */
 function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' }>): string {
   // `Visual` is a public type and `each` is an unconstrained number on it, so the drawing defends itself:
@@ -152,7 +156,7 @@ function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' 
   // is escaped reads as proof the row is safe, when its neighbour is not.
   const icon = esc(pict?.icon ?? '⭐');
   const kind = esc(v.kind);
-  const body = rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
+  const body = tableHead(v.kind === 'table' ? v.head : undefined) + rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
   // The key is the whole point of a pictogram — without it the picture is a different number from the data.
   const key = pict && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
   return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;
@@ -201,7 +205,8 @@ function symmetryHtml(v: Extract<Visual, { type: 'symmetry' }>): string {
 }
 
 /** One chart row's data cell. Tally groups in fives (four uprights and a gate stroke), the way a child is taught to read them. */
-function chartRow(kind: 'pictogram' | 'tally' | 'block', n: number, each: number, icon: string): string {
+function chartRow(kind: 'pictogram' | 'tally' | 'block' | 'table', n: number, each: number, icon: string): string {
+  if (kind === 'table') return String(n);
   if (kind === 'block') return Array.from({ length: n }, () => '<i class="blk"></i>').join('');
   if (kind === 'pictogram') return Array.from({ length: n / each }, () => `<span class="pic">${icon}</span>`).join('');
   let html = '';

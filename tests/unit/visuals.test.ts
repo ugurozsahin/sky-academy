@@ -538,3 +538,23 @@ describe('single fraction bar fits a phone card (#1195)', () => {
     expect(w[0] * 12 + 33).toBeCloseTo(240, 5);
   });
 });
+
+describe('chart visual: table (#1021)', () => {
+  const rows = [{ label: '🐶 dogs', n: 7 }, { label: '🐱 cats', n: 12 }, { label: '🐰 rabbits', n: 3 }];
+  it('draws the heading row, then every label with its count as a numeral', () => {
+    const h = renderVisual({ type: 'chart', kind: 'table', rows, head: ['Pet', 'Children'] });
+    const segs = h.split('class="chart-row"').slice(1);
+    expect(segs).toHaveLength(4);
+    expect(segs[0]).toContain('Pet'); expect(segs[0]).toContain('Children');
+    rows.forEach((r, k) => { expect(segs[k + 1]).toContain(r.label); expect(segs[k + 1]).toContain(`>${r.n}</span>`); });
+    expect(h).not.toContain('class="key"');
+  });
+  it('leaves the tally, block and pictogram output unchanged', () => {
+    const tally = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'a', n: 6 }] });
+    expect(tally).toBe('<div class="vis"><div class="chart tally"><div class="chart-row"><span class="cat">a</span><span class="data"><span class="tal five">||||</span><span class="tal">|</span></span></div></div></div>');
+    const block = renderVisual({ type: 'chart', kind: 'block', rows: [{ label: 'a', n: 2 }] });
+    expect(block).toBe('<div class="vis"><div class="chart block"><div class="chart-row"><span class="cat">a</span><span class="data"><i class="blk"></i><i class="blk"></i></span></div></div></div>');
+    const pic = renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 4 }], each: 2, icon: '⭐' });
+    expect(pic).toBe('<div class="vis"><div class="chart pictogram"><div class="chart-row"><span class="cat">a</span><span class="data"><span class="pic">⭐</span><span class="pic">⭐</span></span></div><div class="key">1 ⭐ = 2</div></div></div>');
+  });
+});

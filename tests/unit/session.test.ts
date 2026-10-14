@@ -1173,7 +1173,7 @@ describe('the repeat key holds the whole question (#412)', () => {
   const MEASURABLE_TOPICS = [
     'r-compare', 'r-soundhunt', 'r-syllables', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-compare', 'y1-length', 'y1-mass', 'y1-missing', 'y1-soundhunt',
     'y1-spelling', 'y1-story', 'y1-sub', 'y1-syllables', 'y2-anyorder', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
-    'y2-measure-compare', 'y2-oddeven', 'y2-punct', 'y2-pv', 'y2-related', 'y2-spelling', 'y2-stats', 'y2-stats-order', 'y2-story-times', 'y2-temp', 'y2-three',
+    'y2-measure-compare', 'y2-oddeven', 'y2-punct', 'y2-pv', 'y2-related', 'y2-spelling', 'y2-stats', 'y2-stats-order', 'y2-stats-table', 'y2-story-times', 'y2-temp', 'y2-three',
   ];
   it('the measurable set is exactly these topics, not just this many (#453 item 3)', () => {
     // The two extremes of the issue's own table are in this list: the listening topics, where the key *was* the
@@ -1217,7 +1217,7 @@ describe('the repeat key holds the whole question (#412)', () => {
   const BIG_ENOUGH_TOPICS = [
     'r-soundhunt', 'y1-add', 'y1-alphabet', 'y1-balance', 'y1-capacity', 'y1-compare', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
     'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-story', 'y1-sub', 'y2-add', 'y2-anyorder', 'y2-balance', 'y2-capacity', 'y2-compare',
-    'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-measure-compare', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats', 'y2-stats-order', 'y2-story-add', 'y2-story-money',
+    'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-measure-compare', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats', 'y2-stats-order', 'y2-stats-table', 'y2-story-add', 'y2-story-money',
     'y2-sub', 'y2-temp', 'y2-three',
   ];
   it('the big-topic set is exactly these topics, not just this many (#453 item 3)', () => { // #1050: EYFS/KS1-only pin

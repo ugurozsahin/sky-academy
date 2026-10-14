@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { expectFitsViewport, gateProduct, outsideItsBox, overrideSafeAreaInsets } from './viewport';
 import { AVATARS, VILLAIN } from '../../src/avatars';
+import { INFER_BANK } from '../../src/curriculum/year2-infer';
 import type { StoredCert, StoredDuel } from '../../src/storage';
 
 /**
@@ -170,6 +171,42 @@ test.describe('tablet viewports (#116)', () => {
     expect(box.lLeft, 'the line starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
     expect(box.lRight, 'the line ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
     await expectFitsViewport(page, 'estimate number line');
+  });
+
+  /** #1015: the longest `y2-infer` sentence (up to 60 characters) shows whole on its question card at 390x664. */
+  test('the longest inference sentence fits the question card at 390x664 (#1015)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-infer', 'writing');
+    const longest = INFER_BANK.map(i => i[0]).sort((a, b) => b.length - a.length)[0];
+    await page.evaluate(text => { document.querySelector('.vis.sentence')!.textContent = text; }, longest);
+    const box = await page.evaluate(() => {
+      const l = document.querySelector('.vis.sentence')!.getBoundingClientRect(), c = document.querySelector('.qcard')!.getBoundingClientRect();
+      return { lLeft: l.left, lRight: l.right, cLeft: c.left, cRight: c.right };
+    });
+    expect(box.lLeft, 'the sentence starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
+    expect(box.lRight, 'the sentence ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    expect(await page.evaluate(() => { const e = document.querySelector('.vis.sentence')!; return e.scrollWidth <= e.clientWidth + 1; }), 'the sentence does not scroll sideways').toBe(true);
+    await expectFitsViewport(page, 'inference sentence');
+  });
+
+  test('a Year 2 table card shows its heading and every row inside the question card at 390x664 (#1021)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-stats-table', 'maths');
+    // Dress the card with the longest category and heading in the survey bank, in one evaluate.
+    await page.evaluate(() => {
+      const cats = document.querySelectorAll('.chart.table .cat');
+      cats[0].textContent = 'Playtime game'; cats[1].textContent = '🍓 strawberries';
+    });
+    const box = await page.evaluate(() => {
+      const t = document.querySelector('.chart.table')!.getBoundingClientRect(), c = document.querySelector('.qcard')!.getBoundingClientRect();
+      return { rows: document.querySelectorAll('.chart.table .chart-row').length, tLeft: t.left, tRight: t.right, cLeft: c.left, cRight: c.right };
+    });
+    expect(box.rows, 'heading row plus three categories').toBe(4);
+    expect(box.tLeft, 'the table starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
+    expect(box.tRight, 'the table ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    await expectFitsViewport(page, 'table card');
   });
 
   /**
