@@ -94,8 +94,8 @@ Maths:
 - y2-pv — tens/ones
 - y2-compare — < > =
 - y2-skip — 2,3,5,10 incl. backwards
-- y2-add — 2-digit ± ones/tens/2-digit
-- y2-sub — 2-digit ± ones/tens/2-digit
+- y2-add — 2-digit ± ones/tens/2-digit; d3 half the cards are "build the answer" (slice the digits)
+- y2-sub — 2-digit ± ones/tens/2-digit; d3 half the cards are "build the answer" (slice the digits)
 - y2-related — related facts: 3 + 4 = 7, so 30 + 40 = ?; d1 adds, d2 subtracts, d3 hides the second number or the result
 - y2-three — three 1-digit
 - y2-inverse — missing number
@@ -152,6 +152,7 @@ Writing:
 - y2-punct — commas in lists, possessive apostrophe
 - y2-sentence — Story Sentences: 5–7 words, expanded noun phrases, `because`/`when`/`if`/`that`, commands & exclamations; d1 shown, d2–3 listen & build
 - y2-conjunction — Joining Words: gap sentence, slice the joining word; d1 and/or/but (3 bubbles), d2 because/when/if/that (3), d3 any (4); decoys hand-keyed per sentence so only one word fits
+- y2-infer — What Happened?: one sentence and a question, slice the answer the clues point to (no emoji, so a picture never gives it away); d1 how someone feels (3 bubbles), d2 adds weather and place (4), d3 adds what happened just before (4); every sentence holds a clue word for its answer and none for another
 - y2-trace — words
 
 Unit conversion (`1 m = 100 cm`, `1 kg = 1000 g`, `1 l = 1000 ml`) is **not** a KS1 topic and the three Year 2

@@ -30,6 +30,7 @@ import { y2SpellC } from './year2-spell-c';
 import { y2SpellTion } from './year2-spell-tion';
 import { y2SpellMore } from './year2-spell-more';
 import { y2Conjunction } from './year2-conjunction';
+import { y2Infer } from './year2-infer';
 import { y2Nouns } from './year2-nouns';
 import { tableDrill } from './tables';
 
@@ -38,8 +39,8 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-pv', title: 'Tens & Ones', icon: '🔟', subject: 'maths', year: 'year2', nc: 'Y2 NPV: place value', gen: y2PlaceValue },
   { id: 'y2-compare', title: 'Compare < > =', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 NPV: compare to 100', gen: y2Compare },
   { id: 'y2-skip', title: 'Count in 2s, 3s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year2', nc: 'Y2 NPV: count in steps', gen: y2Skip },
-  { id: 'y2-add', title: 'Adding to 100', icon: '➕', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit addition', gen: y2Add },
-  { id: 'y2-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit subtraction', gen: y2Sub },
+  { id: 'y2-add', title: 'Adding to 100', icon: '➕', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit addition', sequenceFrom: 3, gen: y2Add },
+  { id: 'y2-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit subtraction', sequenceFrom: 3, gen: y2Sub },
   { id: 'y2-related', title: 'Related Facts', icon: '🔗', subject: 'maths', year: 'year2', nc: 'Y2 A&S: derive and use related facts up to 100', gen: y2Related },
   { id: 'y2-three', title: 'Three Numbers', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 A&S: add three 1-digit', gen: y2Three },
   { id: 'y2-inverse', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year2', nc: 'Y2 A&S: inverse, missing number', gen: y2Inverse },
@@ -95,5 +96,6 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: commas, apostrophes', gen: y2Punct },
   { id: 'y2-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year2', nc: 'Y2 Writing: word order, conjunctions, noun phrases', sequenceFrom: 1, gen: y2Sentence },
   { id: 'y2-conjunction', title: 'Joining Words', icon: '🔗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: co-ordination (and, or, but) and subordination (because, when, if, that)', gen: y2Conjunction },
+  { id: 'y2-infer', title: 'What Happened?', icon: '🔎', subject: 'writing', year: 'year2', nc: 'Y2 Reading: making inferences on the basis of what is being said and done', gen: y2Infer },
   { id: 'y2-trace', title: 'Trace Words', icon: '✍️', subject: 'writing', year: 'year2', nc: 'Y2 Handwriting', input: 'tracing', gen: y2Trace },
 ];
