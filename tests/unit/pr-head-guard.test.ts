@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
@@ -20,7 +21,7 @@ const denied = (input: unknown) => typeof check(input) === 'string';
 
 describe('github-write-guard refuses a pull request from a branch CI will hold red (#1838)', () => {
   it('denies a claude/ head and any other non-repo-form name, through check()', () => {
-    for (const head of ['claude/confident-meitner-cjdt5y', 'feature/no-number', 'Feature/1-x', 'fix/1-', 'chore/1-a_b', 'main'])
+    for (const head of ['claude/confident-meitner-cjdt5y', 'feature/no-number', 'Feature/1-x', 'fix/1-', 'chore/1-a_b', 'main', 'ugurozsahin:claude/x'])
       expect({ head, denied: denied({ head, base: 'main', body: 'Closes #1' }) }).toEqual({ head, denied: true });
   });
 
@@ -34,6 +35,8 @@ describe('github-write-guard refuses a pull request from a branch CI will hold r
     expect(denied({ head: 'claude/x', body: 'BRANCH: PUSH REFUSED at the very start' })).toBe(false);
     expect(denied({ head: 'claude/x', body: 'I did not claim BRANCH: PUSH REFUSED here' })).toBe(true);
     expect(denied({ head: 'claude/x', body: ' BRANCH: PUSH REFUSED, indented' })).toBe(true);
+    expect(denied({ head: 'claude/x', body: 'branch: push refused' }), "CI's grep is case-sensitive").toBe(true);
+    expect(denied({ head: 'feature/1-x' }), 'a repo-form head needs no body at all').toBe(false);
   });
 
   it('refuses a head that is not a string, marker or not, and leaves calls with no head alone', () => {
@@ -53,24 +56,43 @@ describe('github-write-guard refuses a pull request from a branch CI will hold r
 
   it("uses the branch-name job's pattern in ci.yml, character for character", () => {
     const ci = read('.github/workflows/ci.yml');
-    const job = ci.slice(ci.indexOf('\n  branch-name:'));
+    const from = ci.indexOf('\n  branch-name:');
+    expect(from, 'ci.yml must still carry the branch-name job').toBeGreaterThan(0);
+    const next = ci.slice(from + 1).search(/\n  [\w-]+:\n/);
+    const job = next < 0 ? ci.slice(from) : ci.slice(from, from + 1 + next);
     const pattern = job.match(/PATTERN='([^']+)'/)?.[1];
     expect(pattern, 'the branch-name job must still declare PATTERN, or this rail compares nothing').toBeDefined();
     expect(BRANCH_PATTERN).toBe(pattern);
+    expect(BRANCH_PATTERN, 'ERE and JS must read it alike').not.toMatch(/\[\[:|\\[dwsb]|\(\?/);
     expect(job, 'and CI must still accept the marker only at a line start').toContain("grep -Eq '^BRANCH: PUSH REFUSED'");
+  });
+});
+
+describe('the hook as settings.json runs it, reading the payload from stdin (#1838)', () => {
+  const run = (toolInput: unknown) => execFileSync('node', ['.claude/hooks/github-write-guard.mjs'], {
+    cwd: new URL('../../', import.meta.url), input: JSON.stringify({ tool_name: 'mcp__github__create_pull_request', tool_input: toolInput }),
+  }).toString();
+  it('prints a deny for a claude/ head and nothing for a repo-form one', () => {
+    expect(run({ head: 'claude/x', base: 'main', body: 'b' })).toMatch(/"permissionDecision":"deny".*not a push refusal/);
+    expect(run({ head: 'feature/1-x', base: 'main', body: 'b' })).toBe('');
   });
 });
 
 describe('docs/ROUTINE-PROMPT.md picks up an orphan draft and never leaves one (#1838)', () => {
   const prompt = read('docs/ROUTINE-PROMPT.md');
-  const step = (from: string, to: string) => prompt.slice(prompt.indexOf(from), prompt.indexOf(to));
+  const step = (from: string, to: string) => {
+    const [a, b] = [prompt.indexOf(from), prompt.indexOf(to)];
+    expect(a >= 0 && b > a, `ROUTINE-PROMPT.md must still carry "${from}" before "${to}"`).toBe(true);
+    return prompt.slice(a, b);
+  };
 
   it('STEP 2.5 takes a draft a run left with no REVIEW: comment, and never undrafts a block', () => {
     const s25 = step('STEP 2.5', 'STEP 3 —');
-    pinSentence(s25, 'An open, non-fork pull request a run left a draft, with no `REVIEW:` comment at all, its newest commit over ~2 hours old and not this run\'s, is claimed the same way (#459).');
-    pinSentence(s25, 'Newest CI on its head green and `mergeable_state` not `dirty` → mark it Ready for review with a one-line note (#200).');
+    pinSentence(s25, 'An open, non-fork pull request a run left a draft, with no `REVIEW:` comment at all, its newest commit over ~2 hours old and not this run\'s, not labelled `owner-approval` and with no `Replaced by #` comment, is claimed the same way (#459).');
+    pinSentence(s25, 'Check its head first: a head that is not a repo-form branch → push the same commits to the right name, open a replacement saying `Replaces #n`, and comment `Replaced by #m` on the old one.');
+    pinSentence(s25, 'Then its newest CI run: green and `mergeable_state` not `dirty` → mark it Ready for review with a one-line note (#200).');
     pinSentence(s25, 'Red or `dirty` → fix it as above (`open-pr` §2), push, and ready it once green.');
-    pinSentence(s25, 'A head that is not a repo-form branch → push the same commits to the right name, open a replacement saying `Replaces #n`, and comment on the old one.');
+    pinSentence(s25, 'Still running, or `unknown` → recheck later; never ready it on that.');
     pinSentence(s25, 'A draft carrying `REVIEW: CHANGES REQUESTED` is a block: never undraft it.');
   });
 

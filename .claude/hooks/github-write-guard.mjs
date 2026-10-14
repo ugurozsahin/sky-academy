@@ -160,14 +160,16 @@ export const filePath = (input, root) => {
  * for character — a rail reads both, so the two cannot drift — and the one exception is CI's too: a body line
  * that begins `BRANCH: PUSH REFUSED`. Only `create_pull_request` carries `head`, so its presence is the test.
  */
+// Written in the syntax POSIX ERE (`grep -E`) and JS read alike — no `\d`, `[[:digit:]]`, lookaround or flags.
 export const BRANCH_PATTERN = '^(feature|fix|chore)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$';
+const BRANCH_RE = new RegExp(BRANCH_PATTERN);
 
 export const prHead = (input) => {
   if (input === null || typeof input !== 'object' || !('head' in input)) return null;
   const { head, body } = input;
   // A head that is not a string is refused outright, marker or not: there is no branch to judge (#359's class).
   const named = typeof head === 'string';
-  if (named && new RegExp(BRANCH_PATTERN).test(head.replace(/^[^:]*:/, ''))) return null;
+  if (named && BRANCH_RE.test(head.replace(/^[^:]*:/, ''))) return null;
   if (named && typeof body === 'string' && /(^|\n)BRANCH: PUSH REFUSED/.test(body)) return null;
   return `A pull request's head must be named \`feature|fix|chore/<issue>-<slug>\`, the pattern the branch-name `
     + `job in ci.yml checks (#89, #1838); ${JSON.stringify(head)} is not. Push the same commit with `
