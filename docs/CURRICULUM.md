@@ -132,6 +132,7 @@ Maths:
 - y2-balance — equivalence to 100: 2-digit ± ones/tens vs `? + c`, `n × t = ? + c`, `a + b = ? − c`
 - y2-stats — statistics: read a tally chart, a pictogram with a key of 2 or 5, and a block diagram; totalling, comparing and "which was most"
 - y2-stats-order — statistics: read a chart (tally, pictogram with a key of 2 or 5, block diagram) and slice the categories from most to least; no ties
+- y2-stats-table — statistics: read a simple table (category and count) — how many chose one, how many altogether, how many more, which most; no ties
 
 Writing:
 - y2-spelling — 64 CEW

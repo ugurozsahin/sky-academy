@@ -190,6 +190,25 @@ test.describe('tablet viewports (#116)', () => {
     await expectFitsViewport(page, 'inference sentence');
   });
 
+  test('a Year 2 table card shows its heading and every row inside the question card at 390x664 (#1021)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-stats-table', 'maths');
+    // Dress the card with the longest category and heading in the survey bank, in one evaluate.
+    await page.evaluate(() => {
+      const cats = document.querySelectorAll('.chart.table .cat');
+      cats[0].textContent = 'Playtime game'; cats[1].textContent = '🍓 strawberries';
+    });
+    const box = await page.evaluate(() => {
+      const t = document.querySelector('.chart.table')!.getBoundingClientRect(), c = document.querySelector('.qcard')!.getBoundingClientRect();
+      return { rows: document.querySelectorAll('.chart.table .chart-row').length, tLeft: t.left, tRight: t.right, cLeft: c.left, cRight: c.right };
+    });
+    expect(box.rows, 'heading row plus three categories').toBe(4);
+    expect(box.tLeft, 'the table starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
+    expect(box.tRight, 'the table ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    await expectFitsViewport(page, 'table card');
+  });
+
   /**
    * The other two portrait-tablet geometries the issue names (#109). They are one test rather than two
    * projects on purpose: a project costs a whole sequential leg of the nightly (see `playwright.config.ts`),

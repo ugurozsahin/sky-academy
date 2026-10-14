@@ -33,6 +33,8 @@ export type Visual =
   // and the `icon` it draws — so both are required where they mean something and absent where they do not.
   | { type: 'chart'; kind: 'tally' | 'block'; rows: ChartRow[] }
   | { type: 'chart'; kind: 'pictogram'; rows: ChartRow[]; each: number; icon: string }
+  // A table (Y2, #1021): a heading row `head` (category, count), then one row per category with the count as a numeral.
+  | { type: 'chart'; kind: 'table'; rows: ChartRow[]; head: [string, string] }
   // Scaled bar chart (Y3, #1076): vertical bars on a left axis counting in `step`s up to `max` (a multiple of `step`, at most 10 steps).
   | { type: 'chart'; kind: 'bar'; rows: ChartRow[]; step: number; max: number }
   // Line symmetry in a vertical line (Y2 Geometry, #299 slice 4). `grid` is one string per row, `#` for a

@@ -10,6 +10,7 @@ import {
   y2SuffixRoot, y2Homophones, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
 } from './year2';
 import { y2StatsOrder } from './year2-stats-order';
+import { y2StatsTable } from './year2-stats-table';
 import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
 import { y2MeasureCompare } from './year2-measure-compare';
@@ -77,6 +78,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
   { id: 'y2-stats', title: 'Charts & Tallies', icon: '📊', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: pictograms, tally charts, block diagrams', gen: y2Stats },
   { id: 'y2-stats-order', title: 'Most to Least', icon: '📈', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: sort the categories by quantity', sequenceFrom: 1, gen: y2StatsOrder },
+  { id: 'y2-stats-table', title: 'Read the Table', icon: '🗒️', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: interpret simple tables', gen: y2StatsTable },
   // Year 2 writing
   { id: 'y2-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year2', nc: 'Y2 common exception words', sequenceFrom: 3, gen: y2Spelling },
   { id: 'y2-contractions', title: "Contractions don't", icon: '✂️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: contractions', gen: y2Contractions },
