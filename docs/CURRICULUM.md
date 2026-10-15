@@ -204,7 +204,9 @@ Maths:
 
 Writing:
 - y3-an — a or an for the gap in a sentence: a noun follows (d1), an adjective sits between so it decides (d2), the sound not the letter decides — an hour, a unicorn — mixed with d2 (d3); always two bubbles, `a` and `an`
+- y3-dictionary — dictionary order: 3 words share their first letter and are sliced alphabetically by the second letter (d1), share two and are decided by the third (d2), share three and are decided by the fourth letter, 3–4 words (d3); no decoys, every word is placed
 - y3-wordfamily — word families (solve, solution, solver, dissolve, insoluble…): the word in the same family as the root (d1, 3 bubbles); the one that is not in the family (d2, 4 bubbles); d3 slice every family word in any order, 2–3 targets and 2 decoys; decoys are always real words from other families
+- y3-sounds — hear a word and slice its spelling from hand-written non-word decoys, the sentence with a gap always printed: /ʌ/ spelt ou (young, touch, country; d1, 2 bubbles), /ɪ/ spelt y (myth, gym, Egypt; d2, 3 bubbles), both mixed (d3, 4 bubbles)
 - y3-perfect — present perfect or simple past: the time word in the sentence decides (`went` with yesterday, `has gone` with already), `has`/`have` agreeing with the subject; two bubbles (d1), three with a wrong-agreement decoy (d2), d3 adds questions and negatives with the auxiliary printed (`seen` / `saw` / `see`)
 - y3-speech — which version of a sentence has the inverted commas round exactly the spoken words: two versions with speech first (d1), three (d2), reporting clause first mixed in (d3); the bubbles are the letters A–C and the versions sit on the card, commas and end marks identical in each
 - y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
