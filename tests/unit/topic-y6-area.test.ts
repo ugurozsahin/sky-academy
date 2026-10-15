@@ -51,7 +51,7 @@ describe('y6-area (#1244)', () => {
       const mark = parts(q).filter(p => p.kind === 'angle');
       expect(mark).toHaveLength(1); expect(mark[0]).toMatchObject({ deg: 90, dir: 0 });
       for (const p of parts(q)) {
-        const pts = p.kind === 'segment' ? [p.a, p.b, ...(p.labelAt ? [p.labelAt] : [])] : [p.at, [p.at[0] + (p.len ?? 16), p.at[1]], [p.at[0], p.at[1] - (p.len ?? 16)]];
+        const pts = p.kind === 'segment' ? [p.a, p.b, ...(p.labelAt ? [p.labelAt] : [])] : p.kind === 'polygon' ? p.pts : [p.at, [p.at[0] + (p.len ?? 16), p.at[1]], [p.at[0], p.at[1] - (p.len ?? 16)]];
         for (const [x, y] of pts) { expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThanOrEqual(100); expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThanOrEqual(70); }
       }
     }
