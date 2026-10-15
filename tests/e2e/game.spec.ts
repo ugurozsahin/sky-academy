@@ -30,7 +30,7 @@ declare global {
   interface Window { __spoken?: string[] }                          // #380 review B2: every line the engine was handed, in order
   interface Window { __seedMiss?: boolean }                         // #518: true when a dojo seed keyed by date missed the page's own day
   interface Window { __cancelled?: number }                         // #884: how many times the engine's cancel() ran — hush() reaches it
-  interface Window { __tutShown?: boolean }                         // #1648: the tutorial hand was rendered visible at least once
+  interface Window { __tutShown?: boolean; __tutText?: string }                         // #1648: the tutorial hand was rendered visible at least once
   interface Window { __saved?: string | null; __wasDisabled?: boolean | null }   // #1797: the certificate test's fake `save` — the filename it was handed, and `#cert.disabled` as it stood when the save began
 }
 
@@ -4304,11 +4304,20 @@ test.describe('Sky Ninja Academy', () => {
   // → play — so
   // the path every other test now seeds past keeps a test of its own, end to end and in order.
   test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
+    // The hand shows for ~1.1 s at 8× speed (play.ts: scaled(9000)); a loaded runner polls past that window
+    // (nightly 2026-10-14 and 10-15), so record that it was shown and what it said rather than racing to catch it.
+    await page.addInitScript(() => {
+      window.__tutShown = false; window.__tutText = '';
+      document.addEventListener('DOMContentLoaded', () => new MutationObserver(() => {
+        const t = document.querySelector<HTMLElement>('#tutorial');
+        if (t && !t.hidden && t.checkVisibility()) { window.__tutShown = true; window.__tutText = t.textContent; }
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] }));
+    });
     await pickAvatar(page);
     await startTopic(page, 'reception', 'r-count');
     const tut = page.locator('#tutorial');
-    await expect(tut).toBeVisible();
-    await expect(tut).toContainText('Slice the bubble');
+    await page.waitForFunction(() => window.__tutShown);
+    expect(await page.evaluate(() => window.__tutText)).toContain('Slice the bubble');
     await page.waitForFunction(() => window.__sna.bubbles().some((b: any) => b.label === window.__sna.state().answer));
     expect(await answer(page)).toBe(true);
     await expect(tut).toBeHidden();
