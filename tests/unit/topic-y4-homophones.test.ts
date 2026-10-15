@@ -15,7 +15,7 @@ const setOf = (w: string) => Y34_HOMOPHONE_SETS_2.findIndex(s => s.includes(w.to
 const D1 = [0, 1, 2, 5, 6, 8];
 
 describe('y4-homophones (#1171)', () => {
-  it('is registered once in Year 3 writing', () => {
+  it('is registered once in Year 4 writing', () => {
     expect(TOPICS.filter(t => t.id === 'y4-homophones')).toHaveLength(1);
     expect(topic).toMatchObject({ year: 'year4', subject: 'writing' });
   });
@@ -30,7 +30,7 @@ describe('y4-homophones (#1171)', () => {
       expect(s.split('___'), s).toHaveLength(2);
       expect(s.length, s).toBeLessThanOrEqual(60);
       expect(Y34_HOMOPHONE_SETS_2[si], s).toContain(a.toLowerCase());
-      if (s.startsWith('___')) expect(a, s).toBe(a[0].toUpperCase() + a.slice(1));
+      expect(a === a[0].toUpperCase() + a.slice(1), s).toBe(s.startsWith('___'));
     }
   });
 
@@ -45,7 +45,9 @@ describe('y4-homophones (#1171)', () => {
       expect(q.prompt.split('___')).toHaveLength(2);
       expect(q.options).toContain(q.answer);
       const si = setOf(q.answer);
-      expect([...q.options.map(o => o.toLowerCase())].sort()).toEqual([...Y34_HOMOPHONE_SETS_2[si]].sort());
+      const up = q.prompt.startsWith('___');
+      const set = Y34_HOMOPHONE_SETS_2[si].map(w => (up ? w[0].toUpperCase() + w.slice(1) : w));
+      expect([...q.options].sort()).toEqual([...set].sort());
       expect(q.visual).toMatchObject({ type: 'sentence' });
       expect(q.hintIsData).toBe(false);
     }
