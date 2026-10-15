@@ -43,12 +43,32 @@ export function pushCheck(checks: readonly Ks2Check[], entry: Ks2Check): Ks2Chec
 export const isSecure = (f: Ks2Fact): boolean => f.last === 'rrr';
 
 /**
+ * Facts that became secure in this save (#1176): secure after it, not yet `locked`, and touched by it (an untouched
+ * entry is the same record as before). Fact keys, sorted, so the line is stable. The caller sets `locked` on them.
+ */
+export function newlySecure(before: Record<string, Ks2Fact>, after: Record<string, Ks2Fact>): string[] {
+  return Object.keys(after).filter(k => isSecure(after[k]) && !after[k].locked && (after[k].right + after[k].slow + after[k].wrong) !== tries(before[k])).sort();
+}
+const tries = (f: Ks2Fact | undefined) => f ? f.right + f.wrong + f.slow : 0;
+
+/** The results line for newly secure facts (#1176): at most two named, the rest counted. `spoken` says "times", never "×". */
+export function lockedLine(keys: readonly string[]): { text: string; spoken: string } | null {
+  if (!keys.length) return null;
+  const say = (k: string, sym: string) => k.replace('×', ` ${sym} `).replace(/^ +| +$/g, '');
+  const join = (sym: string) => {
+    const names = keys.slice(0, keys.length > 2 ? 2 : keys.length).map(k => say(k, sym));
+    if (keys.length > 2) return `${names.join(', ')} and ${keys.length - 2} more`;
+    return names.join(' and ');
+  };
+  return { text: `${join('×')} locked in`, spoken: `${join('times')} locked in` };
+}
+
+/**
  * The child's least secure × facts (#1123), as lines of one or two fact keys: a fact shares its line with its reversed
  * pair when that is listed too (`9×6`, `6×9`); a square fact stands alone. Facts with no tries or that are secure are
  * left out; the rest rank by (wrong + slow) ÷ tries, highest first, then the most recent day, then the fact text.
  */
 export function leastSecure(facts: Record<string, Ks2Fact>, n = 8): string[][] {
-  const tries = (f: Ks2Fact) => f.right + f.wrong + f.slow;
   const ranked = Object.keys(facts).filter(k => tries(facts[k]) > 0 && !isSecure(facts[k]))
     .sort((a, b) => {
       const fa = facts[a], fb = facts[b];

@@ -3,6 +3,7 @@ import { mtcCheck } from '../game/mtc';
 import type { PlaySession } from './play-session';
 import type { ResultCandidate } from './results';
 import { keepBest, speedLine, tablesSpeed } from '../speed-record';
+import { lockedLine } from '../fact-record';
 import { titleRise } from '../game/speed-titles';
 
 /** The fact record of a finished game for `recordGameEnd` (#1122): the answered facts, and the Tables Check result of a complete `mtc` run. */
@@ -16,4 +17,10 @@ const speedOf = (ps: PlaySession, o: Pick<SessionOpts, 'mode'>, r: SessionResult
 export function speedCandidates(ps: PlaySession, o: Pick<SessionOpts, 'mode'>, r: SessionResult, prevSpeed: number | undefined): ResultCandidate[] {
   const speed = speedOf(ps, o, r), text = speedLine(speed, prevSpeed), title = titleRise(prevSpeed, keepBest(speed, prevSpeed));   // #1175
   return [...(title ? [{ kind: 'trophy' as const, text: title }] : []), ...(text ? [{ kind: 'best' as const, text }] : [])];
+}
+
+/** "7 × 8 locked in" (#1176): one `best` line for the facts this run's save just locked. */
+export function lockedLines(secured: readonly string[] | undefined): ResultCandidate[] {
+  const l = lockedLine(secured ?? []);
+  return l ? [{ kind: 'best', text: l.text, spoken: l.spoken }] : [];
 }

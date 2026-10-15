@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFactLog, leastSecure, mergeFacts, pushCheck } from '../../src/fact-record';
+import { createFactLog, leastSecure, lockedLine, mergeFacts, newlySecure, pushCheck } from '../../src/fact-record';
 import type { Question } from '../../src/curriculum/types';
 
 const card = (fact?: string): Question => ({ prompt: 'x', answer: '1', options: ['1'], fact });
@@ -79,5 +79,38 @@ describe('leastSecure (#1123)', () => {
     for (let a = 2; a <= 10; a++) t[`${a}×${a}`] = f(0, 1, 0, 'w');
     expect(leastSecure(t)).toHaveLength(8);
     expect(leastSecure(t, 3)).toHaveLength(3);
+  });
+});
+
+describe('locked in (#1176)', () => {
+  const f = (last: string, locked?: true) => ({ right: 3, wrong: 0, slow: 0, last, ...(locked ? { locked } : {}) });
+  const step = (before: Record<string, ReturnType<typeof f>>, ...e: [string, 'correct' | 'wrong', number?][]) => {
+    const l = createFactLog(); for (const [k, o, ms] of e) l.note(card(k), o, ms);
+    return { before, after: mergeFacts(before, l.entries(), '2026-10-06') };
+  };
+  it('fires on the third straight right, not on rsr or wrr', () => {
+    const a = step({ '7×8': f('rr') }, ['7×8', 'correct', 2000]);
+    expect(newlySecure(a.before, a.after)).toEqual(['7×8']);
+    const b = step({ '7×8': f('sr') }, ['7×8', 'correct', 2000]);
+    expect(newlySecure(b.before, b.after)).toEqual([]);
+    const c = step({ '7×8': f('wr') }, ['7×8', 'correct', 2000]);
+    expect(newlySecure(c.before, c.after)).toEqual([]);
+    const d = step({ '7×8': f('rr') }, ['7×8', 'correct', 7000]);   // slow is not secure
+    expect(newlySecure(d.before, d.after)).toEqual([]);
+  });
+  it('never for a locked fact, and not for one this run did not touch', () => {
+    const a = step({ '7×8': f('rr', true) }, ['7×8', 'correct', 1000]);
+    expect(newlySecure(a.before, a.after)).toEqual([]);
+    const b = step({ '6×9': f('rrr') }, ['7×8', 'correct', 1000]);
+    expect(newlySecure(b.before, b.after)).toEqual([]);
+  });
+  it('line text for 1, 2 and 5 facts, and the spoken form has no ×', () => {
+    expect(lockedLine([])).toBeNull();
+    expect(lockedLine(['7×8'])).toEqual({ text: '7 × 8 locked in', spoken: '7 times 8 locked in' });
+    expect(lockedLine(['7×8', '6×9'])?.text).toBe('7 × 8 and 6 × 9 locked in');
+    const five = lockedLine(['7×8', '6×9', '3×4', '2×5', '9×9'])!;
+    expect(five.text).toBe('7 × 8, 6 × 9 and 3 more locked in');
+    expect(five.spoken).toBe('7 times 8, 6 times 9 and 3 more locked in');
+    expect(five.spoken).not.toContain('×');
   });
 });

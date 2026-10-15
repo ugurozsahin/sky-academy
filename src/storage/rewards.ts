@@ -1,6 +1,6 @@
 // Paying out coins, stickers and the Daily Dojo when a game ends.
 import { applyEvent, dojoFor, type DojoEvent, type DojoOutcome, type DojoState } from '../game/dojo';
-import { mergeFacts, pushCheck, type FactEntry } from '../fact-record';
+import { mergeFacts, newlySecure, pushCheck, type FactEntry } from '../fact-record';
 import { ks2WithWords, type WordAnswer } from '../word-record';
 import { keepBest } from '../speed-record';
 import { logGame, sanitizeSlips, type Slip } from '../save-records';
@@ -31,7 +31,7 @@ export function recordDojo(e: DojoEvent, now = new Date()): DojoOutcome {
   save({ dojo: out.state }); return out;
 }
 /** What a finished game settled: the dojo's own outcome, and the stickers the payout unlocked. */
-export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[]; /** The best tables speed stored before this save (#1174). */ prevSpeed?: number }
+export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[]; /** The best tables speed stored before this save (#1174). */ prevSpeed?: number; /** Fact keys that became secure in this save, now `locked` (#1176). */ secured?: string[] }
 /**
  * Settle a finished game in **one** write: the Daily Dojo state, the coins it pays (the game's plus the
  * dojo's bonus) and the stickers that unlocks (#365).
@@ -71,7 +71,9 @@ export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topic
   const withWords = ks2WithWords(d.ks2, e.words);   // #1289
   const ks2Base = e.facts?.length || e.check ? { ...withWords, facts: mergeFacts(d.ks2.facts, e.facts ?? [], today(now)), checks: e.check ? pushCheck(d.ks2.checks, { date: today(now), ...e.check }) : d.ks2.checks } : withWords;   // #1122
   const best = keepBest(e.speed ?? null, d.ks2.bestSpeed);   // #1174: the lower of the stored and this run's tables speed, in the same one save
+  const secured = newlySecure(d.ks2.facts, ks2Base.facts);   // #1176: locked in the same write, so a fact is announced once
+  for (const k of secured) ks2Base.facts[k] = { ...ks2Base.facts[k], locked: true };
   const ks2 = best === d.ks2.bestSpeed ? ks2Base : { ...ks2Base, bestSpeed: best };
   save({ ks2, dojo: dojo.state, coins: total, stickers: unlocked, slips, log: logGame(d.log, today(now), { ...asked, topics: e.topics }) });
-  return { dojo, fresh, prevSpeed: d.ks2.bestSpeed };
+  return { dojo, fresh, prevSpeed: d.ks2.bestSpeed, secured };
 }
