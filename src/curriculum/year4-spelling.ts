@@ -2,6 +2,7 @@
 import { y4Ous } from './year4-ous';
 import { y4Shun } from './year4-shun';
 // import: y4-origins
+import { y4Origins } from './year4-origins';
 import { y4Proofread } from './year4-proofread';
 // import: y4-homophones
 import type { Topic } from './types';
@@ -15,7 +16,7 @@ export const Y4_SPELLING: Topic[] = [
   { id: 'y4-sure-ture', title: 'Endings -sure -ture -sion', icon: '🔤', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: -sure, -ture, -sion (/ʒən/)', strand: 'spelling', gen: y4SureTure },
   { id: 'y4-ous', title: 'The Suffix -ous', icon: '🔤', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: the suffix -ous', strand: 'spelling', gen: y4Ous },
   { id: 'y4-shun', title: 'Endings -tion -sion -ssion -cian', icon: '✂️', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: /ʃən/ spelt -tion, -sion, -ssion, -cian', strand: 'spelling', gen: y4Shun },
-  // slot: y4-origins
+  { id: 'y4-origins', title: 'Word Origins', icon: '🌍', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: ch (Greek/French), -gue/-que, sc, ei/eigh/ey', strand: 'spelling', gen: y4Origins },
   { id: 'y4-proofread', title: 'Proofreading', icon: '🔎', subject: 'writing', year: 'year4', nc: 'Y3–4 Writing: proofread for spelling', strand: 'spelling', gen: y4Proofread },
   // slot: y4-homophones
 ];
