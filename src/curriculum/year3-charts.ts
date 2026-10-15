@@ -5,6 +5,7 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, numQ } from './util';
 import { ks2Say } from './ks2say';
+import { tableCard } from './year3-charts-table';
 
 /** Plain words of at most 7 letters, each narrow enough to sit under one bar of a five-bar chart at 240px (`tests/unit/vis-axis-chart.test.ts` measures). */
 const THEMES: readonly (readonly string[])[] = [
@@ -17,7 +18,7 @@ const SYMBOL = '⭐';
 
 const lead = (n: number) => String(n)[0];
 /** Decoys, in priority order: the first named slip, then (answers of 20 or more, #1058) one sharing the units digit and one the leading digit, then the other slips, then fillers. */
-function decoys(answer: number, named: number[], need: number): number[] {
+export function decoys(answer: number, named: number[], need: number): number[] {
   const ok = (v: number) => Number.isInteger(v) && v >= 0 && v !== answer;
   const near = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 10, -10].map(k => answer + k);
   const guard = answer >= 20
@@ -52,6 +53,7 @@ function plan(d: Difficulty, rng: Rng): Plan {
 }
 
 export const y3Charts: Generator = (d: Difficulty, rng: Rng): Question => {
+  if (d === 3 && rng() < 0.33) return tableCard(rng);
   const p = plan(d, rng);
   const { cats, step, n } = p;
   const rows = cats.map((label, k) => ({ label, n: n[k] }));
