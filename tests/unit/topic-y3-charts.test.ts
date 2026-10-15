@@ -20,6 +20,7 @@ function oracle(c: Question): number {
   if ((m = c.prompt.match(/^How many chose (\w+)\?$/))) return n(m[1]);
   if ((m = c.prompt.match(/^How many (more|fewer) chose (\w+) than (\w+)\?$/))) return m[1] === 'more' ? n(m[2]) - n(m[3]) : n(m[3]) - n(m[2]);
   if ((m = c.prompt.match(/^How many more chose (\w+) and (\w+) together than (\w+)\?$/))) return n(m[1]) + n(m[2]) - n(m[3]);
+  if (c.prompt === 'How many children chose the two most popular?') return v.rows.map(r => r.n).sort((x, y) => y - x).slice(0, 2).reduce((x, y) => x + y, 0);
   expect(c.prompt).toBe('How many children were asked altogether?');
   return v.rows.reduce((s, r) => s + r.n, 0);
 }
@@ -49,6 +50,7 @@ describe('y3-charts (#1076)', () => {
       expect(v.rows.length).toBeGreaterThanOrEqual(3);
       expect(v.rows.length).toBeLessThanOrEqual(d === 1 ? 4 : 5);
       expect(new Set(v.rows.map(r => r.label)).size).toBe(v.rows.length);
+      if (v.kind === 'table') continue; // table cards have their own test below
       for (const r of v.rows) {
         expect(r.label, 'plain word').toMatch(/^[a-z]{2,7}$/);
         expect(labelEm(r.label) * AXIS_FS, r.label).toBeLessThanOrEqual(barSlot(AXIS_FRAME, 5));
@@ -81,6 +83,7 @@ describe('y3-charts (#1076)', () => {
     const d3 = draws(3);
     expect(d3.some(c => c.prompt.includes('together'))).toBe(true);
     expect(d3.some(c => c.prompt.includes('altogether'))).toBe(true);
+    expect(d3.some(c => (c.visual as Chart).kind === 'pictogram')).toBe(true);
     expect(d3.some(c => { const v = c.visual as Chart; return v.kind === 'bar' && v.rows.some(r => r.n % v.step !== 0); })).toBe(true);
   });
 
@@ -97,7 +100,7 @@ describe('y3-charts (#1076)', () => {
 
   it('every card has a spoken form that names the chart and has no digit-slash or question mark', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d).slice(0, 300)) {
-      expect(c.say, c.prompt).toMatch(/^Look at the (bar chart|pictogram)\./);
+      expect(c.say, c.prompt).toMatch(/^Look at the (bar chart|pictogram|table)\./);
       expect(c.say, c.prompt).not.toMatch(/\d\/\d|\?/);
     }
   });
@@ -108,5 +111,22 @@ describe('y3-charts (#1076)', () => {
       expect(s.units, `d${d}`).toBeLessThanOrEqual(0.3);
       expect(s.leading, `d${d}`).toBeLessThanOrEqual(0.3);
     }
+  });
+
+  it('table cards (#1115) are d3 only, 20–45% of d3 draws, with distinct plain-word rows and counts of 10–99', () => {
+    for (const d of [1, 2] as Difficulty[]) for (const c of draws(d)) expect((c.visual as Chart).kind).not.toBe('table');
+    const d3 = draws(3), tables = d3.filter(c => (c.visual as Chart).kind === 'table');
+    expect(tables.length / d3.length).toBeGreaterThanOrEqual(0.2);
+    expect(tables.length / d3.length).toBeLessThanOrEqual(0.45);
+    for (const c of tables) {
+      const v = c.visual as Extract<Chart, { kind: 'table' }>;
+      expect(v.rows.length).toBeGreaterThanOrEqual(4);
+      expect(new Set(v.rows.map(r => r.n)).size, 'no tied counts').toBe(v.rows.length);
+      for (const r of v.rows) { expect(r.label).toMatch(/^[A-Z][a-z]{2,7}$/); expect(r.n).toBeGreaterThanOrEqual(10); expect(r.n).toBeLessThanOrEqual(99); }
+      expect(c.prompt + c.say, 'no count is stated').not.toMatch(/\d/);
+    }
+    expect(new Set(tables.map(c => c.prompt.replace(/chose .*/, '')))).toContain('How many more ');
+    expect(tables.some(c => c.prompt.includes('two most popular'))).toBe(true);
+    expect(tables.some(c => c.prompt.includes('together'))).toBe(true);
   });
 });
