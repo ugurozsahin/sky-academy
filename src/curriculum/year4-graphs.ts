@@ -4,7 +4,7 @@
 // halfway between two gridlines (only on an even scale). Every answer is worked out from the visual's own rows;
 // no prompt or `say` states a data value, and a difference is always the larger value take the smaller.
 import type { Difficulty, Generator, Question, Rng, ChartRow } from './types';
-import { ri, pick, shuffle, numQ, wordQ } from './util';
+import { ri, pick, shuffle, numQ, wordQ, numberWord } from './util';
 import { ks2Say } from './ks2say';
 
 /** Time-graph banks: the labels run along the x axis, the values up the y axis. `at` is the preposition before a label. */
@@ -26,6 +26,17 @@ const TABLES: readonly { head: string; words: readonly string[] }[] = [
   { head: 'Fruit', words: ['Apple', 'Pear', 'Plum', 'Grape', 'Mango', 'Lemon'] },
 ];
 
+/** `ks2Say` turns a `?` into " what" and reads "08:00" as hours, so only the plain words go through it: each sentence is said without its `?`, which is put back after. */
+const sayQ = (text: string) => text.split('?').map((part, i, all) => {
+  const t = part.trim();
+  return t ? ks2Say(t) + (i < all.length - 1 ? '?' : '') : '';
+}).filter(Boolean).join(' ');
+/** An x-axis label as it is spoken: "eight o'clock", "week four"; a day name is already words. */
+const spoken = (label: string): string => {
+  const t = /^(\d\d):00$/.exec(label), w = /^Wk (\d)$/.exec(label);
+  return t ? `${numberWord(Number(t[1]))} o'clock` : w ? `week ${numberWord(Number(w[1]))}` : label;
+};
+
 /** Named slips first; an answer of 20 or more also gets a decoy sharing its last digit (#1058), then fillers. */
 export function decoys(answer: number, named: number[], need: number): number[] {
   const ok = (v: number) => Number.isInteger(v) && v >= 0 && v !== answer;
@@ -45,26 +56,27 @@ function series(rng: Rng, b: Bank, count: number, half: boolean): number[] {
     for (let i = 0; i < count; i++) { cur = Math.max(1, Math.min(top, cur + ri(rng, -2, 2))); v.push(cur * unit - (half && rng() < 0.5 ? unit / 2 : 0)); }
     if (new Set(v).size === count) return v;
   }
-  return Array.from({ length: count }, (_, i) => (i + 1) * unit);
+  // Fallback: distinct levels in a shuffled order, never a ramp.
+  return shuffle(rng, Array.from({ length: top }, (_, i) => (i + 1) * unit)).slice(0, count).map(v => v - (half ? unit / 2 : 0));
 }
 
-type Finish = (prompt: string, spoken: string, answer: number, named: number[]) => Question;
+type Finish = (prompt: string, said: string, answer: number, named: number[]) => Question;
 const lineCard = (d: Difficulty, rng: Rng, half: boolean): Question => {
   const b = pick(rng, BANKS), count = ri(rng, 4, 5);
   const labels = b.labels(count), n = series(rng, b, count, half);
   const visual: Question['visual'] = { type: 'chart', kind: 'line', rows: labels.map((label, k) => ({ label, n: n[k] })), step: b.step, max: b.max };
-  const finish: Finish = (prompt, spoken, answer, named) =>
-    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, say: ks2Say(`Look at the graph. ${spoken}`), slow: d === 3 });
+  const finish: Finish = (prompt, said, answer, named) =>
+    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, say: sayQ(`Look at the graph. ${said}`), slow: d === 3 });
   const [i, j] = shuffle(rng, labels.map((_, k) => k));
   if (d === 2 && rng() < 0.5 || d === 3 && rng() < 0.5) {
     // Difference: the later reading is the larger one, so the answer is never negative.
     const [lo, hi] = n[i] < n[j] ? [i, j] : [j, i], answer = n[hi] - n[lo];
     return finish(`How much ${b.more} was it ${b.at} ${labels[hi]} than ${b.at} ${labels[lo]}? (${b.unit})`,
-      `By how many ${b.say} was the ${b.noun} greater ${b.at} ${labels[hi]} than ${b.at} ${labels[lo]}?`, answer,
+      `By how many ${b.say} was the ${b.noun} greater ${b.at} ${spoken(labels[hi])} than ${b.at} ${spoken(labels[lo])}?`, answer,
       [n[hi] + n[lo], n[hi], answer / b.step, answer + b.step, answer - b.step]);
   }
   const k = i, nb = n[k + 1] ?? n[k - 1];
-  return finish(`What was the ${b.noun} ${b.at} ${labels[k]}? (${b.unit})`, `What was the ${b.noun} ${b.at} ${labels[k]}? Answer in ${b.say}.`, n[k],
+  return finish(`What was the ${b.noun} ${b.at} ${labels[k]}? (${b.unit})`, `What was the ${b.noun} ${b.at} ${spoken(labels[k])}? Answer in ${b.say}.`, n[k],
     [nb, n[k] / b.step, n[k] + b.step, n[k] - b.step]);
 };
 
@@ -75,7 +87,7 @@ function peakCard(rng: Rng): Question {
   // Slips: the point beside the peak, the first point, the last point.
   const others = [labels[top + 1] ?? labels[top - 1], labels[0], labels[count - 1], ...labels].filter(l => l !== labels[top]);
   return wordQ(rng, `When was the ${b.noun} ${b.most}?`, labels[top], others,
-    { visual, say: ks2Say(`Look at the graph. When was the ${b.noun} ${b.most}?`), slow: true });
+    { visual, say: sayQ(`Look at the graph. When was the ${b.noun} ${b.most}?`), slow: true });
 }
 
 function barCard(d: Difficulty, rng: Rng): Question {
@@ -87,8 +99,8 @@ function barCard(d: Difficulty, rng: Rng): Question {
   if (n[a] === n[b]) n[a] = n[b] < step * topN ? n[b] + step : n[b] - step;
   const rows: ChartRow[] = cats.map((label, k) => ({ label, n: n[k] }));
   const visual: Question['visual'] = { type: 'chart', kind: 'bar', rows, step, max: Math.ceil(Math.max(...n) / step) * step };
-  const finish: Finish = (prompt, spoken, answer, named) =>
-    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, say: ks2Say(`Look at the bar chart. ${spoken}`), slow: d === 3 });
+  const finish: Finish = (prompt, said, answer, named) =>
+    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, say: sayQ(`Look at the bar chart. ${said}`), slow: d === 3 });
   const [hi, lo] = n[a] > n[b] ? [a, b] : [b, a];
   if (d === 1 && rng() < 0.5) return finish(`How many chose ${cats[a]}?`, `How many children chose ${cats[a]}?`, n[a], [n[a] / step, n[b], n[a] + step, n[a] - step]);
   if (d === 1) {
@@ -110,7 +122,7 @@ function tableCard(rng: Rng): Question {
   const [a, b] = shuffle(rng, words.map((_, k) => k)), [hi, lo] = counts[a] > counts[b] ? [a, b] : [b, a], answer = counts[hi] - counts[lo];
   return numQ(rng, `How many more chose ${words[hi]} than ${words[lo]}?`, answer, {
     min: 0, max: 999, distractors: decoys(answer, [counts[hi] + counts[lo], counts[hi], counts[lo]], 3), visual,
-    say: ks2Say(`Look at the table. How many more children chose ${words[hi]} than ${words[lo]}?`), slow: true,
+    say: sayQ(`Look at the table. How many more children chose ${words[hi]} than ${words[lo]}?`), slow: true,
   });
 }
 

@@ -124,6 +124,34 @@ describe('y4-graphs (#1156)', () => {
     }
   });
 
+  it('the spoken text is plain words: no "what" from a stray ?, no digits, no "hundred hours", and every ? ends a sentence', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1156_800 + d);
+      for (let i = 0; i < DRAWS; i++) {
+        const q = topic.gen(d, r), say = q.say ?? '';
+        expect(say, q.prompt).not.toMatch(/[a-z] what\b/);
+        expect(say, q.prompt).not.toMatch(/hundred hours|\d/);
+        expect(say, q.prompt).not.toMatch(/\?\S/);
+        expect(say.trim().length, q.prompt).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('a time graph says its labels as words ("eight o\'clock", "week four"), and a peak card is not always the last point', () => {
+    const r = rng(1156_900);
+    const said = new Set<string>();
+    let lastPeak = 0, peaks = 0;
+    for (let i = 0; i < 3000; i++) {
+      const q = topic.gen(3, r), c = chart(q);
+      if (/o'clock|week \w+/.test(q.say ?? '')) said.add((q.say ?? '').match(/o'clock|week \w+/)![0].replace(/\w+ o'clock/, "o'clock"));
+      if (q.prompt.startsWith('When was')) { peaks++; if (q.answer === c.rows[c.rows.length - 1].label) lastPeak++; }
+    }
+    expect(said.has("o'clock")).toBe(true);
+    expect([...said].some(s => s.startsWith('week'))).toBe(true);
+    expect(peaks).toBeGreaterThan(100);
+    expect(lastPeak / peaks).toBeLessThan(0.5);
+  });
+
   it('options are unique, and at most 30% of cards with an answer of 20 or more leave the last digit unshared by every decoy', () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       const r = rng(1156_600 + d);
