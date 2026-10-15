@@ -67,3 +67,22 @@ describe('geometry visual (#1075)', () => {
     expect(renderVisual({ type: 'geometry', parts: [angle(90)] })).toContain('class="geo"');
   });
 });
+
+describe('polygon part (#1154)', () => {
+  const tri: GeoPart = { kind: 'polygon', pts: [[10, 50], [40, 50], [10, 20]], ticks: [0, 1, 2], right: [0], label: 'A' };
+  it('draws exactly its vertices, one tick per mark, one right-angle square, and the letter', () => {
+    const html = geometrySVG({ type: 'geometry', parts: [tri] });
+    expect(html).toContain('d="M10 50L40 50L10 20Z"');
+    expect(html.match(/class="rightmark"/g)).toHaveLength(1);
+    expect(html.match(/<path/g)).toHaveLength(1 + 3 + 1);   // outline + 0+1+2 ticks + right-angle mark
+    expect(html).toContain('>A</text>');
+    expect(html).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+  });
+  it('draws side labels when given, and skips a polygon with a bad number or too few vertices', () => {
+    expect(geometrySVG({ type: 'geometry', parts: [{ ...tri, sides: ['5 cm', '', '3 cm'] } as GeoPart] })).toContain('>5 cm</text>');
+    const warn = console.warn; console.warn = () => {};
+    try {
+      expect(geometrySVG({ type: 'geometry', parts: [{ kind: 'polygon', pts: [[1, 1], [NaN, 2], [3, 3]] }, { kind: 'polygon', pts: [[1, 1], [2, 2]] }] })).not.toContain('<path');
+    } finally { console.warn = warn; }
+  });
+});
