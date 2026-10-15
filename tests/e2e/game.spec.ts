@@ -6149,6 +6149,21 @@ test.describe('hidden KS2 years (preview)', () => {
   });
 });
 
+// #1128: Year 4 has its own Memory Match deck (times-table fact and product); 16 cards fit the shortest phone.
+test('Year 4 Memory Match: 16 cards fit the 390×664 phone viewport without overflow (#1128)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPreview(page);
+  await seedPlayer(page);
+  await page.click('.island[data-year="year4"]');
+  await expect(page.locator('#memory')).toBeVisible();
+  await page.click('#memory');
+  await expect(page.locator('.memory')).toBeVisible();
+  await expect(page.locator('.memory .card')).toHaveCount(16);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  const box = await page.locator('.memory .card').last().boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(664);
+});
+
 // #1072: Boss Battle on a KS2 island offers Mixed and one entry per strand; a strand Boss asks only that strand.
 test.describe('strand Boss Battle (#1072)', () => {
   test.beforeEach(async ({ page }) => {

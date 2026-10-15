@@ -79,6 +79,13 @@ const fractionPairs = (rng: Rng): Pair[] => [...FRACTION_POOL, pick(rng, HALF_FO
 export const TENSE_POOL: readonly (readonly [string, string])[] = [['go', 'went'], ['see', 'saw'], ['run', 'ran'], ['eat', 'ate'], ['come', 'came'], ['take', 'took'], ['give', 'gave'], ['write', 'wrote'], ['sit', 'sat'], ['swim', 'swam'], ['sing', 'sang'], ['fly', 'flew'], ['find', 'found'], ['make', 'made'], ['hide', 'hid'], ['sleep', 'slept']];
 const tensePairs = (rng: Rng): Pair[] => shuffle(rng, TENSE_POOL).slice(0, 8).map(([now, then]) => ({ a: txt(now), b: txt(then) }));
 
+/** Year 4 Times tables (#1128): eight `a × b` facts, factors 2–12, every product different — 24 is 3 × 8 and 4 × 6, and 3 × 8 and 8 × 3 share a product — so each fact has exactly one answer card. Products above 100 are spoken as numerals, never `numberWord`, which stops at 100. */
+const tables12Pairs = (rng: Rng): Pair[] => {
+  const facts: [number, number][] = []; const seen = new Set<number>();
+  for (let guard = 0; facts.length < 8 && guard < 400; guard++) { const a = ri(rng, 2, 12), b = ri(rng, 2, 12); if (!seen.has(a * b)) { seen.add(a * b); facts.push([a, b]); } }
+  return facts.map(([a, b]) => ({ a: txt(`${a} × ${b}`, `${a} times ${b}`), b: txt(String(a * b)) }));
+};
+
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
 export const THEMES: Partial<Record<YearId, Theme[]>> = {
   reception: [
@@ -108,6 +115,9 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
     { id: 'fractions', title: 'Fraction names', hint: 'Match each fraction to its name', hintIsData: false, pairs: fractionPairs },
     { id: 'past', title: 'Past tense', hint: 'Match each word to its past tense', hintIsData: false, pairs: tensePairs },
     { id: 'contractions', title: 'Short forms', hint: 'Match each short form to its full form', hintIsData: false, pairs: rng => shuffle(rng, CONTRACTIONS).slice(0, 8).map(([long, short]) => ({ a: txt(long, long, long.length > 6), b: txt(short) })) },
+  ],
+  year4: [
+    { id: 'tables', title: 'Times tables', hint: 'Match each times-table fact to its answer', hintIsData: true, pairs: tables12Pairs },
   ],
 };
 

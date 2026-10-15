@@ -357,3 +357,36 @@ describe('Year 2 Past tense deck (#966)', () => {
     }
   });
 });
+
+describe('Year 4 Times tables deck (#1128)', () => {
+  const deck = THEMES.year4!.find(t => t.id === 'tables')!;
+  it('exists on Year 4 only, as the one deck, and marks its hint as data', () => {
+    expect(THEMES.year4!.map(t => t.id)).toEqual(['tables']);
+    expect(deck.hintIsData).toBe(true);
+    expect(hasMemoryDecks('year4')).toBe(true);
+  });
+  it('every board is 8 facts with factors 2–12, and each face has exactly one partner (seeds 1–200)', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const pairs = deck.pairs(rng(seed));
+      expect(pairs.length, `seed ${seed}`).toBe(8);
+      const products = pairs.map(p => Number(p.b.text));
+      expect(new Set(products).size, `seed ${seed} products`).toBe(8);
+      expect(new Set(pairs.map(p => p.a.text)).size).toBe(8);
+      for (const p of pairs) {
+        const [a, b] = p.a.text.split(' × ').map(Number);
+        for (const f of [a, b]) { expect(f).toBeGreaterThanOrEqual(2); expect(f).toBeLessThanOrEqual(12); }
+        expect(a * b).toBe(Number(p.b.text));
+        expect(pairs.filter(q => Number(q.b.text) === a * b).length).toBe(1);
+      }
+    }
+  });
+  it('every face says text a voice can read, with products above 100 as numerals', () => {
+    for (let seed = 1; seed <= 200; seed++) for (const p of deck.pairs(rng(seed))) for (const f of [p.a, p.b]) {
+      expect(f.say).toBeTruthy();
+      expect(f.say).not.toContain('undefined');
+      expect(f.say).not.toContain('NaN');
+    }
+    const big = Array.from({ length: 200 }, (_, i) => deck.pairs(rng(i + 1))).flat().find(p => Number(p.b.text) > 100);
+    expect(big?.b.say).toBe(big?.b.text);
+  });
+});
