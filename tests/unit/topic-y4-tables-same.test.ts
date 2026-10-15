@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { y4Tables } from '../../src/curriculum/year4-tables';
+import { y4Tables, y4TablesQ } from '../../src/curriculum/year4-tables';
 
 // #1126: the factory behind the drills must not move y4-tables' cards. Captured from the pre-factory generator.
 const GOLDEN = [
@@ -71,7 +71,7 @@ describe('y4-tables draws the same cards as before the drills (#1126)', () => {
     for (const d of [1, 2, 3] as const) for (let s = 1; s <= 20; s++) {
       let a = s * 7919 + d;
       const r = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-      const c = y4Tables(d, r);
+      const c = d === 1 ? y4Tables(d, r) : y4TablesQ(d, r);   // #1127: from d2 the topic also draws reverse cards; the forward path is what stays pinned
       got.push(`${d}|${c.prompt}|${c.answer}|${c.options.join(',')}`);
     }
     expect(got).toEqual(GOLDEN);
