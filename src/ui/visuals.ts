@@ -2,7 +2,7 @@
 import type { Visual } from '../curriculum';
 import { coinLabel, NOTES, isNote } from '../curriculum/util';
 import { esc } from './dom';
-import { barChartSVG } from './vis-axis-chart';
+import { barChartSVG, lineChartSVG } from './vis-axis-chart';
 import { geometrySVG } from './vis-geometry';
 import { coordsSVG } from './vis-coords';
 import { romanClockSVG } from './vis-roman-clock';
@@ -111,15 +111,15 @@ export function renderVisual(v: Visual | undefined): string {
   }
 }
 
-/** The bar chart is `vis-axis-chart.ts`'s; the other chart kinds are `chartHTML`'s. */
-const chartOrBar = (v: Extract<Visual, { type: 'chart' }>): string => v.kind === 'bar' ? barChartSVG(v) : chartHTML(v);
+/** The bar and line charts are `vis-axis-chart.ts`'s; the other chart kinds are `chartHTML`'s. */
+const chartOrBar = (v: Extract<Visual, { type: 'chart' }>): string => v.kind === 'bar' ? barChartSVG(v) : v.kind === 'line' ? lineChartSVG(v) : chartHTML(v);
 
 /** A table's heading row (#1021): the same grid row as the data rows, holding the two heading strings. */
 const tableHead = (head: [string, string] | undefined): string => head
   ? `<div class="chart-row"><span class="cat">${esc(head[0])}</span><span class="data">${esc(head[1])}</span></div>` : '';
 
 /** Tally, block diagram and pictogram (Y2, #8) — the bar chart is `vis-axis-chart.ts`'s. */
-function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' }>): string {
+function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' | 'line' }>): string {
   // `Visual` is a public type and `each` is an unconstrained number on it, so the drawing defends itself:
   // a key that is zero, negative, fractional or does not divide the row draws one symbol per child rather
   // than rounding to a count the data does not have. A picture that lies is worse here than a plain one,
