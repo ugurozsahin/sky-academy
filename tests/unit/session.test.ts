@@ -782,9 +782,7 @@ describe('the previous answer carries no signal about the next (#390)', () => {
     if (t.input === 'tracing') return false;
     const r = rng(11);
     const cards = Array.from({ length: 200 }, () => t.gen(D1, r));
-    // A binary *answer space* (#1111): a 2-bubble card whose answer is one of many words (y3-sounds) is not one — it
-    // never repeats an identical card, so the coin-flip band below has nothing to measure on it.
-    return cards.every(c => c.prompt === cards[0].prompt && c.options.length === 2 && !c.sequence) && new Set(cards.map(c => c.answer)).size <= 2;
+    return cards.every(c => c.prompt === cards[0].prompt && c.options.length === 2 && !c.sequence) && new Set(cards.map(c => c.answer)).size <= 2; // binary answer space (#1111)
   });
 
   it('YEARS stage 1 is difficulty 1, which is what this rail samples', () => {
