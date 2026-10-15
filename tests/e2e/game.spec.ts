@@ -2509,6 +2509,26 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'y4-shapes polygons at 390×664');
   });
 
+  test('y4-symmetry: a lettered d3 grid and a d2 shape fit the card on a 390×664 phone (#1155)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year4', 'y4-symmetry');
+    // The first card may be d1 (a letter), so inject the app's own renderVisual output for fixed d3 and d2 fixtures.
+    const d3 = renderVisual({ type: 'symmetry', grid: ['#..A.#', '.#.#C.', '#.#.B#', '.##.#.', '#..D.#'] });
+    const d2 = renderVisual({ type: 'symmetry', grid: ['#....', '#....', '#....', '#....', '#####'], mirror: false });
+    for (const html of [d3, d2]) {
+      await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+      await expect(page.locator('#vis svg.symgrid')).toBeVisible();
+      await page.setViewportSize({ width: 390, height: 664 });
+      const [card, art] = await Promise.all([page.locator('.qcard').boundingBox(), page.locator('#vis svg.symgrid').boundingBox()]);
+      expect(art!.y).toBeGreaterThanOrEqual(card!.y - 1);
+      expect(art!.y + art!.height).toBeLessThanOrEqual(card!.y + card!.height + 1);
+      expect(art!.x + art!.width).toBeLessThanOrEqual(card!.x + card!.width + 1);
+      await expectFitsViewport(page, 'y4-symmetry grid at 390×664');
+    }
+    await page.screenshot({ path: 'test-results/y4-symmetry-390x664.png' });
+  });
+
   // #65, one test per topic rather than one walk through all of them: the walk ran to ~60 s on a loaded desktop
   // runner and was reported as "page.goto hangs" — the test budget expiring mid-navigation, not a wedged page.
   test('no voice: Sound Hunt prints its keywords, mid-wave and without a pause, and stays answerable (#65)', async ({ page }) => {
