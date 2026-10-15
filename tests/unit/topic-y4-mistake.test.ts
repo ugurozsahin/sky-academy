@@ -93,4 +93,42 @@ describe('y4-mistake (#1173)', () => {
       expect(cardBudgetProblem(q), text(q)).toBeNull();
     }
   });
+
+  it('both slips occur at every difficulty, and exchanges occur when taking away', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const kinds = draw(d, 600).map(q => { const { a, b, add, shown } = parse(q); return { add, kind: wrongAnswers(a, b, add).find(w => w.value === shown)!.kind }; });
+      expect(kinds.some(k => k.kind === 'carry'), `d${d} carry`).toBe(true);
+      expect(kinds.some(k => k.kind === 'slip'), `d${d} slip`).toBe(true);
+      if (d > 1) expect(kinds.some(k => !k.add && k.kind === 'carry'), `d${d} exchange`).toBe(true);
+    }
+  });
+
+  it('ladder limits: d1 one carry and a 3-digit sum; d2 one carry or exchange; d2–d3 a 4-digit result; d3 top number has a zero below the thousands', () => {
+    for (const q of draw(1, 600)) { const { a, b } = parse(q); expect(carryColumns(a, b, true)).toHaveLength(1); expect(a + b).toBeGreaterThanOrEqual(100); }
+    for (const q of draw(2, 600)) { const { a, b, add } = parse(q), r = add ? a + b : a - b; expect(carryColumns(a, b, add), text(q)).toHaveLength(1); expect(r).toBeGreaterThanOrEqual(1000); expect(r).toBeLessThanOrEqual(9999); }
+    for (const q of draw(3, 600)) { const { a, b, add } = parse(q), r = add ? a + b : a - b; expect(r).toBeGreaterThanOrEqual(1000); expect(r).toBeLessThanOrEqual(9999); expect(String(a).slice(1)).toMatch(/0/); }
+  });
+
+  it('every offered column is the answer sometimes: d1 H T O, d3 Th H T O; sums vary', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const qs = draw(d, 1500);
+      expect(new Set(qs.map(q => q.answer)), `d${d}`).toEqual(new Set(qs[0].options));
+      expect(new Set(qs.map(q => text(q))).size, `d${d} variety`).toBeGreaterThan(1000);
+    }
+  });
+
+  it('the spoken card names the same columns as its bubbles, in the same order', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const say = draw(d, 1)[0].say!;
+      expect(say.includes('thousands')).toBe(d > 1);
+      expect(say).toMatch(d > 1 ? /thousands, hundreds, tens or ones\?$/ : /hundreds, tens or ones\?$/);
+    }
+  });
+
+  it('wrongAnswers never returns a negative or different-length value, including subtractions across zeros', () => {
+    for (const [a, b, add] of [[4005, 1238, false], [5000, 1999, false], [9009, 2345, false], [4005, 1238, true], [999, 999, true]] as [number, number, boolean][]) {
+      const r = add ? a + b : a - b;
+      for (const w of wrongAnswers(a, b, add)) { expect(w.value).toBeGreaterThanOrEqual(0); expect(String(w.value)).toHaveLength(String(r).length); expect(w.value).not.toBe(r); }
+    }
+  });
 });
