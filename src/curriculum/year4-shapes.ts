@@ -47,6 +47,9 @@ export function decoyOk(asked: Cls, d: Cls): boolean {
   return !((asked === 'trapezium' && fam(d)) || (d === 'trapezium' && fam(asked)));
 }
 
+/** The trapezium rule, both ways round: a trapezium and a parallelogram-family shape never share a card. */
+const trapClash = (a: Cls, b: Cls) => (a === 'trapezium' && PARALLEL_FAMILY.includes(b)) || (b === 'trapezium' && PARALLEL_FAMILY.includes(a));
+
 const TERM: Record<Cls, string> = {
   equilateral: 'an equilateral triangle', isosceles: 'an isosceles triangle', scalene: 'a scalene triangle', 'right-angled': 'a right-angled triangle',
   square: 'a square', rectangle: 'a rectangle', rhombus: 'a rhombus', parallelogram: 'a parallelogram', trapezium: 'a trapezium', kite: 'a kite', irregular: 'an irregular shape',
@@ -83,11 +86,12 @@ const STATEMENTS: { noun: 'triangle' | 'shape'; has: string; yes: Cls; no: Cls[]
 ];
 export { STATEMENTS };
 
+/** A card of three shapes of `pool`'s kind: every shape has the same number of sides, so the irregular decoy is a quadrilateral and joins only the quadrilateral pool. */
 function cardOf(rng: Rng, pool: Cls[], d: number): Question {
   const asked = pick(rng, pool);
   const decoys: Cls[] = [];
-  for (const c of shuffle(rng, [...pool, 'irregular' as Cls].filter(c => decoyOk(asked, c))))
-    if (decoys.length < 2 && decoys.every(o => decoyOk(o, c))) decoys.push(c);   // the decoys keep the trapezium rule between themselves too
+  for (const c of shuffle(rng, pool === QUADS ? [...pool, 'irregular' as Cls] : pool).filter(c => decoyOk(asked, c)))
+    if (decoys.length < 2 && decoys.every(o => !trapClash(o, c))) decoys.push(c);   // the decoys keep the trapezium rule between themselves too
   if (decoys.length < 2) throw new Error(`y4-shapes: too few decoys for ${asked}`);
   const classes = shuffle(rng, [asked, ...decoys]);
   const parts = classes.map((c, i) => draw(rng, pick(rng, SHAPES[c]), i));

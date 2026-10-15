@@ -65,6 +65,7 @@ describe('y4-shapes (#1154)', () => {
         const cls = q.prompt.replace(/^Which is (the|an?) /, '').replace(/\?$/, '').replace(/ triangle$/, '') as Cls;
         asked.add(cls);
         expect(parts).toHaveLength(3);
+        for (const p of parts) expect(p.pts, `${q.prompt}: every d${d} shape has ${d === 2 ? 3 : 4} vertices`).toHaveLength(d === 2 ? 3 : 4);
         const ans = parts[q.answer.charCodeAt(0) - 65];
         const sets = parts.map(p => classesOf(p.pts));
         expect(sets[q.answer.charCodeAt(0) - 65].has(cls), q.prompt).toBe(true);
@@ -84,6 +85,22 @@ describe('y4-shapes (#1154)', () => {
       }
       expect(asked.size).toBe(d === 2 ? 4 : 6);
     }
+  });
+
+  it('tick marks sit on equal sides: a ticked side matches another by count exactly when it matches by length, and never an unticked one', () => {
+    for (const [cls, tpls] of Object.entries(SHAPES)) for (const tpl of tpls) {
+      const n = tpl.pts.length, len = tpl.pts.map((a, i) => Math.hypot(tpl.pts[(i + 1) % n][0] - a[0], tpl.pts[(i + 1) % n][1] - a[1]));
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        const [ti, tj] = [tpl.ticks?.[i] ?? 0, tpl.ticks?.[j] ?? 0], same = Math.abs(len[i] - len[j]) < 1e-6;
+        if (ti || tj) expect(ti === tj, `${cls} sides ${i},${j}`).toBe(same);
+      }
+    }
+  });
+
+  it('a statement is false of every "no" class for its yes shape (read by the oracle), and the polygon guard rejects a bad right index', () => {
+    for (const s of STATEMENTS) for (const tpl of SHAPES[s.yes]) for (const no of s.no) expect(classesOf(tpl.pts).has(no), `${s.has}: ${s.yes} v ${no}`).toBe(false);
+    const warn = console.warn; console.warn = () => {};
+    try { expect(geometrySVG({ type: 'geometry', parts: [{ kind: 'polygon', pts: [[1, 1], [9, 1], [1, 9]], right: [5] }] })).not.toContain('<path'); } finally { console.warn = warn; }
   });
 
   it('decoyOk gives every asked class at least two legal decoy classes', () => {

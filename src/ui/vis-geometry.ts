@@ -86,9 +86,9 @@ function polygonSVG(p: Extract<GeoPart, { kind: 'polygon' }>): string {
 export function geometrySVG(v: Extract<Visual, { type: 'geometry' }>): string {
   const body = v.parts.map(p => {
     const ok = p.kind === 'angle' ? finite(...p.at, p.dir, p.deg, p.len ?? 1)
-      : p.kind === 'polygon' ? p.pts.length >= 3 && p.pts.length <= 6 && finite(...p.pts.flat())
+      : p.kind === 'polygon' ? p.pts.length >= 3 && p.pts.length <= 6 && finite(...p.pts.flat()) && (p.right ?? []).every(i => Number.isInteger(i) && i >= 0 && i < p.pts.length)
       : finite(...p.a, ...p.b, ...(p.labelAt ?? [0, 0]));
-    if (!ok) { console.warn('geometry visual: a part has a non-finite number — skipped'); return ''; }
+    if (!ok) { console.warn('geometry visual: a part has a bad number or index — skipped'); return ''; }
     return p.kind === 'angle' ? angleSVG(p) : p.kind === 'polygon' ? polygonSVG(p) : segmentSVG(p);
   }).join('');
   return `<div class="vis"><svg viewBox="0 0 100 70" class="geo" style="width:clamp(200px,60vw,220px);height:auto">${body}</svg></div>`;
