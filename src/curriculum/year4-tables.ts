@@ -3,6 +3,7 @@
 // The table `t` is the first factor and the other factor `n` runs 2–12 — no × 0 or × 1 facts (#1138).
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, q } from './util';
+import { y4TablesPickMulQ, y4TablesPickDivQ } from './tables';
 
 /** STA Table 1's maximum items per table (2–12): the d3 weights. */
 export const TABLE_WEIGHTS: Record<number, number> = { 2: 2, 3: 3, 4: 3, 5: 3, 6: 4, 7: 4, 8: 4, 9: 4, 10: 2, 11: 3, 12: 4 };
@@ -60,4 +61,8 @@ export function y4TablesQ(d: Difficulty, rng: Rng, table?: number): Question {
   return { ...q(prompt), ...fact, answer: String(answer), options: shuffle(rng, [answer, ...decoys].map(String)) };
 }
 
-export const y4Tables: Generator = (d, rng) => y4TablesQ(d, rng);
+/** #1127: from d2, one card in three is a reverse form ("Which makes P?"), half × and half ÷; the drills keep y4TablesQ's one form. */
+export const y4Tables: Generator = (d, rng) => {
+  if (d > 1 && rng() < 1 / 3) return rng() < 0.5 ? y4TablesPickMulQ(rng) : y4TablesPickDivQ(rng);
+  return y4TablesQ(d, rng);
+};

@@ -20,6 +20,31 @@ export const tablesPickQ = (rng: () => number, table: number): Question => {
   const near = shuffle(rng, [n - 1, n + 1]).concat(shuffle(rng, [n - 2, n + 2, n + 3, n - 3])).filter(a => a >= 1 && a <= 12);
   return wordQ(rng, `Which makes ${p}?`, `${n} × ${table}`, near.slice(0, 3).map(a => `${a} × ${table}`), { say: `Which fact makes ${p}?` });
 };
+/**
+ * #1127: Year 4's reverse forms — "Which makes P?" / "Which makes Q?" with four calculations on the bubbles, both
+ * factors 2–12. Decoys are neighbouring table steps; every decoy's value differs from the target, so no commuted or
+ * other factorisation of it (24 = 4 × 6) is ever a decoy, and every ÷ option is a whole-number quotient.
+ */
+export const y4TablesPickMulQ = (rng: () => number): Question => {
+  const a = ri(rng, 2, 12), b = ri(rng, 2, 12), p = a * b;
+  const ok = ([x, y]: number[]) => x >= 2 && x <= 12 && y >= 2 && y <= 12 && x * y !== p;
+  const step1 = shuffle(rng, [[a - 1, b], [a + 1, b], [a, b - 1], [a, b + 1]]).filter(ok);
+  const step2 = shuffle(rng, [[a - 2, b], [a + 2, b], [a, b - 2], [a, b + 2]]).filter(ok);
+  const decoys = [...new Set([...step1, ...step2].map(([x, y]) => `${x} × ${y}`))].slice(0, 3);
+  return wordQ(rng, `Which makes ${p}?`, `${a} × ${b}`, decoys, { say: `Which fact makes ${p}?`, wide: true });
+};
+export const y4TablesPickDivQ = (rng: () => number): Question => {
+  const d = ri(rng, 2, 12), qt = ri(rng, 2, 12);
+  const other = (): number => { const o = shuffle(rng, Array.from({ length: 11 }, (_, i) => i + 2).filter(x => x !== d)); return o[0]; };
+  const label = (quot: number, div: number) => `${quot * div} ÷ ${div}`;
+  const ok = (quot: number) => quot >= 2 && quot <= 12 && quot !== qt;
+  const same = shuffle(rng, [qt - 1, qt + 1]).filter(ok).map(x => label(x, d));
+  const d2 = other();
+  const diff = shuffle(rng, [qt - 2, qt + 2]).filter(ok).map(x => label(x, d2));
+  const fill = shuffle(rng, [qt - 3, qt + 3, qt - 4, qt + 4]).filter(ok).map(x => label(x, d2));
+  const decoys = [...new Set([...same, ...diff, ...fill])].slice(0, 3);
+  return wordQ(rng, `Which makes ${qt}?`, label(qt, d), decoys, { say: `Which division makes ${qt}?`, wide: true });
+};
 /** The mixed topic picks its table first, then draws the card — the rng order it always had at d1. From d2, one card in three is the reverse form. */
 export const y2Tables: Generator = (d, rng) => {
   const table = d === 1 ? pick(rng, [2, 10]) : pick(rng, [2, 5, 10]);
