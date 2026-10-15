@@ -64,6 +64,7 @@
 🎈	0.6	balloon
 🎉	0.6	party popper
 🎤	0.6	microphone
+🎧	0.6	headphone
 🎨	0.6	artist palette
 🎩	0.6	top hat
 🎬	0.6	clapper board
