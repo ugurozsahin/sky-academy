@@ -6434,6 +6434,35 @@ test('a y4-coords d3 grid card fits a 390×664 phone (#1129)', async ({ page }, 
   }
 });
 
+// #1156: a y4-graphs d2 and d3 time graph (four or five points, the d3 halfway points) fits a 390×664 phone. Built from the real generator and renderVisual.
+test('a y4-graphs time graph fits a 390×664 phone (#1156)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year4', 'y4-graphs');
+  const topic = TOPICS.find(t => t.id === 'y4-graphs')!;
+  let drawn = 0;
+  for (let seed = 1; seed <= 80 && drawn < 6; seed++) {
+    const q = topic.gen(seed % 2 ? 2 : 3, seededRng(seed));
+    if (q.visual?.type !== 'chart' || q.visual.kind !== 'line') continue;
+    drawn++;
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: renderVisual(q.visual), prompt: q.prompt });
+    const fig = (await page.locator('#vis svg').boundingBox())!, card = (await page.locator('.qcard').boundingBox())!;
+    expect(fig.x, `seed ${seed}: graph inside the card`).toBeGreaterThanOrEqual(card.x);
+    expect(fig.x + fig.width).toBeLessThanOrEqual(card.x + card.width + 1);
+    expect(fig.y + fig.height).toBeLessThanOrEqual(card.y + card.height + 1);
+    expect(await page.locator('#vis svg .pt').count(), `seed ${seed}: a marker per point`).toBe(q.visual.rows.length);
+    await expectFitsViewport(page, `y4-graphs time graph, seed ${seed}`);
+    if (drawn === 1 && process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
+  }
+  expect(drawn, 'drew time graphs').toBeGreaterThan(0);
+});
+
 // #1247: a y6-missingangles d1 drawing (crossing lines, or angles at a point) fits a 390×664 phone. Built from the real generator and renderVisual.
 test('a y6-missingangles d1 drawing fits a 390×664 phone (#1247)', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
