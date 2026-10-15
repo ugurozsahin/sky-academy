@@ -1,7 +1,7 @@
 // Year 4 grammar strand (#1069). No topic lands here yet — each slot below is a future PR's own ticket.
 import { y4PluralPoss } from './year4-plural-poss';
 import { y4Standard } from './year4-standard';
-// import: y4-nounphrase
+import { y4NounPhrase } from './year4-nounphrase';
 import { y4Adverbials } from './year4-adverbials';
 import { y4Speech } from './year4-speech';
 // import: y4-pronouns
@@ -11,7 +11,7 @@ import type { Topic } from './types';
 export const Y4_GRAMMAR: Topic[] = [
   { id: 'y4-plural-poss', title: 'Plural and Possessive -s', icon: '✏️', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: plural and possessive -s, plural possession', strand: 'grammar', gen: y4PluralPoss },
   { id: 'y4-standard', title: 'Standard English', icon: '📖', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: Standard English verb forms', strand: 'grammar', gen: y4Standard },
-  // slot: y4-nounphrase
+  { id: 'y4-nounphrase', title: 'Expanded Noun Phrases', icon: '🧩', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: expanded noun phrases', strand: 'grammar', gen: y4NounPhrase },
   { id: 'y4-adverbials', title: 'Fronted Adverbials', icon: '🧭', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: fronted adverbials and their comma', strand: 'grammar', gen: y4Adverbials },
   { id: 'y4-speech', title: 'Direct Speech', icon: '💬', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: punctuating direct speech', strand: 'grammar', gen: y4Speech },
   // slot: y4-pronouns
