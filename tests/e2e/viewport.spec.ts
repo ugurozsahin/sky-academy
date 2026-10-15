@@ -173,6 +173,28 @@ test.describe('tablet viewports (#116)', () => {
     await expectFitsViewport(page, 'estimate number line');
   });
 
+  /** #1134: the 0–10,000 line of `y4-round` (ends "0" and "10,000" with a comma) fits its question card at 390x664. */
+  test('the y4-round estimate line fits the question card at 390x664 (#1134)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year4', 'y4-round');
+    // Dress the card with the d3 line in one evaluate: 11 ticks, only the two ends print, the ? at 4,000.
+    await page.evaluate(() => {
+      const spans = Array.from({ length: 11 }, (_, i) => `<span class="${i === 4 ? 'mark' : ''}">${i === 0 ? '0' : i === 10 ? '10,000' : i === 4 ? '?' : ''}</span>`).join('');
+      const card = document.querySelector('.qcard')!;
+      card.querySelector('.vis')?.remove();
+      card.insertAdjacentHTML('beforeend', `<div class="vis"><div class="nline">${spans}</div></div>`);
+    });
+    await expect(page.locator('.nline span')).toHaveCount(11);
+    const box = await page.evaluate(() => {
+      const l = document.querySelector('.nline')!.getBoundingClientRect(), c = document.querySelector('.qcard')!.getBoundingClientRect();
+      return { lLeft: l.left, lRight: l.right, cLeft: c.left, cRight: c.right };
+    });
+    expect(box.lLeft, 'the line starts inside the card').toBeGreaterThanOrEqual(box.cLeft - 1);
+    expect(box.lRight, 'the line ends inside the card').toBeLessThanOrEqual(box.cRight + 1);
+    await expectFitsViewport(page, 'y4-round estimate line');
+  });
+
   /** #1015: the longest `y2-infer` sentence (up to 60 characters) shows whole on its question card at 390x664. */
   test('the longest inference sentence fits the question card at 390x664 (#1015)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });

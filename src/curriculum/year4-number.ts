@@ -1,7 +1,7 @@
 // Year 4 number strand (#1069). One topic today (`y4-count`); every other row is a future PR's own slot —
 // see the `// slot:`/`// import:` comments. Keep this file ≤300 lines: a generator that would push it past that
 // moves to its own `year4-<slug>.ts` and this file keeps only its row/import.
-// import: y4-round
+import { y4Round } from './year4-round';
 // import: y4-roman
 import type { Difficulty, Generator, Question, Topic } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
@@ -120,6 +120,6 @@ export const Y4_NUMBER: Topic[] = [
   { id: 'y4-count', title: 'Count in 6s, 7s, 9s, 25s and 1,000s', icon: '🔢', subject: 'maths', year: 'year4', nc: 'Y4 NPV: count in 6s, 7s, 9s, 25s, 1,000s; 1,000 more or less', gen: y4Count },
   { id: 'y4-negative', title: 'Negative Numbers', icon: '❄️', subject: 'maths', year: 'year4', nc: 'Y4 NPV: count backwards through 0 to negative numbers', gen: y4Negative },
   { id: 'y4-pv', title: 'Place Value, Compare & Order', icon: '🔢', subject: 'maths', year: 'year4', nc: 'Y4 NPV: place value of 4-digit numbers; compare and order beyond 1,000', sequenceFrom: 3, gen: y4PlaceValue },
-  // slot: y4-round
+  { id: 'y4-round', title: 'Rounding & Estimating', icon: '🎯', subject: 'maths', year: 'year4', nc: 'Y4 NPV: round to the nearest 10, 100 or 1,000; estimate on a number line', gen: y4Round },
   // slot: y4-roman
 ];
