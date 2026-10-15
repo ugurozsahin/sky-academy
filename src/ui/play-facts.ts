@@ -2,7 +2,8 @@ import type { SessionOpts, SessionResult } from '../game/session';
 import { mtcCheck } from '../game/mtc';
 import type { PlaySession } from './play-session';
 import type { ResultCandidate } from './results';
-import { speedLine, tablesSpeed } from '../speed-record';
+import { keepBest, speedLine, tablesSpeed } from '../speed-record';
+import { titleRise } from '../game/speed-titles';
 
 /** The fact record of a finished game for `recordGameEnd` (#1122): the answered facts, and the Tables Check result of a complete `mtc` run. */
 export const factsOf = (ps: PlaySession, o: Pick<SessionOpts, 'mode' | 'deck'>, r: SessionResult) =>
@@ -13,6 +14,6 @@ const speedOf = (ps: PlaySession, o: Pick<SessionOpts, 'mode'>, r: SessionResult
 
 /** The results-screen speed line (#1174) against the best stored before this run's save (`prevSpeed`, from `recordGameEnd`). */
 export function speedCandidates(ps: PlaySession, o: Pick<SessionOpts, 'mode'>, r: SessionResult, prevSpeed: number | undefined): ResultCandidate[] {
-  const text = speedLine(speedOf(ps, o, r), prevSpeed);
-  return text ? [{ kind: 'best', text }] : [];
+  const speed = speedOf(ps, o, r), text = speedLine(speed, prevSpeed), title = titleRise(prevSpeed, keepBest(speed, prevSpeed));   // #1175
+  return [...(title ? [{ kind: 'trophy' as const, text: title }] : []), ...(text ? [{ kind: 'best' as const, text }] : [])];
 }

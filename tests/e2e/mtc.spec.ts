@@ -37,7 +37,8 @@ test.describe('Tables Check practice (#1118)', () => {
     const results = page.locator('.results');
     await expect(results).toBeVisible();
     await expect(results).toContainText('Tables Check practice');
-    await expect(results.locator('.best-pill')).toContainText(/seconds per answer · your first tables speed/);   // #1174
+    await expect(results.locator('.best-pill', { hasText: 'seconds per answer' })).toContainText(/your first tables speed/);   // #1174
+    await expect(results.locator('.best-pill', { hasText: 'New tables title' })).toHaveCount(1);   // #1175: a first speed lifts Trainee, under setSpeed far below 4.2 s
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).ks2.bestSpeed)).toBeGreaterThan(0);
     await expect(results).toContainText('25 out of 25');
     await expect(results).toContainText('25/25');
