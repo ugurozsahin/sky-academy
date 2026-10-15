@@ -9,7 +9,7 @@ import { dec, fmt } from './ks2num';
 import { ks2Say } from './ks2say';
 
 /** Text before and after the number on a bubble: `£` before, `m` after. */
-type Unit = readonly [pre: string, post: string];
+export type Unit = readonly [pre: string, post: string];
 
 /** [unit, text]. `{a}` is the base measure, `{b}` the scale factor. */
 export const SCALING: readonly (readonly [Unit, string])[] = [
@@ -53,10 +53,16 @@ export function decoyValues(rng: Rng, answer: number, misconceptions: readonly n
     const s = sign();
     for (const k of steps) for (const sg of [s, -s]) { const v = answer + sg * k; if (v > 0 && same(v) && !out.includes(v)) return add(v); }
   };
+  const unitsTwin = (v: number) => v % 10 === answer % 10, leadTwin = (v: number) => leading(v) === leading(answer);
   if (misconceptions.length) add(misconceptions[0]);
-  twin(v => v % 10 === answer % 10, [10, 20, 30]);
-  twin(v => leading(v) === leading(answer), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  misconceptions.slice(1).forEach(add);
+  // A second misconception is taken only while the slots left still cover the twins it does not already supply.
+  const second = misconceptions[1];
+  if (second !== undefined && Number.isInteger(second) && second > 0 && second !== answer && !out.includes(second)) {
+    const missing = answer < 20 ? 0 : [unitsTwin, leadTwin].filter(same => ![...out, second].some(same)).length;
+    if (3 - out.length - 1 >= missing) add(second);
+  }
+  twin(unitsTwin, [10, 20, 30]);
+  twin(leadTwin, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   for (let k = 1; out.length < 3 && k < 100; k++) add(answer + sign() * k);
   return out;
 }
@@ -75,7 +81,7 @@ function distributive(rng: Rng): Question {
 function scaling(rng: Rng): Question {
   for (;;) {
     const [unit, text] = pick(rng, SCALING), a = ri(rng, 2, 12), b = ri(rng, 2, 12);
-    if (a === b || a * b > 144) continue; // a + b would equal a × b at 2 and 2; equal numbers read as a trick
+    if (a === b) continue; // a + b would equal a × b at 2 and 2; equal numbers read as a trick
     const prompt = text.replace('{a}', f(a)).replace('{b}', f(b));
     return wordQ(rng, prompt, label(a * b, unit), decoyValues(rng, a * b, [a + b]).map(v => label(v, unit)), { say: ks2Say(prompt) });
   }
@@ -86,7 +92,6 @@ function counting(rng: Rng): Question {
     const [text, kind] = pick(rng, COUNTING), a = ri(rng, 2, 9), b = ri(rng, 2, 12), c = ri(rng, 2, 9);
     if (a === b && kind === 'cor') continue;
     const answer = kind === 'cor' ? a * b : a * b + c;
-    if (answer > 144) continue;
     const prompt = text.replace('{a}', f(a)).replace('{b}', f(b)).replace('{c}', f(c));
     const wrong = kind === 'cor' ? [a + b] : [a * b, a * b * c];
     return wordQ(rng, prompt, f(answer), decoyValues(rng, answer, wrong).map(f), { say: ks2Say(prompt) });

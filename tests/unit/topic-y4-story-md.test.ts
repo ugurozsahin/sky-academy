@@ -28,17 +28,19 @@ describe('y4-story-md (#1141)', () => {
 
   it('d1 distributive law: the oracle holds, both card forms appear, the other partial product is offered', () => {
     const forms = new Set<string>();
+    let secondOffered = 0;
     for (const q of draw(1, 400)) {
       const m = q.prompt.match(/^(\d+) × (\d) = (?:(\d+) × \d \+ (\d) × \d = ([\d,]+) \+ \?|([\d,]+) \+ ([\d,]+) = \?)$/)!;
       expect(m, q.prompt).toBeTruthy();
       const a = Number(m[1]), k = Number(m[2]), t = Math.floor(a / 10) * 10, u = a % 10;
       expect(t).toBeGreaterThanOrEqual(20); expect(u).toBeGreaterThanOrEqual(1);
       expect(k).toBeGreaterThanOrEqual(3); expect(k).toBeLessThanOrEqual(9);
-      if (m[3]) { forms.add('partial'); expect(Number(m[3])).toBe(t); expect(Number(m[4])).toBe(u); expect(val(m[5])).toBe(t * k); expect(val(q.answer)).toBe(u * k); expect(q.options.map(val)).toContain(t * k); }
-      else { forms.add('whole'); expect(val(m[6])).toBe(t * k); expect(val(m[7])).toBe(u * k); expect(val(q.answer)).toBe(a * k); expect(q.options.map(val)).toContain(t * k); }
+      if (m[3]) { forms.add('partial'); expect(Number(m[3])).toBe(t); expect(Number(m[4])).toBe(u); expect(val(m[5])).toBe(t * k); expect(val(q.answer)).toBe(u * k); expect(q.options.map(val)).toContain(t * k); if (q.options.map(val).includes(a * k)) secondOffered++; }
+      else { forms.add('whole'); expect(val(m[6])).toBe(t * k); expect(val(m[7])).toBe(u * k); expect(val(q.answer)).toBe(a * k); expect(q.options.map(val)).toContain(t * k); if (q.options.map(val).includes(u * k)) secondOffered++; }
       expect(val(q.answer)).toBeLessThanOrEqual(891);
     }
     expect(forms).toEqual(new Set(['partial', 'whole']));
+    expect(secondOffered, 'the whole product on a partial card, the second partial on a whole card').toBeGreaterThan(40);
   });
 
   it('d2 scaling: answer = base × factor ≤ 144 with its unit on every bubble; the sum is always offered', () => {
@@ -54,6 +56,7 @@ describe('y4-story-md (#1141)', () => {
 
   it('d3 correspondence and multiply-then-add: the oracle holds; the sum or the product-without-add is offered', () => {
     const kinds = new Set<string>();
+    let adds = 0, overMultiplied = 0;
     for (const q of draw(3, 600)) {
       const [, kind] = template(q.prompt, COUNTING, 0) as unknown as [string, 'cor' | 'add'];
       kinds.add(kind);
@@ -63,9 +66,10 @@ describe('y4-story-md (#1141)', () => {
       expect(answer).toBeLessThanOrEqual(144);
       const opts = q.options.map(val);
       if (kind === 'cor') expect(opts).toContain(ns[0] + ns[1]);
-      else expect(opts.includes(ns[0] * ns[1]) || opts.length === 4).toBe(true);
+      else { adds++; expect(opts, q.prompt).toContain(ns[0] * ns[1]); if (opts.includes(ns[0] * ns[1] * ns[2])) overMultiplied++; }
     }
     expect(kinds).toEqual(new Set(['cor', 'add']));
+    expect(overMultiplied, 'the over-multiplied a × b × c decoy').toBeGreaterThan(adds * 0.1);
   });
 
   it('decoyValues puts the misconception first, then keeps both digit twins, all positive and distinct', () => {
@@ -78,6 +82,7 @@ describe('y4-story-md (#1141)', () => {
       expect(new Set(ds).size).toBe(3);
       for (const v of ds) { expect(v).toBeGreaterThan(0); expect(v).not.toBe(answer); }
       expect(ds.some(v => v % 10 === answer % 10)).toBe(true);
+      expect(ds.some(v => String(v)[0] === String(answer)[0])).toBe(true);
     }
   });
 
