@@ -2,7 +2,7 @@
 // see the `// slot:`/`// import:` comments. Keep this file ≤300 lines: a generator that would push it past that
 // moves to its own `year4-<slug>.ts` and this file keeps only its row/import.
 import { y4Round } from './year4-round';
-// import: y4-roman
+import { y4Roman } from './year4-roman';
 import type { Difficulty, Generator, Question, Topic } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
 import { dec, fmt, digitAt } from './ks2num';
@@ -121,5 +121,5 @@ export const Y4_NUMBER: Topic[] = [
   { id: 'y4-negative', title: 'Negative Numbers', icon: '❄️', subject: 'maths', year: 'year4', nc: 'Y4 NPV: count backwards through 0 to negative numbers', gen: y4Negative },
   { id: 'y4-pv', title: 'Place Value, Compare & Order', icon: '🔢', subject: 'maths', year: 'year4', nc: 'Y4 NPV: place value of 4-digit numbers; compare and order beyond 1,000', sequenceFrom: 3, gen: y4PlaceValue },
   { id: 'y4-round', title: 'Rounding & Estimating', icon: '🎯', subject: 'maths', year: 'year4', nc: 'Y4 NPV: round to the nearest 10, 100 or 1,000; estimate on a number line', gen: y4Round },
-  // slot: y4-roman
+  { id: 'y4-roman', title: 'Roman Numerals to 100', icon: '🏛️', subject: 'maths', year: 'year4', nc: 'Y4 NPV: Roman numerals to 100 (I to C); zero and place value', gen: y4Roman },
 ];
