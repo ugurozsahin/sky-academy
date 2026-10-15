@@ -7,7 +7,7 @@ import { y4Mental } from './year4-mental';
 import { y4Story } from './year4-story';
 import { y4FactorPairs } from './year4-factorpairs';
 import { y4ShortMult } from './year4-shortmult';
-// import: y4-story-md
+import { y4StoryMD } from './year4-story-md';
 import type { Topic } from './types';
 
 export const Y4_CALC: Topic[] = [
@@ -24,5 +24,5 @@ export const Y4_CALC: Topic[] = [
   { id: 'y4-mental', title: 'Mental Multiplying', icon: '💡', subject: 'maths', year: 'year4', nc: 'Y4 M&D: × 0, × 1, ÷ 1, derived facts, three numbers', gen: y4Mental },
   { id: 'y4-factorpairs', title: 'Factor Pairs', icon: '🔗', subject: 'maths', year: 'year4', nc: 'Y4 M&D: factor pairs and commutativity in mental calculations (4M15)', gen: y4FactorPairs },
   { id: 'y4-shortmult', title: 'Short Multiplication', icon: '✏️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 2- and 3-digit × 1-digit, formal written method', sequenceFrom: 2, gen: y4ShortMult },
-  // slot: y4-story-md
+  { id: 'y4-story-md', title: 'Multiply & Scale Problems', icon: '📋', subject: 'maths', year: 'year4', nc: 'Y4 M&D: distributive law, scaling and correspondence problems', gen: y4StoryMD },
 ];
