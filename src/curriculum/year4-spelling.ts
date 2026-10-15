@@ -4,7 +4,7 @@ import { y4Shun } from './year4-shun';
 // import: y4-origins
 import { y4Origins } from './year4-origins';
 import { y4Proofread } from './year4-proofread';
-// import: y4-homophones
+import { y4Homophones } from './year4-homophones';
 import type { Topic } from './types';
 import { y4PrefixNot } from './year4-prefix-not';
 import { y4Wordlist } from './wordlist-y4';
@@ -18,5 +18,5 @@ export const Y4_SPELLING: Topic[] = [
   { id: 'y4-shun', title: 'Endings -tion -sion -ssion -cian', icon: '✂️', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: /ʃən/ spelt -tion, -sion, -ssion, -cian', strand: 'spelling', gen: y4Shun },
   { id: 'y4-origins', title: 'Word Origins', icon: '🌍', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: ch (Greek/French), -gue/-que, sc, ei/eigh/ey', strand: 'spelling', gen: y4Origins },
   { id: 'y4-proofread', title: 'Proofreading', icon: '🔎', subject: 'writing', year: 'year4', nc: 'Y3–4 Writing: proofread for spelling', strand: 'spelling', gen: y4Proofread },
-  // slot: y4-homophones
+  { id: 'y4-homophones', title: 'Homophones 2', icon: '👂', subject: 'writing', year: 'year4', nc: 'Y3–4 Spelling: homophones and near-homophones (sets 12–22)', strand: 'spelling', gen: y4Homophones },
 ];
