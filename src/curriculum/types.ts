@@ -37,6 +37,8 @@ export type Visual =
   | { type: 'chart'; kind: 'table'; rows: ChartRow[]; head: [string, string] }
   // Scaled bar chart (Y3, #1076): vertical bars on a left axis counting in `step`s up to `max` (a multiple of `step`, at most 10 steps).
   | { type: 'chart'; kind: 'bar'; rows: ChartRow[]; step: number; max: number }
+  // Line (time) graph (Y4, #1156): the same axis fields as `bar`; `rows` are the points in x order, `label` the x-axis label ("10:00", "Wk 3"), `n` the value (a whole number of `step`s or halfway). 3-6 points.
+  | { type: 'chart'; kind: 'line'; rows: ChartRow[]; step: number; max: number }
   // Line symmetry in a vertical line (Y2 Geometry, #299 slice 4). `grid` is one string per row, `#` for a
   // coloured square and `.` for an empty one; the drawing puts a dashed mirror line down the middle, so the
   // child compares the two halves rather than being told which side to look at. A picture, not a shape name:
