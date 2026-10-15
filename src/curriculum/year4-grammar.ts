@@ -5,7 +5,7 @@ import { y4NounPhrase } from './year4-nounphrase';
 import { y4Adverbials } from './year4-adverbials';
 import { y4Speech } from './year4-speech';
 import { y4Pronouns } from './year4-pronouns';
-// import: y4-determiners
+import { y4Determiners } from './year4-determiners';
 import type { Topic } from './types';
 
 export const Y4_GRAMMAR: Topic[] = [
@@ -15,5 +15,5 @@ export const Y4_GRAMMAR: Topic[] = [
   { id: 'y4-adverbials', title: 'Fronted Adverbials', icon: '🧭', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: fronted adverbials and their comma', strand: 'grammar', gen: y4Adverbials },
   { id: 'y4-speech', title: 'Direct Speech', icon: '💬', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: punctuating direct speech', strand: 'grammar', gen: y4Speech },
   { id: 'y4-pronouns', title: 'Pronoun or Noun?', icon: '🔗', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: pronoun or noun for cohesion and clarity', strand: 'grammar', gen: y4Pronouns },
-  // slot: y4-determiners
+  { id: 'y4-determiners', title: 'Determiners and Pronouns', icon: '🔤', subject: 'writing', year: 'year4', nc: 'Y4 Grammar: determiner, pronoun, possessive pronoun', strand: 'grammar', gen: y4Determiners },
 ];
