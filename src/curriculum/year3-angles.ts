@@ -30,6 +30,7 @@ export function geoAnswer(parts: GeoPart[], ask: GeoAsk): string[] {
   }
   const ok = (p: GeoPart) => p.kind === 'angle'
     ? (ask === 'right' ? p.deg === 90 : ask === 'less' ? p.deg < 90 : ask === 'greater' && p.deg > 90)
+    : p.kind === 'polygon' ? false
     : (ask === 'horizontal' ? gap(segDir(p), 0) < 0.5 : ask === 'vertical' && gap(segDir(p), 90) < 0.5);
   return parts.filter(ok).map(p => p.label ?? '');
 }

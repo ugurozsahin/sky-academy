@@ -2489,6 +2489,26 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
+  test('y4-shapes: three lettered triangles with tick and right-angle marks fit the card on a phone (#1154)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year4', 'y4-shapes');
+    // The first card may be a text-only d1 statement, so inject the app's own renderVisual output for a fixed fixture.
+    const html = renderVisual({ type: 'geometry', parts: [
+      { kind: 'polygon', pts: [[4, 50], [29, 50], [16.5, 10]], ticks: [0, 1, 1], label: 'A' },
+      { kind: 'polygon', pts: [[37, 50], [62, 50], [39, 20]], label: 'B' },
+      { kind: 'polygon', pts: [[70, 50], [95, 50], [70, 20]], right: [0], label: 'C' },
+    ] });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await expect(page.locator('#vis svg.geo')).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 664 });
+    const [card, art] = await Promise.all([page.locator('.qcard').boundingBox(), page.locator('#vis svg.geo').boundingBox()]);
+    expect(art!.y).toBeGreaterThanOrEqual(card!.y - 1);
+    expect(art!.y + art!.height).toBeLessThanOrEqual(card!.y + card!.height + 1);
+    expect(art!.x + art!.width).toBeLessThanOrEqual(card!.x + card!.width + 1);
+    await expectFitsViewport(page, 'y4-shapes polygons at 390×664');
+  });
+
   test('y4-symmetry: a lettered d3 grid and a d2 shape fit the card on a 390×664 phone (#1155)', async ({ page }) => {
     await seedPreview(page);
     await seedPlayer(page);
