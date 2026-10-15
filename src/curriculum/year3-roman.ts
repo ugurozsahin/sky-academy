@@ -10,7 +10,7 @@ const HARD = [4, 9, 8, 11, 12, 7, 3];
 const CLOCK = [['top', 12], ['bottom', 6]] as const;
 const inRange = (v: number) => v >= 1 && v <= 12;
 
-/** Three distinct values in 1-12 that are not `n`: the the subtractive swap and additive misread (IV/VI, IV as 6, IX/XI), the letter count (IV as 2), ±1, then fill. */
+/** Three distinct values in 1-12 that are not `n`: the subtractive swap and additive misread (IV/VI, IV as 6, IX/XI), the letter count (IV as 2), ±1, then fill. */
 function slips(rng: Rng, n: number): number[] {
   const misread = n === 4 ? [6] : n === 9 ? [11] : n === 6 ? [4] : n === 11 ? [9] : [];
   const near = shuffle(rng, [n - 1, n + 1]), letters = toRoman(n).length;
