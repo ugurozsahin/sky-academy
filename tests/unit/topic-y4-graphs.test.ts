@@ -26,6 +26,25 @@ function oracle(q: Question): string {
   throw new Error(`unrecognised prompt: ${q.prompt}`);
 }
 
+/** The named misconceptions a card must carry at least one of, recomputed from the visual and the prompt alone: the neighbouring reading, the sum where the difference was asked (and the reverse), the height in squares (answer ÷ step), the third smallest bar added in. A gridline off (± step) is left out on purpose: the fillers' ±1/±2/±5 can coincide with it, so it could not tell a named slip from a filler. */
+function slips(q: Question): Set<string> {
+  const c = chart(q), a = Number(q.answer), step = 'step' in c ? c.step : 0, out = new Set<string>();
+  const add = (v: number) => { if (Number.isInteger(v) && v !== a) out.add(String(v)); };
+  let m: RegExpMatchArray | null;
+  if (/^When was/.test(q.prompt)) {
+    const i = c.rows.findIndex(r => r.label === q.answer);
+    for (const j of [i - 1, i + 1]) if (c.rows[j]) out.add(c.rows[j].label);
+    return out;
+  }
+  if (step) add(a / step);
+  if ((m = q.prompt.match(/^How many more chose (\w+) than (\w+)\?$/))) { add(val(c, m[1]) + val(c, m[2])); add(val(c, m[1])); add(val(c, m[2])); }
+  else if ((m = q.prompt.match(/^How many chose (\w+) and (\w+) altogether\?$/))) { add(Math.abs(val(c, m[1]) - val(c, m[2]))); add(val(c, m[1])); }
+  else if ((m = q.prompt.match(/^How much \w+ was it (?:at|in|on) (.+) than (?:at|in|on) (.+)\? \(.+\)$/))) { add(val(c, m[1]) + val(c, m[2])); add(val(c, m[1])); }
+  else if (q.prompt === 'What is the total of the two smallest bars?') { const ns = c.rows.map(r => r.n).sort((x, y) => x - y); add(ns[0] + ns[1] + ns[2]); add(ns[0]); }
+  else for (const r of c.rows) add(r.n);   // a read: the neighbouring bar or point
+  return out;
+}
+
 describe('y4-graphs (#1156)', () => {
   it('is a Year 4 statistics topic', () => {
     expect(topic.year).toBe('year4');
@@ -91,6 +110,16 @@ describe('y4-graphs (#1156)', () => {
         expect(c.max % c.step).toBe(0);
         for (const row of c.rows) { expect(row.n).toBeGreaterThan(0); expect(row.n).toBeLessThanOrEqual(c.max); }
         if (q.prompt.startsWith('When was')) { const top = Math.max(...c.rows.map(x => x.n)); expect(c.rows.filter(x => x.n === top)).toHaveLength(1); }
+      }
+    }
+  });
+
+  it('every card offers at least one named misconception decoy (a neighbouring reading, the wrong operation, the unscaled count, the peak\'s neighbour)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1156_700 + d);
+      for (let i = 0; i < DRAWS; i++) {
+        const q = topic.gen(d, r), named = slips(q);
+        expect(q.options.some(o => o !== q.answer && named.has(o)), `${q.prompt} options ${q.options} named ${[...named]}`).toBe(true);
       }
     }
   });

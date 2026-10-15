@@ -6414,7 +6414,7 @@ test('a y4-coords d3 grid card fits a 390×664 phone (#1129)', async ({ page }, 
   }
 });
 
-// #1156: a y4-graphs d3 time graph (five points, the staggered x labels) fits a 390×664 phone. Built from the real generator and renderVisual.
+// #1156: a y4-graphs d2 and d3 time graph (four or five points, the d3 halfway points) fits a 390×664 phone. Built from the real generator and renderVisual.
 test('a y4-graphs time graph fits a 390×664 phone (#1156)', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
   await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
@@ -6424,8 +6424,8 @@ test('a y4-graphs time graph fits a 390×664 phone (#1156)', async ({ page }, in
   await startTopic(page, 'year4', 'y4-graphs');
   const topic = TOPICS.find(t => t.id === 'y4-graphs')!;
   let drawn = 0;
-  for (let seed = 1; seed <= 40 && drawn < 3; seed++) {
-    const q = topic.gen(2, seededRng(seed));
+  for (let seed = 1; seed <= 80 && drawn < 6; seed++) {
+    const q = topic.gen(seed % 2 ? 2 : 3, seededRng(seed));
     if (q.visual?.type !== 'chart' || q.visual.kind !== 'line') continue;
     drawn++;
     await page.evaluate(({ html, prompt }) => {
