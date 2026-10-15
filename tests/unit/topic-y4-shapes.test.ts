@@ -104,8 +104,8 @@ describe('y4-shapes (#1154)', () => {
   });
 
   it('decoyOk gives every asked class at least two legal decoy classes', () => {
-    const all = Object.keys(SHAPES) as Cls[];
-    for (const asked of all.filter(c => c !== 'irregular')) expect(all.filter(c => decoyOk(asked, c)).length, asked).toBeGreaterThanOrEqual(2);
+    const tri: Cls[] = ['equilateral', 'isosceles', 'scalene', 'right-angled'], quad: Cls[] = ['square', 'rectangle', 'rhombus', 'parallelogram', 'trapezium', 'kite', 'irregular'];
+    for (const pool of [tri, quad]) for (const asked of pool.filter(c => c !== 'irregular')) expect(pool.filter(c => decoyOk(asked, c)).length, asked).toBeGreaterThanOrEqual(2);
   });
 
   it('each letter answers 25–42 % of 1,500 d2 and d3 cards', () => {
@@ -121,6 +121,11 @@ describe('y4-shapes (#1154)', () => {
     for (let i = 0; i < N; i++) {
       const q = t.gen(1, r);
       expect(q.visual).toBeUndefined();
+      // the key follows the statement: Yes exactly when the asked term is the statement's own shape
+      const st = STATEMENTS.find(x => q.prompt.startsWith(`A ${x.noun} has ${x.has}. Is it `))!, asked = q.prompt.match(/Is it (?:an? )?([a-z-]+)\?$/)![1];
+      expect(st, q.prompt).toBeTruthy();
+      expect([st.yes, ...st.no]).toContain(asked);
+      expect(q.answer, q.prompt).toBe(asked === st.yes ? 'Yes' : 'No');
       expect(q.options.slice().sort()).toEqual(['No', 'Yes']);
       if (q.answer === 'Yes') yes++;
     }
