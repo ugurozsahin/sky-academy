@@ -145,6 +145,7 @@
 📊	0.6	bar chart
 📋	0.6	clipboard
 📌	0.6	pushpin
+📍	0.6	round pushpin
 📏	0.6	straight ruler
 📐	0.6	triangular ruler
 📖	0.6	open book
