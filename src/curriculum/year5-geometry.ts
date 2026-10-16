@@ -8,6 +8,7 @@
 import type { Topic } from './types';
 import { y5AngleFacts } from './year5-anglefacts';
 import { y5Angles } from './year5-angles';
+import { y5Transform } from './year5-transform';
 
 export const Y5_GEOMETRY: Topic[] = [
   // slot: y5-3d
@@ -18,5 +19,5 @@ export const Y5_GEOMETRY: Topic[] = [
 
   // slot: y5-polygons
 
-  // slot: y5-transform
+  { id: 'y5-transform', title: 'Reflection and Translation', icon: '🔄', subject: 'maths', year: 'year5', nc: 'Y5 Geometry: position after a reflection or translation (5M47)', strand: 'geometry', gen: y5Transform },
 ];
