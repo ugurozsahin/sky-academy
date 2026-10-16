@@ -979,7 +979,9 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Whiteboard mode: a topic tap is Relaxed practice, nothing is saved (#949)', async ({ page }) => {
-    await seedPlayer(page);
+    // `voice` is seeded for the same reason as the guest-play test above (#1906): the speech-voice probe otherwise
+    // saves `voice:"no"` to the real profile mid-test on a loaded runner (manual full run 2026-10-16).
+    await seedPlayer(page, 'volt', 'Ada', { voice: 'no' });
     await openGrownUps(page);
     const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
     const before = await keys();
