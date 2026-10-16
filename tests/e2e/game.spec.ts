@@ -951,7 +951,9 @@ test.describe('Sky Ninja Academy', () => {
 
   test('guest play saves nothing and ends cleanly, from behind the gate only (#948)', async ({ page }) => {
     test.setTimeout(150_000);
-    await seedPlayer(page);
+    // `voice` is seeded so the 4 s speech-voice probe has nothing to write: it otherwise saves `voice:"no"` to the
+    // real profile whenever it fires, and on a loaded runner that landed between `before` and Guest play (nightly 2026-10-16).
+    await seedPlayer(page, 'volt', 'Ada', { voice: 'no' });
     await openGrownUps(page);
     const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
     const before = await keys();
@@ -6212,6 +6214,25 @@ test('y5-volume layer-grid and capacity cards fit a 390×664 phone (#1206)', asy
     }, { html: q.visual ? renderVisual(q.visual) : '', prompt: q.prompt });
     await expectFitsViewport(page, `y5-volume d${d} card, seed ${seed}`);
     if (process.env.SHOT && seed === 1 && d === 3) await page.screenshot({ path: process.env.SHOT });
+  }
+});
+
+test('y5-polygons shape cards fit a 390×664 phone (#1211)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year5', 'y5-polygons');
+  const topic = TOPICS.find(t => t.id === 'y5-polygons')!;
+  for (let seed = 1; seed <= 12; seed++) for (const d of [1, 2] as const) {
+    const q = topic.gen(d, seededRng(seed));
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: q.visual ? renderVisual(q.visual) : '', prompt: q.prompt });
+    await expectFitsViewport(page, `y5-polygons d${d} card, seed ${seed}`);
+    if (process.env.SHOT && seed === 1 && d === 2) await page.screenshot({ path: process.env.SHOT });
   }
 });
 
