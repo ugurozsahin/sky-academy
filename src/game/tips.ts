@@ -40,7 +40,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   add: 'addsub', sub: 'addsub', story: 'addsub', 'story-add': 'addsub', 'story-as': 'addsub', mental: 'addsub', check: 'addsub', column: 'addsub', whichop: 'addsub', context: 'addsub',
   tables: 'times', multiply: 'times', arrays: 'times', 'story-times': 'times', longmult: 'times', shortmult: 'times', squares: 'times', mentalmd: 'times',
   share: 'sharing', half: 'sharing', shortdiv: 'sharing', longdiv: 'sharing',
-  factors: 'factors', factorpairs: 'factors', primes: 'factors',
+  factors: 'factors', factorpairs: 'factors', primes: 'factors', truefalse: 'factors',
   coins: 'money', money: 'money', coincombo: 'money', 'story-money': 'money',
   time: 'time', timetable: 'time', timewords: 'time', months: 'time', days: 'time', when: 'time', duration: 'time',
   measure: 'measure', length: 'measure', mass: 'measure', capacity: 'measure', temp: 'measure', convert: 'measure', imperial: 'measure', 'story-measure': 'measure', perimeter: 'measure', area: 'measure', volume: 'measure',
