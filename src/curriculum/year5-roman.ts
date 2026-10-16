@@ -65,7 +65,7 @@ function write(rng: Rng): Question {
   let n = ri(rng, 4, 999);
   while (!fitsBubble(n)) n = ri(rng, 4, 999);
   const r = toRoman(n);
-  const cand = wrong(rng, r, n, 1, 999).concat(shuffle(rng, [n + 10, n - 10, n + 100, n - 100, n + 1, n - 1]));
+  const cand = wrong(rng, r, n, 1, 999).concat(shuffle(rng, [n + 10, n - 10, n + 100, n - 100, n + 1, n - 1, n + 2, n - 2, n + 3, n - 3, n + 20, n - 20, n + 50, n - 50]));
   const opts = [...new Set(cand.filter(x => x !== n && fitsBubble(x)))].slice(0, 3);
   return wordQ(rng, `Which Roman numeral is ${n}?`, r, opts.map(toRoman), { say: `Which Roman numeral is ${n}?`, hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true });
 }

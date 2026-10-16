@@ -25,9 +25,10 @@ describe('y5-roman (#1181)', () => {
       if (isRead(q)) {
         const v = fromRoman(card(q))!;
         expect(toRoman(v)).toBe(card(q));
+        expect(q.answer, q.answer).toMatch(d === 3 ? /^\d{4}$/ : /^\d{1,3}(,\d{3})*$/);
         expect(q.answer.replace(/,/g, '')).toBe(String(v));
         expect(q.options.filter(o => o === q.answer)).toHaveLength(1);
-        for (const o of q.options) expect(o, o).toMatch(/^(\d{1,3}(,\d{3})*|\d{4})$/);
+        for (const o of q.options) expect(o, o).toMatch(d === 3 ? /^\d{4}$/ : /^\d{1,3}(,\d{3})*$/);
         expect(new Set(q.options).size).toBe(q.options.length);
       } else {
         const v = Number(q.prompt.match(/\d+/)![0]);
@@ -51,6 +52,19 @@ describe('y5-roman (#1181)', () => {
       expect(Number(q.answer)).toBeGreaterThanOrEqual(1066); expect(Number(q.answer)).toBeLessThanOrEqual(2030);
       for (const o of q.options) expect(o).toMatch(/^\d{4}$/);
     }
+  });
+
+  it('every card has four distinct options, over many seeds (a short fallback pool once left a write card with three)', () => {
+    for (const d of ALL) for (const seed of [1, 2, 3, 4]) {
+      const r = rng(1181_500 + seed * 10 + d);
+      for (let i = 0; i < 3000; i++) { const q = topic.gen(d, r); expect(new Set(q.options).size, `${q.prompt} ${q.options}`).toBe(4); }
+    }
+  });
+
+  it('decoys: a pair read the wrong way round is an option (XL as 60)', () => {
+    const qs = draws(1, 6000);
+    expect(qs.filter(q => card(q) === 'XL').every(q => q.options.includes('60'))).toBe(true);
+    expect(qs.filter(q => card(q) === 'XL').length).toBeGreaterThan(0);
   });
 
   it('misreading decoys: a subtractive pair read as adding is an option (XIX as 21, MCMXCIX as 2221)', () => {
