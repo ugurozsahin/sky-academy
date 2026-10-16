@@ -979,7 +979,9 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Whiteboard mode: a topic tap is Relaxed practice, nothing is saved (#949)', async ({ page }) => {
-    await seedPlayer(page);
+    // `voice` is seeded for the same reason as the guest-play test above (#1906): the speech-voice probe otherwise
+    // saves `voice:"no"` to the real profile mid-test on a loaded runner (manual full run 2026-10-16).
+    await seedPlayer(page, 'volt', 'Ada', { voice: 'no' });
     await openGrownUps(page);
     const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
     const before = await keys();
@@ -2489,6 +2491,21 @@ test.describe('Sky Ninja Academy', () => {
       expect(art!.x + art!.width).toBeLessThanOrEqual(card!.x + card!.width + 1);
       await expectFitsViewport(page, `geometry drawing at 390×${height}`);
     }
+  });
+
+  test('y5-transform: a shaded shape, a dashed mirror and three lettered candidates fit the card on a phone (#1214)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year5', 'y5-transform');
+    const html = renderVisual({ type: 'coords', size: 10, points: [], mirror: { axis: 'x', at: 5 }, shapes: [
+      { shaded: true, pts: [[1, 1], [4, 1], [1, 3]] }, { label: 'A', pts: [[6, 1], [9, 1], [9, 3]] },
+      { label: 'B', pts: [[6, 5], [9, 5], [6, 7]] }, { label: 'C', pts: [[1, 6], [4, 6], [1, 8]] },
+    ] });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await expect(page.locator('#vis svg.coords polygon.shaded')).toHaveCount(1);
+    await expect(page.locator('#vis svg.coords line.mirror')).toHaveCount(1);   // a vertical line has no width, so not toBeVisible
+    await expectFitsViewport(page, 'y5-transform shapes and mirror line');
   });
 
   test('y4-shapes: three lettered triangles with tick and right-angle marks fit the card on a phone (#1154)', async ({ page }) => {
@@ -6233,6 +6250,25 @@ test('y5-polygons shape cards fit a 390×664 phone (#1211)', async ({ page }, in
     }, { html: q.visual ? renderVisual(q.visual) : '', prompt: q.prompt });
     await expectFitsViewport(page, `y5-polygons d${d} card, seed ${seed}`);
     if (process.env.SHOT && seed === 1 && d === 2) await page.screenshot({ path: process.env.SHOT });
+  }
+});
+
+test('y5-3d name and net cards fit a 390×664 phone (#1208)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year5', 'y5-3d');
+  const topic = TOPICS.find(t => t.id === 'y5-3d')!;
+  for (let seed = 1; seed <= 12; seed++) for (const d of [1, 2, 3] as const) {
+    const q = topic.gen(d, seededRng(seed));
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: q.visual ? renderVisual(q.visual) : '', prompt: q.prompt });
+    await expectFitsViewport(page, `y5-3d d${d} card, seed ${seed}`);
+    if (process.env.SHOT && seed === 1 && d === 3) await page.screenshot({ path: process.env.SHOT });
   }
 });
 
