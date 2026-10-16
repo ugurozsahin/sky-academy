@@ -77,7 +77,7 @@ export const y5Polygons: Generator = (d: Difficulty, rng: Rng): Question => {
   const yes = rng() < 0.5;
   if (d === 3) {
     const s = pick(rng, STATEMENTS.filter(x => x.regular === yes));
-    return card(rng, s.text, `${s.text.slice(0, -1)} Yes or no?`, yes, {});
+    return card(rng, s.text, `${s.text} Yes or no?`, yes, {});
   }
   const prompt = 'Is this polygon regular?', say = 'Is this polygon regular? Yes or no?';
   if (d === 1) {
