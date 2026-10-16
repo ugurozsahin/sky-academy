@@ -9,8 +9,8 @@ import { y5MentalMd } from './year5-mentalmd';
 import { y5ShortDiv } from './year5-shortdiv';
 import { y5X10 } from './year5-x10';
 import { y5Squares } from './year5-squares';
-// import: y5-equals
-// import: y5-story-md
+import { y5Equals } from './year5-equals';
+import { y5StoryMd } from './year5-story-md';
 // import: y5-truefalse
 import type { Topic } from './types';
 import { y5Column } from './year5-column';
@@ -36,9 +36,9 @@ export const Y5_CALC: Topic[] = [
 
   { id: 'y5-squares', title: 'Square and Cube Numbers', icon: '🟦', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: square and cube numbers, ² and ³ (5M18–19)', gen: y5Squares },
 
-  // slot: y5-equals
+  { id: 'y5-equals', title: 'Balance the Equation', icon: '⚖️', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5: four operations and the meaning of = (5M20)', gen: y5Equals },
 
-  // slot: y5-story-md
+  { id: 'y5-story-md', title: 'Scaling and Rates Problems', icon: '📰', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: scaling by simple fractions, simple rates (5M21)', gen: y5StoryMd },
 
   // slot: y5-truefalse
 ];

@@ -6176,6 +6176,45 @@ test('a y5-factopinion d3 card shows three lettered lines and fits a 390×664 ph
   }
 });
 
+test('a y5-equals d3 card shows both scale pans and fits a 390×664 phone (#1192)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year5', 'y5-equals');
+  const topic = TOPICS.find(t => t.id === 'y5-equals')!;
+  for (let seed = 1; seed <= 12; seed++) {
+    const q = topic.gen(3, seededRng(seed));
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: renderVisual(q.visual!), prompt: q.prompt });
+    await expect(page.locator('#vis .scales .pan'), `seed ${seed}: both pans`).toHaveCount(2);
+    await expectFitsViewport(page, `y5-equals d3 card, seed ${seed}`);
+    if (process.env.SHOT && seed === 1) await page.screenshot({ path: process.env.SHOT });
+  }
+});
+
+test('y5-volume layer-grid and capacity cards fit a 390×664 phone (#1206)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year5', 'y5-volume');
+  const topic = TOPICS.find(t => t.id === 'y5-volume')!;
+  for (let seed = 1; seed <= 12; seed++) for (const d of [2, 3] as const) {
+    const q = topic.gen(d, seededRng(seed));
+    await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+    }, { html: q.visual ? renderVisual(q.visual) : '', prompt: q.prompt });
+    await expectFitsViewport(page, `y5-volume d${d} card, seed ${seed}`);
+    if (process.env.SHOT && seed === 1 && d === 3) await page.screenshot({ path: process.env.SHOT });
+  }
+});
+
 // #1052: a hidden KS2 year is off the map, so only the preview key reaches it. One smoke test per KS2 shell plays
 // its first topic through the real map, island and play screen, so a topic that breaks in the browser shows at once.
 test.describe('hidden KS2 years (preview)', () => {

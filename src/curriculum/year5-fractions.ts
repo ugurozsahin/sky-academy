@@ -2,7 +2,7 @@
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
 import { y5FracMult } from './year5-fracmult';
 import { y5DecFrac } from './year5-decfrac';
-// import: y5-rounddec
+import { y5RoundDec } from './year5-rounddec';
 import { y5Decimals } from './year5-decimals';
 import { y5Percent } from './year5-percent';
 import type { Topic } from './types';
@@ -24,7 +24,7 @@ export const Y5_FRACTIONS: Topic[] = [
 
   { id: 'y5-decfrac', title: 'Decimals and Fractions', icon: '🔢', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: decimals as fractions, e.g. 0.71 = 71/100 (5M27)', gen: y5DecFrac },
 
-  // slot: y5-rounddec
+  { id: 'y5-rounddec', title: 'Rounding Decimals', icon: '📍', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: round 2-dp decimals to the nearest whole and to 1 dp (5M29)', gen: y5RoundDec },
 
   { id: 'y5-decimals', title: 'Thousandths and Decimal Order', icon: '🔍', subject: 'maths', year: 'year5', strand: 'fractions', nc: 'Y5 Fractions: thousandths; order and compare to 3 dp (5M28, 5M30)', gen: y5Decimals },
 
