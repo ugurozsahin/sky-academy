@@ -43,6 +43,25 @@ const REVIEWED: [string, boolean][] = [
   ['Every square number is even.', false],
   ['Every number that ends in 3 is a multiple of 3.', false],
 ];
+
+/** Independent re-statements of each bank claim (a, b), written separately so a claim cannot drift from its text. */
+const INDEPENDENT: Record<string, (a: number, b: number) => boolean> = {
+  'The sum of two odd numbers is always even.': (a, b) => a % 2 && b % 2 ? (a + b) % 2 === 0 : true,
+  'The sum of two even numbers is always even.': (a, b) => a % 2 || b % 2 ? true : (a + b) % 2 === 0,
+  'The product of two even numbers is always even.': (a, b) => a % 2 || b % 2 ? true : (a * b) % 2 === 0,
+  'Every multiple of 4 is also a multiple of 2.': a => a % 4 ? true : a % 2 === 0,
+  'Every multiple of 6 is also a multiple of 3.': a => a % 6 ? true : a % 3 === 0,
+  'A square number never ends in 7.': a => String(a * a).slice(-1) !== '7',
+  'Every number that ends in 5 is a multiple of 5.': a => String(a).endsWith('5') ? a % 5 === 0 : true,
+  'All prime numbers are odd.': a => !(PRIMES.includes(a) && a % 2 === 0),
+  'Every odd number is a prime number.': a => !(a % 2 === 1 && !PRIMES.includes(a)),
+  'The product of two odd numbers is always even.': (a, b) => a % 2 && b % 2 ? (a * b) % 2 === 0 : true,
+  'The sum of two odd numbers is always odd.': (a, b) => a % 2 && b % 2 ? (a + b) % 2 === 1 : true,
+  'Every multiple of 2 is also a multiple of 4.': a => a % 2 ? true : a % 4 === 0,
+  'Every multiple of 3 is also a multiple of 6.': a => a % 3 ? true : a % 6 === 0,
+  'Every square number is even.': a => (a * a) % 2 === 0,
+  'Every number that ends in 3 is a multiple of 3.': a => String(a).endsWith('3') ? a % 3 === 0 : true,
+};
 const EXCLUDE = new Set(['gay', 'queer', 'bitch', 'butt']);
 
 describe('y5-truefalse (#1231)', () => {
@@ -80,6 +99,10 @@ describe('y5-truefalse (#1231)', () => {
         expect(e.claim(e.counter![0], e.counter![1]), `${e.text} should break at ${e.counter}`).toBe(false);
       }
     }
+  });
+
+  it('every bank claim agrees with an independent re-statement of its text', () => {
+    for (const e of BANK) for (let a = 1; a <= 60; a++) for (let b = 1; b <= 60; b++) expect(e.claim(a, b), `${e.text} ${a},${b}`).toBe(INDEPENDENT[e.text](a, b));
   });
 
   it('no statement is "sometimes" true', () => {
