@@ -1,12 +1,12 @@
 // Year 5 grammar strand (#1177). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
 import { y5Verbs } from './year5-verbs';
-// import: y5-verbprefix
+import { y5VerbPrefix } from './year5-verbprefix';
 import { y5Relative } from './year5-relative';
 import { y5Modal } from './year5-modal';
 // import: y5-parenthesis
 import { y5Commas } from './year5-commas';
-// import: y5-cohesion
+import { y5Cohesion } from './year5-cohesion';
 import { y5Perfect } from './year5-perfect';
 import { y5Parenthesis } from './year5-parenthesis';
 import type { Topic } from './types';
@@ -14,7 +14,7 @@ import type { Topic } from './types';
 export const Y5_GRAMMAR: Topic[] = [
   { id: 'y5-verbs', title: 'Making verbs: -ate, -ise, -ify', icon: '✏️', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: converting nouns or adjectives into verbs using suffixes (-ate, -ise, -ify)', gen: y5Verbs },
 
-  // slot: y5-verbprefix
+  { id: 'y5-verbprefix', title: 'Verb prefixes: dis-, de-, mis-, over-, re-', icon: '🧩', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: verb prefixes dis–, de–, mis–, over– and re–', gen: y5VerbPrefix },
 
   { id: 'y5-relative', title: 'Relative Clauses', icon: '🔗', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: relative clauses with who, which, where, when, whose, that or an omitted pronoun', gen: y5Relative },
 
@@ -24,7 +24,7 @@ export const Y5_GRAMMAR: Topic[] = [
 
   { id: 'y5-commas', title: 'Commas for clear meaning', icon: '✍️', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Punctuation: commas to clarify meaning or avoid ambiguity', gen: y5Commas },
 
-  // slot: y5-cohesion
+  { id: 'y5-cohesion', title: 'Cohesion: linking adverbials', icon: '🧭', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: linking ideas across paragraphs with adverbials of time, place and number', gen: y5Cohesion },
 
   { id: 'y5-perfect', title: 'Perfect tense: had, has, have', icon: '⏳', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5–6 Grammar: the perfect form of verbs to mark relationships of time and cause', gen: y5Perfect },
 ];

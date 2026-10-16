@@ -114,6 +114,17 @@ export function renderVisual(v: Visual | undefined): string {
 /** The bar and line charts are `vis-axis-chart.ts`'s; the other chart kinds are `chartHTML`'s. */
 const chartOrBar = (v: Extract<Visual, { type: 'chart' }>): string => v.kind === 'bar' ? barChartSVG(v) : v.kind === 'line' ? lineChartSVG(v) : chartHTML(v);
 
+/** Minutes after midnight as 24-hour HH:MM (a timetable, #1216). */
+const clock24 = (m: number): string => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+/** One table value (#1021, #1216): the count as a numeral, a time as HH:MM, or `?` for the hidden row. */
+const tableCell = (v: Extract<Visual, { type: 'chart'; kind: 'table' }>, k: number, n: number): string => v.hide === k ? '?' : v.time ? clock24(n) : String(n);
+
+/** A row's value cell, and the largest count a row may hold: a timetable's is a day, not a tally's 200 (#1216). */
+const cellOf = (v: Extract<Visual, { type: 'chart' }>, k: number, n: number, each: number, icon: string): string =>
+  v.kind === 'table' ? tableCell(v, k, n) : v.kind === 'bar' || v.kind === 'line' ? '' : chartRow(v.kind, n, each, icon);
+const rowCap = (v: Extract<Visual, { type: 'chart' }>): number => (v.kind === 'table' && v.time ? 1439 : 200);
+
 /** A table's heading row (#1021): the same grid row as the data rows, holding the two heading strings. */
 const tableHead = (head: [string, string] | undefined): string => head
   ? `<div class="chart-row"><span class="cat">${esc(head[0])}</span><span class="data">${esc(head[1])}</span></div>` : '';
@@ -130,10 +141,10 @@ function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' 
   // throw (`n: -3`, invalid array/repeat length), hang forever (`n: Infinity`, `Math.floor(Infinity/5)`
   // never terminates the tally loop) or exhaust the heap (`n: 1e9`). A row outside a sane range renders as
   // an empty one instead — real generator output never exceeds 30 (a d2 pictogram, 6 icons * each 5), so
-  // the cap below leaves a wide margin without allowing unbounded allocation from a malformed `Visual`.
-  const CHART_ROW_CAP = 200;
+  // the cap (`rowCap`) leaves a wide margin without allowing unbounded allocation from a malformed `Visual`.
+  const cap = rowCap(v);
   const rows = v.rows.map(r => {
-    const safe = Number.isInteger(r.n) && r.n >= 0 && r.n <= CHART_ROW_CAP ? r.n : 0;
+    const safe = Number.isInteger(r.n) && r.n >= 0 && r.n <= cap ? r.n : 0;
     if (safe !== r.n) console.warn(`chart visual: row "${r.label}" had an invalid count (${r.n}) — rendered as 0`);
     return safe === r.n ? r : { ...r, n: safe };
   });
@@ -157,7 +168,7 @@ function chartHTML(v: Exclude<Extract<Visual, { type: 'chart' }>, { kind: 'bar' 
   // is escaped reads as proof the row is safe, when its neighbour is not.
   const icon = esc(pict?.icon ?? '⭐');
   const kind = esc(v.kind);
-  const body = tableHead(v.kind === 'table' ? v.head : undefined) + rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
+  const body = tableHead(v.kind === 'table' ? v.head : undefined) + rows.map((r, k) => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${cellOf(v, k, r.n, each, icon)}</span></div>`).join('');
   // The key is the whole point of a pictogram — without it the picture is a different number from the data.
   const key = pict && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
   return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;

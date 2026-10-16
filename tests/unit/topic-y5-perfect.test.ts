@@ -19,28 +19,29 @@ const frameOf = (c: Card) => FRAMES.find(fr => {
 })!;
 const isHelperCard = (c: Card) => PERFECT_HELPERS.includes(c.answer as never);
 
-/** The pinned frame list, in full, for review in the PR (#666): each has a clear past or present anchor in its other clause. */
-const PINNED = [
-  'By the time we got there, the birds {aux} {pp} away.',
-  'The room was quiet because everyone {aux} {pp} home.',
-  'Once she {aux} {pp} the letter, she posted it.',
-  'The plate was empty because the dog {aux} {pp} the sausages.',
-  'Before Mia dropped the vase, she {aux} {pp} it from the shelf.',
-  'He was sad because he {aux} {pp} his homework.',
-  'After the storm, we saw that the wind {aux} {pp} the fence.',
-  'The team cheered when the coach {aux} {pp} Sam for the final.',
-  'Tom was tired because he {aux} {pp} all day.',
-  'Nobody was surprised because they {aux} {pp} the film before.',
-  'I {aux} {pp} my key, so I cannot get in.',
-  'Sam {aux} {pp} all the biscuits, so the tin is empty.',
-  'The children {aux} {pp} their stories, so they can read them out.',
-  'My brother {aux} {pp} my pen, so I cannot write.',
-  'The mug {aux} {pp}, so we need a new one.',
-  'Ella {aux} {pp} a book, so she is reading it now.',
-  'The birds {aux} {pp}, so the nest is empty.',
-  'You {aux} {pp} that film already, so you know the ending.',
-  'Dad {aux} {pp} to the shop, so he is not at home.',
-  'They {aux} {pp} too fast, so I cannot follow.',
+/** The pinned frame list, in full, for review in the PR (#666): `[text, third person, anchor, verb, expected helper]`. The helper is a hand-read
+ * literal, not recomputed, so a wrong flag or anchor on any row fails here. */
+const PINNED: readonly (readonly [string, boolean, string, string, string])[] = [
+  ['By the time we got there, the birds {aux} {pp} away.', false, 'past', 'fly', 'had'],
+  ['The room was quiet because everyone {aux} {pp} home.', false, 'past', 'go', 'had'],
+  ['Once she {aux} {pp} the letter, she posted it.', true, 'past', 'write', 'had'],
+  ['The plate was empty because the dog {aux} {pp} the sausages.', true, 'past', 'eat', 'had'],
+  ['Before Mia dropped the vase, she {aux} {pp} it from the shelf.', true, 'past', 'take', 'had'],
+  ['He was sad because he {aux} {pp} his homework.', true, 'past', 'forget', 'had'],
+  ['After the storm, we saw that the wind {aux} {pp} the fence.', true, 'past', 'break', 'had'],
+  ['The team cheered when the coach {aux} {pp} Sam for the final.', true, 'past', 'choose', 'had'],
+  ['Tom was tired because he {aux} {pp} all day.', true, 'past', 'speak', 'had'],
+  ['Nobody was surprised because they {aux} {pp} the film before.', false, 'past', 'see', 'had'],
+  ['I {aux} {pp} my key, so I cannot get in.', false, 'present', 'forget', 'have'],
+  ['Sam {aux} {pp} all the biscuits, so the tin is empty.', true, 'present', 'eat', 'has'],
+  ['The children {aux} {pp} their stories, so they can read them out.', false, 'present', 'write', 'have'],
+  ['My brother {aux} {pp} my pen, so I cannot write.', true, 'present', 'take', 'has'],
+  ['The mug {aux} {pp}, so we need a new one.', true, 'present', 'break', 'has'],
+  ['Ella {aux} {pp} a book, so she is reading it now.', true, 'present', 'choose', 'has'],
+  ['The birds {aux} {pp}, so the nest is empty.', false, 'present', 'fly', 'have'],
+  ['You {aux} {pp} that film already, so you know the ending.', false, 'present', 'see', 'have'],
+  ['Dad {aux} {pp} to the shop, so he is not at home.', true, 'present', 'go', 'has'],
+  ['They {aux} {pp} too fast, so I cannot follow.', false, 'present', 'speak', 'have'],
 ];
 
 describe('y5-perfect (#1230)', () => {
@@ -50,7 +51,7 @@ describe('y5-perfect (#1230)', () => {
   });
 
   it('pins the frame list as a literal', () => {
-    expect(FRAMES.map(x => x.text)).toEqual(PINNED);
+    expect(FRAMES.map(x => [x.text, x.third, x.anchor, x.verb, helperOf(x)])).toEqual(PINNED);
   });
 
   it('every frame has one of each slot, a verb in the table, and a helper recomputed from anchor and subject', () => {
