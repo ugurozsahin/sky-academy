@@ -71,7 +71,23 @@ describe('y5-3d (#1208)', () => {
     expect(names.size).toBe(6);
   });
 
-  it('d1 descriptions are true: a cube is the only solid with six equal squares', () => {
-    for (const q of draw(1, 500)) { if (q.prompt.includes('6 square faces')) expect(q.answer).toBe('cube'); if (q.prompt.includes('triangular')) expect(q.answer).toBe('pyramid'); }
+  it('d1 descriptions are true: every description names the one solid it fits', () => {
+    const want: Record<string, string> = {
+      '6 square faces, all the same size': 'cube', '6 rectangular faces': 'cuboid', '2 square faces and 4 rectangular faces': 'cuboid',
+      '1 curved surface and no flat faces': 'sphere', '2 flat circular faces and 1 curved surface': 'cylinder',
+      '1 flat circular face and 1 curved surface': 'cone', '1 square face and 4 triangular faces': 'pyramid',
+    };
+    const seen = new Set<string>();
+    for (const q of draw(1, 800)) { const d = /^Which solid has (.+)\?$/.exec(q.prompt)![1]; expect(want[d], d).toBeDefined(); expect(q.answer, d).toBe(want[d]); seen.add(d); }
+    expect(seen.size).toBe(Object.keys(want).length);
+  });
+
+  it('d2 nets are drawn as written (no turning), d3 turns and flips them', () => {
+    const trim = (g: string[]) => { const rs = g.map((r, i) => (r.includes('#') ? i : -1)).filter(i => i >= 0), cs = [...g[0]].map((_, j) => (g.some(r => r[j] === '#') ? j : -1)).filter(j => j >= 0); return g.slice(rs[0], rs[rs.length - 1] + 1).map(r => r.slice(cs[0], cs[cs.length - 1] + 1)).join('/'); };
+    const written = new Set([...CUBE_NETS, ...OBVIOUS].map(n => n.join('/')));
+    for (const q of draw(2, 300)) expect(written.has(trim(gridOf(q))), trim(gridOf(q))).toBe(true);
+    const d3 = draw(3, 600).map(q => trim(gridOf(q)));
+    expect(d3.some(t => !written.has(t) && !NEAR_MISSES.some(n => n.join('/') === t))).toBe(true);
+    expect(new Set(d3.filter(t => canon(t.split('/')) === canon([...CUBE_NETS[0]]))).size).toBeGreaterThan(1);
   });
 });

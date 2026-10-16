@@ -34,7 +34,9 @@ export function foldFaces(grid: string[]): (number | null)[][] {
   return seen.size === 6 ? face : blank.map(row => row.map(() => null));
 }
 
-export const isCubeNet = (grid: string[]): boolean => foldFaces(grid).flat().some(f => f !== null);
+const hasBlock = (grid: string[]): boolean => grid.some((row, r) => r > 0 && Array.from(row).some((ch, c) => ch !== '.' && row[c + 1] !== undefined && row[c + 1] !== '.' && grid[r - 1][c] !== undefined && grid[r - 1][c] !== '.' && grid[r - 1][c + 1] !== undefined && grid[r - 1][c + 1] !== '.'));
+/** No cube net holds a 2 × 2 block (the roll only walks a spanning tree of the cells, so cells touching off-tree are not compared), so one is rejected up front. */
+export const isCubeNet = (grid: string[]): boolean => !hasBlock(grid) && foldFaces(grid).flat().some(f => f !== null);
 
 /** Canonical form under the eight rotations and reflections of the square, trimmed to its bounding box. */
 export function canon(grid: string[]): string {
