@@ -3,11 +3,12 @@
 // import: y5-3d
 // import: y5-angles
 // import: y5-anglefacts
-// import: y5-polygons
 // import: y5-transform
 import type { Topic } from './types';
 import { y5AngleFacts } from './year5-anglefacts';
 import { y5Angles } from './year5-angles';
+import { y5Polygons } from './year5-polygons';
+import { y5Transform } from './year5-transform';
 
 export const Y5_GEOMETRY: Topic[] = [
   // slot: y5-3d
@@ -16,7 +17,7 @@ export const Y5_GEOMETRY: Topic[] = [
 
   { id: 'y5-anglefacts', title: 'Angle Facts', icon: '📐', subject: 'maths', year: 'year5', nc: 'Y5 Geometry: angles at a point, on a line, and rectangle facts (5M44–45)', strand: 'geometry', gen: y5AngleFacts },
 
-  // slot: y5-polygons
+  { id: 'y5-polygons', title: 'Regular Polygons', icon: '🔷', subject: 'maths', year: 'year5', nc: 'Y5 Geometry: regular and irregular polygons (5M46)', strand: 'geometry', gen: y5Polygons },
 
-  // slot: y5-transform
+  { id: 'y5-transform', title: 'Reflection and Translation', icon: '🔄', subject: 'maths', year: 'year5', nc: 'Y5 Geometry: position after a reflection or translation (5M47)', strand: 'geometry', gen: y5Transform },
 ];

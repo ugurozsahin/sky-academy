@@ -138,4 +138,41 @@ describe('coords visual (#1129)', () => {
       expect(repeatKey(q({ ...grid(5, pts), min: 0 }))).toBe(repeatKey(q(grid(5, pts))));
     });
   });
+
+  describe('shapes and a mirror line (#1214)', () => {
+    const tri: [number, number][] = [[1, 1], [4, 1], [1, 3]];
+    const withShapes = (extra: Partial<Coords>): Coords => ({ ...grid(10, []), ...extra });
+
+    it('each outline has one vertex per grid point at its mapped position, and the mirror sits at `at`', () => {
+      const svg = coordsSVG(withShapes({ shapes: [{ pts: tri, shaded: true, label: 'A' }], mirror: { axis: 'x', at: 5 } }));
+      const poly = svg.match(/<polygon class="shape shaded" points="([^"]+)"/)![1];
+      expect(poly.split(' ').map(s => s.split(',').map(Number))).toEqual(tri.map(([x, y]) => coordsPos(10, x, y).map(n => Math.round(n * 100) / 100)));
+      const m = svg.match(/<line class="mirror" x1="([\d.]+)" y1="[\d.]+" x2="([\d.]+)"/)!;
+      expect(+m[1]).toBe(coordsPos(10, 5, 0)[0]); expect(+m[2]).toBe(+m[1]);
+      const h = coordsSVG(withShapes({ mirror: { axis: 'y', at: 4 } })).match(/<line class="mirror" x1="14" y1="([\d.]+)" x2="114" y2="([\d.]+)"/)!;
+      expect(+h[1]).toBe(coordsPos(10, 0, 4)[1]); expect(+h[2]).toBe(+h[1]);
+    });
+
+    it('a card without shapes or a mirror renders byte-identically, and a shape off the grid is dropped', () => {
+      const plain = grid(5, [{ x: 1, y: 2, label: 'A' }]);
+      expect(coordsSVG({ ...plain, shapes: [], mirror: undefined })).toBe(coordsSVG(plain));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(coordsSVG(withShapes({ shapes: [{ pts: [[1, 1], [11, 1], [1, 3]] }, { pts: [[1, 1], [2, 2]] }], mirror: { axis: 'x', at: 11 } }))).not.toMatch(/<polygon|class="mirror"/);
+      expect(warn).toHaveBeenCalledTimes(3);
+      warn.mockRestore();
+    });
+
+    it('draws with tokens only, no hex colours', () => {
+      expect(coordsSVG(withShapes({ shapes: [{ pts: tri, shaded: true, label: 'A' }], mirror: { axis: 'x', at: 5 } }))).not.toMatch(/#[0-9a-f]{3,6}/i);
+    });
+
+    it('the repeat key tells different shapes or mirror lines apart and ignores relabelling', () => {
+      const q = (v: Coords) => ({ prompt: 'p', answer: 'a', options: ['a'], visual: v });
+      const a = withShapes({ shapes: [{ pts: tri, shaded: true }, { label: 'A', pts: [[6, 1], [9, 1], [6, 3]] }], mirror: { axis: 'x', at: 5 } });
+      expect(repeatKey(q(a))).not.toBe(repeatKey(q({ ...a, shapes: [a.shapes![0], { label: 'A', pts: [[6, 1], [9, 1], [9, 3]] }] })));
+      expect(repeatKey(q(a))).not.toBe(repeatKey(q({ ...a, mirror: { axis: 'x', at: 6 } })));
+      expect(repeatKey(q(a))).not.toBe(repeatKey(q({ ...a, mirror: { axis: 'y', at: 5 } })));
+      expect(repeatKey(q(a))).toBe(repeatKey(q({ ...a, shapes: [a.shapes![0], { label: 'C', pts: [[6, 3], [6, 1], [9, 1]] }] })));
+    });
+  });
 });
