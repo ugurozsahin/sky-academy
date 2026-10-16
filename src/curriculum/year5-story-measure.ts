@@ -23,7 +23,7 @@ const SPEAK: Fmt = { q: d => fmt(d), m: moneySay };
 const tenths = (v: number) => dec(v, 1);
 const whole = (v: number) => dec(v, 0);
 /** A price in pence, a multiple of 5 whose pence part is 0 or at least 10, so it can be spoken without a leading zero. */
-const price = (rng: Rng, lo: number, hi: number): Dec => { let p: number; do p = 5 * ri(rng, lo / 5, hi / 5); while (p % 100 !== 0 && p % 100 < 10); return dec(p, 2); };
+const price = (rng: Rng, lo: number, hi: number): Dec => { let p = 5 * ri(rng, lo / 5, hi / 5); for (let i = 0; i < 50 && p % 100 !== 0 && p % 100 < 10; i++) p = 5 * ri(rng, lo / 5, hi / 5); return dec(p % 100 !== 0 && p % 100 < 10 ? p + 10 : p, 2); };
 const shift = (a: Dec) => mulPow10(a, 1);
 const small = (a: Dec) => divPow10(a, 1);
 
@@ -109,7 +109,7 @@ function finish(rng: Rng, d: Difficulty, w: Draw): Question {
     const s = lab(c);
     if (ds.length < 3 && c.v > 0 && s !== ans && !ds.includes(s)) ds.push(s);
   }
-  const prompt = w.text(WRITE), say = ks2Say(w.text(SPEAK));
+  const prompt = w.text(WRITE), say = ks2Say(w.text(SPEAK).replace(/\?/g, '.'));
   const q = wordQ(rng, prompt, ans, ds, { say, hint: HINTS[d - 1], hintIsData: false });
   return d === 3 ? { ...q, slow: true } : q;
 }

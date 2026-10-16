@@ -77,7 +77,9 @@ describe('y5-story-measure (#1207)', () => {
   it('no spoken line ends in a bare single-letter unit, and d3 cards are slow (#1207 review)', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
       expect(q.say!, q.prompt).not.toMatch(/(^|\s)[a-z]\s*[?.]?$/i);
-      expect(q.say!, q.prompt).not.toMatch(/equals what/);
+      expect(q.say!, q.prompt).not.toMatch(/ what\b/); // symSay turns a spoken "?" into " what"
+      expect(q.say!, q.prompt).not.toContain('?');
+      if (/ kg \+ /.test(q.prompt)) expect(q.say!, q.prompt).toMatch(/kilograms plus \d+ grams\./);
       expect(!!q.slow, q.prompt).toBe(d === 3);
     }
   });
