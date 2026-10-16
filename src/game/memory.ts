@@ -1,6 +1,7 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
 import { clockPhrase, CONTRACTIONS } from '../curriculum/year2';
+import { fdpPairs } from './memory-fdp';
 import { coinLabel, CVC, DIGRAPHS, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean; quiet?: true }  // coin = pence, drawn as a coin; quiet = not spoken when turned over (#964)
@@ -86,6 +87,9 @@ const tables12Pairs = (rng: Rng): Pair[] => {
   return facts.map(([a, b]) => ({ a: txt(`${a} × ${b}`, `${a} times ${b}`), b: txt(String(a * b)) }));
 };
 
+/** Fractions, decimals, % (#1238): two forms of the same amount; the hint is the only place that rule is stated. */
+const FDP_THEME: Theme = { id: 'fdp', title: 'Fractions, decimals, %', hint: 'Match each pair that is the same amount', hintIsData: true, pairs: fdpPairs };
+
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
 export const THEMES: Partial<Record<YearId, Theme[]>> = {
   reception: [
@@ -119,6 +123,8 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
   year4: [
     { id: 'tables', title: 'Times tables', hint: 'Match each times-table fact to its answer', hintIsData: true, pairs: tables12Pairs },
   ],
+  year5: [FDP_THEME],
+  year6: [FDP_THEME],
 };
 
 export class Memory {

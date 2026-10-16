@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { equal, parseFrac, simplify, type Frac } from '../../src/curriculum/fractions';
 import { clockEmoji, FRACTION_POOL, HALF_FORMS, TENSE_POOL, gridFor, hasMemoryDecks, BOND_POOL, LETTER_POOL, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS, isKs2, type YearId } from '../../src/curriculum';
 import { clockPhrase, CONTRACTIONS } from '../../src/curriculum/year2';
@@ -43,7 +44,7 @@ describe('memory decks', () => {
         const solidsLost = Math.max(0, SHAPES_3D.filter(r => SAME_SOLID.has(r[1])).length - 1);
         const asked = y.id === 'reception' ? 4 : 6;
         const want = y.id === 'year2' && theme.id === 'shapes' ? Math.min(asked, SHAPES_3D.length - solidsLost)
-          : y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'words' ? 6 : theme.id === 'fractions' ? 4 : 8;
+          : y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'words' ? 6 : theme.id === 'fractions' ? 4 : theme.id === 'fdp' ? 6 : 8;
         expect(pairs.length, `${y.id}/${theme.id}`).toBe(want);
         expect(new Set(pairs.map(p => faceKey(p.a))).size, `${y.id}/${theme.id} left faces`).toBe(pairs.length);
         expect(new Set(pairs.map(p => faceKey(p.b))).size, `${y.id}/${theme.id} right faces`).toBe(pairs.length);
@@ -192,7 +193,7 @@ describe('memory decks', () => {
   // a check that today's NINE existing themes are classified as the issue says, not a guard against a new
   // one shipping unclassified — `tsc` is that guard now.
   it('only doubles and tables mark their hint as the sole statement of the matching rule', () => {
-    const dataThemes = new Set(['doubles', 'tables', 'bonds10']);
+    const dataThemes = new Set(['doubles', 'tables', 'bonds10', 'fdp']);
     for (const y of YEARS) for (const theme of THEMES[y.id] ?? []) {
       expect(theme.hintIsData, `${y.id}/${theme.id}`).toBe(dataThemes.has(theme.id));
     }
@@ -388,5 +389,42 @@ describe('Year 4 Times tables deck (#1128)', () => {
     }
     const big = Array.from({ length: 200 }, (_, i) => deck.pairs(rng(i + 1))).flat().find(p => Number(p.b.text) > 100);
     expect(big?.b.say).toBe(big?.b.text);
+  });
+});
+
+describe('Years 5–6 Fractions, decimals, % deck (#1238)', () => {
+  const deck = THEMES.year6!.find(t => t.id === 'fdp')!;
+  const value = (text: string): Frac => {
+    if (text.endsWith('%')) return simplify({ n: Number(text.slice(0, -1)), d: 100 });
+    if (text.includes('.')) return simplify({ n: Math.round(Number(text) * 1000), d: 1000 });
+    return parseFrac(text)!;
+  };
+  it('is the one deck on Year 6 and Year 5, and marks its hint as data', () => {
+    expect(THEMES.year6!.map(t => t.id)).toEqual(['fdp']);
+    expect(THEMES.year5!.map(t => t.id)).toEqual(['fdp']);
+    expect(deck.hintIsData).toBe(true);
+    expect(hasMemoryDecks('year6')).toBe(true);
+  });
+  it('every board is 6 pairs; each face has exactly one partner by exact value, in a different form (seeds 1–200)', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const pairs = deck.pairs(rng(seed));
+      expect(pairs.length, `seed ${seed}`).toBe(6);
+      const faces = pairs.flatMap(p => [p.a, p.b]);
+      for (const p of pairs) {
+        expect(p.a.text).not.toBe(p.b.text);
+        expect(equal(value(p.a.text), value(p.b.text)), `${p.a.text} = ${p.b.text}`).toBe(true);
+        const kind = (t: string) => t.endsWith('%') ? 'pct' : t.includes('.') ? 'dec' : 'frac';
+        expect(kind(p.a.text)).not.toBe(kind(p.b.text));
+        expect(faces.filter(f => equal(value(f.text), value(p.a.text))).length, `seed ${seed} ${p.a.text}`).toBe(2);
+      }
+    }
+  });
+  it('fractions are in simplest form and every face is spoken in words', () => {
+    for (let seed = 1; seed <= 200; seed++) for (const p of deck.pairs(rng(seed))) for (const f of [p.a, p.b]) {
+      const fr = parseFrac(f.text);
+      if (fr && f.text.includes('/')) expect(`${fr.n}/${fr.d}`).toBe(f.text);
+      expect(f.say).not.toMatch(/\d/);
+      expect(f.say).not.toContain('%');
+    }
   });
 });
