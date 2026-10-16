@@ -24,6 +24,33 @@ const axisNum = (i: number) => (i < 0 ? '−' : '') + Math.abs(i);
 const text = (s: string, x: number, y: number, anchor: string, style: string, cls: string) =>
   `<text class="${cls}" x="${n2(x)}" y="${n2(y)}" text-anchor="${anchor}" dominant-baseline="central" style="font-size:${LABEL_FS}px;${style}">${esc(s)}</text>`;
 
+const onGrid = (size: number, min: number, x: number, y: number) => ok(x) && ok(y) && x >= min && y >= min && x <= size && y <= size;
+/** Closed outlines through grid points (#1214); one that leaves the grid is dropped. */
+function shapesSVG(v: Coords, size: number, min: number): string {
+  const good = (v.shapes ?? []).filter(sh => {
+    const ok = sh.pts.length > 2 && sh.pts.every(([x, y]) => onGrid(size, min, x, y));
+    if (!ok) console.warn('coords visual: a shape needs 3+ corners on the grid — skipped');
+    return ok;
+  });
+  return good.map(sh => {
+    const ps = sh.pts.map(([x, y]) => coordsPos(size, x, y, min));
+    const cx = ps.reduce((a, q) => a + q[0], 0) / ps.length, cy = ps.reduce((a, q) => a + q[1], 0) / ps.length;
+    const fill = sh.shaded ? 'fill:var(--accent);fill-opacity:0.55' : 'fill:none';
+    return `<polygon class="shape${sh.shaded ? ' shaded' : ''}" points="${ps.map(q => `${n2(q[0])},${n2(q[1])}`).join(' ')}" style="${fill};stroke:var(--text);stroke-width:1.2;stroke-linejoin:round"/>`
+      + (sh.label ? text(sh.label, cx, cy, 'middle', 'font-weight:700;fill:var(--text)', 'sl') : '');
+  }).join('');
+}
+/** The dashed mirror line (#1214): axis 'x' is the vertical line x = at, 'y' the horizontal line y = at. */
+function mirrorSVG(v: Coords, size: number, min: number): string {
+  const m = v.mirror;
+  if (!m) return '';
+  if (!onGrid(size, min, m.at, m.at)) { console.warn('coords visual: the mirror line is off the grid — skipped'); return ''; }
+  const [mx, my] = coordsPos(size, m.at, m.at, min), style = 'stroke:var(--accent);stroke-width:1.6;stroke-dasharray:4 3';
+  return m.axis === 'x'
+    ? `<line class="mirror" x1="${n2(mx)}" y1="${PAD_T}" x2="${n2(mx)}" y2="${PAD_T + SPAN}" style="${style}"/>`
+    : `<line class="mirror" x1="${PAD_L}" y1="${n2(my)}" x2="${PAD_L + SPAN}" y2="${n2(my)}" style="${style}"/>`;
+}
+
 /** The drawing for a `coords` visual; a point outside the grid, or with a non-finite value, is skipped with a warning (#137). */
 export function coordsSVG(v: Coords): string {
   const size = Math.round(v.size), min = Math.round(v.min ?? 0);
@@ -47,10 +74,11 @@ export function coordsSVG(v: Coords): string {
   const at = new Map(good.map(p => [p.label, coordsPos(size, p.x, p.y, min)]));
   const line = (v.join ?? []).map(l => at.get(l)).filter((p): p is [number, number] => !!p);
   const sides = line.length > 1 ? `<polyline class="join" points="${line.map(p => `${n2(p[0])},${n2(p[1])}`).join(' ')}" style="fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round"/>` : '';
+  const shapes = shapesSVG(v, size, min), mirror = mirrorSVG(v, size, min);
   const dots = good.map(p => {
     const [cx, cy] = coordsPos(size, p.x, p.y, min);
     return `<circle class="pt" data-x="${p.x}" data-y="${p.y}" cx="${n2(cx)}" cy="${n2(cy)}" r="2.6" style="fill:var(--accent);stroke:var(--text);stroke-width:0.6"/>`
       + text(p.label, cx + 4, cy - 4.5, 'start', 'font-weight:700;fill:var(--text)', 'pl');
   }).join('');
-  return `<div class="vis"><svg viewBox="0 0 ${VB} ${VB}" class="coords" style="width:min(clamp(${MIN_W}px,70vw,300px),var(--duel-vis,300px));height:auto">${grid.join('')}${nums.join('')}${sides}${dots}</svg></div>`;
+  return `<div class="vis"><svg viewBox="0 0 ${VB} ${VB}" class="coords" style="width:min(clamp(${MIN_W}px,70vw,300px),var(--duel-vis,300px));height:auto">${grid.join('')}${nums.join('')}${mirror}${shapes}${sides}${dots}</svg></div>`;
 }

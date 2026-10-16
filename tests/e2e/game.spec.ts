@@ -2491,6 +2491,21 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
+  test('y5-transform: a shaded shape, a dashed mirror and three lettered candidates fit the card on a phone (#1214)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year5', 'y5-transform');
+    const html = renderVisual({ type: 'coords', size: 10, points: [], mirror: { axis: 'x', at: 5 }, shapes: [
+      { shaded: true, pts: [[1, 1], [4, 1], [1, 3]] }, { label: 'A', pts: [[6, 1], [9, 1], [9, 3]] },
+      { label: 'B', pts: [[6, 5], [9, 5], [6, 7]] }, { label: 'C', pts: [[1, 6], [4, 6], [1, 8]] },
+    ] });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await expect(page.locator('#vis svg.coords polygon.shaded')).toHaveCount(1);
+    await expect(page.locator('#vis svg.coords line.mirror')).toHaveCount(1);   // a vertical line has no width, so not toBeVisible
+    await expectFitsViewport(page, 'y5-transform shapes and mirror line');
+  });
+
   test('y4-shapes: three lettered triangles with tick and right-angle marks fit the card on a phone (#1154)', async ({ page }) => {
     await seedPreview(page);
     await seedPlayer(page);
