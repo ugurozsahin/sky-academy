@@ -66,6 +66,15 @@ describe('y5-polygons (#1211)', () => {
     }
   });
 
+  it('d1 and d2: Yes and No cards are turned alike, so the tilt never gives the answer away', () => {
+    const level = (pts: Pt[]) => pts.some((a, i) => { const b = pts[(i + 1) % pts.length]; return Math.abs(a[0] - b[0]) < 0.05 || Math.abs(a[1] - b[1]) < 0.05; });
+    for (const d of [1, 2] as Difficulty[]) {
+      const qs = draw(d, 600), rate = (yes: boolean) => { const g = qs.filter(q => (q.answer === 'Yes') === yes); return g.filter(q => level(poly(q).pts)).length / g.length; };
+      expect(rate(true), `d${d} yes`).toBeLessThan(0.1); expect(rate(false), `d${d} no`).toBeLessThan(0.1);
+      expect(Math.abs(rate(true) - rate(false)), `d${d}`).toBeLessThan(0.05);
+    }
+  });
+
   it('d3: text only, every statement from the hand-checked table with its answer', () => {
     const seen = new Set<string>();
     for (const q of draw(3, 600)) {

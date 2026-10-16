@@ -34,9 +34,9 @@ const OTHERS: Tpl[] = [
   { pts: [[0, 0], [6, 0], [3, 4]], ticks: [0, 1, 1], lens: [6, 5, 5] }, { pts: [[0, 0], [8, 0], [4, 3]], ticks: [0, 1, 1], lens: [8, 5, 5] },
 ];
 
-/** `tpl` turned (`any`: any angle, else a multiple of 90°, or 180° at most when labelled), maybe mirrored, scaled to fill the 100 × 70 frame. `cm` labels the sides. */
-function draw(rng: Rng, tpl: Tpl, any: boolean, cm?: number[]): Poly {
-  const mirror = rng() < 0.5, a = any ? rng() * 2 * Math.PI : (cm ? Math.floor(rng() * 2) * 2 : Math.floor(rng() * 4)) * Math.PI / 2;   // a labelled shape stays wide so its side labels clear it
+/** `tpl` turned to any angle, maybe mirrored, scaled to fill the 100 × 70 frame. `cm` labels the sides. */
+function draw(rng: Rng, tpl: Tpl, cm?: number[]): Poly {
+  const mirror = rng() < 0.5, a = rng() * 2 * Math.PI;   // every shape, Yes or No, turns the same way: a tilt must not give the answer away
   const pts = tpl.pts.map(([x, y]): Pt => {
     const [mx, my] = [mirror ? -x : x, y];
     return [mx * Math.cos(a) - my * Math.sin(a), mx * Math.sin(a) + my * Math.cos(a)];
@@ -82,12 +82,12 @@ export const y5Polygons: Generator = (d: Difficulty, rng: Rng): Question => {
   const prompt = 'Is this polygon regular?', say = 'Is this polygon regular? Yes or no?';
   if (d === 1) {
     const tpl = yes ? regular(pick(rng, [3, 4, 5, 6]), 0) : pick(rng, CLEAR);
-    return card(rng, prompt, say, yes, { visual: { type: 'geometry', parts: [draw(rng, tpl, yes)] } });
+    return card(rng, prompt, say, yes, { visual: { type: 'geometry', parts: [draw(rng, tpl)] } });
   }
   if (yes) {
     const n = pick(rng, [3, 4, 5, 6]), cm = ri(rng, 3, 8);
-    return card(rng, prompt, say, true, { visual: { type: 'geometry', parts: [draw(rng, regular(n, 0), true, Array(n).fill(cm))] } });
+    return card(rng, prompt, say, true, { visual: { type: 'geometry', parts: [draw(rng, regular(n, 0), Array(n).fill(cm))] } });
   }
   const tpl = rng() < 0.8 ? pick(rng, rng() < 0.5 ? RHOMBI : RECTS) : pick(rng, OTHERS);
-  return card(rng, prompt, say, false, { visual: { type: 'geometry', parts: [draw(rng, tpl, false, tpl.lens)] } });
+  return card(rng, prompt, say, false, { visual: { type: 'geometry', parts: [draw(rng, tpl, tpl.lens)] } });
 };
