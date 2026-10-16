@@ -1,18 +1,18 @@
 // Year 5 grammar strand (#1177). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
-// import: y5-verbs
+import { y5Verbs } from './year5-verbs';
 import { y5VerbPrefix } from './year5-verbprefix';
 import { y5Relative } from './year5-relative';
 import { y5Modal } from './year5-modal';
 // import: y5-parenthesis
-// import: y5-commas
+import { y5Commas } from './year5-commas';
 // import: y5-cohesion
 // import: y5-perfect
 import { y5Parenthesis } from './year5-parenthesis';
 import type { Topic } from './types';
 
 export const Y5_GRAMMAR: Topic[] = [
-  // slot: y5-verbs
+  { id: 'y5-verbs', title: 'Making verbs: -ate, -ise, -ify', icon: '✏️', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: converting nouns or adjectives into verbs using suffixes (-ate, -ise, -ify)', gen: y5Verbs },
 
   { id: 'y5-verbprefix', title: 'Verb prefixes: dis-, de-, mis-, over-, re-', icon: '🧩', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: verb prefixes dis–, de–, mis–, over– and re–', gen: y5VerbPrefix },
 
@@ -22,7 +22,7 @@ export const Y5_GRAMMAR: Topic[] = [
 
   { id: 'y5-parenthesis', title: 'Parenthesis: brackets, dashes, commas', icon: '📝', subject: 'writing', year: 'year5', nc: 'Y5–6 punctuation: brackets, dashes or commas to indicate parenthesis', strand: 'grammar', gen: y5Parenthesis },
 
-  // slot: y5-commas
+  { id: 'y5-commas', title: 'Commas for clear meaning', icon: '✍️', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Punctuation: commas to clarify meaning or avoid ambiguity', gen: y5Commas },
 
   // slot: y5-cohesion
 

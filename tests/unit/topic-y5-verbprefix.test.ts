@@ -98,7 +98,7 @@ describe('y5-verbprefix (#1223)', () => {
       for (const o of c.options) expect(o.length, o).toBeLessThanOrEqual(4);
       const row = rowOf(c as never);
       expect(c.options).toContain(c.answer);
-      expect(c.say, 'speaks the gap, not the answer').toContain(d === 1 ? `Blank-${row[0]} means ${row[2]}.` : row[3].replace('___', 'blank'));
+      expect(c.say, 'speaks the gap, not the answer').toContain(d === 1 ? `Blank-${row[0]} means ${row[2]}.` : row[3].replace('___', 'blank-'));
       for (const p of PREFIXES) expect(c.say).not.toContain(p + row[0]);
       expect(c.say).not.toContain(vpSentence(row));
     }

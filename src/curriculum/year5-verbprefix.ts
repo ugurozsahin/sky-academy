@@ -59,7 +59,7 @@ export const verbPrefixQ = (rng: Rng, row: VerbPrefixRow, difficulty: Difficulty
   const ds = shuffle(rng, nonwords(root)).slice(0, difficulty === 3 ? 3 : 2);
   const gapped = difficulty === 1
     ? { prompt: `${meaning} = ___${root}`, say: `Blank-${root} means ${meaning}.` }
-    : { prompt: 'Which prefix fits the gap?', say: sentence.replace('___', 'blank'), visual: { type: 'sentence' as const, text: sentence } };
+    : { prompt: 'Which prefix fits the gap?', say: sentence.replace('___', 'blank-'), visual: { type: 'sentence' as const, text: sentence } };
   return wordQ(rng, gapped.prompt, prefix, ds, { ...gapped, hint: 'Slice the prefix', hintIsData: false });
 };
 
