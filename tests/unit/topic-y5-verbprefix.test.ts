@@ -17,7 +17,7 @@ const WORDS = (s: string) => s.toLowerCase().match(/[a-z]+/g) ?? [];
 
 /** The whole table, pinned: any change to a verdict is a reviewed diff. Order of letters: dis, de, mis, over, re. */
 const PINNED = [
-  'build:NNRRA', 'cook:NNNAR', 'cycle:NNNNA', 'eat:NNNAN', 'fill:NNRRA', 'flate:NANNR', 'flow:NNNAR', 'frost:NANNN',
+  'build:NNRRA', 'cook:NNRAR', 'cycle:NRNNA', 'eat:NNNAN', 'fill:NNRRA', 'flate:NANNR', 'flow:NRNAR', 'frost:NANNN',
   'fuse:NANRR', 'hydrate:NANRR', 'infect:ANNRR', 'judge:NNARR', 'like:ANRNN', 'pronounce:NNARR', 'qualify:ANNRR',
   'rail:NANNR', 'react:NNNAN', 'sleep:NNNAN', 'understand:NNANN', 'wind:NNNRA',
 ];
@@ -25,11 +25,11 @@ const PINNED = [
 const Y3_EXAMPLES = ['disappoint', 'disagree', 'disobey', 'misbehave', 'mislead', 'misspell', 'redo', 'refresh', 'return', 'reappear', 'redecorate'];
 /** Every prefix + root spelling a card can show as a bubble's completion, sorted. Each N was checked against a dictionary. */
 const INVENTORY = [
-  'debuild', 'decook', 'decycle', 'deeat', 'defill', 'deflow', 'deinfect',
+  'debuild', 'decook', 'deeat', 'defill', 'deinfect',
   'dejudge', 'delike', 'depronounce', 'dequalify', 'dereact', 'desleep', 'deunderstand',
   'dewind', 'disbuild', 'discook', 'discycle', 'diseat', 'disfill', 'disflate',
   'disflow', 'disfrost', 'disfuse', 'dishydrate', 'disjudge', 'dispronounce', 'disrail',
-  'disreact', 'dissleep', 'disunderstand', 'diswind', 'miscook', 'miscycle', 'miseat',
+  'disreact', 'dissleep', 'disunderstand', 'diswind', 'miscycle', 'miseat',
   'misflate', 'misflow', 'misfrost', 'misfuse', 'mishydrate', 'misinfect', 'misqualify',
   'misrail', 'misreact', 'missleep', 'miswind', 'overcycle', 'overflate', 'overfrost',
   'overlike', 'overrail', 'overunderstand', 'reeat', 'refrost', 'relike', 'rereact',
@@ -96,8 +96,11 @@ describe('y5-verbprefix (#1223)', () => {
   it('every label is a prefix of 4 letters or fewer, and every card has a say with the whole verb', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d)) {
       for (const o of c.options) expect(o.length, o).toBeLessThanOrEqual(4);
-      expect(c.say).toBeTruthy();
-      expect(c.say).toContain(vpVerb(rowOf(c as never)).replace(/^(.*)$/, d === 1 ? '$1' : rowOf(c as never)[1]));
+      const row = rowOf(c as never);
+      expect(c.options).toContain(c.answer);
+      expect(c.say, 'speaks the gap, not the answer').toContain(d === 1 ? `Blank-${row[0]} means ${row[2]}.` : row[3].replace('___', 'blank'));
+      for (const p of PREFIXES) expect(c.say).not.toContain(p + row[0]);
+      expect(c.say).not.toContain(vpSentence(row));
     }
   });
 

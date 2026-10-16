@@ -13,8 +13,8 @@ export const VERDICTS: Readonly<Record<string, string>> = {
   frost: 'NANNN', rail: 'NANNR', flate: 'NANNR', fuse: 'NANRR', hydrate: 'NANRR',
   like: 'ANRNN', infect: 'ANNRR', qualify: 'ANNRR',
   judge: 'NNARR', understand: 'NNANN', pronounce: 'NNARR',
-  sleep: 'NNNAN', flow: 'NNNAR', cook: 'NNNAR', eat: 'NNNAN', react: 'NNNAN',
-  cycle: 'NNNNA', build: 'NNRRA', fill: 'NNRRA', wind: 'NNNRA',
+  sleep: 'NNNAN', flow: 'NRNAR', cook: 'NNRAR', eat: 'NNNAN', react: 'NNNAN',
+  cycle: 'NRNNA', build: 'NNRRA', fill: 'NNRRA', wind: 'NNNRA',
 };
 
 /** `[root, prefix, meaning, sentence]`: the sentence gaps the prefix as `___`, and the inflected verb follows it (`___slept`). */
@@ -58,8 +58,8 @@ export const verbPrefixQ = (rng: Rng, row: VerbPrefixRow, difficulty: Difficulty
   const [root, prefix, meaning, sentence] = row;
   const ds = shuffle(rng, nonwords(root)).slice(0, difficulty === 3 ? 3 : 2);
   const gapped = difficulty === 1
-    ? { prompt: `${meaning} = ___${root}`, say: `${vpVerb(row)} means ${meaning}.` }
-    : { prompt: 'Which prefix fits the gap?', say: vpSentence(row), visual: { type: 'sentence' as const, text: sentence } };
+    ? { prompt: `${meaning} = ___${root}`, say: `Blank-${root} means ${meaning}.` }
+    : { prompt: 'Which prefix fits the gap?', say: sentence.replace('___', 'blank'), visual: { type: 'sentence' as const, text: sentence } };
   return wordQ(rng, gapped.prompt, prefix, ds, { ...gapped, hint: 'Slice the prefix', hintIsData: false });
 };
 
