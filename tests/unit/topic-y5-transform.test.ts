@@ -6,6 +6,9 @@ function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const t = topicById('y5-transform')!;
+// The oracle is written here, apart from the module under test: a corner is as far behind the mirror as it was in front, along the line unchanged.
+const mirrored = (p: P, axis: 'x' | 'y', at: number): P => axis === 'x' ? [at + (at - p[0]), p[1]] : [p[0], at + (at - p[1])];
+const moved = (p: P, dx: number, dy: number): P => [p[0] + dx, p[1] + dy];
 type Coords = Extract<Visual, { type: 'coords' }>;
 type P = [number, number];
 const vis = (q: ReturnType<typeof t.gen>) => q.visual as Coords;
@@ -26,10 +29,26 @@ describe('y5-transform (#1214)', () => {
       const v = vis(q), [shaded, ...cands] = v.shapes!;
       expect(shaded.shaded).toBe(true);
       expect(cands.map(c => c.label)).toEqual(['A', 'B', 'C']);
-      const want = d === 1 ? (() => { const [dx, dy] = dirs(q.prompt); return transform.move(shaded.pts, dx, dy); })() : transform.reflect(shaded.pts, v.mirror!.axis, v.mirror!.at);
+      const want = d === 1 ? (() => { const [dx, dy] = dirs(q.prompt); return shaded.pts.map(p => moved(p, dx, dy)); })() : shaded.pts.map(p => mirrored(p, v.mirror!.axis, v.mirror!.at));
       const hits = cands.filter(c => key(c.pts) === key(want));
       expect(hits.map(c => c.label), q.prompt).toEqual([q.answer]);
       expect(q.options).toEqual(['A', 'B', 'C']);
+    }
+  });
+
+  it('the shared transform helper agrees with known shape, mirror and image triples', () => {
+    const tri: P[] = [[1, 1], [4, 1], [1, 3]];
+    expect(key(transform.reflect(tri, 'x', 5))).toBe(key([[9, 1], [6, 1], [9, 3]]));
+    expect(key(transform.reflect(tri, 'y', 5))).toBe(key([[1, 9], [4, 9], [1, 7]]));
+    expect(key(transform.move(tri, 3, -1))).toBe(key([[4, 0], [7, 0], [4, 2]]));
+  });
+
+  it('d2: each corner sits as far behind the mirror as it was in front, and its along-line coordinate is unchanged', () => {
+    for (const q of draws(2)) {
+      const v = vis(q), { axis, at } = v.mirror!, [shaded, ...cands] = v.shapes!, right = cands.find(c => c.label === q.answer)!;
+      const i = axis === 'x' ? 0 : 1, j = 1 - i;
+      const a = shaded.pts.map(p => [p[i] - at, p[j]]).sort().join(';'), b = right.pts.map(p => [at - p[i], p[j]]).sort().join(';');
+      expect(b, q.prompt).toBe(a);
     }
   });
 
@@ -60,11 +79,11 @@ describe('y5-transform (#1214)', () => {
         seen.add('describe');
         const [a, b] = v.shapes!, dx = b.pts[0][0] - a.pts[0][0], dy = b.pts[0][1] - a.pts[0][1];
         expect(q.answer).toBe(String(q.prompt.includes('right') ? dx : dy));
-        expect(key(transform.move(a.pts, dx, dy))).toBe(key(b.pts));
+        expect(key(a.pts.map(p => moved(p, dx, dy)))).toBe(key(b.pts));
       } else if (q.prompt.startsWith('P is at')) {
         seen.add('corner');
         const p = v.points[0], to = q.answer.match(/\d+/g)!.map(Number);
-        const want = v.mirror ? transform.reflect([[p.x, p.y]], v.mirror.axis, v.mirror.at)[0] : (() => { const [dx, dy] = dirs(q.prompt); return [p.x + dx, p.y + dy]; })();
+        const want = v.mirror ? mirrored([p.x, p.y], v.mirror.axis, v.mirror.at) : (() => { const [dx, dy] = dirs(q.prompt); return [p.x + dx, p.y + dy]; })();
         expect(to).toEqual(want);
         for (const o of q.options) { const n = o.match(/\d+/g)!.map(Number); expect(n.every(c => c >= 0 && c <= 10)).toBe(true); }
       } else { seen.add('area'); expect(q.answer).toBe('same'); expect([...q.options].sort()).toEqual(['bigger', 'same', 'smaller']); }

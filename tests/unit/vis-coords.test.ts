@@ -149,13 +149,17 @@ describe('coords visual (#1129)', () => {
       expect(poly.split(' ').map(s => s.split(',').map(Number))).toEqual(tri.map(([x, y]) => coordsPos(10, x, y).map(n => Math.round(n * 100) / 100)));
       const m = svg.match(/<line class="mirror" x1="([\d.]+)" y1="[\d.]+" x2="([\d.]+)"/)!;
       expect(+m[1]).toBe(coordsPos(10, 5, 0)[0]); expect(+m[2]).toBe(+m[1]);
-      expect(coordsSVG(withShapes({ mirror: { axis: 'y', at: 4 } }))).toMatch(/<line class="mirror" x1="14" y1="([\d.]+)" x2="114" y2="\1"/);
+      const h = coordsSVG(withShapes({ mirror: { axis: 'y', at: 4 } })).match(/<line class="mirror" x1="14" y1="([\d.]+)" x2="114" y2="([\d.]+)"/)!;
+      expect(+h[1]).toBe(coordsPos(10, 0, 4)[1]); expect(+h[2]).toBe(+h[1]);
     });
 
     it('a card without shapes or a mirror renders byte-identically, and a shape off the grid is dropped', () => {
       const plain = grid(5, [{ x: 1, y: 2, label: 'A' }]);
       expect(coordsSVG({ ...plain, shapes: [], mirror: undefined })).toBe(coordsSVG(plain));
-      expect(coordsSVG(withShapes({ shapes: [{ pts: [[1, 1], [11, 1], [1, 3]] }] }))).not.toContain('<polygon');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(coordsSVG(withShapes({ shapes: [{ pts: [[1, 1], [11, 1], [1, 3]] }, { pts: [[1, 1], [2, 2]] }], mirror: { axis: 'x', at: 11 } }))).not.toMatch(/<polygon|class="mirror"/);
+      expect(warn).toHaveBeenCalledTimes(3);
+      warn.mockRestore();
     });
 
     it('draws with tokens only, no hex colours', () => {

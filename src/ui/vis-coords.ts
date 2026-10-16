@@ -27,7 +27,12 @@ const text = (s: string, x: number, y: number, anchor: string, style: string, cl
 const onGrid = (size: number, min: number, x: number, y: number) => ok(x) && ok(y) && x >= min && y >= min && x <= size && y <= size;
 /** Closed outlines through grid points (#1214); one that leaves the grid is dropped. */
 function shapesSVG(v: Coords, size: number, min: number): string {
-  return (v.shapes ?? []).filter(sh => sh.pts.length > 2 && sh.pts.every(([x, y]) => onGrid(size, min, x, y))).map(sh => {
+  const good = (v.shapes ?? []).filter(sh => {
+    const ok = sh.pts.length > 2 && sh.pts.every(([x, y]) => onGrid(size, min, x, y));
+    if (!ok) console.warn('coords visual: a shape needs 3+ corners on the grid — skipped');
+    return ok;
+  });
+  return good.map(sh => {
     const ps = sh.pts.map(([x, y]) => coordsPos(size, x, y, min));
     const cx = ps.reduce((a, q) => a + q[0], 0) / ps.length, cy = ps.reduce((a, q) => a + q[1], 0) / ps.length;
     const fill = sh.shaded ? 'fill:var(--accent);fill-opacity:0.55' : 'fill:none';
@@ -38,7 +43,8 @@ function shapesSVG(v: Coords, size: number, min: number): string {
 /** The dashed mirror line (#1214): axis 'x' is the vertical line x = at, 'y' the horizontal line y = at. */
 function mirrorSVG(v: Coords, size: number, min: number): string {
   const m = v.mirror;
-  if (!m || !onGrid(size, min, m.at, m.at)) return '';
+  if (!m) return '';
+  if (!onGrid(size, min, m.at, m.at)) { console.warn('coords visual: the mirror line is off the grid — skipped'); return ''; }
   const [mx, my] = coordsPos(size, m.at, m.at, min), style = 'stroke:var(--accent);stroke-width:1.6;stroke-dasharray:4 3';
   return m.axis === 'x'
     ? `<line class="mirror" x1="${n2(mx)}" y1="${PAD_T}" x2="${n2(mx)}" y2="${PAD_T + SPAN}" style="${style}"/>`
