@@ -42,7 +42,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   share: 'sharing', half: 'sharing', shortdiv: 'sharing', longdiv: 'sharing',
   factors: 'factors', factorpairs: 'factors', primes: 'factors',
   coins: 'money', money: 'money', coincombo: 'money', 'story-money': 'money',
-  time: 'time', timewords: 'time', months: 'time', days: 'time', when: 'time', duration: 'time',
+  time: 'time', timetable: 'time', timewords: 'time', months: 'time', days: 'time', when: 'time', duration: 'time',
   measure: 'measure', length: 'measure', mass: 'measure', capacity: 'measure', temp: 'measure', convert: 'measure', imperial: 'measure', 'story-measure': 'measure', perimeter: 'measure', area: 'measure', volume: 'measure',
   shapes: 'shape', polygons: 'shape', shapes3d: 'shape', objects3d: 'shape', symmetry: 'shape', position: 'shape', coords: 'shape', transform: 'shape', angles: 'shape', anglefacts: 'shape', missingangles: 'shape', '3d': 'shape',
   stats: 'data', charts: 'data', mean: 'data', linegraph: 'data',
@@ -56,9 +56,9 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   trace: 'tracing', tracenum: 'tracing',
   read: 'reading', tricky: 'reading', sentence: 'reading', capitals: 'reading',
   spelling: 'spelling', spellrules: 'spelling', plurals: 'spelling', suffix: 'spelling', 'suffix-root': 'spelling', prefix: 'spelling', 'prefix-not': 'spelling', wordlist: 'spelling', homophones: 'spelling',
-  contractions: 'spelling', 'spell-kn': 'spelling', 'spell-le': 'spelling', 'spell-dge': 'spelling', 'spell-c': 'spelling', 'spell-tion': 'spelling', 'spell-more': 'spelling', spellgap: 'spelling', cious: 'spelling', able: 'spelling', fer: 'spelling', silent: 'spelling', 'sure-ture': 'spelling', shun: 'spelling', origins: 'spelling', proofread: 'spelling',
+  contractions: 'spelling', 'spell-kn': 'spelling', 'spell-le': 'spelling', 'spell-dge': 'spelling', 'spell-c': 'spelling', 'spell-tion': 'spelling', 'spell-more': 'spelling', spellgap: 'spelling', cious: 'spelling', ant: 'spelling', able: 'spelling', fer: 'spelling', silent: 'spelling', 'sure-ture': 'spelling', shun: 'spelling', origins: 'spelling', proofread: 'spelling',
   punct: 'grammar', wordclass: 'grammar', sentencetype: 'grammar', tense: 'grammar', conjunction: 'grammar', conjunctions: 'grammar', perfect: 'grammar', speech: 'grammar', adverbials: 'grammar',
-  'plural-poss': 'grammar', relative: 'grammar', verbs: 'grammar', commas: 'grammar', modal: 'grammar', parenthesis: 'grammar', passive: 'grammar', clauses: 'grammar', lists: 'grammar', hyphen: 'grammar', subjectobject: 'grammar', an: 'grammar', standard: 'grammar',
+  'plural-poss': 'grammar', relative: 'grammar', verbs: 'grammar', verbprefix: 'grammar', commas: 'grammar', modal: 'grammar', parenthesis: 'grammar', passive: 'grammar', clauses: 'grammar', lists: 'grammar', hyphen: 'grammar', subjectobject: 'grammar', an: 'grammar', standard: 'grammar',
   formal: 'vocab', synonyms: 'vocab', consistency: 'grammar', factopinion: 'reading',
 };
 

@@ -2471,6 +2471,21 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'y3-line number line');
   });
 
+  test('y5-timetable: a five-stop timetable with a hidden time shows every row on a phone (#1216)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year5', 'y5-timetable');
+    const rows = [['Station', 585], ['Library', 600], ['Market', 615], ['Park', 625], ['School', 650]] as const;
+    const html = renderVisual({ type: 'chart', kind: 'table', rows: rows.map(([label, n]) => ({ label, n })), head: ['Stop', 'Time'], time: true, hide: 4 });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await expect(page.locator('#vis .chart-row')).toHaveCount(6);
+    await expect(page.locator('#vis .chart-row').nth(5)).toContainText('?');
+    // `.chart-row` is `display: contents`, so the boxes to measure are its cells.
+    for (const cell of await page.locator('#vis .chart-row > span').all()) await expect(cell).toBeInViewport({ ratio: 1 });
+    await expectFitsViewport(page, 'y5-timetable table');
+  });
+
   test('y3-angles: a four-line geometry drawing sits inside the question card on a short phone (#1075)', async ({ page }) => {
     await seedPreview(page);
     await seedPlayer(page);

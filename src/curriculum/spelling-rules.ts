@@ -12,6 +12,8 @@ export const REAL_LOOKALIKES: ReadonlySet<string> = new Set([
   'nock', 'nee', 'nome', 'nat', 'wrung', 'wist', 'ren', 'rap', 'ring', 'rite', 'right', 'no', 'new', 'night', 'not', 'nit', 'nose', 'nor', 'rote', 'doge', 'cadge',
   // real words met curating y5-cious (#1218): officious (meddling), specious (misleadingly plausible)
   'officious', 'specious',
+  // real words met curating y5-ant (#1219): confidant, decant, hesitance, dependant, pendant
+  'confidant', 'decant', 'hesitance', 'dependant', 'pendant',
   // real words met curating y2-spell-more (#1014): bawl, cawl (a dialect word), wont, woke, worm, worn, wonder
   'bawl', 'cawl', 'wont', 'woke', 'worm', 'worn', 'wonder',
 ]);
