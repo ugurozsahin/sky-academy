@@ -62,7 +62,7 @@ describe('y5-commas (#1227)', () => {
       const text = (c.visual as { text: string }).text, [p] = parse(text);
       expect(ALL).toContain(text);
       expect(c.answer).toBe(p.answer);
-      expect(c.prompt).toBe(`Which word does the comma go after? ${p.meaning}`);
+      expect(c.prompt).toBe(`Which word gets the comma? ${p.meaning}`);
       expect(wordsOf(text).filter(w => w === c.answer)).toHaveLength(1);
       for (const o of c.options.filter(o => o !== c.answer)) expect(wordsOf(text)).toContain(o);
     }
@@ -113,7 +113,7 @@ describe('y5-commas (#1227)', () => {
       for (const o of c.options) expect(o).toMatch(/^[A-Za-z']+$/);
       expect(c.visual?.type).toBe('sentence');
       expect(c.say).toContain((c.visual as { text: string }).text);
-      expect(c.say).toContain(c.prompt.replace('Which word does the comma go after? ', ''));
+      expect(c.say).toContain(c.prompt.replace('Which word gets the comma? ', ''));
     }
   });
 

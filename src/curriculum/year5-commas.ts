@@ -53,7 +53,7 @@ function decoys(rng: Rng, sentence: string, answer: string, near: boolean): stri
 
 function build(rng: Rng, d: Difficulty, sentence: string, answer: string, meaning: string, bubbles: number): Question {
   const ds = decoys(rng, sentence, answer, d === 3).slice(0, bubbles - 1);
-  return wordQ(rng, `Which word does the comma go after? ${meaning}`, answer, ds, {
+  return wordQ(rng, `Which word gets the comma? ${meaning}`, answer, ds, {
     visual: { type: 'sentence', text: sentence },
     say: `${meaning} ${sentence} Which word does the comma go after?`, hint: 'Say it aloud: where would you pause?', hintIsData: false,
   });
