@@ -29,6 +29,16 @@ function oracle(q: Question): string {
   throw new Error(`unrecognised prompt: ${q.prompt}`);
 }
 
+/** The two x labels a spoken difference question names, in order, with "at/in/on" and the spoken-hour form undone. */
+const SPOKEN_HOUR = /^(\w+) o'clock$/;
+const HOURS = ['eight', 'ten', 'twelve', 'fourteen', 'sixteen', 'eighteen'];
+function unspeak(w: string): string {
+  const h = SPOKEN_HOUR.exec(w);
+  if (h) return `${String(8 + 2 * HOURS.indexOf(h[1])).padStart(2, '0')}:00`;
+  const k = /^week (\w+)$/.exec(w);
+  return k ? `Wk ${['one', 'two', 'three', 'four', 'five', 'six'].indexOf(k[1]) + 1}` : w;
+}
+
 describe('y5-linegraph (#1215)', () => {
   it('is a Year 5 statistics topic', () => {
     expect(topic.year).toBe('year5');
@@ -42,6 +52,37 @@ describe('y5-linegraph (#1215)', () => {
         const q = topic.gen(d, r);
         expect(q.answer, q.prompt).toBe(oracle(q));
         expect(q.options, q.prompt).toContain(q.answer);
+      }
+    }
+  });
+
+  it('the spoken difference names the same two labels in the same order as the prompt', () => {
+    let seen = 0;
+    for (const d of [2, 3] as Difficulty[]) {
+      const r = rng(1215_400 + d);
+      for (let i = 0; i < DRAWS; i++) {
+        const q = topic.gen(d, r), m = q.prompt.match(/^(?:How much warmer at|How much taller in|How much more rain fell on|How many more visitors on) (.+) than (?:at |in |on )?(.+)\? \(.+\)$/);
+        if (!m) continue;
+        seen++;
+        const said = (q.say ?? '').match(/(?:warmer at|taller in|more rain fell on|more visitors on) (.+?) than (?:at |in |on )?(.+?)\?/);
+        expect(said, q.say).toBeTruthy();
+        expect([unspeak(said![1]), unspeak(said![2])], q.say).toEqual([m[1], m[2]]);
+      }
+    }
+    expect(seen).toBeGreaterThan(50);
+  });
+
+  it('every option is on the axis step grid, and no read card offers a value above the axis maximum', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1215_500 + d);
+      for (let i = 0; i < DRAWS; i++) {
+        const q = topic.gen(d, r), c = chart(q);
+        if (/^(?:When|Which day)/.test(q.prompt)) continue;
+        for (const o of q.options) {
+          expect(Number(o) % c.step, `${q.prompt} ${q.options}`).toBe(0);
+          expect(Number(o), `${q.prompt} ${q.options}`).toBeGreaterThanOrEqual(c.step);
+        }
+        if (d === 1) for (const o of q.options) expect(Number(o), `${q.prompt} ${q.options}`).toBeLessThanOrEqual(c.max);
       }
     }
   });
@@ -87,11 +128,15 @@ describe('y5-linegraph (#1215)', () => {
   });
 
   it('keeps the distractor leak within #1058\'s limit at every difficulty', () => {
+    // On a step-10 axis a two-digit answer is the only gridline with its leading digit (40 on an 80 axis), so no on-grid decoy can share it:
+    // that bank is measured on the last digit alone; the step-2 and step-5 banks are measured on both.
+    const fine = (d: Difficulty, r: () => number): Question => { let q: Question; do q = topic.gen(d, r); while (chart(q).step === 10); return q; };
     for (const d of [1, 2, 3] as Difficulty[]) {
-      const s = leakShares(topic.gen, d);
-      if (s.counted < 100) continue;
-      expect(s.units, `d${d} last digit`).toBeLessThanOrEqual(0.3);
-      expect(s.leading, `d${d} leading digit`).toBeLessThanOrEqual(0.3);
+      const all = leakShares(topic.gen, d), sub = leakShares(fine, d);
+      expect(all.counted, `d${d} counted`).toBeGreaterThan(100);
+      expect(all.units, `d${d} last digit`).toBeLessThanOrEqual(0.3);
+      expect(sub.counted, `d${d} fine counted`).toBeGreaterThan(100);
+      expect(sub.leading, `d${d} leading digit (steps 2 and 5)`).toBeLessThanOrEqual(0.3);
     }
   });
 });
