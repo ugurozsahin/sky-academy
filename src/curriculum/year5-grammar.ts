@@ -1,6 +1,6 @@
 // Year 5 grammar strand (#1177). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year5-<slug>.ts` and this file keeps only its row/import.
-// import: y5-verbs
+import { y5Verbs } from './year5-verbs';
 // import: y5-verbprefix
 import { y5Relative } from './year5-relative';
 import { y5Modal } from './year5-modal';
@@ -12,7 +12,7 @@ import { y5Parenthesis } from './year5-parenthesis';
 import type { Topic } from './types';
 
 export const Y5_GRAMMAR: Topic[] = [
-  // slot: y5-verbs
+  { id: 'y5-verbs', title: 'Making verbs: -ate, -ise, -ify', icon: '✏️', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: converting nouns or adjectives into verbs using suffixes (-ate, -ise, -ify)', gen: y5Verbs },
 
   // slot: y5-verbprefix
 
