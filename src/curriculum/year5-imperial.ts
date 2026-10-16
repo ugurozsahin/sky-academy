@@ -19,7 +19,8 @@ const EQS: Eq[] = [
 
 const lab = (e: Eq, which: 'a' | 'b', n: number) => which === 'b' || e.a === 'in' || e.a === 'kg' ? e[which] : n === 1 ? e.aOne : e.aMany;
 const spoken = (e: Eq, which: 'a' | 'b', n: number) => (which === 'a' ? (n === 1 ? e.aOne : e.aMany) : (n === 1 ? e.bOne : e.bMany));
-const HINT = (e: Eq) => `About ${fmt(dec(e.f10, 1))} ${e.b} to one ${e.aOne}`;
+const HINT_FWD = 'Multiply to change into the smaller unit, divide to change into the bigger one';
+const HINT_CMP = 'Change one amount into the other\'s unit, then compare';
 
 /** Whole when the answer is 10 or more, otherwise one decimal place. */
 function round(x: number, whole: boolean): Dec {
@@ -51,21 +52,21 @@ function convert(rng: Rng, e: Eq, k: number, forward: boolean): Question {
   const ds = decoys(src, answer, exact, whole, forward, e.f10 / 10, others);
   const fromS = fmt(round(src, src >= 10)), prompt = `${fromS} ${lab(e, fromW, src)} is about ? ${lab(e, toW, ans)}`;
   const say = ks2Say(`About how many ${spoken(e, toW, 2)} is ${fromS} ${spoken(e, fromW, src)}?`);
-  return wordQ(rng, prompt, fmt(answer), ds, { say, hint: HINT(e), hintIsData: false });
+  return wordQ(rng, prompt, fmt(answer), ds, { say, hint: HINT_FWD, hintIsData: false });
 }
 
 /** Imperial amount against a metric one: the larger is at least 25 % more than the smaller, judged on the exact conversion. */
-interface Cmp { word: string; ask: string; imp: (n: number) => string; met: (n: number) => string; impW: (n: number) => string; metW: (n: number) => string; ns: number[]; toMetric: (n: number) => number; nice: (x: number) => number; hint: string }
+interface Cmp { word: string; ask: string; imp: (n: number) => string; met: (n: number) => string; impW: (n: number) => string; metW: (n: number) => string; ns: number[]; toMetric: (n: number) => number; nice: (x: number) => number }
 const plural = (n: number, one: string, many: string) => `${fmt(dec(n, 0))} ${n === 1 ? one : many}`;
 const CMPS: Cmp[] = [
   { word: 'longer', ask: 'Which is longer?', imp: n => `${n} in`, met: n => `${fmt(dec(n, 0))} cm`, impW: n => plural(n, 'inch', 'inches'), metW: n => plural(n, 'centimetre', 'centimetres'),
-    ns: [1, 2, 3, 4, 6, 8, 10, 12], toMetric: n => n * 2.54, nice: x => Math.max(1, Math.round(x)), hint: 'About 2.5 cm to one inch' },
+    ns: [1, 2, 3, 4, 6, 8, 10, 12], toMetric: n => n * 2.54, nice: x => Math.max(1, Math.round(x)) },
   { word: 'longer', ask: 'Which is longer?', imp: n => `${n} ${n === 1 ? 'foot' : 'feet'}`, met: n => `${fmt(dec(n, 0))} cm`, impW: n => plural(n, 'foot', 'feet'), metW: n => plural(n, 'centimetre', 'centimetres'),
-    ns: [1, 2, 3, 4, 5], toMetric: n => n * 30.48, nice: x => Math.max(10, Math.round(x / 10) * 10), hint: 'About 30 cm to one foot' },
+    ns: [1, 2, 3, 4, 5], toMetric: n => n * 30.48, nice: x => Math.max(10, Math.round(x / 10) * 10) },
   { word: 'heavier', ask: 'Which is heavier?', imp: n => `${n} lb`, met: n => `${n} kg`, impW: n => plural(n, 'pound', 'pounds'), metW: n => plural(n, 'kilogram', 'kilograms'),
-    ns: [3, 4, 5, 6, 8, 10, 12], toMetric: n => n / 2.2046, nice: x => Math.max(1, Math.round(x)), hint: 'About 2.2 lb to one kg' },
+    ns: [3, 4, 5, 6, 8, 10, 12], toMetric: n => n / 2.2046, nice: x => Math.max(1, Math.round(x)) },
   { word: 'more', ask: 'Which is more?', imp: n => `${n} ${n === 1 ? 'pint' : 'pints'}`, met: n => `${fmt(dec(n, 0))} ml`, impW: n => plural(n, 'pint', 'pints'), metW: n => plural(n, 'millilitre', 'millilitres'),
-    ns: [1, 2, 3, 4, 5], toMetric: n => n * 568.26, nice: x => Math.max(100, Math.round(x / 100) * 100), hint: 'About 570 ml to one pint' },
+    ns: [1, 2, 3, 4, 5], toMetric: n => n * 568.26, nice: x => Math.max(100, Math.round(x / 100) * 100) },
 ];
 
 function compare(rng: Rng): Question {
@@ -75,7 +76,7 @@ function compare(rng: Rng): Question {
     if (Math.max(exactImp, m) < 1.25 * Math.min(exactImp, m)) continue;
     const impBig = exactImp > m, big = impBig ? c.imp(n) : c.met(m), small = impBig ? c.met(m) : c.imp(n);
     const say = ks2Say(`${c.ask.slice(0, -1)}, ${c.impW(n)} or ${c.metW(m)}?`);
-    return wordQ(rng, c.ask, big, [small], { say, hint: c.hint, hintIsData: false });
+    return wordQ(rng, c.ask, big, [small], { say, hint: HINT_CMP, hintIsData: false });
   }
   throw new Error('y5-imperial: no comparison with a 25 % margin found');
 }
