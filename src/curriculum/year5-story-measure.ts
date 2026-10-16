@@ -63,7 +63,7 @@ const recipe = (rng: Rng): Draw => {
 };
 const kgPlusG = (rng: Rng): Draw => {
   const a = pick(rng, [3, 5, 7, 12, 15, 25]), g = pick(rng, [150, 250, 350, 450, 50]), ans = whole(a * 100 + g);
-  return { text: f => `${f.q(tenths(a))} kg + ${g} g = ? g`, answer: ans, cands: [small(ans), whole(a + g), shift(ans), whole(a * 10 + g)] };
+  return { text: f => `How many grams is ${f.q(tenths(a))} kg + ${g} g?`, answer: ans, cands: [small(ans), whole(a + g), shift(ans), whole(a * 10 + g)] };
 };
 const change = (rng: Rng): Draw => {
   const n = ri(rng, 2, 4), P = price(rng, 120, 290), note = pick(rng, [10, 20].filter(x => x * 100 > n * P.v + 100)), total = mulDecByInt(P, n), N = dec(note * 100, 2), ans = subDec(N, total);

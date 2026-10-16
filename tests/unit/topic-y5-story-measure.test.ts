@@ -32,7 +32,7 @@ const ORACLE: Array<{ re: RegExp; ans: (m: RegExpExecArray) => string }> = [
   { re: new RegExp(`^${N} litres is shared equally into (\\d+) bottles`), ans: m => trim(out(T(m[1]) / Number(m[2]), 1)) },
   { re: new RegExp(`^(\\d+) pens cost ${M} in all`), ans: m => out(P(m[2]) / Number(m[1]), 2, true) },
   { re: /^A recipe for (\d+) uses (\d+) g of \w+\. How many grams for (\d+)\?/, ans: m => grp((Number(m[2]) / Number(m[1])) * Number(m[3])) },
-  { re: new RegExp(`^${N} kg \\+ (\\d+) g = \\? g`), ans: m => grp(T(m[1]) * 100 + Number(m[2])) },
+  { re: new RegExp(`^How many grams is ${N} kg \\+ (\\d+) g\\?`), ans: m => grp(T(m[1]) * 100 + Number(m[2])) },
   { re: new RegExp(`^(\\d+) \\w+ cost ${M} each\\. How much change from £(\\d+)\\.00\\?`), ans: m => out(Number(m[3]) * 100 - Number(m[1]) * P(m[2]), 2, true) },
   { re: new RegExp(`^A jug holds ${N} litres\\. (\\d+) cups of ${N} litres`), ans: m => trim(out(T(m[1]) - Number(m[2]) * T(m[3]), 1)) },
   { re: new RegExp(`^(\\d+) apples cost ${M}\\. How much do (\\d+) apples cost\\?`), ans: m => out((P(m[2]) / Number(m[1])) * Number(m[3]), 2, true) },
@@ -71,6 +71,14 @@ describe('y5-story-measure (#1207)', () => {
       expect(q.say!, q.prompt).not.toMatch(/\d\.\d+ pounds/); expect(q.say!).not.toContain('£');
       expect(sayIsSafe(q.say!), q.say).toBe(true);
       for (const o of q.options) expect(o).not.toMatch(/^−|^0\.0*$/);
+    }
+  });
+
+  it('no spoken line ends in a bare single-letter unit, and d3 cards are slow (#1207 review)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
+      expect(q.say!, q.prompt).not.toMatch(/(^|\s)[a-z]\s*[?.]?$/i);
+      expect(q.say!, q.prompt).not.toMatch(/equals what/);
+      expect(!!q.slow, q.prompt).toBe(d === 3);
     }
   });
 
