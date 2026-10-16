@@ -11,7 +11,7 @@ import { y5X10 } from './year5-x10';
 import { y5Squares } from './year5-squares';
 import { y5Equals } from './year5-equals';
 import { y5StoryMd } from './year5-story-md';
-// import: y5-truefalse
+import { y5TrueFalse } from './year5-truefalse';
 import type { Topic } from './types';
 import { y5Column } from './year5-column';
 
@@ -40,5 +40,5 @@ export const Y5_CALC: Topic[] = [
 
   { id: 'y5-story-md', title: 'Scaling and Rates Problems', icon: '📰', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 M&D: scaling by simple fractions, simple rates (5M21)', gen: y5StoryMd },
 
-  // slot: y5-truefalse
+  { id: 'y5-truefalse', title: 'True or false?', icon: '✅', subject: 'maths', year: 'year5', strand: 'calc', nc: 'Y5 aims: reason mathematically; multiples, factors, primes, squares and cubes (5M11–13, 5M18)', gen: y5TrueFalse },
 ];
