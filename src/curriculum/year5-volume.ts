@@ -44,14 +44,14 @@ const rect = (rng: Rng, max: number): Grid => { for (;;) { const g = fill(ri(rng
 /** Everyday containers and their sensible capacity in ml. Every wrong size offered is at least ×10 or ÷10 away. */
 export const CAPACITY: readonly [string, number][] = [
   ['a mug', 300], ['a teaspoon', 5], ['a bucket', 10000], ['a bath', 150000], ['a water bottle', 500], ['a fish tank', 60000],
-  ['a kettle', 1500], ['a yoghurt pot', 150], ['a swimming pool', 25000000], ['a bottle of medicine', 100], ['a watering can', 8000], ['a juice carton', 1000],
+  ['a kettle', 1500], ['a yoghurt pot', 150], ['a saucepan', 2000], ['a bottle of medicine', 100], ['a watering can', 8000], ['a juice carton', 1000],
 ];
 const grouped = (n: number) => String(n).replace(/\B(?=(\d{3})+$)/g, ',');   // four digits or more take commas (#1047)
 export const capLabel = (ml: number): string => (ml < 1000 ? `${ml} ml` : `${grouped(ml / 1000)} l`);
 
 function capacity(rng: Rng): Question {
   const [thing, ml] = pick(rng, CAPACITY);
-  const slips = [ml * 10, ml / 10, ml * 100, ml / 100, ml * 1000].filter(v => Number.isInteger(v) && v >= 1 && (v < 1000 || v % 100 === 0));
+  const slips = [ml * 10, ml / 10, ml * 100, ml / 100, ml * 1000].filter(v => Number.isInteger(v) && v >= 1 && (v < 1000 || v % 100 === 0) && capLabel(v).length <= 7);   // a long label spills out of its bubble
   const ds = shuffle(rng, slips).slice(0, 3);
   return wordQ(rng, `About how much does ${thing} hold?`, capLabel(ml), ds.map(capLabel), { say: `About how much does ${thing} hold?`, hint: 'Think of a real one. Is it a sip, a mug, a bucket or a bath?', hintIsData: false });
 }
