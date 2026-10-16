@@ -49,7 +49,7 @@ export const BANK: Template[][] = [
     { text: 'Three quarters of a # km trail has been walked. How far?', draw: r => share(r, 4, 3, [12, 15, 18, 25, 30, 40, 50, 60, 75]) },
     { text: '# kg cost £#. How much do # kg cost?', money: true, draw: r => rate3(r, [2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 8, 9], [7, 8, 9, 10, 12, 15]) },
     { text: 'Three fifths of # sweets are red. How many are red?', draw: r => share(r, 5, 3, [12, 15, 18, 20, 24, 30, 40, 50, 60]) },
-    { text: 'A train goes # km in # hours. How far in # hours?', draw: r => rate3(r, [2, 3, 4, 5], [40, 45, 50, 60, 75, 80], [7, 8, 9, 10, 12]) },
+    { text: 'A train takes # hours to go # km. How far in # hours?', draw: r => rate3(r, [2, 3, 4, 5], [40, 45, 50, 60, 75, 80], [7, 8, 9, 10, 12]) },
   ],
 ];
 export const MAX = 90;

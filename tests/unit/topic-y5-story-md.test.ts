@@ -27,7 +27,7 @@ const ORACLE: Record<string, (v: number[], text: string) => [number, number]> = 
   '# tickets cost £#. What does 1 ticket cost?': v => [v[1] / v[0], v[1] / v[0]],
   'A runner covers # km in # hours. How far in 1 hour?': v => [v[0] / v[1], v[0] / v[1]],
   '# kg cost £#. How much do # kg cost?': v => [v[1] / v[0] * v[2], v[1] / v[0]],
-  'A train goes # km in # hours. How far in # hours?': v => [v[1] / v[0] * v[2], v[1] / v[0]],
+  'A train takes # hours to go # km. How far in # hours?': v => [v[1] / v[0] * v[2], v[1] / v[0]],
 };
 for (const [text, word] of [['A model is a tenth of the height of a # m tower. How tall is it?', 'tenth'], ['A drawing is a quarter of the width of a # cm poster. How wide is it?', 'quarter'],
   ['Three quarters of a # km trail has been walked. How far?', 'Three quarters'], ['Three fifths of # sweets are red. How many are red?', 'Three fifths']] as const) {
@@ -62,6 +62,25 @@ describe('y5-story-md (#1193)', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d, 300)) {
       expect(q.options).toHaveLength(4); expect(new Set(q.options).size).toBe(4);
       for (const o of q.options) { expect(num(o)).toBeGreaterThanOrEqual(1); expect(num(o)).toBeLessThanOrEqual(10000); }
+    }
+  });
+
+  it('the story reads right: each number sits beside its own unit (#1897 round 1)', () => {
+    const by = (prompt: string, re: RegExp) => { const m = prompt.match(re); return m ? Number(m[1].replace(/,/g, '')) : NaN; };
+    const SPEED: [RegExp, RegExp, number, number][] = [
+      [/A train takes (\d[\d,]*) hours to go/, /to go (\d[\d,]*) km/, 40, 80],   // km an hour
+      [/A runner covers (\d[\d,]*) km/, /in (\d[\d,]*) hours/, 6, 14],
+      [/A car uses (\d[\d,]*) litres/, /to go (\d[\d,]*) km/, 12, 25],
+    ];
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d, 400)) {
+      if (q.prompt.includes('train')) expect(q.prompt, 'the hours come first').toMatch(/^A train takes \d+ hours to go [\d,]+ km\. How far in \d+ hours\?$/);
+      for (const [a, b, lo, hi] of SPEED) {
+        if (!a.test(q.prompt)) continue;
+        const x = by(q.prompt, a), y = by(q.prompt, b), per = a.source.includes('hours') && a.source.includes('train') ? y / x : a.source.includes('runner') ? x / y : y / x;
+        expect(per, q.prompt).toBeGreaterThanOrEqual(lo); expect(per, q.prompt).toBeLessThanOrEqual(hi);
+      }
+      const kg = q.prompt.match(/^(\d+) kg cost £(\d+)\./);
+      if (kg) expect(Number(kg[2]) / Number(kg[1]), q.prompt).toBeGreaterThanOrEqual(2);
     }
   });
 
