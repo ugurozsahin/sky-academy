@@ -6,7 +6,7 @@ import { y5Relative } from './year5-relative';
 import { y5Modal } from './year5-modal';
 // import: y5-parenthesis
 import { y5Commas } from './year5-commas';
-// import: y5-cohesion
+import { y5Cohesion } from './year5-cohesion';
 // import: y5-perfect
 import { y5Parenthesis } from './year5-parenthesis';
 import type { Topic } from './types';
@@ -24,7 +24,7 @@ export const Y5_GRAMMAR: Topic[] = [
 
   { id: 'y5-commas', title: 'Commas for clear meaning', icon: '✍️', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Punctuation: commas to clarify meaning or avoid ambiguity', gen: y5Commas },
 
-  // slot: y5-cohesion
+  { id: 'y5-cohesion', title: 'Cohesion: linking adverbials', icon: '🧭', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: linking ideas across paragraphs with adverbials of time, place and number', gen: y5Cohesion },
 
   // slot: y5-perfect
 ];
