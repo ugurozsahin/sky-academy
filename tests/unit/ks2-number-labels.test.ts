@@ -318,7 +318,8 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
           // A year-label topic's own answer IS the year for that draw — named explicitly (review round 2:
           // a blanket years flag can't tell the real year from a coincidental in-range number sharing the
           // same label), best-effort until a real topic lands and fixes its actual answer shape.
-          const years = isYearTopic && /^\d+$/.test(q.answer) ? [Number(q.answer)] : undefined;
+          // A year topic's decoys are years too (#1181: "a year answer and its decoys use the year format"), named the same way.
+          const years = isYearTopic && /^\d+$/.test(q.answer) ? [q.answer, ...q.options].filter(o => /^\d+$/.test(o)).map(Number) : undefined;
           // An any-order card's `answer` is its targets joined by a comma (any-order.ts), which the grouping check would read as one number: check each target instead.
           for (const label of [q.prompt, ...(q.anyOrder ? q.sequence! : [q.answer]), ...q.options]) {
             expect(labelProblems(label, { years }), `${t.id} d${d}: "${label}"`).toEqual([]);
