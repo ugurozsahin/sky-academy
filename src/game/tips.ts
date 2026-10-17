@@ -59,7 +59,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   contractions: 'spelling', 'spell-kn': 'spelling', 'spell-le': 'spelling', 'spell-dge': 'spelling', 'spell-c': 'spelling', 'spell-tion': 'spelling', 'spell-more': 'spelling', spellgap: 'spelling', cious: 'spelling', ant: 'spelling', able: 'spelling', fer: 'spelling', silent: 'spelling', 'sure-ture': 'spelling', shun: 'spelling', origins: 'spelling', proofread: 'spelling',
   punct: 'grammar', wordclass: 'grammar', sentencetype: 'grammar', tense: 'grammar', conjunction: 'grammar', conjunctions: 'grammar', perfect: 'grammar', speech: 'grammar', adverbials: 'grammar',
   'plural-poss': 'grammar', relative: 'grammar', verbs: 'grammar', verbprefix: 'grammar', commas: 'grammar', modal: 'grammar', parenthesis: 'grammar', passive: 'grammar', clauses: 'grammar', lists: 'grammar', hyphen: 'grammar', subjectobject: 'grammar', an: 'grammar', standard: 'grammar',
-  formal: 'vocab', synonyms: 'vocab', consistency: 'grammar', factopinion: 'reading',
+  formal: 'vocab', synonyms: 'vocab', consistency: 'grammar', factopinion: 'reading', figurative: 'reading',
 };
 
 /** The help-at-home line for a topic id, or `null` when its family has none. */
