@@ -30,6 +30,7 @@ import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEnt
 import { subjectPool, subjectTopics } from '../game/pools';
 import { strandPools } from '../game/strand-pools';
 import { $, $$, capDigits, esc, render } from './dom';
+import { DAILY_TEN_TITLE, dailyTenDeck, dailyTenPool } from '../game/daily-ten';
 import { recordLines } from './my-record';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
@@ -244,10 +245,21 @@ const dailySprintRow = (nav: Nav, year: YearInfo): MenuRow[] => {
     blurb: 'Same 60 seconds for everyone today', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Daily Sprint', seed: dailySprintSeed(today(), year.id) }) }];
 };
 
+/** Daily Ten (#1296): ten maths questions from this island, easy to hard — only while Whiteboard mode is on (#949). No lives; as a guest session it saves nothing. */
+const dailyTenRows = (nav: Nav, year: YearInfo): MenuRow[] => {
+  const topics = topicsFor(year.id);
+  if (!isWhiteboard() || !dailyTenPool(topics).length) return [];
+  const play = (mode: 'relaxed' | 'sprint') => () => nav.play({ year, mode, deck: dailyTenDeck(topics, Math.random), title: DAILY_TEN_TITLE });
+  return [
+    { id: 'daily10', mod: '', vport: '<span class="vport emoji">🔟</span>', title: 'Daily Ten', blurb: 'Ten questions, no clock', go: play('relaxed') },
+    { id: 'daily10t', mod: '', vport: '<span class="vport emoji">⏱️</span>', title: 'Daily Ten · 60 seconds', blurb: 'Ten questions against the clock', go: play('sprint') },
+  ];
+};
+
 /** The island menu's rows that come between Sky Storm and Ninja Sprint: Legend, Tables Check (twice), Arithmetic practice, Arithmetic Sprint, Grammar mix, Daily Sprint (#924). */
 const deckRows = (nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>): MenuRow[] =>
   [...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year),
-    ...arithmeticRow(nav, year), ...grammarRow(nav, year), ...dailySprintRow(nav, year)];
+    ...arithmeticRow(nav, year), ...grammarRow(nav, year), ...dailySprintRow(nav, year), ...dailyTenRows(nav, year)];
 
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
