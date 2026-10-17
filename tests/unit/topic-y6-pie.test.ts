@@ -38,6 +38,14 @@ describe('y6-pie (#1239)', () => {
     }
   });
 
+  it('d1: the answer\'s slice beats the runner-up by at least 15 degrees, so it can be judged by eye', () => {
+    for (const q of draw(1)) {
+      const ns = slices(q).map(x => x.n), total = ns.reduce((a, b) => a + b, 0), asc = [...ns].sort((a, b) => a - b);
+      const gap = q.prompt.endsWith('most?') ? asc[3] - asc[2] : asc[1] - asc[0];
+      expect(gap / total * 360, `${q.prompt} ${ns}`).toBeGreaterThanOrEqual(15);
+    }
+  });
+
   it('d2 oracle: the answer is the named slice over the total, in its simplest form, and no option equals it by value', () => {
     for (const q of draw(2)) {
       const s = slices(q), name = /chose (\w+)\?/.exec(q.prompt)![1], total = s.reduce((a, x) => a + x.n, 0);

@@ -19,6 +19,8 @@ const SPLITS: readonly (readonly [number, readonly number[]])[] = [
   [6, [3, 2, 1]], [6, [3, 1, 1, 1]], [6, [2, 2, 1, 1]], [8, [4, 2, 1, 1]], [8, [3, 3, 2]], [8, [4, 3, 1]], [8, [5, 2, 1]],
   [10, [5, 3, 2]], [10, [5, 2, 2, 1]], [10, [4, 3, 2, 1]],
 ];
+/** d1: the smallest angle between the answer's slice and the next-closest one. */
+export const MIN_GAP_DEG = 15;
 const TOTALS = [12, 24, 36, 40, 60, 72, 100, 120];
 const FILLER: readonly Frac[] = [[1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 8], [1, 10], [3, 4], [2, 3], [3, 8], [3, 10]].map(([n, d]) => ({ n, d }));
 
@@ -34,6 +36,9 @@ function extreme(rng: Rng): Question {
     const ns = shuffle(rng, Array.from({ length: 12 }, (_, i) => i + 3)).slice(0, 4), total = ns.reduce((a, b) => a + b, 0);
     if (Math.min(...ns) * 12 < total) continue;
     const labels = shuffle(rng, pick(rng, THEMES)).slice(0, 4), most = rng() < 0.5;
+    // No numbers sit on the chart, so the winner must beat the runner-up by at least 15 degrees to be judged by eye.
+    const asc = [...ns].sort((a, b) => a - b), gap = most ? asc[3] - asc[2] : asc[1] - asc[0];
+    if (gap / total * 360 < MIN_GAP_DEG) continue;
     const hit = ns.indexOf(most ? Math.max(...ns) : Math.min(...ns));
     const word = most ? 'most' : 'least';
     return wordQ(rng, `Which was chosen ${word}?`, labels[hit], labels, {
