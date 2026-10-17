@@ -1,6 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { arithmeticPool, grammarPool, offeredPool } from '../game/sprint-pools';
-import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint';
+import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint'; import { sprintSeed } from '../game/challenge-run';
 import { mtcDeck } from '../game/mtc';
 import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
@@ -77,7 +77,7 @@ const racePill = (t: Topic): string => {
 function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', mode: 'sprint' | 'relaxed', pool: Topic[], progress: Record<string, TopicProgress>) {
   openChooser($('#island-overlay'), chooserTopics(year.id, subject), topic => {
     sfx.tap();
-    topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
+    topic ? nav.play({ year, mode, topic, seed: mode === 'sprint' ? sprintSeed(topic) : undefined }) : playMixed(nav, year, mode, pool, progress);
   }, { mixed: true, badge: t => trophyBadge(year, progress)(t) + (mode === 'sprint' ? racePill(t) : '') });
 }
 /** #1071/#1072: Boss Battle opens the chooser on an island with strands or table drills
