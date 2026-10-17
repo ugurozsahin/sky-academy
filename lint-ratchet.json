@@ -24,7 +24,6 @@
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/three/sketchbook/view.ts::createView": 81,
     "src/ui/duel.ts::duelScreen": 201,
     "src/ui/home.ts::islandScreen": 65,
     "src/ui/memory.ts::memoryScreen": 84,
