@@ -287,6 +287,25 @@ export interface BubblePlan { label: string; x: number; vx: number; vy: number; 
 /** A laid-out wave: the values the arena keeps for itself, plus one plan per bubble in launch order. */
 export interface WavePlan { r: number; waveT: number; batchSpan: number; perBatch: number; batchGap: number; stagger: number; bubbles: BubblePlan[] }
 
+interface FlightGeom { W: number; H: number; r: number; apexMin: number; usable: number; T: number; speedK: number }
+
+/** One bubble's x, arc and look; the `rng` calls keep the order layoutWave always made them in. */
+function planBubble(p: { label: string; k: number; idx: number; size: number; perBatch: number; launchAt: number }, g: FlightGeom, rng: Rng): BubblePlan {
+  const { W, H, r, apexMin, usable, T, speedK } = g;
+  const margin = r + 8, span = W - margin * 2;
+  // spread x across the width in shuffled slots so bubbles don't overlap; a full row uses the whole span edge to edge
+  const full = p.size >= p.perBatch && p.size > 1;
+  const slot = full ? p.idx / (p.size - 1) : (p.idx + 0.5) / p.size;
+  const x = margin + span * Math.min(1, Math.max(0, slot + (rng() - 0.5) * ((full ? 0.25 : 0.6) / p.size)));
+  const h = H + r - (apexMin + usable * (0.05 + rng() * 0.45)), tUp = T / 2, grav = 2 * h / (tUp * tUp);
+  const vy = -Math.sqrt(2 * grav * h);
+  // #138: `* speedK` is what makes fast mode a pure time compression. vx is px/SECOND and the flight lasts
+  // T/k seconds, so an unscaled vx drifts the bubble 1/k of the way across — a path no child ever sees.
+  // Scaling it keeps the whole trajectory identical at any speed: same apex, same landing x, less time.
+  const vx = ((W / 2 - x) / W) * 30 * (rng() * 0.6 + 0.4) * speedK;
+  return { label: p.label, x, vx, vy, g: grav, launchAt: p.launchAt, color: PALETTE[(p.k * 3 + Math.floor(rng() * 3)) % PALETTE.length], wobble: rng() * Math.PI * 2 };
+}
+
 /**
  * Lay out one wave (#43). Every number spawnWave used to compute inline lives here, and nothing here touches
  * a canvas, a clock or `Math.random` — `now` and `rng` are arguments — so the batch layout, the arcs and the
@@ -297,12 +316,10 @@ export interface WavePlan { r: number; waveT: number; batchSpan: number; perBatc
  */
 export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: number, rng: Rng): WavePlan {
   const { W, H, topInset } = geom;
-  const n = o.labels.length;
-  let r = waveRadius(W, H, !!o.wide, n);
-  const T = (o.speed === 0 ? 7.5 : o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
-  const apexMin = topInset + r + 10;
-  const usable = H - apexMin - r;
-  const stagger = (o.speed === 0 ? 500 : o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260) / speedK;
+  const n = o.labels.length, r = waveRadius(W, H, !!o.wide, n);
+  const T = ([7.5, 5.6, 4.4][o.speed] ?? 3.4) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
+  const apexMin = topInset + r + 10, usable = H - apexMin - r;
+  const stagger = ([500, 420, 330][o.speed] ?? 260) / speedK;
   // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
   // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
   // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:
@@ -310,27 +327,10 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
   const perBatch = Math.max(3, Math.min(o.ordered?.length ? 4 : n, Math.floor((W - 16) / (2 * r + 10))));
   const batchGap = T * 1000 * (perBatch < n && perBatch <= 4 ? 0.8 : 0.62);   // narrow screens: the row is mostly down before the next rises
   const order = o.ordered?.length ? dealOrdered(o.labels, o.ordered, perBatch, rng) : shuffle(rng, o.labels.map((_, i) => i));
-  const margin = r + 8;
-  const span = W - margin * 2;
   const bubbles: BubblePlan[] = [];
   for (let k = 0; k < n; k++) {
-    const i = order[k];
     const batch = Math.floor(k / perBatch), idx = k % perBatch, size = Math.min(perBatch, n - batch * perBatch);
-    // spread x across the width in shuffled slots so bubbles don't overlap; a full row uses the whole span edge to edge
-    const full = size >= perBatch && size > 1;
-    const slot = full ? idx / (size - 1) : (idx + 0.5) / size;
-    const x = margin + span * Math.min(1, Math.max(0, slot + (rng() - 0.5) * ((full ? 0.25 : 0.6) / size)));
-    const apexY = apexMin + usable * (0.05 + rng() * 0.45);
-    const h = H + r - apexY;
-    const tUp = T / 2;
-    const g = 2 * h / (tUp * tUp);
-    const vy = -Math.sqrt(2 * g * h);
-    // #138: `* speedK` is what makes fast mode a pure time compression. vx is px/SECOND and the flight lasts
-    // T/k seconds, so an unscaled vx drifts the bubble 1/k of the way across — a path no child ever sees.
-    // Scaling it keeps the whole trajectory identical at any speed: same apex, same landing x, less time.
-    const vx = ((W / 2 - x) / W) * 30 * (rng() * 0.6 + 0.4) * speedK;
-    const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
-    bubbles.push({ label: o.labels[i], x, vx, vy, g, launchAt, color: PALETTE[(k * 3 + Math.floor(rng() * 3)) % PALETTE.length], wobble: rng() * Math.PI * 2 });
+    bubbles.push(planBubble({ label: o.labels[order[k]], k, idx, size, perBatch, launchAt: now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1) }, { W, H, r, apexMin, usable, T, speedK }, rng));
   }
   return { r, waveT: T * 1000, batchSpan: perBatch * stagger, perBatch, batchGap, stagger, bubbles };
 }
