@@ -29,7 +29,7 @@ import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEnt
 import { subjectPool, subjectTopics } from '../game/pools';
 import { strandPools } from '../game/strand-pools';
 import { $, $$, capDigits, render } from './dom';
-import { dailyTenDeck, dailyTenPool } from '../game/daily-ten';
+import { DAILY_TEN_TITLE, dailyTenDeck, dailyTenPool } from '../game/daily-ten';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
 
@@ -241,7 +241,7 @@ const dailySprintRow = (nav: Nav, year: YearInfo): MenuRow[] => {
 const dailyTenRows = (nav: Nav, year: YearInfo): MenuRow[] => {
   const topics = topicsFor(year.id);
   if (!isWhiteboard() || !dailyTenPool(topics).length) return [];
-  const play = (mode: 'relaxed' | 'sprint') => () => nav.play({ year, mode, deck: dailyTenDeck(topics, Math.random), title: 'Daily Ten' });
+  const play = (mode: 'relaxed' | 'sprint') => () => nav.play({ year, mode, deck: dailyTenDeck(topics, Math.random), title: DAILY_TEN_TITLE });
   return [
     { id: 'daily10', mod: '', vport: '<span class="vport emoji">🔟</span>', title: 'Daily Ten', blurb: 'Ten questions, no clock', go: play('relaxed') },
     { id: 'daily10t', mod: '', vport: '<span class="vport emoji">⏱️</span>', title: 'Daily Ten · 60 seconds', blurb: 'Ten questions against the clock', go: play('sprint') },

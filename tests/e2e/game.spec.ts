@@ -1028,6 +1028,27 @@ test.describe('Sky Ninja Academy', () => {
     expect(await keys(), 'localStorage is byte-identical').toBe(before);
   });
 
+  test('Daily Ten (#1296): the 60-second variant ends after ten cards, and Play again deals a fresh ten-card deck', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { voice: 'no' });
+    await openGrownUps(page);
+    await page.click('#whiteboard-start');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="year2"]');
+    await page.click('#daily10t');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => window.__sna.session.o.deck?.length), 'a ten-card deck').toBe(10);
+    for (let i = 0; i < 10; i++) await solveCurrent(page);
+    await page.waitForFunction(() => window.__sna.state().ended);
+    expect(await page.evaluate(() => window.__sna.session.questionsAsked as number)).toBe(10);
+    expect(await page.evaluate(() => window.__sna.state().timeLeft), 'ended with the clock still running').toBeGreaterThan(0);
+    await page.click('#again');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => window.__sna.session.o.deck?.length), 'Play again deals a ten-card deck too').toBe(10);
+    expect(await page.evaluate(() => window.__sna.session.questionsAsked as number), 'a new run, on its first card').toBeLessThanOrEqual(1);
+  });
+
   test('Daily Ten (#1296): outside Whiteboard mode the island menu has no Daily Ten rows', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year2"]');
