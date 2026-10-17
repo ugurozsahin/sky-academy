@@ -103,7 +103,7 @@ const MULTI_LETTER_UNITS = new Set(['cm²', 'm²', 'km²', 'mm²', 'cm³', 'm³'
 const SINGLE_LETTER_UNITS = new Set(['m', 'g', 'l']);
 const singleLetterUnitOK = (text: string, start: number): boolean => /[0-9] ?$/.test(text.slice(0, start));
 
-type TokKind = 'text' | 'digit' | 'dimension' | 'compound' | 'power' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'money' | 'malformed' | 'unit' | 'roman';
+export type TokKind = 'text' | 'digit' | 'dimension' | 'compound' | 'power' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'money' | 'malformed' | 'unit' | 'roman';
 /** Numerals the caller declares (whole canonical numerals only — see the header). */
 export interface Ks2SayOpts { readonly roman?: readonly string[]; }
 export interface Tok { readonly kind: TokKind; readonly start: number; readonly end: number; readonly raw: string; readonly spoken: string; }
@@ -111,10 +111,14 @@ export interface Tok { readonly kind: TokKind; readonly start: number; readonly 
 // stay "347"), a declared Roman numeral, and the idioms `ks2Say` rewrites but a raw author may still write:
 // "3-digit", a price ("£3.50" — speech engines read a pound sign right, so it is converted, never refused), and
 // "5²" (`sayIsSafe` catches that one through its `²` backstop). Every other kind is a span
-// `ks2Say` must render and `sayIsSafe` must never find un-rendered, so a kind added to `TokKind` is notation
-// until it is listed here (#1465: the set used to be spelled out the other way round and could drift).
-const NOT_NOTATION: ReadonlySet<TokKind> = new Set<TokKind>(['text', 'digit', 'roman', 'compound', 'power', 'money']);
-const NOTATION = (k: TokKind): boolean => !NOT_NOTATION.has(k);
+// `ks2Say` must render and `sayIsSafe` must never find un-rendered. The table is a `Record<TokKind, boolean>`, so
+// a kind added to `TokKind` does not compile until someone has decided which side it is on (#1465: the set used
+// to be a list of the prose kinds and could drift).
+const IS_NOTATION: Record<TokKind, boolean> = {
+  text: false, digit: false, roman: false, compound: false, power: false, money: false,
+  dimension: true, mixedFraction: true, fraction: true, time: true, decimal: true, malformed: true, unit: true,
+};
+export const NOTATION = (k: TokKind): boolean => IS_NOTATION[k];
 
 const romanTok = (raw: string, start: number): Tok =>
   ({ kind: 'roman', start, end: start + raw.length, raw, spoken: `Roman numeral ${[...raw].join(', ')}` });
@@ -229,7 +233,11 @@ const moneyRule: Rule = rest => {
 };
 // Shapes that look like notation but are not any: "1.5.2", "3/4.5", "£3.505" (more than two decimal places is
 // no price). Left raw, so `sayIsSafe` fails them.
-const malformedRule: Rule = rest => { const m = rest.match(/^(?:\d+(?:\.\d+){2,}|\d+\s*\/\s*\d+\.\d|£\d+\.\d{3,})/); return m && hit('malformed', m, m[0]); };
+const malformedRule: Rule = rest => {
+  // "4/ 3" and "4 /3": a slash spaced on one side only is neither a tight fraction nor a division.
+  const m = rest.match(/^(?:\d+(?:\.\d+){2,}|\d+\s*\/\s*\d+\.\d|£\d+\.\d{3,}|\d+ \/(?! )\d|\d+\/ \d)/);
+  return m && hit('malformed', m, m[0]);
+};
 // A denominator of 0 or 1 is no spoken fraction ("one first", "one zeroth") and stays raw.
 const mixedRule: Rule = rest => {
   const m = rest.match(/^(\d+) (\d+)\s*\/\s*(\d+)/);
@@ -263,12 +271,15 @@ const asciiPowerRule: Rule = (rest, before) => {
   return m && hit('unit', m, unitWord(`${m[1]}${m[2] === '2' ? '²' : '³'}`));
 };
 const powerRule: Rule = rest => { const m = rest.match(/^(\d+)([²³])/); return m && hit('power', m, `${m[1]} ${m[2] === '²' ? 'squared' : 'cubed'}`); };
-// Order matters: the first rule that matches claims the span, so the longer shapes come before the shorter.
+// Order matters: the first rule that matches claims the span. `malformedRule` goes before `decimalRule`, which would
+// otherwise take the "1.5" of "1.5.2" and leave ".2" behind; the dimension and compound idioms go first because a
+// digit and a hyphen are all they need. The tokenize tests pin the pairs that depend on it.
 const RULES: readonly Rule[] = [dimensionRule, compoundRule, moneyRule, malformedRule, mixedRule, fractionRule, timeRule,
   decimalRule, speedRule, asciiPowerRule, powerRule];
 
 /** One left-to-right scan claiming the longest notation match at each position; everything else is a
- *  digit run (kept bare — plain numerals are out of this module's scope) or one plain character. */
+ *  digit run (kept bare — plain numerals are out of this module's scope) or one plain character.
+ *  Exported for the tests only (the tiling and rule-order checks); callers use `ks2Say` and `sayIsSafe`. */
 export function tokenize(text: string, roman: ReadonlySet<string> = new Set()): Tok[] {
   const toks: Tok[] = [];
   let i = 0;
@@ -324,17 +335,19 @@ function normalizeWs(text: string): string {
   return text.replace(/\s+/g, ' ');
 }
 
-/** A unit spoken for exactly one of it: "1 kilograms" -> "1 kilogram" (#1465). */
+/** The unit for exactly one of it: "kilograms" -> "kilogram" (#1465). */
 const singular = (spoken: string): string => spoken.replace(/(metre|gram|litre)s\b/, '$1');
 
-/** A unit spoken for exactly one of it ("1 kilograms" -> "1 kilogram"), and a single-letter unit left raw when
- *  nothing on the other side of an "=" is a unit: "2 m = 6" is an equation in m, so `sayIsSafe` should refuse it. */
+/** A unit spoken for exactly one of it ("1 kilograms" -> "1 kilogram"); a fraction right before it makes it "of a
+ *  metre" ("3/4 m" -> "three quarters of a metre"); and a single-letter unit that is the only unit in a sentence
+ *  with an "=" in it is left raw, because "2 m = 6" and "3m + 1 = 7" are equations in m and `sayIsSafe` should
+ *  refuse them (while "3 m = ? cm" and "5 m + 3 m = 8 m" are still measurements, there being another unit). */
 function unitSpoken(toks: readonly Tok[], idx: number, norm: string): string {
   const tok = toks[idx], prev = toks[idx - 1];
-  const rhs = norm.slice(tok.end);
-  if (tok.raw.length === 1 && /^ ?=/.test(rhs) && !tokenize(rhs).some(t => t.kind === 'unit')) return tok.raw;
-  const one = (t: Tok | undefined) => t?.kind === 'digit' && t.raw === '1';
-  return one(prev) || (prev?.raw === ' ' && one(toks[idx - 2])) ? singular(tok.spoken) : tok.spoken;
+  if (tok.raw.length === 1 && norm.includes('=') && toks.filter(t => t.kind === 'unit').length === 1) return tok.raw;
+  const before = prev?.raw === ' ' ? toks[idx - 2] : prev;
+  if (before?.kind === 'fraction') return `of a ${singular(tok.spoken)}`;
+  return before?.kind === 'digit' && before.raw === '1' ? singular(tok.spoken) : tok.spoken;
 }
 
 /** Plain text: a spaced slash is "divided by", a hyphen between two times is "to", `>` and `<` are spoken, the rest goes through `symSay`. */

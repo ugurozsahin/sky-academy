@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ks2Say, sayIsSafe, tokenize } from '../../src/curriculum/ks2say';
+import { ks2Say, sayIsSafe, tokenize, NOTATION, type TokKind } from '../../src/curriculum/ks2say';
 import { TOPICS } from '../../src/curriculum';
 import { isKs2 } from '../../src/curriculum/key-stage';
 import type { Difficulty } from '../../src/curriculum/types';
@@ -53,8 +53,8 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     // a unit right after a fraction or a decimal — the digit the unit substitution needs has to survive
     // long enough to be seen, before the fraction/decimal passes turn it into words
     ['3.5 kg', 'three point five kilograms'],
-    ['3/4 m', 'three quarters metres'],
-    ['1/2 kg', 'one half kilograms'],
+    ['3/4 m', 'three quarters of a metre'],
+    ['1/2 kg', 'one half of a kilogram'],
     ['1 1/2 kg', 'one and one half kilograms'],
     // a unit with no space at all — the tokenizer's own gluing rule inserts exactly one
     ['12.5cm', 'twelve point five centimetres'],
@@ -471,7 +471,8 @@ describe('ks2say.ts: misreadings swept from the #1430 review (#1465)', () => {
     '1/1', '1/0', '5/1', '2 3/1',                  // a denominator of 0 or 1 is no fraction ("one first", "one zeroth")
     '25:10', '7:5', '14:30pm', '0:30am', '3:4',     // not a time (a ratio has no spoken form here: write it in words)
     '1.5.2', '1.2.3.4', '3/4.5', '£3.505',         // not a number, not a fraction, not a price
-    'Solve 2 m = 6', '3 g = 9',                    // a single letter after a digit with no unit across the "=": an equation in m
+    'Solve 2 m = 6', '3 g = 9', 'Solve 3m + 1 = 7',  // the only unit in a sentence with an "=" is a single letter: an equation in m
+    '4/ 3', '4 /3',                                // a slash spaced on one side only
   ])('ks2Say(%j) leaves it raw and sayIsSafe refuses the result', (input) => {
     expect(sayIsSafe(ks2Say(input))).toBe(false);
   });
@@ -481,14 +482,18 @@ describe('ks2say.ts: misreadings swept from the #1430 review (#1465)', () => {
     expect(ks2Say('2 l = 2000 ml')).toBe('2 litres equals 2000 millilitres');
   });
 
-  // Odd readings that are today's behaviour, pinned so a change to them is a decision and not an accident:
-  // none of these is claimed to be what a teacher would say.
+  // A fraction right before a unit is a part of one of it. An improper fraction is written tight ("7/4"); spaced
+  // after a number that is not smaller, the slash is division ("7 / 4"), which cannot be told from a fraction.
   it.each([
-    ['3/4 m', 'three quarters metres'],
-    ['1/2 kg', 'one half kilograms'],
+    ['3/4 m', 'three quarters of a metre'],
+    ['1/2 kg', 'one half of a kilogram'],
+    ['7/4 l', 'seven quarters of a litre'],
     ['7 / 4', '7 divided by 4'],
-  ] as const)('current behaviour, not a promise: ks2Say(%j) is %j', (input, expected) => {
+    ['5 m + 3 m = 8 m', '5 metres plus 3 metres equals 8 metres'],
+    ['12:30pm', 'twelve thirty p m'],
+  ] as const)('ks2Say(%j) is %j', (input, expected) => {
     expect(ks2Say(input)).toBe(expected);
+    expect(sayIsSafe(ks2Say(input))).toBe(true);
   });
 
   // The module's tokens must tile its (whitespace-normalised) input exactly: no gap, no overlap, whatever the
@@ -498,40 +503,90 @@ describe('ks2say.ts: misreadings swept from the #1430 review (#1465)', () => {
     '1:30pm', '2:30-3:15', '5 kg', '1 kg', '5kgs', '10 cm³', '5 m2', '5²', '60 km/h', '3-D', '3-digit', 'Mmm', 'Solve 2 m = 6',
     '347', '+', '=', '?', ' ', ',', '.', ':', '/', '-', 'and', 'the cube',
   ];
+  /** The fragments above that are refused or ambiguous by design, so the "always safe" invariant leaves them out. */
+  const REFUSED_FRAGMENTS = new Set(['1/1', '£3.505', '1.5.2', '3/4.5', '25:10', 'Solve 2 m = 6', '=', '?', ':', '.', '/', '-', ',', '+']);
   const seeded = (seed: number, n: number): string => {
     const r = rng(seed);
     return Array.from({ length: n }, () => FRAGMENTS[Math.floor(r() * FRAGMENTS.length)]).join(r() < 0.5 ? ' ' : '');
   };
 
-  it('the tokens tile the input exactly, over a seeded fuzz of notation fragments', () => {
+  it('the tokens tile the input exactly, raw or whitespace-normalised, with or without declared numerals', () => {
     for (let seed = 1; seed <= 300; seed++) {
-      const text = seeded(seed, 1 + (seed % 6)).replace(/\s+/g, ' ');
-      const toks = tokenize(text);
-      let at = 0;
-      for (const t of toks) {
-        expect(t.start, `seed ${seed}: ${JSON.stringify(text)}`).toBe(at);
-        expect(t.raw).toBe(text.slice(t.start, t.end));
-        at = t.end;
+      const raw = seeded(seed, 1 + (seed % 6));
+      for (const text of [raw, raw.replace(/\s+/g, ' ')]) {
+        for (const roman of [new Set<string>(), new Set(['X', 'XIV'])]) {
+          let at = 0;
+          for (const t of tokenize(text, roman)) {
+            expect(t.start, `seed ${seed}: ${JSON.stringify(text)}`).toBe(at);
+            expect(t.raw).toBe(text.slice(t.start, t.end));
+            at = t.end;
+          }
+          expect(at, `seed ${seed}: ${JSON.stringify(text)}`).toBe(text.length);
+        }
       }
-      expect(at, `seed ${seed}: ${JSON.stringify(text)}`).toBe(text.length);
     }
   });
 
-  it('never throws and always returns a string, over the same fuzz', () => {
+  it('never throws, and never speaks a broken number, over the same fuzz', () => {
     for (let seed = 1; seed <= 300; seed++) {
       const text = seeded(seed, 1 + (seed % 6));
-      expect(typeof ks2Say(text), JSON.stringify(text)).toBe('string');
+      const out = ks2Say(text);
+      expect(out, JSON.stringify(text)).not.toMatch(/undefined|NaN|Infinity|\[object/);
       expect(typeof sayIsSafe(text)).toBe('boolean');
     }
   });
 
-  // Every notation kind is flagged when raw, and the kinds that are not notation are not: the table is derived
-  // from `TokKind`, so a kind added without a decision here is notation by default.
+  // The invariant the issue asked a fuzz for (it would have found the 24:00 hole): whatever supported
+  // fragments are put side by side, what `ks2Say` says is safe to speak.
+  const SUPPORTED = FRAGMENTS.filter(f => !REFUSED_FRAGMENTS.has(f));
+  it('ks2Say of supported fragments laid side by side is always safe to speak', () => {
+    for (let seed = 1; seed <= 400; seed++) {
+      const r = rng(seed * 31);
+      const text = Array.from({ length: 2 + (seed % 4) }, () => SUPPORTED[Math.floor(r() * SUPPORTED.length)]).join(' ');
+      expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
+    }
+  });
+
+  // Which rule claims a span is order-sensitive (`RULES` in ks2say.ts); each pair that shares a prefix is pinned.
+  it.each([
+    ['2 3/4', ['mixedFraction']],                       // not a digit, a space and a fraction
+    ['3/4', ['fraction']],
+    ['1.5.2', ['malformed']],                           // not a decimal followed by ".2"
+    ['3/4.5', ['malformed']],                           // not a fraction followed by ".5"
+    ['£3.505', ['malformed']],                          // not a price followed by "5"
+    ['£3.50', ['money']],                               // not a decimal after a "£" text
+    ['£1,250.50', ['money']],
+    ['1,234.5', ['decimal']],
+    ['12 / 3', ['digit', 'text', 'text', 'text', 'digit']],   // division: no fraction claims it
+    ['4/ 3', ['malformed']],
+    ['3-D', ['dimension']],
+    ['3-digit', ['compound']],
+    ['14:35', ['time']],
+    ['60 km/h', ['digit', 'text', 'unit']],
+    ['5²', ['power']],
+  ] as const)('tokenize(%j) is %j', (text, kinds) => {
+    expect(tokenize(text).map(t => t.kind)).toEqual(kinds);
+  });
+
+  // Every notation kind is flagged when raw, and the kinds that are not notation are not. `NOTATION` is a
+  // `Record<TokKind, boolean>`, so a kind added without a decision does not compile; the second test below holds
+  // each kind to what `sayIsSafe` actually does with a raw sample of it.
   it.each([
     ['3/4', false], ['2 3/4', false], ['3.75', false], ['14:35', false], ['5 kg', false], ['3-D', false], ['1.5.2', false],
     ['£3.50', true], ['3-digit', true], ['347', true], ['plain words', true],
   ] as const)('sayIsSafe(%j) is %j', (raw, safe) => {
     expect(sayIsSafe(raw)).toBe(safe);
+  });
+  it('sayIsSafe agrees with NOTATION for a raw sample of every kind that can appear in raw text', () => {
+    // (`power` is left out: a raw "5²" is refused by the superscript backstop, tested below, not by its kind)
+    const samples: Partial<Record<TokKind, string>> = {
+      text: 'plain words', digit: '347', compound: '3-digit', money: '£3.50',
+      dimension: '3-D', mixedFraction: '2 3/4', fraction: '3/4', time: '14:35', decimal: '3.75', malformed: '1.5.2', unit: '5 kg',
+    };
+    for (const [kind, sample] of Object.entries(samples) as [TokKind, string][]) {
+      expect(tokenize(sample).some(t => t.kind === kind), `${sample} holds a ${kind}`).toBe(true);
+      expect(sayIsSafe(sample), `${kind}: ${sample}`).toBe(!NOTATION(kind));
+    }
   });
   it('a raw superscript is refused whether or not ks2Say would rewrite it', () => {
     expect(sayIsSafe('5²')).toBe(false);
