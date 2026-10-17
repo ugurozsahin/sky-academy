@@ -15,7 +15,6 @@
     "src/main.ts::(anonymous)": 16,
     "src/ui/play-results.ts::showResults": 21,
     "src/ui/play.ts::playScreen": 22,
-    "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,
     "src/ui/visuals.ts::renderVisual": 22,
     "tests/unit/curriculum.test.ts::(anonymous)": 28
