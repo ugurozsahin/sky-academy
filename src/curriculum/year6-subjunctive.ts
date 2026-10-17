@@ -1,7 +1,7 @@
 // y6-subjunctive (#1280): the subjunctive in formal writing (English Appendix 2, Year 6): If I were…, requires that every pupil be…,
-// Were they to come…. Every card's prompt is the stem "In formal writing, which word fits?", never the hint alone: the stem is what makes
-// the indicative form wrong, because it sets the register. A `were` sentence is always hypothetical (its main clause has would, could or
-// might), so a real conditional ("If I was rude, I apologise") never appears. The indicative form is always one of the decoys.
+// Were they to come…. Every card's prompt is the stem "Which word fits in formal writing?" (the Grammar mix pool needs a prompt that starts with "Which"), never the hint alone: the stem is what makes
+// the indicative form wrong, because it sets the register. A `were` sentence is always counterfactual: its if-clause is plainly untrue (a bird, a giant, ten years older) and its main
+// clause has would, so the indicative ("If I am a bird, I would…") is not natural and a real conditional never appears. The indicative form is always one of the decoys.
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { pick, shuffle, wordQ } from './util';
 
@@ -9,18 +9,18 @@ export type Kind = 'were' | 'mandative' | 'inversion';
 /** `person` is the subject of a `were` row; `base` is the stored infinitive a `mandative` answer must equal. */
 export interface Row { text: string; answer: string; decoys: [string, string, string]; kind: Kind; person?: 'I' | 'other'; base?: string }
 
-export const STEM = 'In formal writing, which word fits?';
+export const STEM = 'Which word fits in formal writing?';
 
 export const SUBJUNCTIVES: readonly Row[] = [
-  { kind: 'were', person: 'I', text: 'If I _ taller, I could reach the shelf.', answer: 'were', decoys: ['was', 'am', 'be'] },
   { kind: 'were', person: 'I', text: 'If I _ you, I would say sorry.', answer: 'were', decoys: ['was', 'am', 'be'] },
   { kind: 'were', person: 'I', text: 'If I _ a bird, I would fly over the sea.', answer: 'were', decoys: ['was', 'am', 'be'] },
-  { kind: 'were', person: 'I', text: 'If I _ rich, I might buy a boat.', answer: 'were', decoys: ['was', 'am', 'be'] },
-  { kind: 'were', person: 'I', text: 'If I _ braver, I would climb the tower.', answer: 'were', decoys: ['was', 'am', 'be'] },
-  { kind: 'were', person: 'I', text: 'If I _ in charge, I would change the rules.', answer: 'were', decoys: ['was', 'am', 'be'] },
-  { kind: 'were', person: 'other', text: 'If she _ the captain, we would win more.', answer: 'were', decoys: ['was', 'is', 'be'] },
-  { kind: 'were', person: 'other', text: 'If he _ here, he could help us.', answer: 'were', decoys: ['was', 'is', 'be'] },
-  { kind: 'were', person: 'other', text: 'If it _ sunny, we might go to the beach.', answer: 'were', decoys: ['was', 'is', 'be'] },
+  { kind: 'were', person: 'I', text: 'If I _ a giant, I would step over the wall.', answer: 'were', decoys: ['was', 'am', 'be'] },
+  { kind: 'were', person: 'I', text: 'If I _ ten years older, I would drive the bus.', answer: 'were', decoys: ['was', 'am', 'be'] },
+  { kind: 'were', person: 'I', text: 'If I _ a fish, I would live in the sea.', answer: 'were', decoys: ['was', 'am', 'be'] },
+  { kind: 'were', person: 'I', text: 'If I _ a cat, I would sleep all day.', answer: 'were', decoys: ['was', 'am', 'be'] },
+  { kind: 'were', person: 'other', text: 'If she _ a bird, she would fly to the sea.', answer: 'were', decoys: ['was', 'is', 'be'] },
+  { kind: 'were', person: 'other', text: 'If he _ a giant, he would step over the wall.', answer: 'were', decoys: ['was', 'is', 'be'] },
+  { kind: 'were', person: 'other', text: 'If the moon _ made of cheese, we would eat it.', answer: 'were', decoys: ['was', 'is', 'be'] },
   { kind: 'were', person: 'other', text: 'If Zoë _ the class president, things would be much better.', answer: 'were', decoys: ['was', 'is', 'be'] },
   { kind: 'mandative', base: 'be', text: 'The school requires that every pupil _ honest.', answer: 'be', decoys: ['is', 'are', 'was'] },
   { kind: 'mandative', base: 'leave', text: 'We insist that he _ now.', answer: 'leave', decoys: ['leaves', 'left', 'leaving'] },

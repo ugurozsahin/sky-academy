@@ -25,15 +25,21 @@ describe('y6-subjunctive (#1280)', () => {
     expect(new Set(SUBJUNCTIVES.map(r => r.kind))).toEqual(new Set(['were', 'mandative', 'inversion']));
   });
 
-  it('every were sentence is hypothetical: its main clause has would, could or might, so no real conditional is offered', () => {
-    for (const r of SUBJUNCTIVES.filter(r => r.kind === 'were')) { expect(r.answer).toBe('were'); expect(words(r.text).some(w => ['would', 'could', 'might'].includes(w)), r.text).toBe(true); expect(r.text.startsWith('If ')).toBe(true); }
+  it('every were sentence is counterfactual: its main clause has would (could and might also follow an open condition), and its if-clause is untrue on its face', () => {
+    for (const r of SUBJUNCTIVES.filter(r => r.kind === 'were')) {
+      expect(r.answer).toBe('were'); expect(words(r.text), r.text).toContain('would'); expect(r.text.startsWith('If ')).toBe(true);
+      expect(words(r.text).some(w => ['could', 'might'].includes(w)), r.text).toBe(false);
+    }
+    // The if-clause: "you", an animal or a giant, an impossible age, the moon made of cheese, or the glossary's own example.
+    const untrue = /^If (I|she|he|the moon|Zoë) _ (you|a bird|a giant|a fish|a cat|ten years older|made of cheese|the class president),/;
+    for (const r of SUBJUNCTIVES.filter(r => r.kind === 'were')) expect(untrue.test(r.text), r.text).toBe(true);
   });
 
   it('every mandative answer is the verb\'s base form, and no decoy makes the sentence a statement of fact', () => {
     for (const r of SUBJUNCTIVES.filter(r => r.kind === 'mandative')) {
       expect(r.answer, r.text).toBe(r.base);
       expect(words(r.text).some(w => ['requires', 'insist', 'insists', 'suggest', 'ordered', 'demand', 'asks'].includes(w)), r.text).toBe(true);
-      for (const d of r.decoys) expect(d, r.text).not.toMatch(/\b(is|are) \w+ing\b/);
+      for (const d of r.decoys) expect(d.includes(' '), `${r.text}: "${d}" is one word, never a phrase such as "is leaving"`).toBe(false);
     }
   });
 
