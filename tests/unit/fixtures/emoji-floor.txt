@@ -28,6 +28,7 @@
 ⬆	0.6	up arrow
 ⬇	0.6	down arrow
 ⭐	0.6	star
+⭕	0.6	hollow red circle
 🅰	0.6	A button (blood type)
 🌅	0.6	sunrise
 🌈	0.6	rainbow
