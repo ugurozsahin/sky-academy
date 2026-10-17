@@ -54,4 +54,11 @@ describe('pie chart visual (#1239)', () => {
     for (const bad of [pie([5]), pie([0, 4]), pie([NaN, 4]), pie([-1, 4]), pie([1, 1, 1, 1, 1, 1], ['a', 'b', 'c', 'd', 'e', 'f'])]) expect(renderVisual(bad)).toBe('');
     expect(warn).toHaveBeenCalledTimes(5); warn.mockRestore();
   });
+
+  it('bounds its drawn width by the duel strip\'s visual budget and the zoom the strip applies (#1954)', () => {
+    const html = renderVisual(pie([3, 5, 2]));
+    // The budget is a painted height; the pie is PIE.w wide for PIE.h tall, and a zoomed strip paints at `--duel-zoom` of the layout size.
+    expect(html).toContain(`calc(var(--duel-vis,300px) / var(--duel-zoom,1) * ${Math.round(PIE.w / PIE.h * 100) / 100})`);
+    expect(html).toContain('width:min(clamp(260px,80vw,320px),');   // outside a duel the width is the same clamp as before
+  });
 });

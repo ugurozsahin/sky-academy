@@ -7,6 +7,7 @@ import { y6Sequences } from './year6-sequences';
 // import: y6-algebra
 import { y6Algebra } from './year6-algebra-missing';
 // import: y6-twounknowns
+import { y6TwoUnknowns } from './year6-twounknowns';
 import type { Topic } from './types';
 
 export const Y6_ALGEBRA: Topic[] = [
@@ -20,4 +21,5 @@ export const Y6_ALGEBRA: Topic[] = [
   { id: 'y6-algebra', title: 'Missing numbers with letters', icon: '🔤', subject: 'maths', year: 'year6', strand: 'algebra', nc: 'Y6 Alg: missing numbers algebraically', gen: y6Algebra },
 
   // slot: y6-twounknowns
+  { id: 'y6-twounknowns', title: 'Two unknowns', icon: '🧩', subject: 'maths', year: 'year6', strand: 'algebra', nc: 'Y6 Alg: two unknowns; combinations', gen: y6TwoUnknowns },
 ];

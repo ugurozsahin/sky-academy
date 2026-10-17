@@ -36,5 +36,5 @@ export function pieSVG(v: Pie): string {
       + `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="var(--text)" stroke-width="1.5"/>`
       + `<text x="${tx}" y="${r2(ty + dy)}" text-anchor="${anchor}" font-size="${PIE.fs}" font-weight="700" fill="var(--text)">${esc(s.label)}</text>`;
   }).join('');
-  return `<div class="vis"><svg viewBox="0 0 ${PIE.w} ${PIE.h}" role="img" aria-label="Pie chart" style="width:clamp(260px,80vw,320px);max-width:100%;height:auto;display:block;overflow:visible">${parts}</svg></div>`;
+  return `<div class="vis"><svg viewBox="0 0 ${PIE.w} ${PIE.h}" role="img" aria-label="Pie chart" style="width:min(clamp(260px,80vw,320px),calc(var(--duel-vis,300px) / var(--duel-zoom,1) * ${r2(PIE.w / PIE.h)}));max-width:100%;height:auto;display:block;overflow:visible">${parts}</svg></div>`;
 }
