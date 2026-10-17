@@ -933,7 +933,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#legend-pro');
     await page.click('#island-overlay .topic[data-id="y1-add"]');
     await expect(page.locator('.play')).toBeVisible();
-    expect(await page.evaluate(() => window.__sna.state().lives)).toBe(2);
+    expect(await page.evaluate(() => (window.__sna.session as unknown as { o: { year: { lives: number } } }).o.year.lives)).toBe(YEARS.find(y => y.id === "year1")!.lives - 1);   // read the run's year, not the live count: a Pro bubble may already have slipped
     await winMission(page);
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('sna:v1')!).progress['y1-add']?.crown === true);
   });
