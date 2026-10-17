@@ -7,12 +7,14 @@ import { y6Area } from './year6-area';
 import { y6Volume } from './year6-volume';
 import type { Topic } from './types';
 import { y6Convert } from './year6-convert';
+import { y6AreaPerim } from './year6-areaperim';
 
 export const Y6_MEASURE: Topic[] = [
   // slot: y6-convert
   { id: 'y6-convert', title: 'Converting Units and Miles', icon: '⚖️', subject: 'maths', year: 'year6', strand: 'measure', nc: 'Y6 Measurement: convert units to 3 dp, miles and kilometres (6M34–36)', gen: y6Convert },
 
   // slot: y6-areaperim
+  { id: 'y6-areaperim', title: 'Same Area, Different Perimeter', icon: '🟩', subject: 'maths', year: 'year6', strand: 'measure', nc: 'Y6 Measurement: same area, different perimeter; when formulae apply (6M37–38)', gen: y6AreaPerim },
 
   { id: 'y6-area', title: 'Area of Triangles and Parallelograms', icon: '🔺', subject: 'maths', year: 'year6', nc: 'Y6 Measurement: area of parallelograms and triangles (6M39)', strand: 'measure', gen: y6Area },
 
