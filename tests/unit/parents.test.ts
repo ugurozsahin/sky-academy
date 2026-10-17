@@ -6,7 +6,7 @@ import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveK
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { chooserEligible } from '../../src/ui/chooser';
 import { topicRow, noTrophyHTML } from '../../src/ui/parents-trophies';
-import { ABOUT_LINES, aboutHTML } from '../../src/ui/about';
+import { ABOUT_LINES, aboutHTML, aboutLines } from '../../src/ui/about';
 import { settingsHTML } from '../../src/ui/parents-settings';
 import { slipsHTML } from '../../src/ui/parents-slips';
 import { factsHTML } from '../../src/ui/parents-facts';
@@ -422,6 +422,21 @@ describe('About this game (#946)', () => {
     const html = aboutHTML();
     expect(html).toContain('About this game');
     for (const l of ABOUT_LINES) expect(html).toContain(`<li>${l}</li>`);
+  });
+  it('adds the KS2 claims only for features that exist (#1291)', () => {
+    const TC = 'Tables Check practice with the same timing as the Year 4 check: 25 questions, 6 seconds each.';
+    const both = 'Every word on the statutory Year 3–4 and Year 5–6 spelling lists.', ks2only = 'Every word on the statutory Year 3–4 spelling list.';
+    const facts = (ids: string[], mtc: boolean) => ({ hasTopic: (id: string) => ids.includes(id), mtcPractice: () => mtc });
+    const ALL = ['y3-wordlist', 'y4-wordlist', 'y5-wordlist', 'y6-wordlist'];
+    expect(aboutLines()).toEqual([...ABOUT_LINES, TC, both]);   // the live registry today
+    expect(aboutLines(facts([], false))).toEqual([...ABOUT_LINES]);
+    expect(aboutLines(facts([], true))).toEqual([...ABOUT_LINES, TC]);
+    expect(aboutLines(facts(ALL.slice(0, 2), false))).toEqual([...ABOUT_LINES, ks2only]);
+    expect(aboutLines(facts(['y3-wordlist'], false))).toEqual([...ABOUT_LINES]);
+    expect(aboutLines(facts(ALL.filter(i => i !== 'y5-wordlist'), false))).toEqual([...ABOUT_LINES, ks2only]);
+    expect(aboutLines(facts(ALL.filter(i => i !== 'y4-wordlist'), false))).toEqual([...ABOUT_LINES]);
+    for (const l of aboutLines()) expect(l).not.toMatch(/official|identical|only free|\bSTA\b|DfE|approved/i);
+    expect(aboutHTML()).toContain(`<li>${TC}</li>`);
   });
   it('makes no claim that nothing leaves the device (certificate and progress summary share on request)', () => {
     for (const l of ABOUT_LINES) expect(l).not.toMatch(/never leaves|nothing leaves/i);
