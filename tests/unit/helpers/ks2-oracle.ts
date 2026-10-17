@@ -72,13 +72,15 @@ const NUM_CHUNK_RE = /^[\d,]*\d(?:\.\d+)?/;
 
 function decToFrac(d: Dec): Frac { return simplify({ n: d.v, d: 10 ** d.dp }); }
 
-/** What KS2 content can actually print (#1443): fraction and mixed-number parts of at most six digits (the NC's
- * numbers go to 10,000,000, so a whole part never needs more), and decimals to three places (`fractions.ts`'s
- * `toDecimal` caps KS2 there too). Past either, `Number()` overflows to `Infinity` or `10 ** dp` and the
- * `add`/`mul` arithmetic after it round silently — a non-null, wrong `Frac` — so the oracle refuses instead. */
-const MAX_DIGITS = 6;
+/** What KS2 content can actually print (#1443): each part of a fraction or mixed number has at most six digits,
+ * and a decimal has at most three places (`fractions.ts`'s `toDecimal` caps KS2 there too). Plain whole numbers
+ * are left to `parseNum`'s safe-integer check, since the NC's numbers go to 10,000,000. Past the caps, `Number()`
+ * overflows to `Infinity` or `10 ** dp` and the `add`/`mul` arithmetic after it round silently — a non-null,
+ * wrong `Frac` — so the oracle refuses instead. The caps bound each literal only: a long chain of products can
+ * still outgrow `MAX_SAFE_INTEGER`, which is a separate question (see the PR for #1443). */
+const MAX_PART_DIGITS = 6;
 const MAX_DP = 3;
-const tooLong = (...parts: string[]) => parts.some(p => p.length > MAX_DIGITS);
+const tooLong = (...parts: string[]) => parts.some(p => p.length > MAX_PART_DIGITS);
 
 /** Reads one number literal at the front of `s`: a mixed number, a plain fraction, or a comma/decimal number
  * (validated by `ks2num`'s own strict grouping, so "12,3,456" is rejected here, not silently truncated). */

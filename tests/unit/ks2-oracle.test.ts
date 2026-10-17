@@ -62,6 +62,9 @@ const KNOWN: [string, Frac][] = [
   ['999999/2 + 1/2 = ?', f(500000)],
   ['999999 1/2 + 1/2 = ?', f(1000000)],
   ['0.001 + 1 = ?', f(1001, 1000)],
+  // every part at its cap, so tightening any one of them to five digits fails here and not silently
+  ['1/999999 + 1 = ?', f(1000000, 999999)],
+  ['999999 999999/999999 + 1 = ?', f(1000001)],
 ];
 
 // A prompt this oracle deliberately does not answer: a word problem, an instruction rather than an
