@@ -47,7 +47,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   shapes: 'shape', polygons: 'shape', shapes3d: 'shape', objects3d: 'shape', symmetry: 'shape', position: 'shape', coords: 'shape', transform: 'shape', angles: 'shape', anglefacts: 'shape', missingangles: 'shape', '3d': 'shape',
   stats: 'data', charts: 'data', mean: 'data', linegraph: 'data',
   fractions: 'fractions', equiv: 'fractions', fracof: 'fractions', fracequiv: 'fractions', fracadd: 'fractions', fracmult: 'fractions', fracdiv: 'fractions', tenths: 'fractions', hundredths: 'fractions', simplify: 'fractions', mixed: 'fractions',
-  decimals: 'decimals', decfrac: 'decimals', decmult: 'decimals', fdp: 'decimals',
+  decimals: 'decimals', decfrac: 'decimals', decmult: 'decimals', decdiv: 'decimals', fdp: 'decimals',
   percent: 'percent', percentof: 'percent',
   ratio: 'ratio',
   algebra: 'algebra', formulae: 'algebra', 'order-ops': 'algebra',
