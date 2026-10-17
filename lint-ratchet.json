@@ -5,7 +5,6 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/curriculum/year2/measure.ts::(anonymous)": 17,
     "src/game/arena.ts::drawBubble": 16,
     "src/game/arena.ts::drawParticle": 21,
     "src/game/arena.ts::drawTrail": 19,
@@ -24,7 +23,6 @@
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/three/sketchbook/view.ts::createView": 81,
     "src/ui/duel.ts::duelScreen": 201,
     "src/ui/home.ts::islandScreen": 65,
     "src/ui/parents.ts::parentsScreen": 102,
