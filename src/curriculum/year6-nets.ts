@@ -1,9 +1,25 @@
 // y6-nets (#1246): 3-D shapes and their nets (NC 6M42). Nothing is drawn in 3-D. d1 counts the faces, edges or vertices of a prism or pyramid,
-// d2 asks whether a list of net faces makes a named solid (yes/no), d3 folds a lettered cube net and asks which letter is opposite another.
+// d2 shows a list of net faces and asks whether it makes a named solid (yes/no), d3 folds a lettered cube net and asks which letter is opposite another.
 // Solid names are too wide for a bubble (R-LBL), so they sit on the card and the bubbles are numbers, yes/no or letters.
 import type { Difficulty, Generator, Question, Rng } from './types';
-import { pick, shuffle, wordQ, sameShape } from './util';
-import { CUBE_NETS, place } from './year5-3d';
+import { pick, ri, shuffle, wordQ, sameShape } from './util';
+
+/** The 11 nets of a cube, one per shape up to turning and flipping (the unit test folds each one). */
+const CUBE_NETS: readonly (readonly string[])[] = [
+  ['#...', '####', '#...'], ['#...', '####', '.#..'], ['#...', '####', '..#.'], ['#...', '####', '...#'], ['.#..', '####', '.#..'], ['.#..', '####', '..#.'],
+  ['##..', '.###', '.#..'], ['##..', '.###', '..#.'], ['##..', '.###', '...#'], ['##..', '.##.', '..##'], ['###..', '..###'],
+];
+const SIZE = 7;   // a 5 × 5 box plus one empty square all round; a lettered grid is at most 7 columns wide
+const turn = (m: string[]): string[] => Array.from(m[0], (_, j) => m.map(r => r[j]).reverse().join(''));
+const flip = (m: string[]): string[] => m.map(r => Array.from(r).reverse().join(''));
+/** The net turned a random number of quarters, maybe flipped, and set on a 7 × 7 grid with an empty margin. */
+function place(rng: Rng, shape: readonly string[]): string[] {
+  let m = [...shape];
+  for (let k = ri(rng, 0, 3); k > 0; k--) m = turn(m);
+  if (rng() < 0.5) m = flip(m);
+  const top = ri(rng, 1, SIZE - 1 - m.length), left = ri(rng, 1, SIZE - 1 - m[0].length);
+  return Array.from({ length: SIZE }, (_, r) => Array.from({ length: SIZE }, (_, c) => m[r - top]?.[c - left] === '#' ? '#' : '.').join(''));
+}
 
 export interface Solid { name: string; faces: number; edges: number; vertices: number; net: string; near: string }
 /** Counts are faces / edges / vertices. `net` lists the faces of the net; `near` is the neighbouring solid whose counts make the confusing decoy. */
@@ -44,8 +60,8 @@ function netCard(rng: Rng): Question {
     const alike = others.filter(o => o.faces === s.faces);
     asked = pick(rng, alike.length ? alike : others);
   }
-  return wordQ(rng, `Net: ${s.net}. A ${asked.name}?`, yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
-    say: `A net has ${s.net}. Does it fold into a ${asked.name}?`, hint: 'Count the faces and look at their shapes', hintIsData: false,
+  return wordQ(rng, `Is it a ${asked.name}?`, yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
+    visual: { type: 'sentence', text: `Net: ${s.net}.` }, say: `A net has ${s.net}. Does it fold into a ${asked.name}?`, hint: 'Count the faces and look at their shapes', hintIsData: false,
   });
 }
 
@@ -76,7 +92,7 @@ function foldCells(grid: string[]): { r: number; c: number; face: number }[] {
 const LETTERS = ['A', 'B', 'C', 'D'];
 /** d3: a cube net with one opposite pair shaded and the other four faces lettered; which letter is opposite the asked one? */
 function oppositeCard(rng: Rng): Question {
-  const grid = place(rng, pick(rng, CUBE_NETS), true);
+  const grid = place(rng, pick(rng, CUBE_NETS));
   const cells = foldCells(grid), pair = pick(rng, [0, 1, 2]);
   const letters = shuffle(rng, LETTERS), lettered = cells.filter(c => c.face !== pair && c.face !== 5 - pair);
   const letterAt = new Map<number, string>(lettered.map((c, i) => [c.face, letters[i]]));

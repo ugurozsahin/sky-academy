@@ -61,7 +61,7 @@ describe('y6-nets (#1246)', () => {
   it('d2: yes exactly when the net lists that solid\'s faces; yes is right on 40–60 %; no card never pairs cube with cuboid; most no cards share a face count', () => {
     let yes = 0, no = 0, alike = 0;
     for (const q of draw(2)) {
-      const m = /^Net: (.+)\. A (.+)\?$/.exec(q.prompt)!, [net, asked] = [m[1], m[2]];
+      const net = /^Net: (.+)\.$/.exec((q.visual as { text: string }).text)![1], asked = /^Is it a (.+)\?$/.exec(q.prompt)![1];
       expect(LEX[asked], q.prompt).toBeDefined();
       const shown = Object.keys(LEX).find(k => LEX[k][3] === net)!;
       expect(q.answer, q.prompt).toBe(LEX[asked][3] === net ? 'yes' : 'no');

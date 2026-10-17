@@ -26,7 +26,7 @@ const turn = (m: string[]): string[] => Array.from(m[0], (_, j) => m.map(r => r[
 const flip = (m: string[]): string[] => m.map(r => Array.from(r).reverse().join(''));
 
 /** The shape turned a random number of quarters, maybe flipped, and set on a 7 × 7 grid with a margin of at least one empty square. */
-export function place(rng: Rng, shape: Rows, spin: boolean): string[] {
+function place(rng: Rng, shape: Rows, spin: boolean): string[] {
   let m = [...shape];
   if (spin) { for (let k = ri(rng, 0, 3); k > 0; k--) m = turn(m); if (rng() < 0.5) m = flip(m); }
   const top = ri(rng, 1, SIZE - 1 - m.length), left = ri(rng, 1, SIZE - 1 - m[0].length);
