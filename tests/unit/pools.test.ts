@@ -78,7 +78,7 @@ describe('subjectTopics / subjectPool (#908, #1325)', () => {
     warn.mockRestore();
   });
   it('the island builds its Mixed pool, and the chooser its list, through these — not through a predicate of their own', () => {
-    expect(readFileSync('src/ui/home.ts', 'utf8')).toContain('subjectPool(topicsFor(year.id), subject)');
+    expect(readFileSync('src/ui/home.ts', 'utf8')).toContain('subjectPool(topicsFor(year.id), subject())');
     expect(readFileSync('src/ui/chooser.ts', 'utf8')).toContain('subjectTopics(topicsFor(year), subject)');
     expect(readFileSync('src/ui/home.ts', 'utf8')).not.toContain('filter(chooserEligible)');   // the inline spelling this replaced
   });
