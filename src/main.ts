@@ -164,6 +164,15 @@ const relaunch = () => {
 // nine).
 const BACK_ONE = new Set<string | undefined>(['play', 'memory', 'duel', 'shop', 'parents']);
 const GUARDED_SCREEN = new Set<string | undefined>(['play', 'duel']);
+/** Draw whatever the entry a pop landed on stands for (see the notes in the listener below on the wizard steps and the reset). */
+const landOn = (s: string | undefined) => {
+  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards();
+  else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); }
+  else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); }
+  else if (BACK_ONE.has(s)) { fromPop = false; history.back(); }
+  else if (isPendingReset()) { clearPendingReset(); nav.avatar(); }
+  else if (!load().onboarded) nav.avatar(); else nav.map();
+};
 // "Let's go!" (#947): its own listener, registered first, so the router's one below keeps its shape — the pop
 // that `finishWizard`'s go(-2) waits for starts the mission instead of drawing the map.
 window.addEventListener('popstate', e => {
@@ -193,7 +202,7 @@ window.addEventListener('popstate', () => {
   // hardware-back press — could land back on that stale entry and silently re-show a wizard step to a
   // player who has already finished onboarding. Once `onboarded` is true, every history entry from before
   // it is inert as far as the wizard is concerned; only the map (or wherever `nav.map()` sends it next) is.
-  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (BACK_ONE.has(s)) { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
+  landOn(s);
 });
 
 // #699: on the Android APK, the hardware/gesture back button otherwise finishes the activity — Capacitor's
