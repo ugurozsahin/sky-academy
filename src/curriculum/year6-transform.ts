@@ -71,23 +71,34 @@ function reflectShape(rng: Rng): Question {
     axis === 'y' ? 'The y-axis is the up-and-down line: left and right swap' : 'The x-axis is the across line: up and down swap');
 }
 
+/** The wrong vertices for a d3 card: a reflection alone has the other axis, a half turn and x and y swapped; a move and a reflection add the steps in the wrong order. */
+function vertexSlips(p: P, d: P | null, axis: 'x' | 'y'): P[] {
+  const other = axis === 'x' ? 'y' : 'x', [first] = transform.reflect([p], axis);
+  if (!d) return [transform.reflect([p], other)[0], transform.half([p])[0], [p[1], p[0]], p];
+  const moved = transform.move([p], d[0], d[1]);
+  return [transform.move([first], d[0], d[1])[0], transform.reflect(moved, other)[0], first, moved[0], transform.half(moved)[0]];
+}
+
+/** A d3 start vertex off both axes, the move (or none) and the axis; the move is never along only one axis. */
+function vertexSpec(rng: Rng): { p: P; d: P | null; axis: 'x' | 'y' } | null {
+  const p: P = [ri(rng, -4, 4), ri(rng, -4, 4)], axis: 'x' | 'y' = rng() < 0.5 ? 'x' : 'y';
+  const d: P | null = rng() < 0.5 ? [ri(rng, -2, 2), ri(rng, -2, 2)] : null;
+  return p[0] === 0 || p[1] === 0 || (d && (d[0] === 0 || d[1] === 0)) ? null : { p, d, axis };
+}
+
 /** d3: a vertex reflected in an axis, or moved and then reflected. */
 function vertexCard(rng: Rng): Question {
   for (;;) {
-    const p: P = [ri(rng, -4, 4), ri(rng, -4, 4)], axis: 'x' | 'y' = rng() < 0.5 ? 'x' : 'y', other = axis === 'x' ? 'y' : 'x';
-    if (p[0] === 0 || p[1] === 0) continue;
-    const both = rng() < 0.5, dx = both ? ri(rng, -2, 2) : 0, dy = both ? ri(rng, -2, 2) : 0;
-    if (both && (dx === 0 || dy === 0)) continue;
-    const moved = transform.move([p], dx, dy), [ans] = transform.reflect(moved, axis);
-    if (!inGrid(moved[0]) || !inGrid(ans)) continue;
-    const [first] = transform.reflect([p], axis);
-    const slips: P[] = both
-      ? [transform.move([first], dx, dy)[0], transform.reflect(moved, other)[0], first, moved[0], transform.half(moved)[0]]
-      : [transform.reflect([p], other)[0], transform.half([p])[0], [p[1], p[0]], p];
-    const ds = decoys(ans, slips);
+    const spec = vertexSpec(rng);
+    if (!spec) continue;
+    const { p, d, axis } = spec;
+    const moved = d ? transform.move([p], d[0], d[1])[0] : p, [ans] = transform.reflect([moved], axis);
+    if (!inGrid(moved) || !inGrid(ans)) continue;
+    const ds = decoys(ans, vertexSlips(p, d, axis));
     if (!ds) continue;
-    const start = fmt(p), m = both ? `Move ${start} ${dirs(dx, dy)}, then reflect in the ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`;
-    return card(both ? `${start}: ${dirs(dx, dy)}, then ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`, say(m), fmt(ans), shuffle(rng, [fmt(ans), ...ds]),
+    const start = fmt(p), steps = d ? dirs(d[0], d[1]) : '';
+    const spoken = d ? `Move ${start} ${steps}, then reflect in the ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`;
+    return card(d ? `${start}: ${steps}, then ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`, say(spoken), fmt(ans), shuffle(rng, [fmt(ans), ...ds]),
       grid({ points: [{ x: p[0], y: p[1], label: 'A' }] }), 'A reflection flips one sign: the axis you reflect in stays the same side');
   }
 }
