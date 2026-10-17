@@ -57,6 +57,8 @@ export type Visual =
   | { type: 'coords'; size: number; min?: number; points: { x: number; y: number; label: string }[]; join?: string[];
       // Closed outlines through grid points (#1214): `shaded` fills one, `label` sits at its centroid. `mirror` is a dashed line: axis 'x' = the vertical line x = at, 'y' = the horizontal line y = at.
       shapes?: { label?: string; pts: [number, number][]; shaded?: boolean }[]; mirror?: { axis: 'x' | 'y'; at: number } }
+  // Pie chart (Y6, #1239): 2-5 slices, each a label and the count `n` it stands for; the angle is n / total of the circle. A placeholder look, final art is #1308.
+  | { type: 'pie'; slices: ChartRow[] }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string }                   // sentence with a blank "_" (writing — English text)
   // a repeating-pattern glyph strip with a blank "_" (y2-patterns): not language, so the drawing keeps it on

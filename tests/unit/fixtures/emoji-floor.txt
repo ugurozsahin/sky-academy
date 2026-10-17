@@ -68,6 +68,7 @@
 🎨	0.6	artist palette
 🎩	0.6	top hat
 🎬	0.6	clapper board
+🎭	0.6	performing arts
 🎮	0.6	video game
 🎯	0.6	bullseye
 🎲	0.6	game die
