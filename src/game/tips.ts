@@ -45,7 +45,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   time: 'time', timetable: 'time', timewords: 'time', months: 'time', days: 'time', when: 'time', duration: 'time',
   measure: 'measure', length: 'measure', mass: 'measure', capacity: 'measure', temp: 'measure', convert: 'measure', imperial: 'measure', 'story-measure': 'measure', perimeter: 'measure', area: 'measure', areaperim: 'measure', volume: 'measure',
   shapes: 'shape', polygons: 'shape', shapes3d: 'shape', objects3d: 'shape', symmetry: 'shape', position: 'shape', coords: 'shape', transform: 'shape', angles: 'shape', anglefacts: 'shape', missingangles: 'shape', nets: 'shape', circles: 'shape', '3d': 'shape',
-  stats: 'data', charts: 'data', mean: 'data', linegraph: 'data', pie: 'data',
+  stats: 'data', graphs: 'data', charts: 'data', mean: 'data', linegraph: 'data', pie: 'data',
   fractions: 'fractions', equiv: 'fractions', fracof: 'fractions', fracequiv: 'fractions', fracadd: 'fractions', fracmult: 'fractions', fracdiv: 'fractions', tenths: 'fractions', hundredths: 'fractions', simplify: 'fractions', mixed: 'fractions',
   decimals: 'decimals', decfrac: 'decimals', decmult: 'decimals', decdiv: 'decimals', fdp: 'decimals',
   percent: 'percent', percentof: 'percent',
@@ -58,7 +58,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   spelling: 'spelling', spellrules: 'spelling', plurals: 'spelling', suffix: 'spelling', 'suffix-root': 'spelling', prefix: 'spelling', 'prefix-not': 'spelling', wordlist: 'spelling', homophones: 'spelling',
   contractions: 'spelling', 'spell-kn': 'spelling', 'spell-le': 'spelling', 'spell-dge': 'spelling', 'spell-c': 'spelling', 'spell-tion': 'spelling', 'spell-more': 'spelling', spellgap: 'spelling', cious: 'spelling', ant: 'spelling', able: 'spelling', fer: 'spelling', silent: 'spelling', 'sure-ture': 'spelling', shun: 'spelling', origins: 'spelling', proofread: 'spelling',
   punct: 'grammar', wordclass: 'grammar', sentencetype: 'grammar', tense: 'grammar', conjunction: 'grammar', conjunctions: 'grammar', perfect: 'grammar', speech: 'grammar', adverbials: 'grammar',
-  'plural-poss': 'grammar', relative: 'grammar', verbs: 'grammar', verbprefix: 'grammar', commas: 'grammar', modal: 'grammar', parenthesis: 'grammar', passive: 'grammar', clauses: 'grammar', lists: 'grammar', hyphen: 'grammar', subjectobject: 'grammar', an: 'grammar', standard: 'grammar',
+  'plural-poss': 'grammar', relative: 'grammar', verbs: 'grammar', verbprefix: 'grammar', commas: 'grammar', modal: 'grammar', parenthesis: 'grammar', passive: 'grammar', subjunctive: 'grammar', clauses: 'grammar', lists: 'grammar', hyphen: 'grammar', subjectobject: 'grammar', an: 'grammar', standard: 'grammar',
   formal: 'vocab', synonyms: 'vocab', consistency: 'grammar', factopinion: 'reading', figurative: 'reading',
 };
 
