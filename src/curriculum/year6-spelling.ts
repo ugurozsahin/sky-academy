@@ -1,6 +1,6 @@
 // Year 6 spelling strand (#1212). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year6-<slug>.ts` and this file keeps only its row/import.
-// import: y6-ough
+import { y6Ough } from './year6-ough';
 // import: y6-homophones
 import { y6Homophones } from './year6-homophones';
 import { y6Wordlist } from './wordlist-y6';
@@ -9,7 +9,7 @@ import { y6Spellgap } from './year6-spellgap';
 import type { Topic } from './types';
 
 export const Y6_SPELLING: Topic[] = [
-  // slot: y6-ough
+  { id: 'y6-ough', title: 'ough and ei Spellings', icon: '🔤', subject: 'writing', year: 'year6', nc: 'Y5/6 Spelling: ough; ei after c (Appendix 1)', strand: 'spelling', gen: y6Ough },
 
   { id: 'y6-homophones', title: 'Often-Confused Words', icon: '👂', subject: 'writing', year: 'year6', nc: 'Y5/6 Spelling: homophones and often-confused words (Appendix 1)', strand: 'spelling', gen: y6Homophones },
 
