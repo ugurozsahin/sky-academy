@@ -190,12 +190,13 @@ function createTintCache(tint: Tint, disposed: () => boolean) {
   };
 }
 
-/** Renders the sheets still missing, once per solid. Throws when the renderer cannot (the caller records `no-webgl`). */
-function bakeSheets(view: SolidView, names: SolidName[], sheets: Map<string, SpinSheet>): void {
+/** Renders the sheets still missing, once per solid. When the renderer throws, `onThrow` hears of it and the rest are left for the next question. */
+function bakeSheets(view: SolidView, names: SolidName[], sheets: Map<string, SpinSheet>, onThrow: (e: unknown) => void): void {
   for (const name of names) {
     const glyph = GLYPH_BY_NAME.get(name)!;
     if (sheets.has(glyph)) continue;
-    const sheet = view.sheet(name, SHEET.frames, SHEET.cell);
+    let sheet: SpinSheet;
+    try { sheet = view.sheet(name, SHEET.frames, SHEET.cell); } catch (e) { onThrow(e); return; }
     // A lost GL context draws nothing and reads back zeros, silently. A sheet with no opaque pixel would put an
     // empty bubble in front of a child, so it is not kept: the emoji stays, and the next question tries again.
     if (!hasInk(sheet)) { console.warn(`3-D solids: the ${name} sheet came back blank (context lost?); keeping the emoji`); continue; }
@@ -241,7 +242,7 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
   function bake() {
     if (!view || disposed) return;
     const names = toBake; toBake = [];
-    try { bakeSheets(view, names, sheets); } catch (e) { fail('no-webgl', e); }
+    bakeSheets(view, names, sheets, e => fail('no-webgl', e));
   }
   const fail = (kind: NonNullable<SolidState['error']>, e: unknown) => { error = kind; noteFailure(kind, e); };
   return {
