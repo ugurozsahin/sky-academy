@@ -8,7 +8,7 @@
 // below, exactly as before the move. The pieces the screen builds *after* the session (the arena, the
 // `window.__sna` hooks) are read through the function-valued deps, so the order in play.ts is unchanged.
 import { cheerLine, type Avatar } from '../avatars';
-import { STAGE_NAMES, type Question } from '../curriculum';
+import type { Question } from '../curriculum';
 import type { Arena } from '../game/arena';
 import type { DojoOutcome } from '../game/dojo';
 import { Session, type SessionOpts, type SessionResult } from '../game/session';
@@ -17,11 +17,13 @@ import { waveOptsFor } from './wave-opts';
 import { canHear, haptic, hush, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate'; import { firstQuestionLine, type ResultCandidate } from './results';   // #897; one line: at its #714 cap
 import { createFactLog } from '../fact-record';
-import { $, esc } from './dom';
+import { $ } from './dom';
 import { freezeUntilVisible } from './hidden-hold';
 import { createGhost } from './ghost'; import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
-import { correctionLine, hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
+import { correctionLine, hintText, promptHTML, promptMode, setHint, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
+import { createMissionPill } from './mission-pill';
+import { createPeek, NO_VOICE_PEEK_MS } from './play-peek';
 import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
@@ -118,8 +120,7 @@ export interface PlaySession {
   dispose(): void;
 }
 
-/** A visual equivalent of hearing a sentence once: look, remember, then build. */
-export const NO_VOICE_PEEK_MS = 3000;
+export { NO_VOICE_PEEK_MS };   // moved to play-peek.ts with the peek (#1501); importers unchanged
 /** The 🔊 button's labels per prompt mode; `read` hides it — the words are already on the card. */
 const SPEAK_LABEL = {
   hear: { aria: 'Read the question aloud', title: 'Tap the card to hear it again' },
@@ -157,27 +158,19 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   // reuses that payout instead of committing (and so paying) the game a second time.
   let earlyPayout: ResultPayout | null = null;
   let activeQuestion: Question | null = null;
-  // The peek (#65): a sentence shown for NO_VOICE_PEEK_MS of un-paused time, then hidden. `peekLeft` is the
-  // time still to run, `peekSince` when the current run started, `peekDone` what the hide releases (the wave
-  // launch, for the first peek of a question). `holdOpen` mirrors the pause overlay; `readThrough` marks a
-  // question whose verdict arrived after its bubbles launched, so its sentence stays readable instead.
-  let peekToken = 0; let peekActive = false; let peekLeft = 0; let peekSince = 0;
-  let peekDone: (() => void) | null = null; let holdOpen = false; let readThrough = false;
+  // `holdOpen` mirrors the pause overlay; `readThrough` marks a question whose verdict arrived after its bubbles
+  // launched, so its sentence stays readable instead of peeking (#65). The peek's own clock lives in play-peek.ts.
+  let holdOpen = false; let readThrough = false;
   let prevLives = opts.year.lives;
   // #44: false only until Fredoka is usable (or the capped wait gives up). The first wave is held back that
   // long so its labels are measured and drawn in the real face; every wave after it spawns synchronously.
   let fontsReady = false; fontReady().then(() => { fontsReady = true; });
   const solid = createSolidSlot(() => els.vis);   // #684: three loads on the first 3-D Shapes card, never before
-  // Mission progress (#55): stage name + one segment per question (green = right, red = slip, pulsing = current) + a small "3/6".
-  let segStage = 0; let segs: ('good' | 'bad' | '')[] = [];
-  function drawStage(stage: number, index: number, total: number) {
-    if (!mission) { els.stage.textContent = `Q${session.questionsAsked}`; return; }
-    if (stage !== segStage) { segStage = stage; segs = Array.from({ length: total }, () => ''); }
-    els.stage.innerHTML = stageHTML(STAGE_NAMES[stage - 1] ?? `Stage ${stage}`, segs, index, total);
-  }
-  const markSeg = (k: 'good' | 'bad') => {
-    if (mission) { segs[session.index] = k; drawStage(session.stage, session.index, session.perStage); }
-  };
+  const pill = createMissionPill(els.stage, mission, () => session.questionsAsked);   // mission progress (#55)
+  const peek = createPeek({
+    els, later: deps.later, mounted: deps.mounted, current: () => activeQuestion, held: () => holdOpen,
+    sync: () => syncPaused(), hiddenHTML: q => promptHTML(q, session.seqIndex, false, session.remaining()),
+  });
   const endWave = (ms: number) => {                // freeze the wave while the outcome is on screen
     const id = waveId; revealUntil = performance.now() + ms;
     deps.later(() => { if (waveId === id) deps.arena()?.clearWave('#ffffff'); }, ms);
@@ -185,7 +178,8 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   /** The beat every outcome shares. `reveal` is what the arena spotlights: the right answer, and the wrong bubble if one was cut. */
   function settle(kind: Outcome, q: Question, reveal: { good: string; bad?: string }) {
     const rule = OUTCOME[kind];
-    lastOutcome = kind; markSeg(rule.seg); facts.note(q, kind, opts.mode === 'mtc' ? session.lastAnswerMs || undefined : undefined);   // #1122: ms only in a timed Tables Check
+    lastOutcome = kind; pill.mark(rule.seg, session.stage, session.index, session.perStage);
+    facts.note(q, kind, opts.mode === 'mtc' ? session.lastAnswerMs || undefined : undefined);   // #1122: ms only in a timed Tables Check
     if (rule.taunt) deps.showTaunt();
     const arena = deps.arena();
     if (!arena) { if (rule.advance) deps.later(() => session.advance(), scaled(rule.advance)); return; }   // #138: the tracing path's own beat, scaled like every other
@@ -197,34 +191,8 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
    *  overlay pauses for good and nothing here may undo. */
   function syncPaused() {
     const arena = deps.arena();
-    if (arena) arena.paused = holdOpen || peekActive || session.ended;
+    if (arena) arena.paused = holdOpen || peek.active || session.ended;
   }
-  /** Drop a peek without finishing it — a new question, a slice, or teardown made it moot. */
-  function releasePeek() {
-    if (!peekActive) return;
-    peekToken++; peekActive = false; peekDone = null;
-    syncPaused();
-  }
-  /** Show the sentence and start (or resume) its clock. `then` runs when it hides — nothing, for a repeat. */
-  function showPeek(q: Question, then: (() => void) | null) {
-    els.prompt.innerHTML = esc(q.listen!);
-    setHint(els, 'Look, remember, then build it');
-    peekActive = true; peekLeft = scaled(NO_VOICE_PEEK_MS); peekDone = then;
-    syncPaused();
-    if (!holdOpen) runPeek(q);
-  }
-  function runPeek(q: Question) {
-    const token = ++peekToken; peekSince = performance.now();
-    deps.later(() => {
-      if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
-      els.prompt.innerHTML = promptHTML(q, session.seqIndex, false, session.remaining());
-      setHint(els, q.peekHint ?? 'Slice the words in order');
-      const then = peekDone; peekActive = false; peekDone = null;
-      syncPaused();
-      then?.();
-    }, peekLeft);
-  }
-
   /**
    * Put the prompt on the card for the device's voice verdict (#65). Returns true when a peek is holding the
    * wave back — the caller launches when it ends. `launched` says the bubbles are already up (a verdict that
@@ -233,7 +201,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
    */
   function renderQuestion(q: Question, launched: boolean): boolean {
     const mode = promptMode(q, canHear());
-    releasePeek();
+    peek.release();
     if (mode === 'peek' && launched) readThrough = true;
     const reveal = mode === 'read' || readThrough;
     els.speak.hidden = reveal;
@@ -253,12 +221,12 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
       const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { deps.later(() => show(), wait + scaled(450)); return; } show();
       function show() {
-        drawStage(info.stage, info.index, info.total);
+        pill.draw(info.stage, info.index, info.total);
         // Sensei: name the topic of each question
         const t = session.currentTopic;
         if (deps.training && t) $('.ttl').textContent = `${t.icon} ${t.title}`;
         const firstLine = firstQuestionLine(q, opts.topic, session.questionsAsked, !!opts.practice, activeQuestion); activeQuestion = q; readThrough = false;
-        const peek = renderQuestion(q, false);
+        const peeking = renderQuestion(q, false);
         els.vis.innerHTML = renderVisual(q.visual);
         solid.show(q, session.currentTopic?.id);
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
@@ -306,7 +274,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
           fontReady().then(() => deps.later(() => { if (deps.mounted()) spawn(); }, scaled(0)));   // never into a torn-down screen
         };
         const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
-        if (peek) showPeek(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
+        if (peeking) peek.show(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
       }
     },
     onCorrect(q, points, combo) {
@@ -330,7 +298,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       if (opts.mode !== 'sprint') hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
     },
     onProgress(label, done, total) {
-      releasePeek();
+      peek.release();
       sfx.slice();
       const arena = deps.arena();
       // the next word is earned: bring it up now instead of making the child wait for its batch
@@ -375,7 +343,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   // Registered after `session` exists: `recordVoice` dispatches synchronously, and this reads the session. A
   // verdict that lands mid-peek is left alone — the sentence is on the card and the wave launches when it hides.
   const stopWatchingVoice = onVoiceStateChange(() => {
-    if (activeQuestion && !session.waiting && !peekActive && deps.mounted()) renderQuestion(activeQuestion, true);
+    if (activeQuestion && !session.waiting && !peek.active && deps.mounted()) renderQuestion(activeQuestion, true);
   });
 
   return {
@@ -392,22 +360,19 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       // #65 stopped it so a child pausing mid-sentence found the sentence still there — and the outcome hold,
       // the inter-question gap and the results cue were the ones still running behind the overlay.
       if (beats) deps.holdTimers(open);
-      if (peekActive && activeQuestion) {
-        if (open) { peekLeft = Math.max(0, peekLeft - (performance.now() - peekSince)); peekToken++; }   // stop the clock
-        else runPeek(activeQuestion);                                                                 // and restart it
-      }
+      peek.pause(open);
       syncPaused();
     },
     repeat() {
       const q = activeQuestion;
       if (!q || session.waiting || readThrough || promptMode(q, canHear()) !== 'peek' || !deps.mounted()) return false;
-      if (!peekActive) showPeek(q, null);   // bubbles already up stay frozen while the child looks; nothing waits on it
+      if (!peek.active) peek.show(q, null);   // bubbles already up stay frozen while the child looks; nothing waits on it
       return true;
     },
     solid: () => solid.state(),
     bubbleArt: (label, colour, phase) => solid.bubbleArt(label, colour, phase),
     solidArt: () => solid.art(),
-    dispose() { releasePeek(); stopWatchingVoice(); solid.dispose(); },
+    dispose() { peek.release(); stopWatchingVoice(); solid.dispose(); },
   };
 }
 
