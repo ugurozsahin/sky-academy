@@ -141,24 +141,13 @@ const tintSheet: Tint = (sheet, colour) => {
 /** Finished tinted sheets kept per screen, least recently drawn evicted first. 16 covers several waves at ~1.2 MB each. */
 const TINTED_MAX = 16;
 
-let warnedOnce = false;
-export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, tint: Tint = tintSheet): SolidSlot {
-  let view: SolidView | null = null;
-  let loading: Promise<typeof import('../three/mount/solids')> | null = null;
-  let wanted: SolidName | null = null;   // the solid the card currently asks for; null once a plain question follows
-  let error: SolidState['error'] = null;   // set once three could not be used — the emoji stays, the hook says why
-  let disposed = false;
-  let topic: string | undefined;          // the live question's topic: bubble art is drawn only on a 3-D Shapes topic
-  let toBake: SolidName[] = [];           // solids among the live question's bubbles with no sheet yet
-  let draws = 0;
-  const sheets = new Map<string, SpinSheet>();   // keyed by the bubble's glyph, the label the arena passes
-  // glyph → bubble colour → its tinted sheet. Both keys are strings the arena already holds, so a lookup builds
-  // nothing on the per-frame path. `used` is a frame-independent tick bumped on every hit: the eviction key.
+/**
+ * glyph → bubble colour → its tinted sheet. Both keys are strings the arena already holds, so a lookup builds
+ * nothing on the per-frame path. `used` is a frame-independent tick bumped on every hit: the eviction key.
+ */
+function createTintCache(tint: Tint, disposed: () => boolean) {
   const tinted = new Map<string, Map<string, Tinted>>();
   let tick = 0;
-  // Reused for every bubble every frame (no per-frame allocation): valid until the next `bubbleArt` call, which
-  // is all the arena needs — it draws it at once. `img` is set before `frame` is ever handed out.
-  const frame: ArtFrame = { img: null as unknown as CanvasImageSource, sx: 0, size: SHEET.cell };
   /** Drop least-recently-used finished sheets until at most `TINTED_MAX` remain. Pending and failed ones are small. */
   function evict() {
     for (;;) {
@@ -179,47 +168,91 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
     let p: Promise<CanvasImageSource>;
     try { p = tint(sheet, complement(colour)); } catch (e) { failed(e); return; }   // never throw into the arena's frame
     p.then(img => {
-      if (disposed || byColour.get(colour) !== entry) { (img as { close?: () => void }).close?.(); return; }
+      if (disposed() || byColour.get(colour) !== entry) { (img as { close?: () => void }).close?.(); return; }
       entry.state = 'ready'; entry.img = img; evict();
     }, failed);
   }
-  function mount(name: SolidName) {
-    if (!view || disposed) return;
-    host().replaceChildren(view.el);
-    view.show(name);
+  return {
+    /** The finished entry for this glyph and colour, bumped as just used; null while it is missing (a tint starts), pending or failed — the emoji stays. */
+    ready(label: string, colour: string, sheet: SpinSheet): Tinted | null {
+      let byColour = tinted.get(label);
+      if (!byColour) { byColour = new Map(); tinted.set(label, byColour); }
+      const entry = byColour.get(colour);
+      if (!entry) { startTint(colour, sheet, byColour); return null; }   // the emoji until it lands
+      if (entry.state !== 'ready') return null;                          // still tinting, or failed for good: the emoji
+      entry.used = ++tick;
+      return entry;
+    },
+    clear() {
+      for (const m of tinted.values()) for (const t of m.values()) (t.img as { close?: () => void } | null)?.close?.();
+      tinted.clear();
+    },
+  };
+}
+
+/** Renders the sheets still missing, once per solid. Throws when the renderer cannot (the caller records `no-webgl`). */
+function bakeSheets(view: SolidView, names: SolidName[], sheets: Map<string, SpinSheet>): void {
+  for (const name of names) {
+    const glyph = GLYPH_BY_NAME.get(name)!;
+    if (sheets.has(glyph)) continue;
+    const sheet = view.sheet(name, SHEET.frames, SHEET.cell);
+    // A lost GL context draws nothing and reads back zeros, silently. A sheet with no opaque pixel would put an
+    // empty bubble in front of a child, so it is not kept: the emoji stays, and the next question tries again.
+    if (!hasInk(sheet)) { console.warn(`3-D solids: the ${name} sheet came back blank (context lost?); keeping the emoji`); continue; }
+    sheets.set(glyph, sheet);
   }
+}
+
+let warnedOnce = false;
+/** The solids among `q`'s bubbles that have no sheet yet: only on a 3-D Shapes topic. */
+function unbakedSolids(q: Question, topicId: string | undefined, sheets: ReadonlyMap<string, SpinSheet>): SolidName[] {
+  if (!topicId || !SOLID_TOPICS.has(topicId)) return [];
+  return q.options.flatMap(o => { const n = NAME_BY_GLYPH.get(o); return n && !sheets.has(o) ? [n] : []; });
+}
+
+/** Why the chunk did not load: a build-time or flag-time choice, or a real failure. */
+function loadFailureKind(e: unknown): NonNullable<SolidState['error']> {
+  const off = e as { builtOff?: boolean; flagOff?: boolean } | null;
+  return off?.builtOff ? 'built-off' : off?.flagOff ? 'flag-off' : 'load-failed';
+}
+
+/** One console warning per page for a failure; a choice (built or flagged off) is the design and warns nothing. */
+function noteFailure(kind: NonNullable<SolidState['error']>, e: unknown): void {
+  if (kind === 'built-off' || kind === 'flag-off') return;
+  if (!warnedOnce) { warnedOnce = true; console.warn(`3-D solids: ${kind === 'no-webgl' ? 'WebGL renderer unavailable' : 'could not load three'}, keeping the emoji`, e); }
+}
+
+export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, tint: Tint = tintSheet): SolidSlot {
+  let view: SolidView | null = null;
+  let loading: Promise<typeof import('../three/mount/solids')> | null = null;
+  let wanted: SolidName | null = null;   // the solid the card currently asks for; null once a plain question follows
+  let error: SolidState['error'] = null;   // set once three could not be used — the emoji stays, the hook says why
+  let disposed = false;
+  let topic: string | undefined;          // the live question's topic: bubble art is drawn only on a 3-D Shapes topic
+  let toBake: SolidName[] = [];           // solids among the live question's bubbles with no sheet yet
+  let draws = 0;
+  const sheets = new Map<string, SpinSheet>();   // keyed by the bubble's glyph, the label the arena passes
+  const cache = createTintCache(tint, () => disposed);
+  // Reused for every bubble every frame (no per-frame allocation): valid until the next `bubbleArt` call, which
+  // is all the arena needs — it draws it at once. `img` is set before `frame` is ever handed out.
+  const frame: ArtFrame = { img: null as unknown as CanvasImageSource, sx: 0, size: SHEET.cell };
+  const mount = (name: SolidName) => { if (view && !disposed) { host().replaceChildren(view.el); view.show(name); } };
   /** Once per solid per screen: a few dozen tiny renders, at question time rather than in the arena's frame. */
   function bake() {
     if (!view || disposed) return;
     const names = toBake; toBake = [];
-    for (const name of names) {
-      const glyph = GLYPH_BY_NAME.get(name)!;
-      if (sheets.has(glyph)) continue;
-      let sheet: SpinSheet;
-      try { sheet = view.sheet(name, SHEET.frames, SHEET.cell); } catch (e) { fail('no-webgl', e); return; }
-      // A lost GL context draws nothing and reads back zeros, silently. A sheet with no opaque pixel would put an
-      // empty bubble in front of a child, so it is not kept: the emoji stays, and the next question tries again.
-      if (!hasInk(sheet)) { console.warn(`3-D solids: the ${name} sheet came back blank (context lost?); keeping the emoji`); continue; }
-      sheets.set(glyph, sheet);
-    }
+    try { bakeSheets(view, names, sheets); } catch (e) { fail('no-webgl', e); }
   }
-  function fail(kind: NonNullable<SolidState['error']>, e: unknown) {
-    error = kind;
-    if (kind === 'built-off' || kind === 'flag-off') return;   // a choice, not a failure: the emoji is the design, nothing to warn about
-    if (!warnedOnce) { warnedOnce = true; console.warn(`3-D solids: ${kind === 'no-webgl' ? 'WebGL renderer unavailable' : 'could not load three'}, keeping the emoji`, e); }
-  }
+  const fail = (kind: NonNullable<SolidState['error']>, e: unknown) => { error = kind; noteFailure(kind, e); };
   return {
     show(q, topicId) {
       topic = topicId;
       const name = solidNameFor(q, topicId);
       wanted = name;
       if (!name) view?.hide();
-      toBake = topicId && SOLID_TOPICS.has(topicId)
-        ? q.options.flatMap(o => { const n = NAME_BY_GLYPH.get(o); return n && !sheets.has(o) ? [n] : []; })
-        : [];
+      toBake = unbakedSolids(q, topicId, sheets);
       if (!name && !toBake.length) return;
-      // A renderer that has already failed once (`bake()`'s catch below) is never retried per question — the
-      // same guard the pre-load path already takes six lines down.
+      // A renderer that has already failed once is never retried per question (`bake()` records it in `error`).
       if (view) { if (error) return; if (name) mount(name); bake(); return; }
       if (error) return;
       // The card and the bubbles already hold the emoji; three arrives a moment later and takes over — unless the
@@ -231,10 +264,7 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
         catch (e) { fail('no-webgl', e); return; }
         if (wanted) mount(wanted);
         bake();
-      }, e => {
-        const off = e as { builtOff?: boolean; flagOff?: boolean } | null;
-        fail(off?.builtOff ? 'built-off' : off?.flagOff ? 'flag-off' : 'load-failed', e);
-      });
+      }, e => fail(loadFailureKind(e), e));
     },
     state() {
       if (!wanted) return null;
@@ -243,13 +273,8 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
     bubbleArt(label, colour, phase) {
       if (!topic || !SOLID_TOPICS.has(topic)) return null;
       const sheet = sheets.get(label); if (!sheet) return null;
-      let byColour = tinted.get(label);
-      if (!byColour) { byColour = new Map(); tinted.set(label, byColour); }
-      const entry = byColour.get(colour);
-      if (!entry) { startTint(colour, sheet, byColour); return null; }   // the emoji until it lands
-      if (entry.state !== 'ready') return null;                          // still tinting, or failed for good: the emoji
-      entry.used = ++tick; draws++;
-      frame.img = entry.img!; frame.sx = (Math.floor(Math.max(0, phase) * SHEET.fps) % SHEET.frames) * SHEET.cell;
+      const entry = cache.ready(label, colour, sheet); if (!entry) return null;
+      draws++; frame.img = entry.img!; frame.sx = (Math.floor(Math.max(0, phase) * SHEET.fps) % SHEET.frames) * SHEET.cell;
       return frame;
     },
     art() {
@@ -259,8 +284,7 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
     cheer() { if (view && wanted) view.beat('cheer'); },
     dispose() {
       disposed = true; wanted = null; topic = undefined; sheets.clear();
-      for (const m of tinted.values()) for (const t of m.values()) (t.img as { close?: () => void } | null)?.close?.();
-      tinted.clear(); view?.destroy(); view = null;
+      cache.clear(); view?.destroy(); view = null;
     },
   };
 }
