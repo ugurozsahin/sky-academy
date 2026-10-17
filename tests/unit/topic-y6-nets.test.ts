@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty, Question } from '../../src/curriculum';
 import { SHAPES_3D, sameShape } from '../../src/curriculum/util';
-import { SOLIDS } from '../../src/curriculum/year6-nets';
-import { foldFaces } from './helpers/cube-fold';
+import { SOLIDS, CUBE_NETS, foldCells } from '../../src/curriculum/year6-nets';
+import { foldFaces, isCubeNet, canon } from './helpers/cube-fold';
 import { rLblProblem } from './helpers/r-lbl';
 
 function rng(seed: number) {
@@ -28,6 +28,10 @@ describe('y6-nets (#1246)', () => {
       expect([s.faces, s.edges, s.vertices, s.net], s.name).toEqual(LEX[s.name]);
       expect(s.faces + s.vertices - s.edges, s.name).toBe(2);
     }
+  });
+
+  it('every near solid names another row of the table', () => {
+    for (const s of SOLIDS) { expect(SOLIDS.map(o => o.name), s.name).toContain(s.near); expect(s.near).not.toBe(s.name); }
   });
 
   it('the cube, cuboid and square-based pyramid agree with SHAPES_3D', () => {
@@ -72,6 +76,23 @@ describe('y6-nets (#1246)', () => {
     expect(alike / no).toBeGreaterThanOrEqual(0.5);
   });
 
+  it('the 11 cube nets are all nets and no two are the same shape', () => {
+    expect(CUBE_NETS).toHaveLength(11);
+    for (const n of CUBE_NETS) expect(isCubeNet([...n]), n.join('/')).toBe(true);
+    expect(new Set(CUBE_NETS.map(n => canon([...n]))).size).toBe(11);
+  });
+
+  it('the generator\'s own fold matches a hand rule: along a strip of four, squares two apart are opposite, and the two squares off the strip are opposite', () => {
+    for (const n of CUBE_NETS.filter(n => n.some(r => r.includes('####')))) {
+      const cells = foldCells([...n]), face = (r: number, c: number) => cells.find(x => x.r === r && x.c === c)?.face;
+      const sr = n.findIndex(r => r.includes('####')), sc = n[sr].indexOf('####');
+      for (let i = 0; i < 2; i++) expect(face(sr, sc + i)! + face(sr, sc + i + 2)!, n.join('/')).toBe(5);
+      const off = cells.filter(x => !(x.r === sr && x.c >= sc && x.c < sc + 4));
+      expect(off).toHaveLength(2); expect(off[0].face + off[1].face, n.join('/')).toBe(5);
+      expect(new Set(cells.map(x => x.face)).size).toBe(6);
+    }
+  });
+
   it('d3: the fold simulation agrees with every answer, the shaded squares are opposite, and no decoy is opposite the asked letter', () => {
     const askedSeen = new Set<string>();
     for (const q of draw(3)) {
@@ -89,5 +110,6 @@ describe('y6-nets (#1246)', () => {
       expect(q.say).toContain('shaded and lettered');
     }
     expect([...askedSeen].sort()).toEqual(['A', 'B', 'C', 'D']);
+    expect(new Set(draw(3).map(q => q.answer)).size).toBe(4);   // the answer letter varies
   });
 });

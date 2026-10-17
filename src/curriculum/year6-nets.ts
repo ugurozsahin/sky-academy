@@ -4,8 +4,8 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { pick, ri, shuffle, wordQ, sameShape } from './util';
 
-/** The 11 nets of a cube, one per shape up to turning and flipping (the unit test folds each one). */
-const CUBE_NETS: readonly (readonly string[])[] = [
+/** The 11 nets of a cube, one per shape up to turning and flipping (the unit test checks each is a net and no two are the same). */
+export const CUBE_NETS: readonly (readonly string[])[] = [
   ['#...', '####', '#...'], ['#...', '####', '.#..'], ['#...', '####', '..#.'], ['#...', '####', '...#'], ['.#..', '####', '.#..'], ['.#..', '####', '..#.'],
   ['##..', '.###', '.#..'], ['##..', '.###', '..#.'], ['##..', '.###', '...#'], ['##..', '.##.', '..##'], ['###..', '..###'],
 ];
@@ -74,18 +74,20 @@ function roll(c: Cube, dr: number, dc: number): Cube {
   if (dr === 1) return { ...c, bottom: c.south, south: c.top, top: c.north, north: c.bottom };
   return { ...c, bottom: c.north, north: c.top, top: c.south, south: c.bottom };
 }
-/** The six `#` cells of a cube net, each with the face (0–5) it folds to, found by rolling a cube over them. */
-function foldCells(grid: string[]): { r: number; c: number; face: number }[] {
+interface FoldCell { r: number; c: number; face: number }
+/** The six `#` cells of a cube net, each with the face (0–5) it folds to, found by rolling a cube over them (a net has no 2 × 2 block, so no cell is reached by two routes). */
+export function foldCells(grid: string[]): FoldCell[] {
   const on = (r: number, c: number) => grid[r]?.[c] === '#';
   const start = grid.flatMap((row, r) => Array.from(row, (_, c) => (on(r, c) ? [r, c] : null))).find(x => x)!;
-  const out: { r: number; c: number; face: number }[] = [], seen = new Set<string>();
-  const stack: [number, number, Cube][] = [[start![0], start![1], { bottom: 0, top: 5, north: 1, south: 4, east: 2, west: 3 }]];
+  const out: FoldCell[] = [], seen = new Set<string>();
+  const stack: [number, number, Cube][] = [[start[0], start[1], { bottom: 0, top: 5, north: 1, south: 4, east: 2, west: 3 }]];
   while (stack.length) {
     const [r, c, cube] = stack.pop()!;
     if (seen.has(`${r},${c}`)) continue;
     seen.add(`${r},${c}`); out.push({ r, c, face: cube.bottom });
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (on(r + dr, c + dc)) stack.push([r + dr, c + dc, roll(cube, dr, dc)]);
   }
+  if (out.length !== 6) throw new Error(`y6-nets: a cube net has six squares, found ${out.length}`);
   return out;
 }
 
