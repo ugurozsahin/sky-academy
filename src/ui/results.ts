@@ -13,6 +13,7 @@ import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import { listedTopics, topicById, type YearInfo } from '../curriculum';
 import { beltFor, totalStarsOf } from '../game/belts';
 import { dailyLine, keepDailyLine } from '../game/daily-line';
+import { familyBest, familyBestLine } from '../family-best';
 
 /** How a finished run scored — the fields the medal reads. */
 export interface RunOutcome {
@@ -196,8 +197,8 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
   if (!topic) return { newBest: recordSprint(year.id, r.score), candidates: [] };
   if (!topicById(topic.id)) return { newBest: false, candidates: [] };   // #1124: a drill built for one run (Tricky Facts) has no row to keep a best on
   const before = load().progress[topic.id]?.sprint ?? 0, newBest = recordTopicSprint(topic.id, r.correct);
-  const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null;
-  return { newBest, candidates: t ? [t] : [] };
+  const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null, fam = familyBest(topic.id);   // #1293: siblings on this device race each other's best
+  return { newBest, candidates: [...(t ? [t] : []), ...(fam ? [{ kind: 'best' as const, text: familyBestLine(fam, r.correct, topic.title) }] : [])] };
 }
 
 /** A Mission's `best` announcement (#933): `New best for <topic title>!` only when `recordTopic()` said the score beat a real previous best. */
