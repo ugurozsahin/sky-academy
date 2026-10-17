@@ -33,19 +33,20 @@ function numCard(rng: Rng, prompt: string, answer: number, named: number[], extr
 /** d1: km to miles, read across from the km label to the line. The slips copy the given number, subtract 3, or are one gridline out. */
 function kmToMiles(rng: Rng): Question {
   const k = pick(rng, KM.slice(1)), a = miles(k);
-  return numCard(rng, `Use the graph. ${k} km ≈ ? miles`, a, [k, k - 3, a + 5, a - 5], {
+  return numCard(rng, `Use the graph. ${k} km is about ? miles`, a, [k, k - 3, a + 5, a - 5], {
     visual: convGraph(), say: `Use the graph. About how many miles is ${k} kilometres?` });
 }
 
 /** d2: miles to km, read backwards from the value to the x label. The slips copy the given number, add 8, or are one label out. */
 function milesToKm(rng: Rng): Question {
   const m = pick(rng, [5, 10, 15, 20, 25]), a = km(m);
-  return numCard(rng, `Use the graph. ${m} miles ≈ ? km`, a, [m, m + 8, a + 8, a - 8], {
+  return numCard(rng, `Use the graph. ${m} miles is about ? km`, a, [m, m + 8, a + 8, a - 8], {
     visual: convGraph(), say: `Use the graph. About how many kilometres is ${m} miles?` });
 }
 
 const hh = (i: number) => `${String(8 + i).padStart(2, '0')}:00`;
-const oclock = (i: number) => `${numberWord(8 + i)} o'clock`;
+/** The hour as it is said: 13:00 is "one o'clock". */
+const oclock = (i: number) => `${numberWord((7 + i) % 12 + 1)} o'clock`;
 /** d2: a cyclist's distance so far, hourly; how far in one hour. Every reading is a multiple of 5 km. */
 function cyclist(rng: Rng): Question {
   const count = ri(rng, 5, 6), picked = shuffle(rng, Array.from({ length: 8 }, (_, i) => (i + 1) * 5)).slice(0, count - 1).sort((a, b) => a - b), n = [0, ...picked];
@@ -70,8 +71,8 @@ function furtherCard(rng: Rng): Question {
 /** d3: past the end of the graph: the line keeps its shape, so 5 miles is always 8 km. */
 function beyondCard(rng: Rng): Question {
   const m = 5 * ri(rng, 6, 20), a = km(m);
-  return numCard(rng, `Use the graph. ${m} miles ≈ ? km`, a, [m, a + 8, a - 8, m + 8], {
-    visual: convGraph(), say: `Use the graph. About how many kilometres is ${m} miles?`, hint: 'The line carries on: every 5 miles is 8 km' });
+  return numCard(rng, `Use the graph. ${m} miles is about ? km`, a, [m, a + 8, a - 8, m + 8], {
+    visual: convGraph(), say: `Use the graph. About how many kilometres is ${m} miles?`, hint: 'The line carries on in the same pattern' });
 }
 
 export const y6Graphs: Generator = (d: Difficulty, rng: Rng): Question =>

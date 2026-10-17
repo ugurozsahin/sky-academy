@@ -41,7 +41,7 @@ describe('y6-graphs (#1250)', () => {
 
   it('d1: the answer is the miles for the km the card gives, read from the plotted data', () => {
     for (const q of draw(1)) {
-      const k = Number(/Use the graph\. (\d+) km ≈ \? miles$/.exec(q.prompt)![1]), row = chart(q).rows.find(r => Number(r.label) === k)!;
+      const k = Number(/Use the graph\. (\d+) km is about \? miles$/.exec(q.prompt)![1]), row = chart(q).rows.find(r => Number(r.label) === k)!;
       expect(q.answer, q.prompt).toBe(String(row.n));
       expect(q.options, q.prompt).toContain(String(k));   // copying the number from the question is a decoy on every card
     }
@@ -52,7 +52,7 @@ describe('y6-graphs (#1250)', () => {
     for (const q of draw(2)) {
       const rows = chart(q).rows;
       if (isConv(rows)) {
-        conv++; const m = Number(/Use the graph\. (\d+) miles ≈ \? km$/.exec(q.prompt)![1]);
+        conv++; const m = Number(/Use the graph\. (\d+) miles is about \? km$/.exec(q.prompt)![1]);
         expect(q.answer, q.prompt).toBe(String(Number(rows.find(r => r.n === m)!.label)));
         expect(q.options, q.prompt).toContain(String(m));
       } else {
@@ -75,7 +75,7 @@ describe('y6-graphs (#1250)', () => {
         expect(f[3] === 'Ben' ? ben > ali : ali > ben, q.prompt).toBe(true);
         expect(q.answer).toBe(String(Math.abs(ben - ali)));
       } else {
-        beyond++; const m = Number(/Use the graph\. (\d+) miles ≈ \? km$/.exec(q.prompt)![1]);
+        beyond++; const m = Number(/Use the graph\. (\d+) miles is about \? km$/.exec(q.prompt)![1]);
         expect(m).toBeGreaterThan(25); expect(m % 5).toBe(0); expect(q.answer).toBe(String(toKm(m)));
       }
       expect(isConv(chart(q).rows)).toBe(true);
@@ -90,6 +90,23 @@ describe('y6-graphs (#1250)', () => {
       const text = [q.prompt, q.hint, q.say].join(' ').replace(/\d\d:00/g, '');
       for (const n of nums(text)) expect(plotted.has(n), `${q.prompt} states ${n}`).toBe(false);
     }
+  });
+
+  it('on a conversion card the hint and say state only the numbers the prompt gives, never a reading of the graph', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
+      if (!isConv(chart(q).rows)) continue;
+      const given = new Set(nums(q.prompt));
+      for (const n of nums([q.hint, q.say].join(' '))) expect(given.has(n), `${q.prompt} / ${q.hint} / ${q.say} states ${n}`).toBe(true);
+    }
+  });
+
+  it('the cyclist\'s say gives the hours in 12-hour words, never "thirteen o\'clock"', () => {
+    let seen13 = 0;
+    for (const q of draw(2, 600)) if (q.prompt.startsWith('Cyclist')) {
+      expect(q.say).not.toMatch(/thirteen/);
+      if (q.prompt.includes('13:00')) { seen13++; expect(q.say).toContain("one o'clock"); }
+    }
+    expect(seen13).toBeGreaterThan(0);
   });
 
   it('on a conversion card the answer is never stated in the prompt, hint or say', () => {
