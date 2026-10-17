@@ -50,7 +50,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   decimals: 'decimals', decfrac: 'decimals', decmult: 'decimals', fdp: 'decimals',
   percent: 'percent', percentof: 'percent',
   ratio: 'ratio',
-  algebra: 'algebra', formulae: 'algebra', 'order-ops': 'algebra',
+  algebra: 'algebra', twounknowns: 'algebra', formulae: 'algebra', 'order-ops': 'algebra',
   sounds: 'phonics', soundhunt: 'phonics', syllables: 'phonics', initial: 'phonics', digraphs: 'phonics', alien: 'phonics', build: 'phonics', alphabet: 'phonics',
   rhyme: 'rhymes',
   trace: 'tracing', tracenum: 'tracing',
