@@ -997,6 +997,45 @@ test.describe('Sky Ninja Academy', () => {
     expect(await keys(), 'localStorage is byte-identical').toBe(before);
   });
 
+  // #1296: Whiteboard mode adds two Daily Ten rows to every island; outside it the rows are absent.
+  test('Daily Ten (#1296): in Whiteboard mode an island offers it, ten questions end the run, no life is lost and nothing is saved', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { voice: 'no' });
+    await openGrownUps(page);
+    const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+    const before = await keys();
+    await page.click('#whiteboard-start');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('#daily10')).toBeVisible();
+    await expect(page.locator('#daily10t')).toBeVisible();
+    await expectFitsViewport(page, 'island menu with the Daily Ten rows');
+    await page.click('#daily10');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    const lives = await page.evaluate(() => window.__sna.state().lives);
+    await waitForWrongOrEnd(page);
+    let asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
+    await waitForWrongOrEnd(page);
+    asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
+    for (let i = 0; i < 8; i++) await solveCurrent(page);   // any card type: a sequence or any-order card takes more than one slice
+    await page.waitForFunction(() => window.__sna.state().ended);
+    expect(await page.evaluate(() => window.__sna.session.questionsAsked as number), 'exactly ten questions').toBe(10);
+    expect(await page.evaluate(() => window.__sna.state().lives), 'no life lost').toBe(lives);
+    expect(await keys(), 'localStorage is byte-identical').toBe(before);
+  });
+
+  test('Daily Ten (#1296): outside Whiteboard mode the island menu has no Daily Ten rows', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('.mode-btn').first()).toBeVisible();
+    await expect(page.locator('#daily10')).toHaveCount(0);
+    await expect(page.locator('#daily10t')).toHaveCount(0);
+  });
+
   test('Relaxed practice: wrong slices cost nothing, ten questions, one coin each right, no stars and no Storm best (#937)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
