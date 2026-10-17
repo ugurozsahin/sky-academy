@@ -43,6 +43,50 @@ export function dragTurn(rot: { x: number; y: number }, dx: number, dy: number):
   rot.x = Math.max(-MAX_TIP, Math.min(MAX_TIP, rot.x + dy * DRAG_TURN));
 }
 
+/**
+ * A finger or mouse turns the object; the idle turn waits while it is held (`held()`), so the two never fight.
+ * A press that barely moves is a tap, and a tap bounces it (#740).
+ */
+function bindDrag(canvas: HTMLCanvasElement, shown: () => Object3D | null, beat: (kind: Beat) => boolean): { held(): boolean } {
+  let held: { id: number; x: number; y: number; moved: number } | null = null;
+  canvas.style.touchAction = 'none';   // a drag on the canvas turns the object instead of scrolling the page
+  canvas.addEventListener('pointerdown', (e) => { held = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e) => {
+    const obj = shown();
+    if (!held || e.pointerId !== held.id || !obj) return;
+    dragTurn(obj.rotation, e.clientX - held.x, e.clientY - held.y);
+    held.moved += Math.abs(e.clientX - held.x) + Math.abs(e.clientY - held.y);
+    held.x = e.clientX; held.y = e.clientY;
+  });
+  const letGo = (e: PointerEvent) => {
+    if (held?.id !== e.pointerId) return;
+    if (e.type === 'pointerup' && held.moved < TAP_SLOP) beat('bounce');
+    held = null;
+  };
+  canvas.addEventListener('pointerup', letGo); canvas.addEventListener('pointercancel', letGo);
+  return { held: () => held !== null };
+}
+
+function releaseObject(o: Object3D): void {
+  o.traverse(x => {
+    const m = x as { geometry?: { dispose(): void }; material?: { dispose(): void } | { dispose(): void }[] };
+    m.geometry?.dispose();
+    // Materials are the stage's, shared across hulls, and the stage is rebuilt with the object: safe to drop.
+    (Array.isArray(m.material) ? m.material : m.material ? [m.material] : []).forEach(mat => mat.dispose());
+  });
+}
+
+/** Counts the pixels the frame just drawn leaves different from its corner (the background) by more than noise. */
+function inkedPixels(gl: WebGLRenderingContext | WebGL2RenderingContext): number {
+  const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+  const px = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let count = 0;
+  for (let i = 0; i < px.length; i += 4)
+    if (Math.abs(px[i] - px[0]) + Math.abs(px[i + 1] - px[1]) + Math.abs(px[i + 2] - px[2]) > 24) count++;
+  return count;
+}
+
 export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion: boolean, initialTier: Tier, size = () => host.clientWidth || 512): View {
   const canvas = document.createElement('canvas');
   host.replaceChildren(canvas);
@@ -58,35 +102,13 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
   const place = () => rig.scene.add(stand.group, stand.shadow);
   place();
   const beat = (kind: Beat) => { if (reducedMotion || !shown) return false; stand.beat(kind, performance.now()); return true; };
-  // A finger or mouse turns the object; the idle turn waits while it is held, so the two never fight. A press
-  // that barely moves is a tap, and a tap bounces it (#740).
-  let held: { id: number; x: number; y: number; moved: number } | null = null;
-  canvas.style.touchAction = 'none';   // a drag on the canvas turns the object instead of scrolling the page
-  canvas.addEventListener('pointerdown', (e) => { held = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!held || e.pointerId !== held.id || !shown) return;
-    dragTurn(shown.rotation, e.clientX - held.x, e.clientY - held.y);
-    held.moved += Math.abs(e.clientX - held.x) + Math.abs(e.clientY - held.y);
-    held.x = e.clientX; held.y = e.clientY;
-  });
-  const letGo = (e: PointerEvent) => {
-    if (held?.id !== e.pointerId) return;
-    if (e.type === 'pointerup' && held.moved < TAP_SLOP) beat('bounce');
-    held = null;
-  };
-  canvas.addEventListener('pointerup', letGo); canvas.addEventListener('pointercancel', letGo);
+  const drag = bindDrag(canvas, () => shown, beat);
 
   const fit = () => { const px = size(); resize(rig, renderer, px, px); };
-  const release = (o: Object3D) => o.traverse(x => {
-    const m = x as { geometry?: { dispose(): void }; material?: { dispose(): void } | { dispose(): void }[] };
-    m.geometry?.dispose();
-    // Materials are the stage's, shared across hulls, and the stage is rebuilt with the object: safe to drop.
-    (Array.isArray(m.material) ? m.material : m.material ? [m.material] : []).forEach(mat => mat.dispose());
-  });
   const tick = (t: number) => {
     raf = requestAnimationFrame(tick);
     const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
-    if (shown && !reducedMotion && !held) shown.rotation.y += IDLE_TURN * dt;
+    if (shown && !reducedMotion && !drag.held()) shown.rotation.y += IDLE_TURN * dt;
     stand.update(t, !reducedMotion);
     renderer.render(rig.scene, rig.camera); frames++;
   };
@@ -102,7 +124,7 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
     get pose(): Pose { return stand.pose; },
     beat,
     set(object, next) {
-      if (shown) release(shown);
+      if (shown) releaseObject(shown);
       if (next !== tier) {
         tier = next;
         rig = createRig({ aspect: rig.camera.aspect, tier, background: tokens('--panel-2') });
@@ -115,19 +137,11 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
     },
     ink() {
       renderer.render(rig.scene, rig.camera);
-      const gl = renderer.getContext();
-      const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
-      const px = new Uint8Array(w * h * 4);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      // The background is whatever the corner shows; a frame is inked where a pixel leaves it by more than noise.
-      let count = 0;
-      for (let i = 0; i < px.length; i += 4)
-        if (Math.abs(px[i] - px[0]) + Math.abs(px[i + 1] - px[1]) + Math.abs(px[i + 2] - px[2]) > 24) count++;
-      return count;
+      return inkedPixels(renderer.getContext());
     },
     dispose() {
       cancelAnimationFrame(raf); ro?.disconnect();
-      if (shown) release(shown);
+      if (shown) releaseObject(shown);
       stand.dispose();
       renderer.dispose(); renderer.forceContextLoss();
     },

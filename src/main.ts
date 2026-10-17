@@ -1,3 +1,4 @@
+import { replaySeed } from './game/challenge-run';
 import './style.css';
 import { mtcDeck } from './game/mtc';
 import { paperDeck } from './game/arithmetic-paper';
@@ -77,7 +78,7 @@ const nav = {
   },
   map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
-  play: ((o: StartOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(played(o), up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, pro: o.pro, seed: o.seed, input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : o.mode === 'paper' ? paperDeck(Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend, pro: o.pro })); }) as StartPlay,
+  play: ((o: StartOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(played(o), up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, pro: o.pro, seed: replaySeed(o.topic, o.seed), input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : o.mode === 'paper' ? paperDeck(Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend, pro: o.pro })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
   duel: (y: YearInfo, topic?: string, labels?: 'players' | 'teams') => { leave(); year = y; enter('duel'); dispose = duelScreen({ year: y, topic, labels }, up, () => nav.duel(y, topic, labels)); },   // #16
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },
