@@ -78,3 +78,17 @@ export function compact<T>(arr: T[], keep: (v: T) => boolean): T[] {
   arr.length = w;
   return arr;
 }
+
+/** Gravity (px/s²) on a particle of this kind: rings, text, bolts and slashes hang; smoke and embers rise; leaves, stars drift; drops fall fast. */
+function particleGravity(kind: Particle['kind']): number {
+  if (kind === 'ring' || kind === 'text' || kind === 'bolt' || kind === 'slash') return 0;
+  if (kind === 'ember' || kind === 'smoke') return -120;
+  if (kind === 'leaf' || kind === 'star') return 80;
+  return kind === 'drop' ? 700 : 500;
+}
+/** Advance one particle by `dt` seconds (#1431, lifted out of `Arena.update`). */
+export function stepParticle(p: Particle, dt: number) {
+  p.life += dt; p.vy += particleGravity(p.kind) * dt;
+  if (p.kind === 'leaf') p.vx += Math.sin(p.life * 9) * 40 * dt;
+  p.x += p.vx * dt; p.y += p.vy * dt;
+}

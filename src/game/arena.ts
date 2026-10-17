@@ -13,11 +13,12 @@ import {
 } from './bubbles';
 import type { Bubble, WaveOpts, ArenaBox, ClampCounts } from './bubbles';
 import {
-  FX_PARTICLE, FX_COLORS, MAX_PARTICLES, SHOT_FLIGHT, SHOT_STYLE, shotPose, starPath, compact, ELEMENTS, burstParticles, prefersReducedMotion,
+  FX_PARTICLE, FX_COLORS, MAX_PARTICLES, SHOT_FLIGHT, SHOT_STYLE, shotPose, starPath, compact, ELEMENTS, burstParticles, prefersReducedMotion, stepParticle,
 } from './particles';
 import type { Particle, Shot, FxKind } from './particles';
 import { drawBubble, drawParticle, drawTrail } from './arena-draw';
 import { segCircle } from './slicing';
+import { relaunchBubble } from './arena-step';
 import type { Stroke } from './slicing';
 
 export * from './bubbles';
@@ -344,45 +345,44 @@ export class Arena {
     this.raf = requestAnimationFrame(this.loop);
   };
   private update(dt: number, now: number) {
+    const live = this.moveBubbles(dt, now);   // bubbles still live or waiting to launch
+    if (!this.frozen) resolveCollisions(this.bubbles, { W: this.W, H: this.H, topInset: this.topInset }, this.orderedWave ? COLLIDE.damped : COLLIDE.bounce, this.clampCounts);   // #108: skipped while `frozen`; `ordered` waves bounce softly
+    if (this.waveActive && live === 0) this.endWave(now);
+    for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
+      if (s.t >= SHOT_FLIGHT) continue;             // already landed this frame; cull() takes it out below (#31)
+      const p = shotPose(s.x0, s.y0, s.target.x, s.target.y, s.t += dt);
+      if (!this.reducedMotion && ++s.emit % 2 === 0) this.emitFx(s.x, s.y, 1, (p.x - s.x) * 0.2, (p.y - s.y) * 0.2);   // element wake, none under #900
+      s.x = p.x; s.y = p.y; if (p.done) this.landShot(s);
+    }
+    for (const p of this.particles) stepParticle(p, dt);
+  }
+  private moveBubbles(dt: number, now: number): number {
     let live = 0;
     for (const b of this.bubbles) {
       if (b.dead) continue;
       if (this.frozen) { live++; b.wobble += dt * 3; continue; }        // outcome reveal: everything holds still
       if (!b.launched) { if (now >= b.launchAt) b.launched = true; else { live++; continue; } }
       b.vy += b.g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.wobble += dt * 3;
-      if (b.y - b.r > this.H + 10 && b.vy > 0) {
-        // #591: a required sequence bubble that leaves the arena un-hit — most often knocked down by a later
-        // bubble launched into it, never by anything the child did — is re-launched rather than punished, up
-        // to MAX_RELAUNCHES times. A decoy (not in `orderedLabels`) and an already-tapped bubble (`hit`, a shot
-        // still on its way) fall through to the miss exactly as before.
-        const seqRelaunch = this.orderedLabels.has(b.label) && b.relaunches < MAX_RELAUNCHES;
-        if (!b.hit && seqRelaunch) {
-          b.relaunches++; b.launched = false; b.launchAt = now + RELAUNCH_DELAY;
-          b.x = b.ox; b.y = this.H + b.r; b.vx = b.ovx; b.vy = b.ovy;   // back on the launch line, its original arc — not a teleport into play
-          live++; continue;
-        }
-        b.dead = true;
-        const gentle = !seqRelaunch && this.gentleTarget === b.label && !this.gentleUsed;   // #742: deferred to wave-end below, not a miss yet
-        if (!b.hit) { if (gentle) this.gentleTargetFallen = b; else { this.cb.onFall(b); if (this.gentleTarget !== undefined && !this.gentleUsed && b.label !== this.gentleTarget && !this.isHazard?.(b.label)) this.gentleDecoys.push(b); } }
-        continue;
-      }
-      live++;
+      if (b.y - b.r > this.H + 10 && b.vy > 0) { if (this.fell(b, now)) live++; } else live++;
     }
-    // #108: bubbles collide with each other. Skipped while `frozen` — the outcome reveal holds everything
-    // still, and the e2e freeze helper predicts a bubble's position from its fixed `g`, which only stays true
-    // while nothing else can move it. `ordered` sequence waves bounce softly so a required label cannot be
-    // knocked out of reach before its batch is up.
-    if (!this.frozen) resolveCollisions(this.bubbles, { W: this.W, H: this.H, topInset: this.topInset }, this.orderedWave ? COLLIDE.damped : COLLIDE.bounce, this.clampCounts);
-    // #742: unless the answer fell un-hit this wave, in which case the free trip is a set (gentleRelaunch.ts).
-    if (this.waveActive && live === 0) { if (this.gentleTargetFallen) { this.gentleUsed = true; for (const b of gentleRelaunchSet(this.gentleTargetFallen, this.gentleDecoys, Math.random)) { b.dead = false; b.launched = false; b.launchAt = now + RELAUNCH_DELAY; b.x = b.ox; b.y = this.H + b.r; b.vx = b.ovx; b.vy = b.ovy; } this.gentleTargetFallen = null; this.gentleDecoys.length = 0; } else { this.waveActive = false; this.cb.onWaveEnd(); } }
-    for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
-      if (s.t >= SHOT_FLIGHT) continue;             // already landed this frame; cull() takes it out below (#31)
-      const p = shotPose(s.x0, s.y0, s.target.x, s.target.y, s.t += dt);
-      if (!this.reducedMotion && ++s.emit % 2 === 0) this.emitFx(s.x, s.y, 1, (p.x - s.x) * 0.2, (p.y - s.y) * 0.2);   // element wake, none under #900
-      s.x = p.x; s.y = p.y;
-      if (p.done) this.landShot(s);
-    }
-    for (const p of this.particles) { p.life += dt; const g = p.kind === 'ring' || p.kind === 'text' || p.kind === 'bolt' || p.kind === 'slash' ? 0 : p.kind === 'ember' || p.kind === 'smoke' ? -120 : p.kind === 'leaf' || p.kind === 'star' ? 80 : p.kind === 'drop' ? 700 : 500; p.vy += g * dt; if (p.kind === 'leaf') p.vx += Math.sin(p.life * 9) * 40 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+    return live;
+  }
+  // true when the bubble is back in play (#591)
+  private fell(b: Bubble, now: number): boolean {
+    // #591: a required sequence bubble that leaves un-hit is re-launched (up to MAX_RELAUNCHES), not punished; a decoy or a `hit` one is a miss.
+    const seqRelaunch = this.orderedLabels.has(b.label) && b.relaunches < MAX_RELAUNCHES;
+    if (!b.hit && seqRelaunch) { b.relaunches++; relaunchBubble(b, this.H, now + RELAUNCH_DELAY); return true; }
+    b.dead = true; if (b.hit) return false;
+    if (!seqRelaunch && this.gentleTarget === b.label && !this.gentleUsed) { this.gentleTargetFallen = b; return false; }   // #742: deferred to wave-end, not a miss yet
+    this.cb.onFall(b);
+    if (this.gentleTarget !== undefined && !this.gentleUsed && b.label !== this.gentleTarget && !this.isHazard?.(b.label)) this.gentleDecoys.push(b);
+    return false;
+  }
+  // #742: unless the answer fell un-hit this wave, the free trip is a set (gentleRelaunch.ts)
+  private endWave(now: number) {
+    if (!this.gentleTargetFallen) { this.waveActive = false; this.cb.onWaveEnd(); return; }
+    for (const b of gentleRelaunchSet(this.gentleTargetFallen, this.gentleDecoys, Math.random)) { b.dead = false; relaunchBubble(b, this.H, now + RELAUNCH_DELAY); }
+    this.gentleUsed = true; this.gentleTargetFallen = null; this.gentleDecoys.length = 0;
   }
   /** Drop what is finished — once a frame, not once a substep (#31). `update()` runs up to six times per
    *  frame, and each `filter()` there built a fresh array, so a busy frame threw away 18 of them for the

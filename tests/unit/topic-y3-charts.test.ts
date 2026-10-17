@@ -129,4 +129,11 @@ describe('y3-charts (#1076)', () => {
     expect(tables.some(c => c.prompt.includes('two most popular'))).toBe(true);
     expect(tables.some(c => c.prompt.includes('together'))).toBe(true);
   });
+
+  // #1467: `slow` is a per-generator opt-in; `curriculum-y3.test.ts` fails a Year 3 topic that sets it without
+  // saying so here. Every d3 card gets the longer clock, and no d1 or d2 card does.
+  it('slow is set on every d3 card and on no d1-d2 card', () => {
+    for (const c of draws(3)) expect(c.slow, c.prompt).toBe(true);
+    for (const d of [1, 2] as Difficulty[]) for (const c of draws(d)) expect(c.slow, c.prompt).toBeFalsy();
+  });
 });

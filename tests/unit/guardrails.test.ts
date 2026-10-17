@@ -213,8 +213,8 @@ describe('guard rails', () => {
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
     // #742: the gentle-year branch sits inside the same `!b.hit` guard, so a tapped bubble in flight still
-    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes.
-    expect(arena).toMatch(/if \(!b\.hit\) \{ if \(gentle\).*this\.cb\.onFall\(b\)/);
+    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes (#1431: `fell` returns on `b.hit` first).
+    expect(arena).toMatch(/if \(b\.hit\) return false;\s*if \(!seqRelaunch && this\.gentleTarget === b\.label.*this\.gentleTargetFallen = b;.*this\.cb\.onFall\(b\)/s);
   });
 
   // #742 review round 1 (pr-test-analyzer, silent-failure-hunter): tests/unit/sim.test.ts's own BOMB-vs-gentle
