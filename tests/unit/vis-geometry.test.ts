@@ -86,3 +86,29 @@ describe('polygon part (#1154)', () => {
     } finally { console.warn = warn; }
   });
 });
+
+describe('circle part (#1248)', () => {
+  const circ: GeoPart = { kind: 'circle', at: [50, 36], r: 26, label: 'C' };
+  it('draws the outline at the data centre and radius, a centre dot, and the letter just outside', () => {
+    const html = geometrySVG({ type: 'geometry', parts: [circ] });
+    expect(html).toContain('class="circ" cx="50" cy="36" r="26"');
+    expect(html).toContain('class="ctr" cx="50" cy="36"');
+    expect(html).toContain('>C</text>');
+    expect(html).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(html).toContain('var(--text)');
+  });
+  it('escapes its label, draws none without one, and leaves the other primitives untouched', () => {
+    expect(geometrySVG({ type: 'geometry', parts: [{ ...circ, label: '<b>' } as GeoPart] })).toContain('&lt;b&gt;');
+    expect(geometrySVG({ type: 'geometry', parts: [{ kind: 'circle', at: [50, 36], r: 10 }] })).not.toContain('<text');
+    const seg: GeoPart = { kind: 'segment', a: [10, 20], b: [40.5, 20], ticks: 2, label: 'B' };
+    expect(geometrySVG({ type: 'geometry', parts: [seg, circ] })).toContain(geometrySVG({ type: 'geometry', parts: [seg] }).replace(/^.*<svg[^>]*>|<\/svg>.*$/g, ''));
+  });
+  it('a circle with a bad number or one that leaves the 100 × 70 box is skipped with a warning', () => {
+    const warn = console.warn; const calls: unknown[] = []; console.warn = (...a) => { calls.push(a); };
+    try {
+      const html = geometrySVG({ type: 'geometry', parts: [{ kind: 'circle', at: [NaN, 36], r: 10 }, { kind: 'circle', at: [50, 36], r: 0 }, { kind: 'circle', at: [50, 36], r: 40 }, { kind: 'circle', at: [95, 36], r: 10 }, circ] });
+      expect(calls).toHaveLength(4);
+      expect(html.match(/class="circ"/g)).toHaveLength(1);
+    } finally { console.warn = warn; }
+  });
+});

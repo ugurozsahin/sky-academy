@@ -12,6 +12,7 @@ import { y6Fdp } from './year6-fdp';
 import { y6Decimals } from './year6-decimals';
 import { y6FracDiv } from './year6-fracdiv';
 import { y6DecMult } from './year6-decmult';
+import { y6DecDiv } from './year6-decdiv';
 import type { Topic } from './types';
 
 export const Y6_FRACTIONS: Topic[] = [
@@ -30,5 +31,5 @@ export const Y6_FRACTIONS: Topic[] = [
 
   { id: 'y6-decmult', title: 'Multiplying decimals', icon: '💷', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: decimals (≤2 dp) × whole numbers', sequenceFrom: 3, gen: y6DecMult },
 
-  // slot: y6-decdiv
+  { id: 'y6-decdiv', title: 'Dividing to decimals', icon: '📏', subject: 'maths', year: 'year6', strand: 'fractions', nc: 'Y6 F: division with a 2 dp answer', sequenceFrom: 3, gen: y6DecDiv },
 ];
