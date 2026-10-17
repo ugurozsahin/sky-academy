@@ -43,6 +43,7 @@ describe('y6-pie (#1239)', () => {
       const s = slices(q), name = /chose (\w+)\?/.exec(q.prompt)![1], total = s.reduce((a, x) => a + x.n, 0);
       expect(parseFrac(q.answer)).toEqual(simplify({ n: s.find(x => x.label === name)!.n, d: total }));
       expect(q.answer).toBe(`${parseFrac(q.answer)!.n}/${parseFrac(q.answer)!.d}`);
+      q.options.forEach(o => { const f = parseFrac(o)!; expect(f.n, `${q.prompt}: ${o} is a whole or more`).toBeLessThan(f.d); });
       q.options.filter(o => o !== q.answer).forEach(o => expect(parseFrac(o), `${q.answer} vs ${o}`).not.toEqual(parseFrac(q.answer)));
     }
   });

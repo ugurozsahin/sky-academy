@@ -72,10 +72,13 @@ function objectsHTML(v: Extract<Visual, { type: 'objects' }>): string {
   if (v.n2 < 0) return `<div class="vis objs">${fiveFrames(v.n, v.emoji, v.n + v.n2)}</div>`;   // take away: cross out |n2| objects
   return `<div class="vis objs two"><div class="grp">${fiveFrames(v.n, v.emoji)}</div><div class="plus">${v.emoji2 && v.emoji2 !== v.emoji ? 'or' : '+'}</div><div class="grp">${fiveFrames(v.n2, v.emoji2 ?? v.emoji)}</div></div>`;
 }
-const DRAWN = { geometry: geometrySVG, coords: coordsSVG, pie: pieSVG };
+type Drawn = 'geometry' | 'coords' | 'pie';
+/** The drawings that are another module's SVG, one entry per type: a key without its function, or the reverse, fails `tsc`. */
+const DRAWN: { [T in Drawn]: (v: Extract<Visual, { type: T }>) => string } = { geometry: geometrySVG, coords: coordsSVG, pie: pieSVG };
+const isDrawn = (v: Visual): v is Extract<Visual, { type: Drawn }> => v.type in DRAWN;
 export function renderVisual(v: Visual | undefined): string {
   if (!v) return '';
-  if (v.type in DRAWN) return DRAWN[v.type as keyof typeof DRAWN](v as never);
+  if (isDrawn(v)) return (DRAWN[v.type] as (x: typeof v) => string)(v);
   switch (v.type) {
     case 'objects': return objectsHTML(v);
     case 'tenframe': {
@@ -109,7 +112,7 @@ export function renderVisual(v: Visual | undefined): string {
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>').replace(/\n/g, '<br>')}</div>`;
     case 'strip': return `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
-    default: return '';   // geometry, coords and pie are drawn above, from `DRAWN`
+    default: { const unhandled: never = v; return unhandled; }   // a new Visual type without a case fails tsc here
   }
 }
 

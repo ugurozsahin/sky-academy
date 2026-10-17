@@ -42,7 +42,7 @@ function extreme(rng: Rng): Question {
   }
 }
 
-/** d2: the fraction of the pie one slice covers. Slips: unsimplified, flipped, the next unit fraction, the rest of the pie. */
+/** d2: the fraction of the pie one slice covers. Slips: the flipped fraction (only when proper), the next unit fractions, the rest of the pie, the other slices; any slip equal in value to the answer, or not below one whole, is dropped. */
 function fraction(rng: Rng): Question {
   const [den, split] = pick(rng, SPLITS), labels = shuffle(rng, pick(rng, THEMES)).slice(0, split.length);
   const { rows, k } = ask(rng, split, labels, 1);
@@ -53,7 +53,7 @@ function fraction(rng: Rng): Question {
   const ds: string[] = [];
   for (const f of [...named, ...shuffle(rng, FILLER)]) {
     const s = fmtFrac(f);
-    if (f.d > 0 && f.n > 0 && !equal(f, ans) && !ds.some(x => equal(parseFrac(x)!, f)) && !ds.includes(s)) ds.push(fmtFrac(f, {}));
+    if (f.d > 0 && f.n > 0 && f.n < f.d && !equal(f, ans) && !ds.some(x => equal(parseFrac(x)!, f)) && !ds.includes(s)) ds.push(fmtFrac(f, {}));
   }
   return wordQ(rng, `What fraction chose ${labels[k]}?`, text, ds.slice(0, 3), {
     visual: { type: 'pie', slices: rows }, say: `${LOOK}What fraction chose ${labels[k]}?`,
