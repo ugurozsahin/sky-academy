@@ -3,7 +3,7 @@ import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isGuest, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { hush, sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, untriedLine, type ParentSummary } from '../game/parents';
-import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { bindDaily, dailyHTML } from './parents-daily'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words'; import { noTrophyHTML, showPct, topicRow } from './parents-trophies';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
+import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share'; import { bindDaily, dailyHTML } from './parents-daily'; import { factsHTML } from './parents-facts'; import { bindReady, readyHTML } from './parents-ready'; import { bindWords, wordsHTML } from './parents-words'; import { noTrophyHTML, showPct, topicRow } from './parents-trophies'; import { bindChallenge, challengeHTML } from './parents-challenge'; import type { StartPlay } from './home';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
 import { bindGuest, guestDash, guestHTML } from './parents-guest';
 import { $, $$, esc, render } from './dom'; import { chooserEligible } from './chooser';
 
@@ -11,7 +11,7 @@ import { $, $$, esc, render } from './dom'; import { chooserEligible } from './c
  *  boot decision, re-run — the picker while two or more profiles are left, otherwise that child's map, or
  *  onboarding when the remaining slot has never been played. It is `main.ts`'s one copy of that rule, not a
  *  second statement of it here. */
-type Nav = { map: () => void; avatar: () => void; launch: () => void };
+type Nav = { map: () => void; avatar: () => void; launch: () => void; play: StartPlay };
 /** The word a grown-up must type to confirm "Start again" — deliberately not a single tap a child could land on. */
 const RESET_WORD = 'RESET';
 
@@ -193,7 +193,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
       <tbody>${modeRows}</tbody>
     </table></div>
 
-    ${aboutHTML()}${profilesHtml(cards)}
+    ${aboutHTML()}${challengeHTML()}${profilesHtml(cards)}
 
     ${settingsHTML(three)}
 
@@ -339,7 +339,7 @@ export function parentsScreen(nav: Nav) {
     // never on the map with an empty profile (#115). "Undo" is the only way out of that state.
     $('#back').addEventListener('click', () => { sfx.tap(); if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else nav.map(); });
     wireMove(() => drawDash()); bindShare(sm, load().name, load().avatar ?? ''); bindDaily(); bindWords();
-    bindSettings(); bindReady(); bindGuest(nav.map);
+    bindSettings(); bindReady(); bindGuest(nav.map); bindChallenge(nav.play);
 
     const overlay = $('#reset-overlay');
     const closeOverlay = () => { overlay.hidden = true; overlay.innerHTML = ''; };
