@@ -1,7 +1,6 @@
 // Year 6 grammar strand (#1212). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year6-<slug>.ts` and this file keeps only its row/import.
 // import: y6-passive
-// import: y6-cohesion
 import { y6Hyphen } from './year6-hyphen';
 import { y6SubjectObject } from './year6-subjectobject';
 import { y6Lists } from './year6-lists';
@@ -12,6 +11,7 @@ import { y6Passive } from './year6-passive';
 import { y6Subjunctive } from './year6-subjunctive';
 import { y6Clauses } from './year6-clauses';
 import { y6Consistency } from './year6-consistency';
+import { y6Cohesion } from './year6-cohesion';
 
 export const Y6_GRAMMAR: Topic[] = [
   { id: 'y6-formal', title: 'Formal or Informal', icon: '📝', subject: 'writing', year: 'year6', nc: 'Y6 Grammar: formal and informal vocabulary and structures (Appendix 2)', gen: y6Formal },
@@ -22,7 +22,7 @@ export const Y6_GRAMMAR: Topic[] = [
 
   { id: 'y6-subjunctive', title: 'The Subjunctive', icon: '💭', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y6 Grammar: subjunctive forms in formal writing (Appendix 2)', gen: y6Subjunctive },
 
-  // slot: y6-cohesion
+  { id: 'y6-cohesion', title: 'Linking Paragraphs', icon: '🔗', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y6 Cohesion: linking adverbials and ellipsis (Appendix 2)', gen: y6Cohesion },
 
   { id: 'y6-clauses', title: 'Semicolons, Colons, Dashes', icon: '✏️', subject: 'writing', year: 'year6', strand: 'grammar', nc: 'Y6 Punctuation: semi-colon, colon and dash between independent clauses (Appendix 2)', gen: y6Clauses },
 

@@ -46,7 +46,7 @@ const VISUAL_QUESTION = {
   numberline: (v: Extract<Visual, { type: 'numberline' }>) => `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}${numberlineText(v)}`,
   fraction: (v: Extract<Visual, { type: 'fraction' }>) => (v.stack ? v.stack.map(b => `${b.parts}:${b.shaded}`).join('/') : ''),
   geometry: (v: Extract<Visual, { type: 'geometry' }>) => v.parts.map(p => p.kind === 'angle' ? `a${p.dir}:${p.deg}` : p.kind === 'polygon' ? `p${p.pts}:${p.ticks ?? ''}:${p.right ?? ''}` : p.kind === 'circle' ? `c${p.at}:${p.r}` : `s${p.a}-${p.b}`).join('/'),
-  coords: (v: Extract<Visual, { type: 'coords' }>) => `${v.size}${v.min ? `m${v.min}` : ''}/${v.points.map(p => `${p.x},${p.y}`).sort().join(';')}${v.shapes ? `/${v.shapes.map(sh => sh.pts.map(q => q.join(',')).sort().join(';')).sort().join('|')}` : ''}${v.mirror ? `/${v.mirror.axis}${v.mirror.at}` : ''}`,
+  coords: (v: Extract<Visual, { type: 'coords' }>) => `${v.size}${v.min ? `m${v.min}` : ''}/${v.points.map(p => `${p.x},${p.y}`).sort().join(';')}${v.shapes ? `/${v.shapes.map(sh => `${sh.shaded ? '*' : ''}${sh.pts.map(q => q.join(',')).sort().join(';')}`).sort().join('|')}` : ''}${v.mirror ? `/${v.mirror.axis}${v.mirror.at}` : ''}`,
   pie: (v: Extract<Visual, { type: 'pie' }>) => v.slices.map(sl => sl.n).join(','),
   chart: (v: Extract<Visual, { type: 'chart' }>) => `${v.kind}/${v.rows.map(r => r.n).join(',')}`,
 } satisfies Partial<{ [T in Visual['type']]: (v: Extract<Visual, { type: T }>) => string }>;

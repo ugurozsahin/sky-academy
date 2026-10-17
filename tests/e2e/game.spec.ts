@@ -6672,6 +6672,25 @@ test('a y6-coords four-quadrant grid fits a 390×664 phone (#1213)', async ({ pa
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });   // the PR's 390×664 evidence
 });
 
+test('y6-transform: a point card, a shape card and a vertex card fit a 390×664 phone (#1249)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await seedPreview(page);
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year6', 'y6-transform');
+  const gen = TOPICS.find(t => t.id === 'y6-transform')!.gen;
+  for (const d of [1, 2, 3] as const) {
+    const q = gen(d, seededRng(1249 + d));
+    await page.evaluate(({ html, prompt }) => { document.querySelector('#vis')!.innerHTML = html; document.querySelector('#prompt')!.textContent = prompt; }, { html: renderVisual(q.visual!), prompt: q.prompt });
+    const grid = (await page.locator('#vis svg').boundingBox())!, card = (await page.locator('.qcard').boundingBox())!;
+    expect(grid.x, `d${d}`).toBeGreaterThanOrEqual(card.x);
+    expect(grid.x + grid.width, `d${d}`).toBeLessThanOrEqual(card.x + card.width + 1);
+    await expectFitsViewport(page, `y6-transform d${d} card`);
+    if (process.env.SHOT) await page.screenshot({ path: `${process.env.SHOT}-d${d}.png` });   // the PR's 390×664 evidence
+  }
+});
+
 // #1288: a KS1 island reads "Warm-up" for a child whose school year is KS2.
 test('the Year 2 card reads Warm-up for a Year 3 child, its age band otherwise (#1288)', async ({ page }) => {
   await seedPreview(page);
