@@ -4,7 +4,7 @@ import { topicsFor, TOPICS, YEARS, shownYears } from '../../src/curriculum';
 import { genericTopicSuite } from './helpers/generic-topic-suite';
 
 // Year 4's per-topic structural loop (#1069), in a file of its own so it runs as a parallel worker.
-genericTopicSuite(topicsFor('year4'));
+genericTopicSuite(TOPICS.filter(t => t.year === 'year4'));   // #1467: drills included, so every topic of the year runs the loop once
 
 describe('Year 4 registry (#1069)', () => {
   it('topicsFor("year4") holds y4-count', () => {

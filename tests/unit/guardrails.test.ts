@@ -173,16 +173,19 @@ describe('guard rails', () => {
     expect(src).toMatch(/class="p-note save-note"/);
   });
 
+  // #1432: the bubble drawing lives in arena-draw.ts; read its bubble section, up to the particle one (the ember builds a gradient).
+  const bubbleDrawing = () => {
+    const src = code(SOURCES['/src/game/arena-draw.ts'] ?? ''), from = src.indexOf('function spotlight('), to = src.indexOf('type PDraw');
+    expect(to, 'the bubble section must exist and end where the particle section starts').toBeGreaterThan(from + 400);
+    return src.slice(from, to);
+  };
   // #28: drawBubble built a radial gradient (+ two colour strings) and ran a `measureText` font-fit loop for
   // every bubble every frame — hundreds of measureText calls per frame with a wide word wave on a phone. The
   // body is now a cached sprite (bodySprite) and the label size is fitted once at spawn (fitLabel), so neither
   // call may reappear in the per-frame draw path. Scoped to drawBubble's body: bodySprite/glowSprite and the
   // ember particle legitimately build gradients elsewhere, and fitLabel measures once at spawn.
   it('drawBubble does no per-frame gradient or measureText work (#28)', () => {
-    const src = code(SOURCES['/src/game/arena.ts']);
-    const from = src.indexOf('private drawBubble(');
-    expect(from).toBeGreaterThan(0);
-    const body = src.slice(from, from + 1 + src.slice(from + 1).indexOf('\n  private '));   // up to the next method
+    const body = bubbleDrawing();
     expect(body).not.toMatch(/createRadialGradient|measureText/);
   });
 
@@ -190,10 +193,7 @@ describe('guard rails', () => {
   // and recentres the block on the disc. Dropping either is a one-line edit that reverts the whole feature,
   // so the shape is pinned here as well as behaviourally in `arena-spawn.test.ts` (PR #467 review, B2).
   it('drawBubble draws every fitted line, recentred on the disc (#348)', () => {
-    const src = code(SOURCES['/src/game/arena.ts']);
-    const from = src.indexOf('private drawBubble(');
-    expect(from).toBeGreaterThan(0);
-    const body = src.slice(from, from + 1 + src.slice(from + 1).indexOf('\n  private '));
+    const body = bubbleDrawing();
     // Both text passes (the dark outline, then the white fill) walk the whole `lines` array…
     expect([...body.matchAll(/for \(let i = 0; i < lines\.length; i\+\+\) c\.(stroke|fill)Text\(lines\[i\]/g)]).toHaveLength(2);
     // …and neither draws `b.label`, which is the answer key and not what a wrapped bubble shows.
@@ -213,8 +213,8 @@ describe('guard rails', () => {
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
     // #742: the gentle-year branch sits inside the same `!b.hit` guard, so a tapped bubble in flight still
-    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes.
-    expect(arena).toMatch(/if \(!b\.hit\) \{ if \(gentle\).*this\.cb\.onFall\(b\)/);
+    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes (#1431: `fell` returns on `b.hit` first).
+    expect(arena).toMatch(/if \(b\.hit\) return false;\s*if \(!seqRelaunch && this\.gentleTarget === b\.label.*this\.gentleTargetFallen = b;.*this\.cb\.onFall\(b\)/s);
   });
 
   // #742 review round 1 (pr-test-analyzer, silent-failure-hunter): tests/unit/sim.test.ts's own BOMB-vs-gentle
@@ -3133,7 +3133,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // file at or past the 300-line bar this table is scoped to — joins it rather than going unbudgeted;
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
-    'src/style.css': 1870, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
+    'src/style.css': 1870, 'src/game/arena.ts': 476, 'src/game/bubbles.ts': 521,
     'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
   };
