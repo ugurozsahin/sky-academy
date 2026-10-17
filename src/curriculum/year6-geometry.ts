@@ -1,10 +1,10 @@
 // Year 6 geometry strand (#1212). Each slot below is a future PR's own ticket. Keep this file ≤300 lines: a generator that
 // would push it past that moves to its own `year6-<slug>.ts` and this file keeps only its row/import.
 // import: y6-missingangles
-// import: y6-circles
 // import: y6-coords
 // import: y6-transform
 import type { Topic } from './types';
+import { y6Circles } from './year6-circles';
 import { y6Coords } from './year6-coords';
 import { y6Nets } from './year6-nets';
 import { y6MissingAngles } from './year6-missingangles';
@@ -15,7 +15,7 @@ export const Y6_GEOMETRY: Topic[] = [
   // slot: y6-missingangles
   { id: 'y6-missingangles', title: 'Missing Angles', icon: '📐', subject: 'maths', year: 'year6', nc: 'Y6 Geometry: missing angles in shapes, on lines, vertically opposite (6M43, 6M45)', strand: 'geometry', gen: y6MissingAngles },
 
-  // slot: y6-circles
+  { id: 'y6-circles', title: 'Parts of a Circle', icon: '⭕', subject: 'maths', year: 'year6', strand: 'geometry', nc: 'Y6 Geometry: radius, diameter and circumference (6M44)', gen: y6Circles },
 
   // slot: y6-coords
   { id: 'y6-coords', title: 'Four-Quadrant Coordinates', icon: '🧭', subject: 'maths', year: 'year6', nc: 'Y6 Geometry: describe positions on the full coordinate grid, all four quadrants (6M46)', gen: y6Coords },
