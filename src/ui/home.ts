@@ -28,7 +28,8 @@ import { duelHistoryHTML } from './duel';
 import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEntryChooser, type ChooserEntry, trophyBadge, trophyCount } from './chooser';
 import { subjectPool, subjectTopics } from '../game/pools';
 import { strandPools } from '../game/strand-pools';
-import { $, $$, capDigits, render } from './dom';
+import { $, $$, capDigits, esc, render } from './dom';
+import { recordLines } from './my-record';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
 
@@ -361,6 +362,7 @@ export function rewardsScreen(nav: Nav) {
   const banner = d.stickers.length === STICKER_IDS.length ? 'Album complete — legendary!'
     : nextCoin ? `<span>Next sticker at 🪙 ${nextCoin}</span><span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * d.coins / nextCoin))}%"></i></span>`
     : 'The rest of the album is earned by playing, not by coins — see each sticker below';
+  const record = recordLines(d).map(l => `<span>${esc(l)}</span>`).join('');   // #1292: none for a KS1 save
   const certs = certificates();
   const duels = duelHistory();
   // #16's last piece, listed under the certificates because it is the other thing on this screen a child
@@ -378,7 +380,7 @@ export function rewardsScreen(nav: Nav) {
       <div><b>🔥 ${d.streak.days}</b><small>day streak</small></div>
       <div><b>${d.stickers.length}/${STICKER_IDS.length}</b><small>stickers</small></div>
     </div>
-    <div class="next-sticker">${banner}</div>
+    <div class="next-sticker">${banner}${record}</div>
     <div class="album">${cards}</div>
     <div class="rewards-cols">
       <div class="rewards-col">

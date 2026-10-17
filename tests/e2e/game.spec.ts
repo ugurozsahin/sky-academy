@@ -1937,6 +1937,25 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.next-sticker')).toContainText('Next sticker at 🪙 30');
   });
 
+  // #1292: two text lines inside the existing banner for a child with a KS2 record; a KS1 save's banner is byte for byte today's.
+  test('rewards screen (#1292): a KS2 record adds "My record" lines to the banner and nothing else', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page, 'volt', 'Ada', { coins: 10, ks2: { facts: {}, checks: [], bestSpeed: 2.4, words: { accident: 'rrr', address: 'rw' } } });
+    await page.click('#rewards');
+    const banner = page.locator('.next-sticker');
+    await expect(banner).toContainText('Next sticker at 🪙 30');
+    await expect(banner).toContainText('My record · fastest tables: 2.4 seconds per answer');
+    await expect(banner).toContainText('My record · spelling words secure: Year 3–4 1 of');
+    await expect(page.locator('.reward-stats > div')).toHaveCount(3);
+    await expectFitsViewport(page, 'rewards screen with a KS2 record');
+  });
+
+  test('rewards screen (#1292): a save with no KS2 record keeps today\'s banner exactly', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 10 });
+    await page.click('#rewards');
+    await expect(page.locator('.next-sticker')).toHaveJSProperty('innerHTML', '<span>Next sticker at 🪙 30</span><span class="isl-bar"><i style="width:33%"></i></span>');
+  });
+
   test('rewards screen banner (#163): every coin sticker bought but achievements still open reads "earned by playing"', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada', { coins: 200, stickers: [] });   // past STICKER_COST[2] (120), no achievement stickers yet
     await page.click('#rewards');
