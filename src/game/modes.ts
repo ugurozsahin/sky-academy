@@ -54,6 +54,9 @@ export interface ModeSpec {
   coins(c: EndCtx): number;         // ninja coins earned
 }
 
+/** #1297: the Legend run's Pro option — the same year with one life fewer and every stage one speed step faster (capped at 3). `id`, `diffs` and `perStage` stay, so records and the crown key on the same year. */
+export const proYear = (year: YearInfo): YearInfo => ({ ...year, lives: Math.max(1, year.lives - 1), speeds: year.speeds.map(s => Math.min(3, s + 1)) });
+
 // A question that is worked out in steps rather than recalled gets one speed step, floored at 1: a spelling
 // sequence (slice several letters in order) or one a generator flagged `slow` — the d3 draws of `y2Add`,
 // `y2Sub` and `y2Inverse`, all of them, not only the ones that cross a ten (#297; `slowAtD3` in `maths.ts`

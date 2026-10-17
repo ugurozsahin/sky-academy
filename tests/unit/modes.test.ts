@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODES, type Mode, type ModeCtx, type EndCtx } from '../../src/game/modes';
+import { MODES, proYear, type Mode, type ModeCtx, type EndCtx } from '../../src/game/modes';
 import { YEARS } from '../../src/curriculum';
 import { menuFor } from '../../src/ui/home';
 import { resultMedal } from '../../src/ui/results';
@@ -260,5 +260,28 @@ describe('a new mode cannot fall through to another mode (#1117)', () => {
     const rows = [{ id: 'a' }, { id: 'tables', years: ['year4' as const] }];
     expect(menuFor(rows, 'year4').map(r => r.id)).toEqual(['a', 'tables']);
     for (const y of YEARS.filter(y => y.id !== 'year4')) expect(menuFor(rows, y.id).map(r => r.id), y.id).toEqual(['a']);
+  });
+});
+
+// #1297: the Legend run's Pro option is the same year, one life fewer and one speed step faster (capped at 3).
+describe('proYear (#1297)', () => {
+  const Y1 = YEARS.find(y => y.id === 'year1')!;
+  const Y5 = YEARS.find(y => y.id === 'year5')!;
+  it('takes one life and adds one speed step, capped at 3', () => {
+    const p = proYear(Y1);
+    expect(p.lives).toBe(Y1.lives - 1);
+    expect(p.speeds).toEqual(Y1.speeds.map(s => Math.min(3, s + 1)));
+    expect(proYear(Y5).speeds.every(s => s <= 3)).toBe(true);
+    expect(proYear(Y5).lives).toBe(Y5.lives - 1);
+  });
+  it('keeps id, diffs and perStage, and does not mutate its input', () => {
+    const before = JSON.stringify(Y1), p = proYear(Y1);
+    expect([p.id, p.diffs, p.perStage]).toEqual([Y1.id, Y1.diffs, Y1.perStage]);
+    expect(JSON.stringify(Y1)).toBe(before);
+  });
+  it('Legend on a Pro year is one step above plain Legend, capped at 3', () => {
+    const c = (year: typeof Y1, stage: number) => ({ year, stage, questionsAsked: 0, sequence: false, slow: false, slower: false, legend: true, enraged: false }) as ModeCtx;
+    for (let stage = 1; stage <= Y1.speeds.length; stage++)
+      expect(MODES.mission.speed(c(proYear(Y1), stage))).toBe(Math.min(3, MODES.mission.speed(c(Y1, stage)) + 1));
   });
 });

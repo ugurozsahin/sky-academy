@@ -20,7 +20,7 @@ import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
 import { needsSchoolYear } from '../school-year';
 import { SPRINT_SECONDS } from '../game/session';
-import { MODES } from '../game/modes';
+import { MODES, proYear } from '../game/modes';
 import { senseiTopics, poolWeights, nextIsland, nextIslandLine, mapLine } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
@@ -249,10 +249,13 @@ export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId)
 function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>) {
   const list = topicsFor(year.id).filter(t => chooserEligible(t) && (progress[t.id]?.stars ?? 0) >= 3);
   const crowned = (t: Topic) => !!progress[t.id]?.crown;
-  const pick = (t: Topic | null) => { if (t) { sfx.tap(); nav.play({ year, mode: 'mission', topic: t, legend: true }); } };
-  return list.length ? [{ id: 'legend', mod: '', vport: '<span class="vport emoji">👑</span>', title: 'Legend run',
-    blurb: `Hardest questions on your 3★ topics · 👑 ${list.filter(crowned).length}`,
-    go: () => openChooser($('#island-overlay'), list, pick, { mixed: false, badge: t => crowned(t) ? ' 👑' : '' }) }] : [];
+  const pick = (y: YearInfo) => (t: Topic | null) => { if (t) { sfx.tap(); nav.play({ year: y, mode: 'mission', topic: t, legend: true }); } };
+  const open = (y: YearInfo) => () => openChooser($('#island-overlay'), list, pick(y), { mixed: false, badge: t => crowned(t) ? ' 👑' : '' });
+  const row = { id: 'legend', mod: '', vport: '<span class="vport emoji">👑</span>', title: 'Legend run',
+    blurb: `Hardest questions on your 3★ topics · 👑 ${list.filter(crowned).length}`, go: open(year) };
+  // #1297: Pro — one speed step faster, one life fewer, the same crown; not on a gentle year (#700).
+  const pro = { ...row, id: 'legend-pro', title: 'Legend run · Pro', blurb: 'One step faster, one fewer life', go: open(proYear(year)) };
+  return !list.length ? [] : year.gentle ? [row] : [row, pro];
 }
 
 /** Island: topics for one year group + its Sky Storm. */
