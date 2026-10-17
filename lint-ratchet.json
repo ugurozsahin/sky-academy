@@ -13,7 +13,6 @@
     "src/game/arena.ts::reveal": 16,
     "src/game/arena.ts::update": 42,
     "src/main.ts::(anonymous)": 16,
-    "src/storage/migrate.ts::sanitizeTypes": 39,
     "src/ui/play-results.ts::showResults": 21,
     "src/ui/play.ts::playScreen": 22,
     "src/ui/profiles.ts::(anonymous)": 16,
@@ -23,11 +22,8 @@
   },
   "lines": {
     "src/ui/duel.ts::duelScreen": 201,
-    "src/ui/parents.ts::parentsScreen": 102,
-    "src/ui/parents.ts::(anonymous)": 77,
     "src/ui/play-session.ts::createPlaySession": 186,
-    "src/ui/play.ts::playScreen": 197,
-    "src/ui/solid.ts::createSolidSlot": 110
+    "src/ui/play.ts::playScreen": 197
   },
   "fileLines": {
     "tests/unit/arena.test.ts": 948,

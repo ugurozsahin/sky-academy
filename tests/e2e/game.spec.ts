@@ -926,6 +926,32 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.topic[data-id="y1-add"] .pill')).toHaveText('👑');
   });
 
+  test('Legend run · Pro: one fewer life, same crown; absent on Reception (#1297)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 3, best: 100, plays: 1 } } });
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('#legend-pro')).toBeVisible();
+    await page.click('#legend-pro');
+    await page.click('#island-overlay .topic[data-id="y1-add"]');
+    await expect(page.locator('.play')).toBeVisible();
+    expect(await page.evaluate(() => (window.__sna.session as unknown as { o: { year: { lives: number } } }).o.year.lives)).toBe(YEARS.find(y => y.id === "year1")!.lives - 1);   // read the run's year, not the live count: a Pro bubble may already have slipped
+    const runLives = () => page.evaluate(() => (window.__sna.session as unknown as { o: { year: { lives: number } } }).o.year.lives);
+    await winMission(page);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('sna:v1')!).progress['y1-add']?.crown === true);
+    await page.click('#again');                                                   // "Play again" keeps the Pro run
+    await expect(page.locator('.play')).toBeVisible();
+    expect(await runLives()).toBe(YEARS.find(y => y.id === 'year1')!.lives - 1);
+    await winMission(page);
+    await page.click('#next-topic');                                              // review #1967: "Next topic" is an ordinary mission on the canonical year
+    await expect.poll(runLives).toBe(YEARS.find(y => y.id === 'year1')!.lives);   // polled: the old play screen is still up for a beat
+  });
+
+  test('no Legend run · Pro row on Reception (#1297)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'r-count': { stars: 3, best: 100, plays: 1 } } });
+    await page.click('.island[data-year="reception"]');
+    await expect(page.locator('#legend')).toBeVisible();                          // the Legend row is there, so the missing Pro row is the gentle-year rule
+    await expect(page.locator('#legend-pro')).toHaveCount(0);
+  });
+
   test('no Legend run row without a 3★ topic (#932)', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 2, best: 100, plays: 1 } } });
     await page.click('.island[data-year="year1"]');
@@ -995,6 +1021,68 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
     expect(await page.evaluate(() => window.__sna.state().lives), 'Relaxed practice loses no life').toBe(lives);
     expect(await keys(), 'localStorage is byte-identical').toBe(before);
+  });
+
+  // #1296: Whiteboard mode adds two Daily Ten rows to every island; outside it the rows are absent.
+  test('Daily Ten (#1296): in Whiteboard mode an island offers it, ten questions end the run, no life is lost and nothing is saved', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { voice: 'no' });
+    await openGrownUps(page);
+    const keys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+    const before = await keys();
+    await page.click('#whiteboard-start');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('#daily10')).toBeVisible();
+    await expect(page.locator('#daily10t')).toBeVisible();
+    await expectFitsViewport(page, 'island menu with the Daily Ten rows');
+    await page.click('#daily10');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    const lives = await page.evaluate(() => window.__sna.state().lives);
+    // `wrong()` needs a launched, live decoy; `waitForWrongOrEnd` only sees one on screen, so on a slow machine the
+    // hook can lag the wait by a frame — the polls below retry the hook itself (it stops at the first slice that lands).
+    await waitForWrongOrEnd(page);
+    let asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+    await expect.poll(() => page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
+    await waitForWrongOrEnd(page);
+    asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+    await expect.poll(() => page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
+    for (let i = 0; i < 8; i++) await solveCurrent(page);   // any card type: a sequence or any-order card takes more than one slice
+    await page.waitForFunction(() => window.__sna.state().ended);
+    expect(await page.evaluate(() => window.__sna.session.questionsAsked as number), 'exactly ten questions').toBe(10);
+    expect(await page.evaluate(() => window.__sna.state().lives), 'no life lost').toBe(lives);
+    expect(await keys(), 'localStorage is byte-identical').toBe(before);
+  });
+
+  test('Daily Ten (#1296): the 60-second variant ends after ten cards, and Play again deals a fresh ten-card deck', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { voice: 'no' });
+    await openGrownUps(page);
+    await page.click('#whiteboard-start');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="year2"]');
+    await page.click('#daily10t');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => window.__sna.session.o.deck?.length), 'a ten-card deck').toBe(10);
+    for (let i = 0; i < 10; i++) await solveCurrent(page);
+    await page.waitForFunction(() => window.__sna.state().ended);
+    expect(await page.evaluate(() => window.__sna.session.questionsAsked as number)).toBe(10);
+    expect(await page.evaluate(() => window.__sna.state().timeLeft), 'ended with the clock still running').toBeGreaterThan(0);
+    await page.click('#again');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => window.__sna.session.o.deck?.length), 'Play again deals a ten-card deck too').toBe(10);
+    expect(await page.evaluate(() => window.__sna.session.questionsAsked as number), 'a new run, on its first card').toBeLessThanOrEqual(1);
+  });
+
+  test('Daily Ten (#1296): outside Whiteboard mode the island menu has no Daily Ten rows', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('.mode-btn').first()).toBeVisible();
+    await expect(page.locator('#daily10')).toHaveCount(0);
+    await expect(page.locator('#daily10t')).toHaveCount(0);
   });
 
   test('Relaxed practice: wrong slices cost nothing, ten questions, one coin each right, no stars and no Storm best (#937)', async ({ page }) => {

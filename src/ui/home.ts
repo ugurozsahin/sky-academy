@@ -30,11 +30,13 @@ import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEnt
 import { subjectPool, subjectTopics } from '../game/pools';
 import { strandPools } from '../game/strand-pools';
 import { $, $$, capDigits, esc, render } from './dom';
+import { DAILY_TEN_TITLE, dailyTenDeck, dailyTenPool } from '../game/daily-ten';
 import { recordLines } from './my-record';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
 
-export type StartPlay = (o: PlayOpts) => void;
+export type StartOpts = PlayOpts & { pro?: boolean };   // #1297: `pro` is applied by main.ts, so every `year` handed around stays canonical
+export type StartPlay = (o: StartOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
   memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string, labels?: 'players' | 'teams') => void; rewards: () => void; shop: () => void; parents: () => void;
@@ -243,10 +245,21 @@ const dailySprintRow = (nav: Nav, year: YearInfo): MenuRow[] => {
     blurb: 'Same 60 seconds for everyone today', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Daily Sprint', seed: dailySprintSeed(today(), year.id) }) }];
 };
 
+/** Daily Ten (#1296): ten maths questions from this island, easy to hard — only while Whiteboard mode is on (#949). No lives; as a guest session it saves nothing. */
+const dailyTenRows = (nav: Nav, year: YearInfo): MenuRow[] => {
+  const topics = topicsFor(year.id);
+  if (!isWhiteboard() || !dailyTenPool(topics).length) return [];
+  const play = (mode: 'relaxed' | 'sprint') => () => nav.play({ year, mode, deck: dailyTenDeck(topics, Math.random), title: DAILY_TEN_TITLE });
+  return [
+    { id: 'daily10', mod: '', vport: '<span class="vport emoji">🔟</span>', title: 'Daily Ten', blurb: 'Ten questions, no clock', go: play('relaxed') },
+    { id: 'daily10t', mod: '', vport: '<span class="vport emoji">⏱️</span>', title: 'Daily Ten · 60 seconds', blurb: 'Ten questions against the clock', go: play('sprint') },
+  ];
+};
+
 /** The island menu's rows that come between Sky Storm and Ninja Sprint: Legend, Tables Check (twice), Arithmetic practice, Arithmetic Sprint, Grammar mix, Daily Sprint (#924). */
 const deckRows = (nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>): MenuRow[] =>
   [...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year),
-    ...arithmeticRow(nav, year), ...grammarRow(nav, year), ...dailySprintRow(nav, year)];
+    ...arithmeticRow(nav, year), ...grammarRow(nav, year), ...dailySprintRow(nav, year), ...dailyTenRows(nav, year)];
 
 /** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
@@ -256,10 +269,13 @@ export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId)
 function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>) {
   const list = topicsFor(year.id).filter(t => chooserEligible(t) && (progress[t.id]?.stars ?? 0) >= 3);
   const crowned = (t: Topic) => !!progress[t.id]?.crown;
-  const pick = (t: Topic | null) => { if (t) { sfx.tap(); nav.play({ year, mode: 'mission', topic: t, legend: true }); } };
-  return list.length ? [{ id: 'legend', mod: '', vport: '<span class="vport emoji">👑</span>', title: 'Legend run',
-    blurb: `Hardest questions on your 3★ topics · 👑 ${list.filter(crowned).length}`,
-    go: () => openChooser($('#island-overlay'), list, pick, { mixed: false, badge: t => crowned(t) ? ' 👑' : '' }) }] : [];
+  const pick = (pro: boolean) => (t: Topic | null) => { if (t) { sfx.tap(); nav.play({ year, mode: 'mission', topic: t, legend: true, pro }); } };
+  const open = (pro: boolean) => () => openChooser($('#island-overlay'), list, pick(pro), { mixed: false, badge: t => crowned(t) ? ' 👑' : '' });
+  const row = { id: 'legend', mod: '', vport: '<span class="vport emoji">👑</span>', title: 'Legend run',
+    blurb: `Hardest questions on your 3★ topics · 👑 ${list.filter(crowned).length}`, go: open(false) };
+  // #1297: Pro — one speed step faster, one life fewer, the same crown; not on a gentle year (#700).
+  const pro = { ...row, id: 'legend-pro', title: 'Legend run · Pro', blurb: 'One step faster, one fewer life', go: open(true) };
+  return !list.length ? [] : year.gentle ? [row] : [row, pro];
 }
 
 /** The island menu rows; `subject` is read at tap time so a tab switch is honoured without rebuilding it. */
