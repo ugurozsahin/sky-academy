@@ -25,10 +25,11 @@ import { senseiTopics, poolWeights, nextIsland, nextIslandLine, mapLine } from '
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
+import { familyBest } from '../family-best';
 import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEntryChooser, type ChooserEntry, trophyBadge, trophyCount } from './chooser';
 import { subjectPool, subjectTopics } from '../game/pools';
 import { strandPools } from '../game/strand-pools';
-import { $, $$, capDigits, render } from './dom';
+import { $, $$, capDigits, esc, render } from './dom';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
 
@@ -67,12 +68,17 @@ function playMixed(nav: Nav, year: YearInfo, mode: 'endless' | 'sprint' | 'boss'
 }
 /** #949: a topic tap is a Mission, or Relaxed practice (no lives) while Whiteboard mode is on. */
 export const topicTapMode = (whiteboard: boolean): 'mission' | 'relaxed' => whiteboard ? 'relaxed' : 'mission';
+/** #1293: a topic where a sibling on this device holds a Sprint best wears the island card's own `.pill` — "🏁 23", the name in its label. */
+const racePill = (t: Topic): string => {
+  const f = familyBest(t.id);
+  return f ? `<small class="pill" aria-label="Race ${esc(f.name)}'s best: ${f.best}">🏁 ${f.best}</small>` : '';
+};
 /** #910/#937: Sprint and Relaxed practice open a chooser first — "🎲 Mixed" or one topic from the open subject. */
 function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', mode: 'sprint' | 'relaxed', pool: Topic[], progress: Record<string, TopicProgress>) {
   openChooser($('#island-overlay'), chooserTopics(year.id, subject), topic => {
     sfx.tap();
     topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
-  }, { mixed: true, badge: trophyBadge(year, progress) });
+  }, { mixed: true, badge: t => trophyBadge(year, progress)(t) + (mode === 'sprint' ? racePill(t) : '') });
 }
 /** #1071/#1072: Boss Battle opens the chooser on an island with strands or table drills
  *  ("🎲 Mixed", strands, then tables); with neither it starts the mixed fight at once. */
