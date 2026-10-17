@@ -101,22 +101,13 @@ export const isFutureSave = (s: RawSave): boolean => {
   const v = saveVersionOf(s);
   return v !== UNREADABLE_VERSION && v > SAVE_VERSION;
 };
-/**
- * Drop any field `migrate()` would otherwise carry through unchanged if it is the wrong *type* (#95 review):
- * a version-valid blob like `{ v: 1, streak: null }` or `{ v: 1, dojo: null }` used to reach the merge below
- * untouched, and then `topbar()`'s `d.streak.days`, `dojoCard()`'s `dojoFor(load().dojo, …)` (`s.date` on a
- * `null` `s`), and every `record*()` writer below (`load().progress[id]` etc.) threw the moment they read it —
- * not just the two call sites (`parentSummary()`, the map's star tally) the original fix touched. Deleting the
- * bad field here, rather than guarding each reader, means a *new* call site gets this for free: every reader
- * goes through `load()` → `migrate()`, so nothing downstream needs to know this hazard exists. The deleted key
- * is filled back in from `DEFAULT` by the `{ ...DEFAULT, ...s }` merge below, exactly as a missing key already is.
- */
-function sanitizeTypes(s: RawSave): RawSave {
-  const clean: RawSave = { ...s };
-  const isRecord = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x);
+const isRecord = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x);
+function dropNonRecords(clean: RawSave): void {
   for (const k of ['progress', 'endless', 'sprint', 'boss', 'memory', 'training', 'equipped', 'streak', 'dojo'] as const) {
     if (k in clean && !isRecord(clean[k])) delete clean[k];
   }
+}
+function dropBadDojo(clean: RawSave): void {
   // #363: `dojo` is the one key whose *interior* is read without a guard, and the guard above stops at the
   // record boundary. `dojoFor()` only rebuilds a state whose `date` is stale, so a record carrying TODAY's
   // date is handed to every reader untouched and throws on `s.streak.last`, `s.done` or `s.progress`.
@@ -138,6 +129,8 @@ function sanitizeTypes(s: RawSave): RawSave {
     const streakOk = isRecord(dj.streak) && typeof dj.streak!.last === 'string' && typeof dj.streak!.days === 'number';
     if (typeof dj.date !== 'string' || !isRecord(dj.progress) || !Array.isArray(dj.done) || !streakOk || typeof dj.total !== 'number') delete clean.dojo;
   }
+}
+function dropNonArrays(clean: RawSave): void {
   // `certs`/`duels` join the same array check the other list fields get (#423 review item 4): each has its
   // own `Array.isArray` guard at its reader (`certificates()`, `duelHistory()`), which is why a wrong-typed
   // value here was never reachable — but every *other* array field is sanitized at this one front door
@@ -145,12 +138,15 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['stickers', 'owned', 'certs', 'duels'] as const) {
     if (k in clean && !Array.isArray(clean[k])) delete clean[k];
   }
-  // #903 review: every v5 field's own front-door guard, present-only like the array check just above — see
-  // save-records.ts's sanitizeV5Fields for why `toV5` alone was not enough.
-  sanitizeV5Fields(clean);
+}
   // #795: dropping a corrupted `spent` to 0 the way every other field falls back to DEFAULT would silently inflate the shop balance (`coins − spent`) — clamp it to (already-sanitized) `coins` instead, the worst-case assumption, and warn on both rejections so a corruption event leaves a trace.
+function sanitizeCoins(clean: RawSave): void {
   if ('coins' in clean && (typeof clean.coins !== 'number' || !Number.isFinite(clean.coins) || clean.coins < 0)) { console.warn(`sanitizeTypes: invalid coins (${JSON.stringify(clean.coins)}) — reset`); delete clean.coins; }
+}
+function sanitizeSpent(clean: RawSave): void {
   if ('spent' in clean && (typeof clean.spent !== 'number' || !Number.isFinite(clean.spent) || clean.spent < 0)) { const cap = typeof clean.coins === 'number' && Number.isFinite(clean.coins) ? clean.coins : 0; console.warn(`sanitizeTypes: invalid spent (${JSON.stringify(clean.spent)}) — clamped to ${cap}`); clean.spent = cap; }
+}
+function sanitizePrimitives(clean: RawSave): void {
   // #171 review: the object/array/number branches above missed every primitive-typed field — `name` most of
   // all, since it is the one field a person freely types into the Restore box. `nameScreen()`'s `esc(d.name)`
   // (`dom.ts`) and `hasName(d.name)` (`.trim()`) both throw on a non-string, and `migrate({ v: 1, name: 123
@@ -169,6 +165,28 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['sound', 'speech', 'tutorialSeen', 'onboarded'] as const) {
     if (k in clean && typeof clean[k] !== 'boolean') delete clean[k];
   }
+}
+/**
+ * Drop any field `migrate()` would otherwise carry through unchanged if it is the wrong *type* (#95 review):
+ * a version-valid blob like `{ v: 1, streak: null }` or `{ v: 1, dojo: null }` used to reach the merge below
+ * untouched, and then `topbar()`'s `d.streak.days`, `dojoCard()`'s `dojoFor(load().dojo, …)` (`s.date` on a
+ * `null` `s`), and every `record*()` writer below (`load().progress[id]` etc.) threw the moment they read it —
+ * not just the two call sites (`parentSummary()`, the map's star tally) the original fix touched. Deleting the
+ * bad field here, rather than guarding each reader, means a *new* call site gets this for free: every reader
+ * goes through `load()` → `migrate()`, so nothing downstream needs to know this hazard exists. The deleted key
+ * is filled back in from `DEFAULT` by the `{ ...DEFAULT, ...s }` merge below, exactly as a missing key already is.
+ */
+function sanitizeTypes(s: RawSave): RawSave {
+  const clean: RawSave = { ...s };
+  dropNonRecords(clean);
+  dropBadDojo(clean);
+  dropNonArrays(clean);
+  // #903 review: every v5 field's own front-door guard, present-only like the array check just above — see
+  // save-records.ts's sanitizeV5Fields for why `toV5` alone was not enough.
+  sanitizeV5Fields(clean);
+  sanitizeCoins(clean);
+  sanitizeSpent(clean);
+  sanitizePrimitives(clean);
   return clean;
 }
 export function migrate(raw: unknown): SaveData {
