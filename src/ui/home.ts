@@ -1,6 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { arithmeticPool, grammarPool, offeredPool } from '../game/sprint-pools';
-import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint';
+import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint'; import { sprintSeed } from '../game/challenge-run';
 import { mtcDeck } from '../game/mtc';
 import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
@@ -30,6 +30,7 @@ import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEnt
 import { subjectPool, subjectTopics } from '../game/pools';
 import { strandPools } from '../game/strand-pools';
 import { $, $$, capDigits, esc, render } from './dom';
+import { recordLines } from './my-record';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
 
@@ -77,7 +78,7 @@ const racePill = (t: Topic): string => {
 function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', mode: 'sprint' | 'relaxed', pool: Topic[], progress: Record<string, TopicProgress>) {
   openChooser($('#island-overlay'), chooserTopics(year.id, subject), topic => {
     sfx.tap();
-    topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
+    topic ? nav.play({ year, mode, topic, seed: mode === 'sprint' ? sprintSeed(topic) : undefined }) : playMixed(nav, year, mode, pool, progress);
   }, { mixed: true, badge: t => trophyBadge(year, progress)(t) + (mode === 'sprint' ? racePill(t) : '') });
 }
 /** #1071/#1072: Boss Battle opens the chooser on an island with strands or table drills
@@ -367,6 +368,7 @@ export function rewardsScreen(nav: Nav) {
   const banner = d.stickers.length === STICKER_IDS.length ? 'Album complete — legendary!'
     : nextCoin ? `<span>Next sticker at 🪙 ${nextCoin}</span><span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * d.coins / nextCoin))}%"></i></span>`
     : 'The rest of the album is earned by playing, not by coins — see each sticker below';
+  const record = recordLines(d).map(l => `<span>${esc(l)}</span>`).join('');   // #1292: none for a KS1 save
   const certs = certificates();
   const duels = duelHistory();
   // #16's last piece, listed under the certificates because it is the other thing on this screen a child
@@ -384,7 +386,7 @@ export function rewardsScreen(nav: Nav) {
       <div><b>🔥 ${d.streak.days}</b><small>day streak</small></div>
       <div><b>${d.stickers.length}/${STICKER_IDS.length}</b><small>stickers</small></div>
     </div>
-    <div class="next-sticker">${banner}</div>
+    <div class="next-sticker">${banner}${record}</div>
     <div class="album">${cards}</div>
     <div class="rewards-cols">
       <div class="rewards-col">

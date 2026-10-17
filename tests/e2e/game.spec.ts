@@ -1937,6 +1937,25 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.next-sticker')).toContainText('Next sticker at 🪙 30');
   });
 
+  // #1292: two text lines inside the existing banner for a child with a KS2 record; a KS1 save's banner is byte for byte today's.
+  test('rewards screen (#1292): a KS2 record adds "My record" lines to the banner and nothing else', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page, 'volt', 'Ada', { coins: 10, ks2: { facts: {}, checks: [], bestSpeed: 2.4, words: { accident: 'rrr', address: 'rw' } } });
+    await page.click('#rewards');
+    const banner = page.locator('.next-sticker');
+    await expect(banner).toContainText('Next sticker at 🪙 30');
+    await expect(banner).toContainText('My record · fastest tables: 2.4 seconds per answer');
+    await expect(banner).toContainText('My record · spelling words secure: Year 3–4 1 of');
+    await expect(page.locator('.reward-stats > div')).toHaveCount(3);
+    await expectFitsViewport(page, 'rewards screen with a KS2 record');
+  });
+
+  test('rewards screen (#1292): a save with no KS2 record keeps today\'s banner exactly', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 10 });
+    await page.click('#rewards');
+    await expect(page.locator('.next-sticker')).toHaveJSProperty('innerHTML', '<span>Next sticker at 🪙 30</span><span class="isl-bar"><i style="width:33%"></i></span>');
+  });
+
   test('rewards screen banner (#163): every coin sticker bought but achievements still open reads "earned by playing"', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada', { coins: 200, stickers: [] });   // past STICKER_COST[2] (120), no achievement stickers yet
     await page.click('#rewards');
@@ -3646,6 +3665,33 @@ test.describe('Sky Ninja Academy', () => {
     await page.evaluate(() => window.__sna.session.tick(60_000));
     await expect(page.locator('.results')).toContainText('You set the family best on');
     await expect(page.locator('.results')).not.toContainText(/lost|lose|loser|behind/i);
+  });
+
+  test('Challenge a friend: a topic Sprint\'s code is behind the grown-ups gate and replays the same questions (#1294)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year2"]');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y2-tables"]');
+    await expect(page.locator('.play')).toBeVisible();
+    const asked: string[] = [];
+    for (let i = 0; i < 3; i++) { asked.push((await state(page)).prompt); await solveCurrent(page); }
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results')).not.toContainText(/challenge|code/i);   // nothing child-facing
+    await page.click('#home');
+    await page.click('#back');
+    await openGrownUps(page);
+    const code = (await page.locator('#challenge-code').inputValue()).trim();
+    expect(code).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+    await page.fill('#challenge-in', 'nope');
+    await page.click('#challenge-play');
+    await expect(page.locator('#challenge-msg')).toContainText("doesn't look right");
+    await page.fill('#challenge-in', code.toLowerCase());
+    await page.click('#challenge-play');
+    await expect(page.locator('.play')).toBeVisible();
+    for (const prompt of asked) { expect((await state(page)).prompt).toBe(prompt); await solveCurrent(page); }
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toContainText('to beat');
   });
 
   test('Ninja Sprint: the 5× table drill asks only the five times table (#916)', async ({ page }) => {

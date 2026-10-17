@@ -192,7 +192,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     if (!r.incomplete) {
       if (o.mode === 'mission' && o.topic) ({ candidates, topicBest } = recordMissionOutcome(o.topic, r, !!o.legend, { name: d.name, avatar: av, year: o.year }));   // #933, #932
       else if (training) { if (r.won) recordTraining(o.year.id); }
-      else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed));   // #911/#912, #925
+      else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed?.startsWith('sprint:'), o.seed));   // #911/#912, #925
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else if (o.mode === 'endless') recordEndless(o.year.id, r.score);   // #1117: no catch-all writer — a new mode records nothing until it names its own
     }
