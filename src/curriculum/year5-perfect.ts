@@ -42,7 +42,11 @@ export const FRAMES: readonly Frame[] = [
 
 /** The oracle for the helper: had after a past anchor; otherwise has for he/she/it and have for the rest. */
 export const helperOf = (fr: Frame): Helper => fr.anchor === 'past' ? 'had' : fr.third ? 'has' : 'have';
-export const formsOf = (fr: Frame): VerbForms => PERFECT_VERBS.find(v => v[0] === fr.verb)!;
+export const formsOf = (fr: Frame): VerbForms => {
+  const forms = PERFECT_VERBS.find(v => v[0] === fr.verb);
+  if (!forms) throw new Error(`year5-perfect: no verb row for "${fr.verb}"`);
+  return forms;
+};
 export const fill = (fr: Frame, aux: string, pp: string) => fr.text.replace('{aux}', aux).replace('{pp}', pp);
 
 const PAST_FRAMES = FRAMES.filter(x => x.anchor === 'past');

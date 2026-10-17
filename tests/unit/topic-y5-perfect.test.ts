@@ -69,6 +69,13 @@ describe('y5-perfect (#1230)', () => {
     for (const v of PERFECT_VERBS) expect(new Set(v).size, v.join('/')).toBe(3);
   });
 
+  it('the verb table is pinned to the standard past and past participle forms', () => {
+    expect(PERFECT_VERBS).toEqual([
+      ['eat', 'ate', 'eaten'], ['go', 'went', 'gone'], ['write', 'wrote', 'written'], ['see', 'saw', 'seen'], ['take', 'took', 'taken'],
+      ['break', 'broke', 'broken'], ['choose', 'chose', 'chosen'], ['speak', 'spoke', 'spoken'], ['forget', 'forgot', 'forgotten'], ['fly', 'flew', 'flown'],
+    ]);
+  });
+
   it('oracle: a helper card answers helperOf(frame); a participle card answers the table\'s third column', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d)) {
       const fr = frameOf(c);
