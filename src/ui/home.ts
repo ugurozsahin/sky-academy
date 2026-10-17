@@ -32,7 +32,8 @@ import { $, $$, capDigits, render } from './dom';
 import { groupTopics, topicsHTML } from './topic-groups';
 import type { PlayOpts } from './play';
 
-export type StartPlay = (o: PlayOpts) => void;
+export type StartOpts = PlayOpts & { pro?: boolean };   // #1297: `pro` is applied by main.ts, so every `year` handed around stays canonical
+export type StartPlay = (o: StartOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
   memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string, labels?: 'players' | 'teams') => void; rewards: () => void; shop: () => void; parents: () => void;

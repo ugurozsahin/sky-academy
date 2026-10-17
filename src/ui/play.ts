@@ -2,7 +2,7 @@ import { avatarById, praiseLine, SENSEI, tutorialLine, VILLAIN, voiced } from '.
 import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
-import { MODES, holdFor, proYear } from '../game/modes'; import { timeOptsFor } from '../game/time-options'; import { playTitle } from '../game/sprint-pools';
+import { MODES, holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options'; import { playTitle } from '../game/sprint-pools';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed'; import { calmReduced, playStyleAttr } from '../device-settings';   // #32: test-only time compression; #906; #907
 import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools'; import { createHud, heartCount } from './hud';   // #1065: one pool rule
 import {
@@ -21,10 +21,9 @@ import { certToStored, certWords, drawCertificate, type CertInfo } from './certi
 import type { PlayHooks } from './hooks';
 
 export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'>
-  & { input?: PlayInput; title?: string; seed?: string; pro?: boolean };   // #1297: `pro` plays `year` through proYear() here, so the callers' `year` stays the canonical one   // #924: a seed, not an rng, so a replay re-deals the same deck
+  & { input?: PlayInput; title?: string; seed?: string };   // #924: a seed, not an rng, so a replay re-deals the same deck
 
-export function playScreen(opts: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
-  const o = opts.pro ? { ...opts, year: proYear(opts.year) } : opts;
+export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
   const d = load(); const av = voiced(avatarById(d.avatar), d, o.year.id);
   const trailItem = equippedItem(wallet(), 'trail');
   const skin = trailItem?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
