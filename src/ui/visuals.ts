@@ -72,48 +72,44 @@ function objectsHTML(v: Extract<Visual, { type: 'objects' }>): string {
   if (v.n2 < 0) return `<div class="vis objs">${fiveFrames(v.n, v.emoji, v.n + v.n2)}</div>`;   // take away: cross out |n2| objects
   return `<div class="vis objs two"><div class="grp">${fiveFrames(v.n, v.emoji)}</div><div class="plus">${v.emoji2 && v.emoji2 !== v.emoji ? 'or' : '+'}</div><div class="grp">${fiveFrames(v.n2, v.emoji2 ?? v.emoji)}</div></div>`;
 }
-type Drawn = 'geometry' | 'coords' | 'pie';
-/** The drawings that are another module's SVG, one entry per type: a key without its function, or the reverse, fails `tsc`. */
-const DRAWN: { [T in Drawn]: (v: Extract<Visual, { type: T }>) => string } = { geometry: geometrySVG, coords: coordsSVG, pie: pieSVG };
-const isDrawn = (v: Visual): v is Extract<Visual, { type: Drawn }> => v.type in DRAWN;
-export function renderVisual(v: Visual | undefined): string {
-  if (!v) return '';
-  if (isDrawn(v)) return (DRAWN[v.type] as (x: typeof v) => string)(v);
-  switch (v.type) {
-    case 'objects': return objectsHTML(v);
-    case 'tenframe': {
-      const total = v.n + (v.n2 ?? 0);
-      const frames = Math.max(1, Math.ceil(Math.max(total, 1) / 10));
-      let html = '';
-      for (let f = 0; f < frames; f++) {
-        const cells = Array.from({ length: 10 }, (_, i) => { const k = f * 10 + i; const cls = k < v.n ? 'a' : k < total ? 'b' : ''; return `<i class="${cls}"></i>`; }).join('');
-        html += `<div class="tenframe">${cells}</div>`;
-      }
-      return `<div class="vis">${html}</div>`;
-    }
-    case 'dots': {
-      const pts = DOT_LAYOUTS[v.n] ?? [];
-      return `<div class="vis"><svg viewBox="0 0 120 80" class="dots">${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9"/>`).join('')}</svg></div>`;
-    }
-    case 'array': {
-      const cells = Array.from({ length: v.rows * v.cols }, () => '<i></i>').join('');
-      return `<div class="vis"><div class="arr" style="grid-template-columns:repeat(${v.cols},1fr)">${cells}</div></div>`;
-    }
-    case 'coins': return `<div class="vis coins">${v.coins.map(coinSVG).join('')}</div>`;
-    case 'clock': return `<div class="vis">${clockFace(v)}</div>`;
-    case 'fraction': return v.stack ? fractionStackHTML(v) : fractionHTML(v);
-    case 'numberline': return numberlineHTML(v);
-    case 'scales': {
-      const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
-      return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
-    }
-    case 'chart': return chartOrBar(v);   // the bar chart is its own module (#1076); tally, block and pictogram output is unchanged
-    case 'symmetry': return symmetryHtml(v);
-    case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
-    case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>').replace(/\n/g, '<br>')}</div>`;
-    case 'strip': return `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
-    default: { const unhandled: never = v; return unhandled; }   // a new Visual type without a case fails tsc here
+function tenframeHTML(v: Extract<Visual, { type: 'tenframe' }>): string {
+  const total = v.n + (v.n2 ?? 0);
+  const frames = Math.max(1, Math.ceil(Math.max(total, 1) / 10));
+  let html = '';
+  for (let f = 0; f < frames; f++) {
+    const cells = Array.from({ length: 10 }, (_, i) => { const k = f * 10 + i; const cls = k < v.n ? 'a' : k < total ? 'b' : ''; return `<i class="${cls}"></i>`; }).join('');
+    html += `<div class="tenframe">${cells}</div>`;
   }
+  return `<div class="vis">${html}</div>`;
+}
+function dotsHTML(v: Extract<Visual, { type: 'dots' }>): string {
+  const pts = DOT_LAYOUTS[v.n] ?? [];
+  return `<div class="vis"><svg viewBox="0 0 120 80" class="dots">${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9"/>`).join('')}</svg></div>`;
+}
+function arrayHTML(v: Extract<Visual, { type: 'array' }>): string {
+  const cells = Array.from({ length: v.rows * v.cols }, () => '<i></i>').join('');
+  return `<div class="vis"><div class="arr" style="grid-template-columns:repeat(${v.cols},1fr)">${cells}</div></div>`;
+}
+function scalesHTML(v: Extract<Visual, { type: 'scales' }>): string {
+  const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
+  return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
+}
+/** One renderer per visual type: a key without its function, or the reverse, fails `tsc`, so a new Visual type cannot be forgotten. */
+const RENDERERS: { [T in Visual['type']]: (v: Extract<Visual, { type: T }>) => string } = {
+  geometry: geometrySVG, coords: coordsSVG, pie: pieSVG,
+  objects: objectsHTML, tenframe: tenframeHTML, dots: dotsHTML, array: arrayHTML,
+  coins: v => `<div class="vis coins">${v.coins.map(coinSVG).join('')}</div>`,
+  clock: v => `<div class="vis">${clockFace(v)}</div>`,
+  fraction: v => v.stack ? fractionStackHTML(v) : fractionHTML(v),
+  numberline: numberlineHTML, scales: scalesHTML,
+  chart: v => chartOrBar(v),   // the bar chart is its own module (#1076); tally, block and pictogram output is unchanged
+  symmetry: v => symmetryHtml(v),
+  word: v => `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`,
+  sentence: v => `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>').replace(/\n/g, '<br>')}</div>`,
+  strip: v => `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`,
+};
+export function renderVisual(v: Visual | undefined): string {
+  return v ? (RENDERERS[v.type] as (x: Visual) => string)(v) : '';
 }
 
 /** The bar and line charts are `vis-axis-chart.ts`'s; the other chart kinds are `chartHTML`'s. */
@@ -255,15 +251,18 @@ export function noteSVG(p: (typeof NOTES)[number]): string {
   return `<svg viewBox="0 0 96 48" class="coin note" style="width:76px"><rect x="3" y="3" width="90" height="42" rx="5" fill="${fill}" stroke="${ink}" stroke-width="3"/><rect x="11" y="11" width="74" height="26" rx="3" fill="none" stroke="${ink}" stroke-width="1.5" opacity="0.55"/><text x="48" y="31" text-anchor="middle" font-size="20" font-weight="700" fill="${ink}">${label}</text></svg>`;
 }
 
+const coinColours = (p: number) => p === 1 || p === 2 ? ['#c9803a', '#7a4a1c'] : p >= 100 ? ['#e6c250', '#8a6d1f'] : ['#d5d9e2', '#7d8594'];
+const COIN_RADIUS: Record<number, number> = { 1: 22, 2: 26, 5: 20, 10: 25, 20: 24, 50: 28, 100: 24 };
+/** The 20p and 50p are seven-sided; every other coin is round. */
+function coinShape(p: number, r: number): string {
+  if (p !== 20 && p !== 50) return `<circle cx="32" cy="32" r="${r}"/>`;
+  const pts = Array.from({ length: 7 }, (_, i) => { const a = i / 7 * Math.PI * 2 - Math.PI / 2; return `${(32 + r * Math.cos(a)).toFixed(1)},${(32 + r * Math.sin(a)).toFixed(1)}`; });
+  return `<polygon points="${pts.join(' ')}"/>`;
+}
 export function coinSVG(p: number): string {
   if (isNote(p)) return noteSVG(p);
-  const gold = p === 1 || p === 2 ? ['#c9803a', '#7a4a1c'] : p >= 100 ? ['#e6c250', '#8a6d1f'] : ['#d5d9e2', '#7d8594'];
-  const label = coinLabel(p);
-  const r = p === 1 ? 22 : p === 2 ? 26 : p === 5 ? 20 : p === 10 ? 25 : p === 20 ? 24 : p === 50 ? 28 : p === 100 ? 24 : 28;
-  const shape = p === 20 || p === 50
-    ? `<polygon points="${Array.from({ length: 7 }, (_, i) => { const a = i / 7 * Math.PI * 2 - Math.PI / 2; return `${(32 + r * Math.cos(a)).toFixed(1)},${(32 + r * Math.sin(a)).toFixed(1)}`; }).join(' ')}"/>`
-    : `<circle cx="32" cy="32" r="${r}"/>`;
-  return `<svg viewBox="0 0 64 64" class="coin" style="width:${r * 2.2}px"><g fill="${gold[0]}" stroke="${gold[1]}" stroke-width="2.5">${shape}</g>${p === 200 ? `<circle cx="32" cy="32" r="18" fill="#e6c250" stroke="#8a6d1f" stroke-width="2"/>` : ''}<text x="32" y="37" text-anchor="middle" font-size="${label.length > 2 ? 15 : 18}" font-weight="700" fill="${gold[1]}">${label}</text></svg>`;
+  const gold = coinColours(p), label = coinLabel(p), r = COIN_RADIUS[p] ?? 28;
+  return `<svg viewBox="0 0 64 64" class="coin" style="width:${r * 2.2}px"><g fill="${gold[0]}" stroke="${gold[1]}" stroke-width="2.5">${coinShape(p, r)}</g>${p === 200 ? `<circle cx="32" cy="32" r="18" fill="#e6c250" stroke="#8a6d1f" stroke-width="2"/>` : ''}<text x="32" y="37" text-anchor="middle" font-size="${label.length > 2 ? 15 : 18}" font-weight="700" fill="${gold[1]}">${label}</text></svg>`;
 }
 
 /** The clock card's face: Arabic numerals, or Roman ones when `roman` is set (#1078). */
