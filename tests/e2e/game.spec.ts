@@ -2430,6 +2430,19 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'Roman-numeral clock face');
   });
 
+  test('y6-circles: a lettered circle, a two-circle card and a circle in a square fit the question card on the phone (#1248)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    const gen = TOPICS.find(t => t.id === 'y6-circles')!.gen;
+    // No Year 6 card is reachable from the preview, so dress the card with the topic's own output, as the #1093 test does.
+    for (const [d, seed] of [[1, 1248], [3, 1249], [3, 1250], [3, 1251], [2, 1252]] as const) {
+      const q = gen(d, seededRng(seed));
+      await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, renderVisual(q.visual!));
+      await expect(page.locator('#vis .geo .circ')).not.toHaveCount(0);
+      await expectFitsViewport(page, `y6-circles d${d} seed ${seed}`);
+    }
+  });
+
   test('y3-fracline: a lettered fraction line and a past-one line fit the question card on the phone (#1093)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');
@@ -2521,6 +2534,27 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#vis svg.coords polygon.shaded')).toHaveCount(1);
     await expect(page.locator('#vis svg.coords line.mirror')).toHaveCount(1);   // a vertical line has no width, so not toBeVisible
     await expectFitsViewport(page, 'y5-transform shapes and mirror line');
+  });
+
+  test('y6-pie: a five-slice pie with seven-letter labels sits inside the question card on a phone (#1239)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year6', 'y6-pie');
+    // The first card may have fewer slices, so inject the app's own renderVisual output for a fixed five-slice fixture.
+    const html = renderVisual({ type: 'pie', slices: [['rabbits', 5], ['pasta', 2], ['purple', 3], ['tennis', 1], ['mango', 1]].map(([label, n]) => ({ label: String(label), n: Number(n) })) });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await page.setViewportSize({ width: 390, height: 664 });
+    const pie = page.locator('#vis svg[aria-label="Pie chart"]');
+    await expect(pie).toBeVisible();
+    await expect(pie.locator('text')).toHaveCount(5);
+    const card = (await page.locator('.qcard').boundingBox())!;
+    for (const box of [await pie.boundingBox(), ...(await Promise.all((await pie.locator('text').all()).map(t => t.boundingBox())))]) {
+      expect(box!.x).toBeGreaterThanOrEqual(card.x - 1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(card.x + card.width + 1);
+      expect(box!.y).toBeGreaterThanOrEqual(card.y - 1);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(card.y + card.height + 1);
+    }
+    await expectFitsViewport(page, 'y6-pie five-slice chart');
   });
 
   test('y4-shapes: three lettered triangles with tick and right-angle marks fit the card on a phone (#1154)', async ({ page }) => {
