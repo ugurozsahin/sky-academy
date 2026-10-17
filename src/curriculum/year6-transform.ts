@@ -7,6 +7,7 @@ import type { Difficulty, Generator, Question, Rng, Visual } from './types';
 import { pick, ri, shuffle, wideFor } from './util';
 
 type P = [number, number];
+type Axis = 'x' | 'y';
 type Coords = Extract<Visual, { type: 'coords' }>;
 const SIZE = 5, MIN = -5;
 const inGrid = (p: P): boolean => p[0] >= MIN && p[0] <= SIZE && p[1] >= MIN && p[1] <= SIZE;
@@ -18,7 +19,7 @@ const say = (s: string) => s.replace(/\((−?\d+), (−?\d+)\)/g, '$1, $2').repl
 /** The topic's own oracle: a point or an outline after a move, or after a reflection in an axis (`'y'` is the y-axis, so x changes sign). */
 export const transform = {
   move: (pts: P[], dx: number, dy: number): P[] => pts.map(([x, y]) => [x + dx, y + dy]),
-  reflect: (pts: P[], axis: 'x' | 'y'): P[] => pts.map(([x, y]) => axis === 'y' ? [-x, y] : [x, -y]),
+  reflect: (pts: P[], axis: Axis): P[] => pts.map(([x, y]) => axis === 'y' ? [-x, y] : [x, -y]),
   half: (pts: P[]): P[] => pts.map(([x, y]) => [-x, -y]),
 };
 
@@ -56,7 +57,7 @@ const BASES: P[][] = [
 
 /** d2: the shaded outline sits in one quadrant, at least a square from both axes; A–C are its reflection, the other-axis reflection and a third. */
 function reflectShape(rng: Rng): Question {
-  const axis: 'x' | 'y' = rng() < 0.5 ? 'x' : 'y', other = axis === 'x' ? 'y' : 'x';
+  const axis: Axis = rng() < 0.5 ? 'x' : 'y', other = axis === 'x' ? 'y' : 'x';
   const o = [ri(rng, 1, 2), ri(rng, 1, 2)], flip = rng() < 0.5, [qx, qy] = [rng() < 0.5 ? 1 : -1, rng() < 0.5 ? 1 : -1];
   const shaded: P[] = pick(rng, BASES).map(([x, y]): P => [qx * ((flip ? 3 - x : x) + o[0]), qy * (y + o[1])]);
   const right = transform.reflect(shaded, axis), wrong1 = transform.reflect(shaded, other);
@@ -72,7 +73,7 @@ function reflectShape(rng: Rng): Question {
 }
 
 /** The wrong vertices for a d3 card: a reflection alone has the other axis, a half turn and x and y swapped; a move and a reflection add the steps in the wrong order. */
-function vertexSlips(p: P, d: P | null, axis: 'x' | 'y'): P[] {
+function vertexSlips(p: P, d: P | null, axis: Axis): P[] {
   const other = axis === 'x' ? 'y' : 'x', [first] = transform.reflect([p], axis);
   if (!d) return [transform.reflect([p], other)[0], transform.half([p])[0], [p[1], p[0]], p];
   const moved = transform.move([p], d[0], d[1]);
@@ -80,8 +81,8 @@ function vertexSlips(p: P, d: P | null, axis: 'x' | 'y'): P[] {
 }
 
 /** A d3 start vertex off both axes, the move (or none) and the axis; the move is never along only one axis. */
-function vertexSpec(rng: Rng): { p: P; d: P | null; axis: 'x' | 'y' } | null {
-  const p: P = [ri(rng, -4, 4), ri(rng, -4, 4)], axis: 'x' | 'y' = rng() < 0.5 ? 'x' : 'y';
+function vertexSpec(rng: Rng): { p: P; d: P | null; axis: Axis } | null {
+  const p: P = [ri(rng, -4, 4), ri(rng, -4, 4)], axis: Axis = rng() < 0.5 ? 'x' : 'y';
   const d: P | null = rng() < 0.5 ? [ri(rng, -2, 2), ri(rng, -2, 2)] : null;
   return p[0] === 0 || p[1] === 0 || (d && (d[0] === 0 || d[1] === 0)) ? null : { p, d, axis };
 }
@@ -93,13 +94,13 @@ function vertexCard(rng: Rng): Question {
     if (!spec) continue;
     const { p, d, axis } = spec;
     const moved = d ? transform.move([p], d[0], d[1])[0] : p, [ans] = transform.reflect([moved], axis);
-    if (!inGrid(moved) || !inGrid(ans)) continue;
+    if (!inGrid(moved) || !inGrid(ans) || moved[axis === 'y' ? 0 : 1] === 0) continue;   // a point on its own mirror line does not move
     const ds = decoys(ans, vertexSlips(p, d, axis));
     if (!ds) continue;
     const start = fmt(p), steps = d ? dirs(d[0], d[1]) : '';
     const spoken = d ? `Move ${start} ${steps}, then reflect in the ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`;
-    return card(d ? `${start}: ${steps}, then ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`, say(spoken), fmt(ans), shuffle(rng, [fmt(ans), ...ds]),
-      grid({ points: [{ x: p[0], y: p[1], label: 'A' }] }), 'A reflection flips one sign: the axis you reflect in stays the same side');
+    return card(d ? `${start}: ${steps}, then reflect in ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`, say(spoken), fmt(ans), shuffle(rng, [fmt(ans), ...ds]),
+      grid({ points: [{ x: p[0], y: p[1], label: 'A' }] }), axis === 'y' ? 'Reflecting in the y-axis changes the sign of x' : 'Reflecting in the x-axis changes the sign of y');
   }
 }
 

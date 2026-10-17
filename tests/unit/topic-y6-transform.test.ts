@@ -23,6 +23,11 @@ const clash = (a: P[], b: P[]) => { const p = box(a), q = box(b); return p.x0 < 
 const refl = (pts: P[], axis: string): P[] => pts.map(([x, y]) => axis === 'y' ? [-x, y] : [x, -y]);
 
 describe('y6-transform (#1249)', () => {
+  it('the conventions, pinned by hand: the y-axis negates x, the x-axis negates y, a move adds', () => {
+    expect(refl([[2, 3]], 'y')).toEqual([[-2, 3]]); expect(refl([[2, 3]], 'x')).toEqual([[2, -3]]);
+    expect(fmt([-3, 4])).toBe('(−3, 4)');
+  });
+
   it('is registered for Year 6 maths in the geometry strand', () => { expect(topic).toMatchObject({ year: 'year6', subject: 'maths', strand: 'geometry', title: 'Reflect in the Axes' }); });
 
   it('every card is on the −5…5 grid, with four distinct options (three lettered at d2), a speakable say, R-LBL labels and a real minus sign', () => {
@@ -59,6 +64,8 @@ describe('y6-transform (#1249)', () => {
       for (const c of cands) { expect(c.pts.every(p => inGrid(p as P))).toBe(true); expect(clash(sp, c.pts as P[])).toBe(false); }
       for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) expect(clash(cands[i].pts as P[], cands[j].pts as P[])).toBe(false);
       const half = key(sp.map(([x, y]) => [-x, -y] as P)), third = cands.find(c => key(c.pts as P[]) !== want && key(c.pts as P[]) !== key(refl(sp, other)))!;
+      const bx = sp.map(p => p[0]), by = sp.map(p => p[1]), slid = sp.map(([x, y]) => [x - (Math.min(...bx) + Math.max(...bx)), y - (Math.min(...by) + Math.max(...by))] as P);
+      expect([half, key(slid)], q.prompt).toContain(key(third.pts as P[]));   // a half turn, or the outline slid unflipped into the same place
       thirds.add(key(third.pts as P[]) === half ? 'half turn' : 'slid copy');
       expect([...q.options].sort()).toEqual(['A', 'B', 'C']);
       expect(sp.every(([x, y]) => Math.abs(x) >= 1 && Math.abs(y) >= 1)).toBe(true);
@@ -69,7 +76,7 @@ describe('y6-transform (#1249)', () => {
   it('d3: the answer is the (moved, then) reflected vertex, and the wrong-order and other-axis slips are decoys', () => {
     let two = 0, one = 0;
     for (const q of draw(3)) {
-      const reflectOnly = /^Reflect (\([^)]*\)) in the (\w)-axis\.$/.exec(q.prompt), both = /^(\([^)]*\)): (.*), then (\w)-axis\.$/.exec(q.prompt);
+      const reflectOnly = /^Reflect (\([^)]*\)) in the (\w)-axis\.$/.exec(q.prompt), both = /^(\([^)]*\)): (.*), then reflect in (\w)-axis\.$/.exec(q.prompt);
       let start: P, axis: string, dx = 0, dy = 0;
       if (reflectOnly) { one++; start = parse(reflectOnly[1]); axis = reflectOnly[2]; }
       else {
@@ -81,8 +88,8 @@ describe('y6-transform (#1249)', () => {
       expect(inGrid(moved) && inGrid(ans)).toBe(true);
       expect(q.options.filter(o => o === fmt(ans))).toHaveLength(1);
       const [wrong] = refl([moved], axis === 'x' ? 'y' : 'x');
-      if (reflectOnly) expect(q.options, q.prompt).toContain(fmt(wrong));
-      else expect(q.options, q.prompt).toContain(fmt(wrong));
+      expect(fmt(wrong), q.prompt).not.toBe(q.answer);   // the moved point is never on its own mirror line, so the other axis always differs
+      expect(q.options, q.prompt).toContain(fmt(wrong));
       for (const o of q.options) expect(inGrid(parse(o))).toBe(true);
     }
     expect(one).toBeGreaterThan(100); expect(two).toBeGreaterThan(100);
