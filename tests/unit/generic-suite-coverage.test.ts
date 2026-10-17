@@ -12,10 +12,18 @@ describe('the generic topic suite covers every topic exactly once (#1467)', () =
   const calls = readdirSync(dir).filter(f => f.endsWith('.test.ts'))
     .flatMap(f => [...readFileSync(new URL(f, dir), 'utf8').matchAll(/^genericTopicSuite\((.+)\);/gm)].map(m => m[1]));
   const ks2Years = YEARS.filter(y => isKs2(y.id));
+  const importsHelper = readdirSync(dir).filter(f => f.endsWith('.test.ts'))
+    .filter(f => /^genericTopicSuite\(/m.test(readFileSync(new URL(f, dir), 'utf8')))
+    .map(f => /import \{[^}]*\bgenericTopicSuite\b[^}]*\} from '\.\/helpers\/generic-topic-suite';/.test(readFileSync(new URL(f, dir), 'utf8')));
 
   it('is called once for EYFS/KS1 and once per KS2 year, and nowhere else', () => {
     const expected = ['TOPICS.filter(t => !isKs2(t.year))', ...ks2Years.map(y => `TOPICS.filter(t => t.year === '${y.id}')`)];
     expect(calls.sort()).toEqual(expected.sort());
+  });
+
+  it('every one of those calls is the real helper, imported from helpers/generic-topic-suite', () => {
+    expect(importsHelper.length).toBe(calls.length);
+    expect(importsHelper.every(Boolean)).toBe(true);
   });
 
   it('every topic belongs to a year in YEARS, so one of those calls reaches it', () => {

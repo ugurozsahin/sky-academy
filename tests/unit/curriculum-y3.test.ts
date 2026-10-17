@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { topicsFor, TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum/types';
+import { seededRng } from '../../src/game/rng';
 import { genericTopicSuite } from './helpers/generic-topic-suite';
 
 // Year 3's per-topic structural loop (#1050), in a file of its own so it runs as a parallel worker.
@@ -19,12 +20,11 @@ describe('Year 3 registry (#1050)', () => {
 
   // #1467: `curriculum.test.ts`'s "no other topic sets slow" rail skips KS2 (#1050) on the promise that a KS2
   // topic which sets `slow` asserts it in its own `topic-<id>.test.ts`. Nothing held it to that promise.
-  it('no Year 3 topic sets slow unless its own topic test mentions it', () => {
-    let seed = 2972;
-    const rng = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  it('no Year 3 topic sets slow unless its own topic test asserts it', () => {
+    const rng = seededRng(2972);
     const mentionsSlow = (id: string) => {
       const file = new URL(`./topic-${id}.test.ts`, import.meta.url);
-      return existsSync(file) && /\bslow\b/.test(readFileSync(file, 'utf8'));
+      return existsSync(file) && /expect\([^)]*\.slow\b/.test(readFileSync(file, 'utf8'));   // an assertion, not a mention
     };
     const offenders: string[] = [];
     for (const t of TOPICS.filter(x => x.year === 'year3' && !mentionsSlow(x.id))) {
