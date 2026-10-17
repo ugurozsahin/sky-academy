@@ -47,7 +47,7 @@ export const ELLIPSES: readonly EllipsisRow[] = [
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 const listed = (linkers: readonly string[]): string => linkers.map((l, i) => `${LETTERS[i]} ${l}`).join('\n');
-const HINT = 'Contrast: the opposite. Consequence: because of it. Example: one case of it.';
+const HINT = 'Opposite, because of it, or an example';
 
 /** A lettered card: one linker per offered relation, the answer is the letter of the asked relation's linker. */
 function linkCard(rng: Rng, asked: Relation, offered: readonly Relation[], lead: string, visual?: string): Question {
