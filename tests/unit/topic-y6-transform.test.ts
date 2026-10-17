@@ -71,6 +71,7 @@ describe('y6-transform (#1249)', () => {
       expect(sp.every(([x, y]) => Math.abs(x) >= 1 && Math.abs(y) >= 1)).toBe(true);
     }
     expect([...axes].sort()).toEqual(['x', 'y']); expect([...thirds].sort()).toEqual(['half turn', 'slid copy']);
+    expect(new Set(draw(2).map(q => q.answer)).size).toBe(3);   // the letters follow the coordinates, yet every letter is right some of the time
   });
 
   it('d3: the answer is the (moved, then) reflected vertex, and the wrong-order and other-axis slips are decoys', () => {

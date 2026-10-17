@@ -55,6 +55,8 @@ const BASES: P[][] = [
   [[0, 0], [3, 0], [3, 1], [1, 3], [0, 2]], [[0, 0], [2, 1], [3, 3], [0, 3]],
 ];
 
+const key = (pts: P[]) => pts.map(p => p.join(',')).sort().join(';');
+
 /** d2: the shaded outline sits in one quadrant, at least a square from both axes; A–C are its reflection, the other-axis reflection and a third. */
 function reflectShape(rng: Rng): Question {
   const axis: Axis = rng() < 0.5 ? 'x' : 'y', other = axis === 'x' ? 'y' : 'x';
@@ -65,7 +67,9 @@ function reflectShape(rng: Rng): Question {
   const bx = shaded.map(p => p[0]), by = shaded.map(p => p[1]);
   const slid = transform.move(shaded, -(Math.min(...bx) + Math.max(...bx)), -(Math.min(...by) + Math.max(...by)));
   const third = rng() < 0.5 ? transform.half(shaded) : slid;
-  const cands = [right, wrong1, third], letters = ['A', 'B', 'C'], order = shuffle(rng, cands);
+  // The letters follow the outlines' coordinates, not a shuffle: the repeat key lists a card's outlines without their letters (#1214), so two
+  // cards with the same outlines must give them the same letters, or one key would stand for two different answers.
+  const cands = [right, wrong1, third], letters = ['A', 'B', 'C'], order = [...cands].sort((a, b) => key(a).localeCompare(key(b)));
   const visual = grid({ shapes: [{ pts: shaded, shaded: true }, ...order.map((pts, i) => ({ label: letters[i], pts }))] });
   const prompt = `Which is the reflection in the ${axis}-axis?`;
   return card(prompt, `Which shape is the shaded one reflected in the ${axis}-axis?`, letters[order.indexOf(right)], letters, visual,
