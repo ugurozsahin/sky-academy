@@ -61,7 +61,7 @@ describe('y6-subjunctive (#1280)', () => {
   it('ladder: d1 only the I rows, d2 the other were rows and the mandatives, inversion only at d3', () => {
     for (const q of draw(1)) expect(row(q)).toMatchObject({ kind: 'were', person: 'I' });
     const kinds2 = new Set(draw(2).map(q => row(q).kind)); expect([...kinds2].sort()).toEqual(['mandative', 'were']);
-    for (const q of draw(2)) if (row(q).kind === 'were') expect(row(q).person).toBe('other');
+    for (const q of draw(2)) { const r = row(q); if (r.kind === 'were') expect(r.person).toBe('other'); }
     expect(new Set(draw(3).map(q => row(q).kind))).toEqual(new Set(['were', 'mandative', 'inversion']));
   });
 

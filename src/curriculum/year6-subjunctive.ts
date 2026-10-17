@@ -5,9 +5,10 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { pick, shuffle, wordQ } from './util';
 
-export type Kind = 'were' | 'mandative' | 'inversion';
-/** `person` is the subject of a `were` row; `base` is the stored infinitive a `mandative` answer must equal. */
-export interface Row { text: string; answer: string; decoys: [string, string, string]; kind: Kind; person?: 'I' | 'other'; base?: string }
+type Common = { readonly text: string; readonly answer: string; readonly decoys: readonly [string, string, string] };
+/** A `were` row names its subject (`I` or another); a `mandative` row stores the infinitive its answer must equal; an `inversion` row has neither. */
+export type Row = Common & ({ readonly kind: 'were'; readonly person: 'I' | 'other' } | { readonly kind: 'mandative'; readonly base: string } | { readonly kind: 'inversion' });
+export type Kind = Row['kind'];
 
 export const STEM = 'Which word fits in formal writing?';
 
@@ -39,8 +40,8 @@ const HINTS: Record<Kind, string> = {
 };
 
 /** The rows a difficulty may draw: d1 the I rows, d2 the other were rows and the mandatives, d3 every kind. */
-export const rowsFor = (d: Difficulty): readonly Row[] =>
-  d === 1 ? SUBJUNCTIVES.filter(r => r.person === 'I') : d === 2 ? SUBJUNCTIVES.filter(r => r.person === 'other' || r.kind === 'mandative') : SUBJUNCTIVES;
+export const rowsFor = (d: Difficulty): readonly Row[] => SUBJUNCTIVES.filter(r =>
+  d === 3 || (d === 1 ? r.kind === 'were' && r.person === 'I' : r.kind === 'mandative' || (r.kind === 'were' && r.person === 'other')));
 
 export const y6Subjunctive: Generator = (d: Difficulty, rng: Rng): Question => {
   const row = pick(rng, rowsFor(d));
