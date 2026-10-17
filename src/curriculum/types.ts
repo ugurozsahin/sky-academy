@@ -17,7 +17,9 @@ export type GeoPart =
   | { kind: 'segment'; a: [number, number]; b: [number, number]; ticks?: 1 | 2 | 3; label?: string; labelAt?: [number, number] }
   // A closed shape of 3–6 vertices (#1154): `ticks[i]` marks equal sides on the side from pts[i] to pts[i+1], `right` lists vertex indices
   // that get a right-angle square, `sides` are optional side labels, `label` is the letter drawn under the shape.
-  | { kind: 'polygon'; pts: [number, number][]; ticks?: (0 | 1 | 2 | 3)[]; right?: number[]; sides?: string[]; label?: string };
+  | { kind: 'polygon'; pts: [number, number][]; ticks?: (0 | 1 | 2 | 3)[]; right?: number[]; sides?: string[]; label?: string }
+  // A circle (#1248): the outline and a centre dot; `label` is drawn just outside the outline, at its upper right. The radius and diameter are ordinary `segment` parts.
+  | { kind: 'circle'; at: [number, number]; r: number; label?: string };
 
 export type Visual =
   | { type: 'objects'; emoji: string; n: number; n2?: number; emoji2?: string } // groups of objects
