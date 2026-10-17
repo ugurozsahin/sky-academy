@@ -7,7 +7,7 @@ import { y5Modal } from './year5-modal';
 // import: y5-parenthesis
 import { y5Commas } from './year5-commas';
 import { y5Cohesion } from './year5-cohesion';
-// import: y5-perfect
+import { y5Perfect } from './year5-perfect';
 import { y5Parenthesis } from './year5-parenthesis';
 import type { Topic } from './types';
 
@@ -26,5 +26,5 @@ export const Y5_GRAMMAR: Topic[] = [
 
   { id: 'y5-cohesion', title: 'Cohesion: linking adverbials', icon: '🧭', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5 Grammar: linking ideas across paragraphs with adverbials of time, place and number', gen: y5Cohesion },
 
-  // slot: y5-perfect
+  { id: 'y5-perfect', title: 'Perfect tense: had, has, have', icon: '⏳', subject: 'writing', year: 'year5', strand: 'grammar', nc: 'Y5–6 Grammar: the perfect form of verbs to mark relationships of time and cause', gen: y5Perfect },
 ];

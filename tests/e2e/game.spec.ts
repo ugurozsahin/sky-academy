@@ -2536,6 +2536,27 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'y5-transform shapes and mirror line');
   });
 
+  test('y6-pie: a five-slice pie with seven-letter labels sits inside the question card on a phone (#1239)', async ({ page }) => {
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year6', 'y6-pie');
+    // The first card may have fewer slices, so inject the app's own renderVisual output for a fixed five-slice fixture.
+    const html = renderVisual({ type: 'pie', slices: [['rabbits', 5], ['pasta', 2], ['purple', 3], ['tennis', 1], ['mango', 1]].map(([label, n]) => ({ label: String(label), n: Number(n) })) });
+    await page.evaluate(h => { document.querySelector('#vis')!.innerHTML = h; }, html);
+    await page.setViewportSize({ width: 390, height: 664 });
+    const pie = page.locator('#vis svg[aria-label="Pie chart"]');
+    await expect(pie).toBeVisible();
+    await expect(pie.locator('text')).toHaveCount(5);
+    const card = (await page.locator('.qcard').boundingBox())!;
+    for (const box of [await pie.boundingBox(), ...(await Promise.all((await pie.locator('text').all()).map(t => t.boundingBox())))]) {
+      expect(box!.x).toBeGreaterThanOrEqual(card.x - 1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(card.x + card.width + 1);
+      expect(box!.y).toBeGreaterThanOrEqual(card.y - 1);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(card.y + card.height + 1);
+    }
+    await expectFitsViewport(page, 'y6-pie five-slice chart');
+  });
+
   test('y4-shapes: three lettered triangles with tick and right-angle marks fit the card on a phone (#1154)', async ({ page }) => {
     await seedPreview(page);
     await seedPlayer(page);
