@@ -19,16 +19,12 @@ export function dojoRowsHTML(d: DojoOutcome): string {
 
 export interface MemoryOpts { year: YearInfo; theme?: string }
 
-export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => void) {
-  const d = load(); const av = voiced(avatarById(d.avatar), d, o.year.id);
-  const theme = pickTheme(o.year.id, Math.random, o.theme);
-  const game = new Memory(theme.pairs(Math.random));
-  // Was `const cols = 4` with a comment enumerating 8 / 12 / 16 cards; `gridFor` is that decision made from
-  // the deck instead, because a five-pair board is ten cards and four columns lay it out ragged (#372 review
-  // B1). `offset` moves the first card of a short last row inwards so the row is centred rather than hanging
-  // off the left edge; it is 0 for every board the game deals today.
-  const { cols, offset, lastRowStart } = gridFor(game.cards.length);
-  render(`
+type Theme = ReturnType<typeof pickTheme>;
+type Voiced = ReturnType<typeof voiced>;
+
+/** The board's markup: the header, the toast line and one button per card. */
+function boardHTML(o: MemoryOpts, theme: Theme, av: Voiced, game: Memory, grid: ReturnType<typeof gridFor>): string {
+  return `
   <section class="screen memory" style="--glow:${av.glow}">
     <div class="hud-top">
       <button class="icon-btn" id="back" aria-label="Back to the island">←</button>
@@ -41,11 +37,38 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
       <div class="hint${theme.hintIsData ? ' own' : ''}">${esc(theme.hint)}</div>
     </div>
     <div class="toast" id="toast" aria-live="polite"></div>
-    <div class="cards" id="cards" style="--cols:${cols}" role="grid" aria-label="Memory cards">
-      ${game.cards.map((c, i) => `<button class="card" data-i="${i}"${i === lastRowStart ? ` style="grid-column-start:${offset + 1}"` : ''} aria-label="Card ${i + 1}"><span class="inner"><span class="back">?</span><span class="front">${faceHTML(c.face)}</span></span></button>`).join('')}
+    <div class="cards" id="cards" style="--cols:${grid.cols}" role="grid" aria-label="Memory cards">
+      ${game.cards.map((c, i) => `<button class="card" data-i="${i}"${i === grid.lastRowStart ? ` style="grid-column-start:${grid.offset + 1}"` : ''} aria-label="Card ${i + 1}"><span class="inner"><span class="back">?</span><span class="front">${faceHTML(c.face)}</span></span></button>`).join('')}
     </div>
     <div class="overlay" id="overlay" hidden></div>
-  </section>`, 'bg-play');
+  </section>`;
+}
+
+interface Payout { boards: number; streak: number; dojo: DojoOutcome; dojoSaved: boolean; stickerHTML: string }
+
+/** The finished board's results modal. */
+function memoryResults(av: Voiced, game: Memory, headline: string, medal: string, p: Payout): string {
+  return resultsModal({
+    glow: av.glow, img: av.img, name: av.name, headline,
+    medal, heading: 'All pairs found!',
+    stars: game.stars,
+    stats: `<div><b>${game.score}</b><small>score</small></div><div><b>${game.moves}</b><small>turns</small></div><div><b>${p.boards}</b><small>boards</small></div>`,
+    coins: game.coins,
+    pills: p.streak > 1 ? `<span class="streak-pill">🔥 ${p.streak}-day streak</span>` : '',
+    dojoRows: p.dojoSaved ? dojoRowsHTML(p.dojo) : '', stickerHTML: p.stickerHTML,
+  });
+}
+
+export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => void) {
+  const d = load(); const av = voiced(avatarById(d.avatar), d, o.year.id);
+  const theme = pickTheme(o.year.id, Math.random, o.theme);
+  const game = new Memory(theme.pairs(Math.random));
+  // Was `const cols = 4` with a comment enumerating 8 / 12 / 16 cards; `gridFor` is that decision made from
+  // the deck instead, because a five-pair board is ten cards and four columns lay it out ragged (#372 review
+  // B1). `offset` moves the first card of a short last row inwards so the row is centred rather than hanging
+  // off the left edge; it is 0 for every board the game deals today.
+  const grid = gridFor(game.cards.length);
+  render(boardHTML(o, theme, av, game, grid), 'bg-play');
 
   let lock = false;
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the play screen
@@ -90,15 +113,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     sfx.stage();
     const headline = praiseLine(av, d.name); say(headline);
     const medal = game.stars === 3 ? '🥇' : game.stars === 2 ? '🥈' : '🥉';
-    const ov = $('#overlay'); ov.hidden = false; ov.innerHTML = resultsModal({
-      glow: av.glow, img: av.img, name: av.name, headline,
-      medal, heading: 'All pairs found!',
-      stars: game.stars,
-      stats: `<div><b>${game.score}</b><small>score</small></div><div><b>${game.moves}</b><small>turns</small></div><div><b>${boards}</b><small>boards</small></div>`,
-      coins: game.coins,
-      pills: streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : '',
-      dojoRows: dojoSaved ? dojoRowsHTML(dojo) : '', stickerHTML,
-    });
+    const ov = $('#overlay'); ov.hidden = false; ov.innerHTML = memoryResults(av, game, headline, medal, { boards, streak, dojo, dojoSaved, stickerHTML });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
   }
