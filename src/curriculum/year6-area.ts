@@ -10,7 +10,7 @@ const TRIPLES: [number, number, number][] = [[4, 3, 5], [3, 4, 5], [8, 6, 10], [
 const lead = (v: number) => String(v)[0];
 
 /** Answer plus three named slips; for answers of 20 or more also a last-digit sharer and a leading-digit sharer (#1058). */
-function areaCard(rng: Rng, prompt: string, answer: number, named: number[], extra: Partial<Question>): Question {
+export function areaCard(rng: Rng, prompt: string, answer: number, named: number[], extra: Partial<Question>): Question {
   const ok = (v: number) => Number.isInteger(v) && v >= 1 && v !== answer;
   const ds = [...new Set(named.filter(ok))].slice(0, 3);
   if (answer >= 20) {
