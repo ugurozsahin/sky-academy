@@ -4,10 +4,10 @@
 // import: y6-missingangles
 // import: y6-circles
 // import: y6-coords
-// import: y6-transform
 import type { Topic } from './types';
 import { y6Coords } from './year6-coords';
 import { y6MissingAngles } from './year6-missingangles';
+import { y6Transform } from './year6-transform';
 
 export const Y6_GEOMETRY: Topic[] = [
   // slot: y6-nets
@@ -20,5 +20,5 @@ export const Y6_GEOMETRY: Topic[] = [
   // slot: y6-coords
   { id: 'y6-coords', title: 'Four-Quadrant Coordinates', icon: '🧭', subject: 'maths', year: 'year6', nc: 'Y6 Geometry: describe positions on the full coordinate grid, all four quadrants (6M46)', gen: y6Coords },
 
-  // slot: y6-transform
+  { id: 'y6-transform', title: 'Reflect in the Axes', icon: '🔄', subject: 'maths', year: 'year6', strand: 'geometry', nc: 'Y6 Geometry: translate and reflect in the axes (6M47)', gen: y6Transform },
 ];
