@@ -83,6 +83,22 @@ const PICTO_SYMBOL = '⭐';
  * Legend-stage child the d1 tally chart in 5.3% of d3 draws, and terminated only because d1 happens to force
  * `ask = 'one'` — a guard twenty-five lines away from the recursion it was holding up (#8 review).
  */
+type Survey = (typeof SURVEYS)[number];
+
+/** The counts for a Stats card and the two rows `more` compares. Bounded, and each re-roll keeps `kind`, `step` and `ask` as generated. */
+function statsCounts(rng: Rng, survey: Survey, kind: string, step: number, ask: string): { counts: number[]; i: number; j: number } {
+  const roll = () => survey.rows.map(() => ri(rng, 1, kind === 'block' ? 9 : 6) * step);
+  let counts = roll();
+  const [i, j] = shuffle(rng, [0, 1, 2]).slice(0, 2);
+  const degenerate = () => ask === 'most'
+    ? counts.filter(n => n === Math.max(...counts)).length > 1
+    : ask === 'more' && counts[i] === counts[j];
+  for (let tries = 0; tries < 20 && degenerate(); tries++) counts = roll();
+  // The terminator: a re-roll can be unlucky twenty times, so end it deterministically rather than loop on.
+  if (degenerate()) counts[ask === 'most' ? 0 : i] = Math.max(...counts) + step;
+  return { counts, i, j };
+}
+
 export const y2Stats: Generator = (d, rng) => {
   const survey = pick(rng, SURVEYS);
   const kind = d === 1 ? 'tally' : d === 2 ? 'pictogram' : 'block';
@@ -90,18 +106,8 @@ export const y2Stats: Generator = (d, rng) => {
   // lies, so they are rolled in steps of the key. A tally or a block diagram has no key (#133) and counts in
   // ones — `step` is the roll unit and nothing else; it never reaches the visual of a chart without a key.
   const step = kind === 'pictogram' ? pick(rng, [2, 5]) : 1;
-  const roll = () => survey.rows.map(() => ri(rng, 1, kind === 'block' ? 9 : 6) * step);
   const ask = d === 1 ? 'one' : pick(rng, d === 2 ? ['one', 'total'] : ['total', 'more', 'most']);
-
-  let counts = roll();
-  const [i, j] = shuffle(rng, [0, 1, 2]).slice(0, 2);
-  // Bounded, and each re-roll keeps `kind`, `each` and `ask` exactly as generated.
-  const degenerate = () => ask === 'most'
-    ? counts.filter(n => n === Math.max(...counts)).length > 1
-    : ask === 'more' && counts[i] === counts[j];
-  for (let tries = 0; tries < 20 && degenerate(); tries++) counts = roll();
-  // The terminator: a re-roll can be unlucky twenty times, so end it deterministically rather than loop on.
-  if (degenerate()) counts[ask === 'most' ? 0 : i] = Math.max(...counts) + step;
+  const { counts, i, j } = statsCounts(rng, survey, kind, step, ask);
 
   const rows = survey.rows.map(([icon, name], k) => ({ label: `${icon} ${name}`, n: counts[k] }));
   const visual: Question['visual'] = kind === 'pictogram'
@@ -109,6 +115,11 @@ export const y2Stats: Generator = (d, rng) => {
     : { type: 'chart', kind, rows };
   const chart = kind === 'tally' ? 'tally chart' : kind === 'pictogram' ? 'pictogram' : 'block diagram';
 
+  return statsAnswer(rng, { survey, counts, i, j, ask, visual, chart });
+};
+
+function statsAnswer(rng: Rng, c: { survey: Survey; counts: number[]; i: number; j: number; ask: string; visual: Question['visual']; chart: string }): Question {
+  const { survey, counts, i, j, ask, visual, chart } = c;
   if (ask === 'total') {
     const total = counts.reduce((a, b) => a + b, 0);
     return numQ(rng, `How many children altogether?`, total, {
@@ -133,7 +144,7 @@ export const y2Stats: Generator = (d, rng) => {
   return numQ(rng, `How many chose ${icon}?`, counts[k], {
     visual, hint: `Read the ${chart}`, hintIsData: false, say: `Look at the ${chart}. How many children chose this one?`,
   });
-};
+}
 /**
  * Year 2 durations (#298 slice 3). Year 2 asks for two time facts — minutes in an hour, hours in a day — and
  * for one thing this topic never did: "compare and sequence intervals of time". Seconds in a minute, days in
