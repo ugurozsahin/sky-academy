@@ -3708,6 +3708,33 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.results')).not.toContainText(/lost|lose|loser|behind/i);
   });
 
+  test('Challenge a friend: a topic Sprint\'s code is behind the grown-ups gate and replays the same questions (#1294)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year2"]');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y2-tables"]');
+    await expect(page.locator('.play')).toBeVisible();
+    const asked: string[] = [];
+    for (let i = 0; i < 3; i++) { asked.push((await state(page)).prompt); await solveCurrent(page); }
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results')).not.toContainText(/challenge|code/i);   // nothing child-facing
+    await page.click('#home');
+    await page.click('#back');
+    await openGrownUps(page);
+    const code = (await page.locator('#challenge-code').inputValue()).trim();
+    expect(code).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+    await page.fill('#challenge-in', 'nope');
+    await page.click('#challenge-play');
+    await expect(page.locator('#challenge-msg')).toContainText("doesn't look right");
+    await page.fill('#challenge-in', code.toLowerCase());
+    await page.click('#challenge-play');
+    await expect(page.locator('.play')).toBeVisible();
+    for (const prompt of asked) { expect((await state(page)).prompt).toBe(prompt); await solveCurrent(page); }
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toContainText('to beat');
+  });
+
   test('Ninja Sprint: the 5× table drill asks only the five times table (#916)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year2"]');

@@ -45,7 +45,7 @@ describe('Grammar mix pool (#1234)', () => {
   });
   it('play.ts passes the title flag to the sprint record and builds its heading through playTitle', () => {
     const src = readFileSync('src/ui/play.ts', 'utf8');
-    expect(src).toContain('recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed)');
+    expect(src).toContain("recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed?.startsWith('sprint:'), o.seed)");
     expect(src).toContain('playTitle(o, spec.staged, training, spec.title)');
   });
   it('main.ts keeps the pool title on Play again and on the fix-it deck, so a replay never writes the Ninja Sprint best', () => {
