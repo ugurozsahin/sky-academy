@@ -11,20 +11,25 @@ const round = (n: number) => Math.round(n * 100) / 100;
 /** The point `r` from `from` at `deg` (anticlockwise from the right; the page's y runs down), to 0.01. */
 export const polar = (from: Pt, deg: number, r: number): Pt => [round(from[0] + r * Math.cos(deg * Math.PI / 180)), round(from[1] - r * Math.sin(deg * Math.PI / 180))];
 
-const radiusSeg = (c: Pt, r: number, deg: number, label?: string): GeoPart => ({ kind: 'segment', a: c, b: polar(c, deg, r), label, labelAt: polar(c, deg, r + 6) });
-const diameterSeg = (c: Pt, r: number, deg: number, label?: string): GeoPart => ({ kind: 'segment', a: polar(c, deg + 180, r), b: polar(c, deg, r), label, labelAt: polar(c, deg, r + 6) });
+/** A single letter sits just beyond the segment's tip; a longer label ("7 cm") takes the module's own place beside the middle, so it never crosses the outline. */
+const tag = (c: Pt, r: number, deg: number, label?: string): { label?: string; labelAt?: Pt } => ({ label, ...(label && label.length === 1 ? { labelAt: polar(c, deg, r + 6) } : {}) });
+/** A longer radius label sits inside the circle on the side away from the radius, so it crosses neither the segment nor the outline. */
+const radiusSeg = (c: Pt, r: number, deg: number, label?: string): GeoPart => ({ kind: 'segment', a: c, b: polar(c, deg, r), ...tag(c, r, deg, label), ...(label && label.length > 1 ? { labelAt: polar(c, deg + 180, r * 0.35) } : {}) });
+const diameterSeg = (c: Pt, r: number, deg: number, label?: string): GeoPart => ({ kind: 'segment', a: polar(c, deg + 180, r), b: polar(c, deg, r), ...tag(c, r, deg, label) });
 
 const PARTS = ['radius', 'diameter', 'circumference'] as const;
 type Part = typeof PARTS[number];
+
+const HINTS: Record<Part, string> = { radius: 'Centre to the edge', diameter: 'Across, through the centre', circumference: 'All the way round' };
 
 /** d1: A, B and C name the radius, the diameter and the circumference in a shuffled order; the card asks for one. */
 function partCard(rng: Rng): Question {
   const ask = pick(rng, PARTS), letters = shuffle(rng, ['A', 'B', 'C']), at = Object.fromEntries(PARTS.map((p, i) => [p, letters[i]])) as Record<Part, string>;
   const dDeg = pick(rng, [0, 10, -10]), rDeg = pick(rng, [135, 225, 315]) + pick(rng, [-10, 0, 10]);
   const parts: GeoPart[] = [{ kind: 'circle', at: C, r: R, label: at.circumference }, diameterSeg(C, R, dDeg, at.diameter), radiusSeg(C, R, rDeg, at.radius)];
-  const prompt = `Which letter shows the ${ask}?`;
+  const prompt = `Which is the ${ask}?`;
   return wordQ(rng, prompt, at[ask], letters.filter(l => l !== at[ask]), {
-    visual: { type: 'geometry', parts }, say: prompt, hint: ask === 'circumference' ? 'The circumference is the distance all the way round' : 'The diameter goes through the centre; the radius stops there', hintIsData: false,
+    visual: { type: 'geometry', parts }, say: `Which letter shows the ${ask}?`, hint: HINTS[ask], hintIsData: false,
   });
 }
 

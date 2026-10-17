@@ -88,15 +88,20 @@ function circleSVG(p: Extract<GeoPart, { kind: 'circle' }>): string {
   return `<circle class="circ" cx="${n1(p.at[0])}" cy="${n1(p.at[1])}" r="${n1(p.r)}" style="${LINE}"/><circle class="ctr" cx="${n1(p.at[0])}" cy="${n1(p.at[1])}" r="1.3" style="fill:var(--text)"/>${tag}`;
 }
 
+/** A circle's numbers are finite and the whole outline sits inside the 100 × 70 box. */
+const circleOk = (p: Extract<GeoPart, { kind: 'circle' }>): boolean =>
+  finite(...p.at, p.r) && p.r > 0 && p.at[0] - p.r >= 0 && p.at[0] + p.r <= 100 && p.at[1] - p.r >= 0 && p.at[1] + p.r <= 70;
+const polygonOk = (p: Extract<GeoPart, { kind: 'polygon' }>): boolean =>
+  p.pts.length >= 3 && p.pts.length <= 6 && finite(...p.pts.flat()) && (p.right ?? []).every(i => Number.isInteger(i) && i >= 0 && i < p.pts.length);
+const partOk = (p: GeoPart): boolean => p.kind === 'angle' ? finite(...p.at, p.dir, p.deg, p.len ?? 1)
+  : p.kind === 'circle' ? circleOk(p) : p.kind === 'polygon' ? polygonOk(p) : finite(...p.a, ...p.b, ...(p.labelAt ?? [0, 0]));
+const partSVG = (p: GeoPart): string => p.kind === 'angle' ? angleSVG(p) : p.kind === 'polygon' ? polygonSVG(p) : p.kind === 'circle' ? circleSVG(p) : segmentSVG(p);
+
 /** The drawing for a `geometry` visual; a part with a non-finite number is skipped, as `chart` and `symmetry` do (#137). */
 export function geometrySVG(v: Extract<Visual, { type: 'geometry' }>): string {
   const body = v.parts.map(p => {
-    const ok = p.kind === 'angle' ? finite(...p.at, p.dir, p.deg, p.len ?? 1)
-      : p.kind === 'circle' ? finite(...p.at, p.r) && p.r > 0 && p.at[0] - p.r >= 0 && p.at[0] + p.r <= 100 && p.at[1] - p.r >= 0 && p.at[1] + p.r <= 70
-      : p.kind === 'polygon' ? p.pts.length >= 3 && p.pts.length <= 6 && finite(...p.pts.flat()) && (p.right ?? []).every(i => Number.isInteger(i) && i >= 0 && i < p.pts.length)
-      : finite(...p.a, ...p.b, ...(p.labelAt ?? [0, 0]));
-    if (!ok) { console.warn('geometry visual: a part has a bad number, index or size — skipped'); return ''; }
-    return p.kind === 'angle' ? angleSVG(p) : p.kind === 'polygon' ? polygonSVG(p) : p.kind === 'circle' ? circleSVG(p) : segmentSVG(p);
+    if (!partOk(p)) { console.warn('geometry visual: a part has a bad number, index or size — skipped'); return ''; }
+    return partSVG(p);
   }).join('');
   return `<div class="vis"><svg viewBox="0 0 100 70" class="geo" style="width:clamp(200px,60vw,220px);height:auto">${body}</svg></div>`;
 }

@@ -34,7 +34,7 @@ describe('y6-circles (#1248)', () => {
   it('d1: the lettered radius runs centre to circle, the diameter runs through the centre, to 0.5 units, and the asked letter is its part', () => {
     const asked = new Set<string>();
     for (const q of draw(1)) {
-      const [c] = circles(q), [dia, rad] = segs(q), part = /shows the (\w+)\?/.exec(q.prompt)![1]; asked.add(part);
+      const [c] = circles(q), [dia, rad] = segs(q), part = /^Which is the (\w+)\?$/.exec(q.prompt)![1]; asked.add(part);
       expect(q.options).toHaveLength(3); expect([...q.options].sort()).toEqual(['A', 'B', 'C']);
       expect(dist(rad.a, c.at), q.prompt).toBeLessThan(0.5); expect(Math.abs(dist(rad.b, c.at) - c.r)).toBeLessThan(0.5);
       expect(Math.abs(dist(dia.a, c.at) - c.r)).toBeLessThan(0.5); expect(Math.abs(dist(dia.b, c.at) - c.r)).toBeLessThan(0.5);
