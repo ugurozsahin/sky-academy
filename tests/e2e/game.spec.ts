@@ -926,6 +926,32 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.topic[data-id="y1-add"] .pill')).toHaveText('👑');
   });
 
+  test('Legend run · Pro: one fewer life, same crown; absent on Reception (#1297)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 3, best: 100, plays: 1 } } });
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('#legend-pro')).toBeVisible();
+    await page.click('#legend-pro');
+    await page.click('#island-overlay .topic[data-id="y1-add"]');
+    await expect(page.locator('.play')).toBeVisible();
+    expect(await page.evaluate(() => (window.__sna.session as unknown as { o: { year: { lives: number } } }).o.year.lives)).toBe(YEARS.find(y => y.id === "year1")!.lives - 1);   // read the run's year, not the live count: a Pro bubble may already have slipped
+    const runLives = () => page.evaluate(() => (window.__sna.session as unknown as { o: { year: { lives: number } } }).o.year.lives);
+    await winMission(page);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('sna:v1')!).progress['y1-add']?.crown === true);
+    await page.click('#again');                                                   // "Play again" keeps the Pro run
+    await expect(page.locator('.play')).toBeVisible();
+    expect(await runLives()).toBe(YEARS.find(y => y.id === 'year1')!.lives - 1);
+    await winMission(page);
+    await page.click('#next-topic');                                              // review #1967: "Next topic" is an ordinary mission on the canonical year
+    await expect.poll(runLives).toBe(YEARS.find(y => y.id === 'year1')!.lives);   // polled: the old play screen is still up for a beat
+  });
+
+  test('no Legend run · Pro row on Reception (#1297)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'r-count': { stars: 3, best: 100, plays: 1 } } });
+    await page.click('.island[data-year="reception"]');
+    await expect(page.locator('#legend')).toBeVisible();                          // the Legend row is there, so the missing Pro row is the gentle-year rule
+    await expect(page.locator('#legend-pro')).toHaveCount(0);
+  });
+
   test('no Legend run row without a 3★ topic (#932)', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 2, best: 100, plays: 1 } } });
     await page.click('.island[data-year="year1"]');
