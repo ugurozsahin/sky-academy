@@ -3408,6 +3408,19 @@ test.describe('Sky Ninja Academy', () => {
     });
   }
 
+  // #1439: `.islands.big .isl-art` (0,3,0) sets `animation-name` and beat the reduced-motion list's plain
+  // `.isl-art` (0,1,0) for that one longhand — masked only because it never sets the duration. Both the base
+  // rule (hoverBig, a phone) and its `min-width: 720px` twin (hover) are read, with and without the setting.
+  for (const [reduced, width, want] of [[true, 390, 'none'], [true, 800, 'none'], [false, 390, 'hoverBig'], [false, 800, 'hover']] as const) {
+    test(`guard rail: the sky map's island art ${reduced ? 'stops under' : 'still floats without'} reduced motion at ${width}px (#1439)`, async ({ page }) => {
+      if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.setViewportSize({ width, height: 800 });
+      await seedPlayer(page);
+      await expect(page.locator('.islands.big .isl-art').first()).toBeAttached();
+      expect(await page.evaluate(() => getComputedStyle(document.querySelector('.islands.big .isl-art')!).animationName)).toBe(want);
+    });
+  }
+
   // #32: the suite runs at 8× (the beforeEach above), which compresses the outcome holds. This one test forces
   // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
   // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a
