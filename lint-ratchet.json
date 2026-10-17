@@ -5,7 +5,6 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/curriculum/year2/measure.ts::(anonymous)": 17,
     "src/game/arena.ts::drawBubble": 16,
     "src/game/arena.ts::drawParticle": 21,
     "src/game/arena.ts::drawTrail": 19,
@@ -13,7 +12,6 @@
     "src/game/arena.ts::render": 19,
     "src/game/arena.ts::reveal": 16,
     "src/game/arena.ts::update": 42,
-    "src/game/bubbles.ts::layoutWave": 18,
     "src/storage/migrate.ts::sanitizeTypes": 39,
     "src/ui/play-results.ts::showResults": 21,
     "src/ui/play.ts::playScreen": 22,
@@ -23,10 +21,8 @@
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/three/sketchbook/view.ts::createView": 81,
     "src/ui/duel.ts::duelScreen": 201,
     "src/ui/home.ts::islandScreen": 65,
-    "src/ui/memory.ts::memoryScreen": 84,
     "src/ui/parents.ts::parentsScreen": 102,
     "src/ui/parents.ts::(anonymous)": 77,
     "src/ui/play-session.ts::createPlaySession": 186,
