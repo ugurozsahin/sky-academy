@@ -14,7 +14,6 @@
     "src/game/arena.ts::update": 42,
     "src/game/bubbles.ts::layoutWave": 18,
     "src/main.ts::(anonymous)": 16,
-    "src/storage/migrate.ts::sanitizeTypes": 39,
     "src/ui/play-results.ts::showResults": 21,
     "src/ui/play.ts::playScreen": 22,
     "src/ui/profiles.ts::(anonymous)": 16,
