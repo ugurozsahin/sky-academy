@@ -1013,13 +1013,15 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.play')).toBeVisible();
     await page.waitForFunction(() => window.__sna?.state().prompt);
     const lives = await page.evaluate(() => window.__sna.state().lives);
+    // `wrong()` needs a launched, live decoy; `waitForWrongOrEnd` only sees one on screen, so on a slow machine the
+    // hook can lag the wait by a frame — the polls below retry the hook itself (it stops at the first slice that lands).
     await waitForWrongOrEnd(page);
     let asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
-    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__sna.wrong())).toBe(true);
     await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
     await waitForWrongOrEnd(page);
     asked = await page.evaluate(() => window.__sna.session.questionsAsked as number);
-    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__sna.wrong())).toBe(true);
     await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, asked);
     for (let i = 0; i < 8; i++) await solveCurrent(page);   // any card type: a sequence or any-order card takes more than one slice
     await page.waitForFunction(() => window.__sna.state().ended);

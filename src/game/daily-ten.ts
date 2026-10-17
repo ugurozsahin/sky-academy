@@ -5,7 +5,6 @@ import { shuffle } from '../curriculum/util';
 import { answerableBy } from './pools';
 import { repeatKey, type DeckItem } from './session';
 
-export const DAILY_TEN_SIZE = 10;
 /** The run's title, which is also how "Play again" (`main.ts`) knows to deal a fresh deck. */
 export const DAILY_TEN_TITLE = 'Daily Ten';
 /** Difficulty by card: 1 for the first four, 2 for the next four, 3 for the last two. */

@@ -62,7 +62,7 @@ describe('Daily Ten (#1296)', () => {
   it('every real island with maths topics deals ten answerable cards whose answers are among their options', () => {
     for (const year of ['reception', 'year1', 'year2', 'year3', 'year4', 'year5', 'year6'] as const) {
       const topics = topicsFor(year);
-      if (year === 'reception' || year === 'year1' || year === 'year2' || year === 'year3' || year === 'year4' || year === 'year5' || year === 'year6') expect(dailyTenPool(topics).length, `${year} has maths topics`).toBeGreaterThan(0);
+      expect(dailyTenPool(topics).length, `${year} has maths topics`).toBeGreaterThan(0);
       for (let seed = 1; seed <= 15; seed++) {
         const deck = dailyTenDeck(topics, rng(seed));
         expect(deck, `${year} seed ${seed}`).toHaveLength(10);
