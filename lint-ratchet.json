@@ -5,7 +5,6 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/curriculum/year2/measure.ts::(anonymous)": 17,
     "src/game/arena.ts::drawBubble": 16,
     "src/game/arena.ts::drawParticle": 21,
     "src/game/arena.ts::drawTrail": 19,
