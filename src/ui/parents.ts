@@ -298,6 +298,88 @@ function wireMove(redraw: () => void) {
   });
 }
 
+function bindProfiles(nav: Nav, overlay: HTMLElement, closeOverlay: () => void, drawDash: () => void) {
+  // #20 slice 3. Both controls redraw rather than patching the row: every number above came from the save
+  // that was just renamed or removed, which is the same reason `wireMove`'s restore redraws.
+  // `render()` ends every redraw at `scrollTo(0, 0)` (right for a screen *change*), which leaves this status
+  // line — well below the stats grid and topic tables — off screen exactly when it has something to say
+  // (#426). `scroll` defaults true because every call site but one follows a `drawDash()` that just did that;
+  // the rename failure below is the one exception, since it never redraws and the grown-up is already looking
+  // at the row that produced it.
+  const profMsg = (text: string, bad = false, scroll = true) => {
+    const el = $('#prof-msg');
+    el.textContent = text; el.classList.toggle('bad', bad); el.hidden = false;
+    if (scroll) el.scrollIntoView({ block: 'center' });
+  };
+  $$('button[data-rename]').forEach(b => b.addEventListener('click', () => {
+    sfx.tap();
+    const id = b.dataset.rename as ProfileId;
+    const input = $<HTMLInputElement>(`input[data-name="${id}"]`);
+    const r = renameProfile(id, input.value);
+    if (!r.ok) { sfx.wrong(); profMsg(RENAME_HINTS[r.why], true, false); return; }
+    sfx.correct();
+    // The stored name, not what was typed: `renameProfile` trims and truncates, and the row has to redraw
+    // with what the store is actually holding.
+    const done = `Renamed to ${r.name}.`;
+    drawDash();
+    profMsg(done);
+  }));
+  $$('button[data-del]').forEach(b => b.addEventListener('click', () => {
+    sfx.tap();
+    const id = b.dataset.del as ProfileId;
+    const row = profileCards().find(c => c.id === id);
+    const name = row ? rowName(row, profileCards().findIndex(c => c.id === id) + 1) : 'this ninja';
+    overlay.hidden = false;
+    overlay.innerHTML = deleteConfirmHTML(name);
+    $('#prof-cancel').addEventListener('click', () => { sfx.tap(); closeOverlay(); });
+    $('#prof-go').addEventListener('click', () => {
+      sfx.tap();
+      const r = deleteProfile(id);
+      closeOverlay();
+      // The refusals redraw too (#420 review round 2, B2). `'orphaned'` leaves the index genuinely changed,
+      // so the row beside the sentence would contradict it; and redrawing costs nothing on the others, where
+      // the list is simply unchanged.
+      if (!r.ok) { sfx.wrong(); drawDash(); profMsg(DELETE_HINTS[r.why], true); return; }
+      sfx.correct();
+      // The save this whole screen is drawn from has just gone, so there is nothing to redraw: `launch` puts
+      // the device back where boot would, which is the picker while siblings remain (#20 slice 3).
+      if (r.self) { nav.launch(); return; }
+      drawDash();
+      profMsg(`${name} was removed from this device.`);
+    });
+  }));
+
+}
+function bindReset(nav: Nav, overlay: HTMLElement, closeOverlay: () => void, drawDash: () => void) {
+  let snapshot: SaveData | null = null;
+  $('#start-again').addEventListener('click', () => {
+    sfx.tap();
+    overlay.hidden = false;
+    overlay.innerHTML = resetConfirmHTML();
+    const input = $<HTMLInputElement>('#reset-word'), go = $<HTMLButtonElement>('#reset-go');
+    const update = () => { go.disabled = input.value.trim() !== RESET_WORD; };
+    input.addEventListener('input', update);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter' && !go.disabled) go.click(); });
+    $('#reset-cancel').addEventListener('click', () => { sfx.tap(); closeOverlay(); });
+    go.addEventListener('click', () => {
+      sfx.tap();
+      snapshot = load();       // kept in memory only — the "Undo" affordance below is what can bring it back
+      hush(); reset();   // hush first: a speech verdict still pending would save() a fresh blob over the cleared key (#1630)
+      pendingReset = true;
+      overlay.innerHTML = resetDoneHTML();
+      $('#reset-undo').addEventListener('click', () => {
+        sfx.tap();
+        if (snapshot) save(snapshot);   // save() replaces every key, so this restores the snapshot exactly
+        clearPendingReset();
+        closeOverlay();
+        drawDash();
+      });
+      $('#reset-continue').addEventListener('click', () => { sfx.tap(); clearPendingReset(); nav.avatar(); });
+    });
+    input.focus();
+  });
+}
+
 /** For grown-ups: a quick maths gate, then a read-only progress dashboard. */
 export function parentsScreen(nav: Nav) {
   let gate = gateChallenge(Math.random, shownYears().some(y => isKs2(y.id)));
@@ -325,7 +407,7 @@ export function parentsScreen(nav: Nav) {
   };
 
   const drawDash = () => {
-    if (isGuest()) return guestDash(nav.map, drawDash); let snapshot: SaveData | null = null;
+    if (isGuest()) return guestDash(nav.map, drawDash);
 
     const sm = parentSummary(load(), listedTopics(), shownYears(), STICKER_IDS.length, new Date(), listedTopics().filter(chooserEligible));
     render(`
@@ -343,85 +425,7 @@ export function parentsScreen(nav: Nav) {
 
     const overlay = $('#reset-overlay');
     const closeOverlay = () => { overlay.hidden = true; overlay.innerHTML = ''; };
-
-    // #20 slice 3. Both controls redraw rather than patching the row: every number above came from the save
-    // that was just renamed or removed, which is the same reason `wireMove`'s restore redraws.
-    //
-    // `render()` ends every redraw at `scrollTo(0, 0)` (right for a screen *change*), which leaves this status
-    // line — well below the stats grid and topic tables — off screen exactly when it has something to say
-    // (#426). `scroll` defaults true because every call site but one follows a `drawDash()` that just did that;
-    // the rename failure below is the one exception, since it never redraws and the grown-up is already looking
-    // at the row that produced it.
-    const profMsg = (text: string, bad = false, scroll = true) => {
-      const el = $('#prof-msg');
-      el.textContent = text; el.classList.toggle('bad', bad); el.hidden = false;
-      if (scroll) el.scrollIntoView({ block: 'center' });
-    };
-    $$('button[data-rename]').forEach(b => b.addEventListener('click', () => {
-      sfx.tap();
-      const id = b.dataset.rename as ProfileId;
-      const input = $<HTMLInputElement>(`input[data-name="${id}"]`);
-      const r = renameProfile(id, input.value);
-      if (!r.ok) { sfx.wrong(); profMsg(RENAME_HINTS[r.why], true, false); return; }
-      sfx.correct();
-      // The stored name, not what was typed: `renameProfile` trims and truncates, and the row has to redraw
-      // with what the store is actually holding.
-      const done = `Renamed to ${r.name}.`;
-      drawDash();
-      profMsg(done);
-    }));
-    $$('button[data-del]').forEach(b => b.addEventListener('click', () => {
-      sfx.tap();
-      const id = b.dataset.del as ProfileId;
-      const row = profileCards().find(c => c.id === id);
-      const name = row ? rowName(row, profileCards().findIndex(c => c.id === id) + 1) : 'this ninja';
-      overlay.hidden = false;
-      overlay.innerHTML = deleteConfirmHTML(name);
-      $('#prof-cancel').addEventListener('click', () => { sfx.tap(); closeOverlay(); });
-      $('#prof-go').addEventListener('click', () => {
-        sfx.tap();
-        const r = deleteProfile(id);
-        closeOverlay();
-        // The refusals redraw too (#420 review round 2, B2). `'orphaned'` leaves the index genuinely changed,
-        // so the row beside the sentence would contradict it; and redrawing costs nothing on the others, where
-        // the list is simply unchanged.
-        if (!r.ok) { sfx.wrong(); drawDash(); profMsg(DELETE_HINTS[r.why], true); return; }
-        sfx.correct();
-        // The save this whole screen is drawn from has just gone, so there is nothing to redraw: `launch` puts
-        // the device back where boot would, which is the picker while siblings remain (#20 slice 3).
-        if (r.self) { nav.launch(); return; }
-        drawDash();
-        profMsg(`${name} was removed from this device.`);
-      });
-    }));
-
-    $('#start-again').addEventListener('click', () => {
-      sfx.tap();
-      overlay.hidden = false;
-      overlay.innerHTML = resetConfirmHTML();
-      const input = $<HTMLInputElement>('#reset-word');
-      const go = $<HTMLButtonElement>('#reset-go');
-      const update = () => { go.disabled = input.value.trim() !== RESET_WORD; };
-      input.addEventListener('input', update);
-      input.addEventListener('keydown', e => { if (e.key === 'Enter' && !go.disabled) go.click(); });
-      $('#reset-cancel').addEventListener('click', () => { sfx.tap(); closeOverlay(); });
-      go.addEventListener('click', () => {
-        sfx.tap();
-        snapshot = load();       // kept in memory only — the "Undo" affordance below is what can bring it back
-        hush(); reset();   // hush first: a speech verdict still pending would save() a fresh blob over the cleared key (#1630)
-        pendingReset = true;
-        overlay.innerHTML = resetDoneHTML();
-        $('#reset-undo').addEventListener('click', () => {
-          sfx.tap();
-          if (snapshot) save(snapshot);   // save() replaces every key, so this restores the snapshot exactly
-          clearPendingReset();
-          closeOverlay();
-          drawDash();
-        });
-        $('#reset-continue').addEventListener('click', () => { sfx.tap(); clearPendingReset(); nav.avatar(); });
-      });
-      input.focus();
-    });
+    bindProfiles(nav, overlay, closeOverlay, drawDash); bindReset(nav, overlay, closeOverlay, drawDash);
   };
 
   drawGate();

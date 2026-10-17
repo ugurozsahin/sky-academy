@@ -22,11 +22,8 @@
   "lines": {
     "src/ui/duel.ts::duelScreen": 201,
     "src/ui/home.ts::islandScreen": 65,
-    "src/ui/parents.ts::parentsScreen": 102,
-    "src/ui/parents.ts::(anonymous)": 77,
     "src/ui/play-session.ts::createPlaySession": 186,
-    "src/ui/play.ts::playScreen": 197,
-    "src/ui/solid.ts::createSolidSlot": 110
+    "src/ui/play.ts::playScreen": 197
   },
   "fileLines": {
     "tests/unit/arena.test.ts": 948,
