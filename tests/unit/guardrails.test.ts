@@ -110,7 +110,7 @@ describe('guard rails', () => {
       .flatMap(([f, s]) => code(s).split('\n').filter(l => /\.paused\s*=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
     expect(writers, 'route a new pause reason through the screen\'s hold()/syncPaused(), never a direct write').toEqual([
       '/src/ui/duel-beats.ts: const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };',
-      '/src/ui/play-session.ts: if (arena) arena.paused = holdOpen || peekActive || session.ended;',
+      '/src/ui/play-session.ts: if (arena) arena.paused = holdOpen || peek.active || session.ended;',
     ]);
   });
 
@@ -846,7 +846,7 @@ describe('guard rails', () => {
     const files = ['/src/ui/play-session.ts', '/src/ui/play.ts'];
     for (const f of files) expect((SOURCES[f] ?? '').length, `${f} must be read, not a blank import`).toBeGreaterThan(1000);
     const beat = files.map(f => code(SOURCES[f] ?? '')).join('\n');
-    for (const call of ['showOutcome(', 'endWave(scaled(', 'arena.reveal(', 'markSeg(']) {
+    for (const call of ['showOutcome(', 'endWave(scaled(', 'arena.reveal(', 'pill.mark(']) {
       const n = beat.split(call).length - 1;
       expect(n, `${call} belongs to settle() alone — put a new outcome in the OUTCOME table`).toBe(1);
     }
