@@ -74,10 +74,10 @@ function countRun(d: Difficulty, rng: () => number): Question {
 /** A decoy sharing the answer's leading digit, the same way `mistakes.ts`'s `fillLead` guarantees one for its
  *  sibling module (#1448 review): ±10/±20 inside the answer's own hundred (1,000-1,099 is the tenth hundred and
  *  its leading digit is that 1), or ±1/±2 inside its own ten for a two-digit answer, whose leading digit is the
- *  tens digit (#1454). `moreOrLess` needs it only for `amt === 100`: adding/subtracting exactly 100 is precisely
+ *  tens digit (#1454). `moreOrLess` needs it for `amt === 100`: adding/subtracting exactly 100 is precisely
  *  the operation that changes the leading digit, so none of its other three named decoys ever land in the
- *  answer's own hundred there (measured 46-89% leak, past the KS2 ≤30% ceiling). `amt === 10`'s crossing case
- *  needs no such fix: its `otherPower` decoy already lands in the answer's own hundred there, by construction.
+ *  answer's own hundred there (measured 46-89% leak, past the KS2 ≤30% ceiling) — and for a two-digit answer at
+ *  `amt === 10` (d3's crossing case, 88% leak, #1766).
  *  `runDecoys` says which of its shapes need it. `null` when no candidate exists — defensive: every answer in
  *  0-1,099 has at least two candidates, so no caller reaches it today. */
 function sameLeadDecoy(answer: number, rng: () => number): number | null {
@@ -112,7 +112,11 @@ function moreOrLess(d: Difficulty, rng: () => number): Question {
   const otherPower = base + otherAmt * sign;
   const wrongDirection = base - amt * sign;
   const both = base - otherAmt * sign;
-  const sameLead = amt === 100 ? sameLeadDecoy(answer, rng) : null;
+  // A guaranteed same-leading-digit decoy where the named three would all leave the answer's leading digit: every
+  // `amt === 100` card, and a two-digit answer at `amt === 10` (#1766: d3's crossing case, "10 less than 100..109"
+  // gives 90..99, and `otherPower` there is 0..9, `wrongDirection` and `both` are in other hundreds). A three-digit
+  // `amt === 10` answer needs none: `otherPower` already lands in its own hundred.
+  const sameLead = amt === 100 || (answer >= 20 && answer < 100) ? sameLeadDecoy(answer, rng) : null;
   const named = sameLead !== null ? [sameLead, wrongDirection, both] : [otherPower, wrongDirection, both];
   const pool = new Set<number>(named.filter(v => v !== answer && v >= 0 && v <= 1099));
   while (pool.size < 3) {

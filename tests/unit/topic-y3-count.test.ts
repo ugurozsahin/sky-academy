@@ -169,6 +169,37 @@ describe('y3-count (#1050)', () => {
     }
   });
 
+  // #1766: the aggregate test above hides the small buckets. The leaking subset is a few per cent of d3's
+  // `moreOrLess` cards, so the ≤30% ceiling passed with the leak in place: "10 less than 10x" gave 9x with
+  // `otherPower`/`wrongDirection`/`both` all in other hundreds (`10 less than 107 = ? -> 97 | 7 207 117`), and
+  // #1764's fix for the `amt=100` two-digit answers (a guaranteed `sameLeadDecoy`) was pinned by nothing. So the
+  // same ceiling is held per (`amt`, answer width) bucket over the draws of every difficulty, and the bucket set is
+  // asserted so a bucket going missing fails rather than passing by absence.
+  it('KS2 leak limit, per amount and answer width: every moreOrLess bucket leaks the leading digit at most 30% (#1766)', () => {
+    const buckets = new Map<string, { total: number; leaked: number }>();
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1766_000 + d);
+      for (let i = 0; i < 40_000; i++) {
+        const q = topic.gen(d, r);
+        const m = /^(10|100) (?:more|less) than /.exec(q.prompt);
+        if (!m) continue;   // countRun
+        const answer = num(q.answer);
+        if (answer < 20) continue;
+        const key = `amt=${m[1]} ${answer < 100 ? 'two-digit' : 'three-digit+'}`;
+        const b = buckets.get(key) ?? { total: 0, leaked: 0 };
+        b.total++;
+        const lead = q.answer.replace(/[^0-9]/g, '')[0];
+        if (!q.options.some(o => o !== q.answer && o.replace(/[^0-9]/g, '')[0] === lead)) b.leaked++;
+        buckets.set(key, b);
+      }
+    }
+    expect([...buckets.keys()].sort(), 'buckets seen').toEqual(['amt=10 three-digit+', 'amt=10 two-digit', 'amt=100 three-digit+', 'amt=100 two-digit']);
+    for (const [key, b] of buckets) {
+      expect(b.total, `${key}: sample`).toBeGreaterThanOrEqual(300);
+      expect(b.leaked / b.total, `${key}: ${b.leaked}/${b.total} leaked the leading digit`).toBeLessThanOrEqual(0.30);
+    }
+  });
+
   // #1454: the same ≤30% ceiling, but for `countRun` cards and PER STEP, not only per difficulty. In aggregate
   // the topic passed while step=100 leaked 36-38% at every difficulty and step=8 leaked 51% at d2: both of
   // `runDecoys`' named decoys are ±100 (or ±8/±10 around a two-digit answer) and so always leave the answer's
