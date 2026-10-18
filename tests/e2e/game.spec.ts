@@ -1282,6 +1282,29 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#prompt')).toHaveText(q.prompt);
     const promptOverflow = await page.locator('#prompt').evaluate(el => el.scrollWidth - el.clientWidth);
     expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
+  // #1020: Reception Story Time answers by picture, so every bubble label must fit and the card must fit the phone.
+  test('r-storytime: the story card fits the shortest phone and every picture bubble fits (#1020)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-storytime');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    const overflow = await page.locator('.vis.sentence').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed by ${overflow}px`).toBeLessThanOrEqual(1);
+    await waitForTarget(page);
+    const states = await page.evaluate(() => window.__sna.bubbles().map((b: { label: string; labelState: string }) => `${b.label}:${b.labelState}`));
+    expect(states.length).toBeGreaterThan(0);
+    for (const s of states) expect(s.endsWith(':ok'), `a bubble label did not fit: ${s}`).toBe(true);
+    // The card holds the story and the question is asked, at d1 (pictures) and then at d3 (the digits 1-5).
+    const q1 = await page.evaluate(() => window.__sna.session.current);
+    expect(await page.locator('.vis.sentence').innerText()).toContain(q1.story!.split('.')[0]);
+    expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(q1.prompt);
+    await skipToStage(page, 5);   // Reception's `diffs` are [1, 1, 2, 2, 3]: d3 is the last stage only
+    await waitForTarget(page);
+    const q3 = await page.evaluate(() => window.__sna.session.current);
+    expect(q3.prompt, 'the last stage is the counting rung').toMatch(/^How many/);
+    const digits = await page.evaluate(() => window.__sna.bubbles().map((b: { label: string; labelState: string }) => `${b.label}:${b.labelState}`));
+    expect(digits.length).toBeGreaterThan(0);
+    for (const s of digits) expect(/^[1-5]:ok$/.test(s), `a digit bubble did not fit: ${s}`).toBe(true);
   });
 
   // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"

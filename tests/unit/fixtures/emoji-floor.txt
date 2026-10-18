@@ -129,9 +129,13 @@
 👏	0.6	clapping hands
 👑	0.6	crown
 👜	0.6	handbag
+👟	0.6	running shoe
+👦	0.6	boy
+👧	0.6	girl
 👩	0.6	woman
 👯	0.6	people with bunny ears
 👴	0.6	old man
+👵	0.6	old woman
 👾	0.6	alien monster
 💍	0.6	ring
 💐	0.6	bouquet
@@ -237,6 +241,7 @@
 🧠	5.0	brain
 🧢	5.0	billed cap
 🧣	5.0	scarf
+🧤	3.0	gloves
 🧥	5.0	coat
 🧦	5.0	socks
 🧩	11.0	puzzle piece
