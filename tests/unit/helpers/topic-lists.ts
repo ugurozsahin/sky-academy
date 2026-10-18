@@ -115,5 +115,4 @@ export const NO_REPEATED_SET = new Set([
   'y2-spell-c d1', 'y2-spell-c d2', 'y2-spell-c d3', // #1012: same bank shape as y2-spell-dge, each word carries its own decoys
   'y2-spell-tion d1', 'y2-spell-tion d2', 'y2-spell-tion d3', // #1013: same bank shape as y2-spell-c, each word carries its own decoys
   'y2-spell-more d1', 'y2-spell-more d2', 'y2-spell-more d3', // #1014: same bank shape as y2-spell-tion, each word carries its own decoys
-  'y3-count d2', 'y3-count d3', // #1050/#1448: moreOrLess's decoys (otherPower/wrongDirection/both/sameLead) are all derived from base/answer, the same structural reason as every other entry above
 ]);

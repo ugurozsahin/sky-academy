@@ -79,6 +79,30 @@ function sayTrickyOffer(r: SessionResult) {
  */
 export function createResultsScreen(deps: ResultsScreenDeps) {
   const { training, year, topic, av, name, els, hold, later, toast, replay, goHome, cleanup, next, fix, retry, practice, deck } = deps;
+  /** The certificate button's click: draw it, hand it over, and say how it went (toast only — 'shown' has its own hint). */
+  async function onCertificate(earned: NonNullable<ResultPayout['cert']>) {
+    sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
+    try {
+      const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+      if (how === 'shared') toast('Certificate shared!', 'good');
+      else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
+      else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
+      // 'shown' opens the full-screen view with its own save hint, so no toast
+    }
+    catch (e) { console.error('certificate delivery failed', e); toast('Could not make the certificate', 'bad'); }
+    b.disabled = false;
+  }
+
+  /** Wires the overlay's buttons; each one taps, tears the play screen down, then does its own thing. */
+  function wireButtons(r: SessionResult, action: ReturnType<typeof resultsAction>, earned: ResultPayout['cert']) {
+    $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
+    $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
+    if (action?.kind === 'next') $('#next-topic').addEventListener('click', () => { sfx.tap(); cleanup(); next(action.topic); });
+    if (action?.kind === 'retry') $('#retry-stage').addEventListener('click', () => { sfx.tap(); cleanup(); retry({ stage: action.stage, stageStars: r.stageStars.slice(0, action.stage - 1) }); });
+    if (action?.kind === 'fix') $('#fix-mistakes').addEventListener('click', () => { sfx.tap(); cleanup(); fix(r.misses); });
+    if (earned) $('#cert').addEventListener('click', () => onCertificate(earned));
+  }
+
   return function showResults(r: SessionResult, payout: ResultPayout) {
     // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
     // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
@@ -116,22 +140,6 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
       resultLines: resultPillsHTML(lines),
       action: actionButton(action),
     });
-    $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
-    $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
-    if (action?.kind === 'next') $('#next-topic').addEventListener('click', () => { sfx.tap(); cleanup(); next(action.topic); });
-    if (action?.kind === 'retry') $('#retry-stage').addEventListener('click', () => { sfx.tap(); cleanup(); retry({ stage: action.stage, stageStars: r.stageStars.slice(0, action.stage - 1) }); });
-    if (action?.kind === 'fix') $('#fix-mistakes').addEventListener('click', () => { sfx.tap(); cleanup(); fix(r.misses); });
-    if (earned) $('#cert').addEventListener('click', async () => {
-      sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
-      try {
-        const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
-        if (how === 'shared') toast('Certificate shared!', 'good');
-        else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
-        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
-        // 'shown' opens the full-screen view with its own save hint, so no toast
-      }
-      catch (e) { console.error('certificate delivery failed', e); toast('Could not make the certificate', 'bad'); }
-      b.disabled = false;
-    });
+    wireButtons(r, action, earned);
   };
 }

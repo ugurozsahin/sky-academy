@@ -1,5 +1,5 @@
 import { avatarOrNull } from '../avatars';
-import { addProfile, MAX_PROFILES, profileCards, setActiveProfile, type AddProfileResult, type ProfileId, type SetActiveResult } from '../storage';
+import { addProfile, MAX_PROFILES, profileCards, setActiveProfile, type AddProfileResult, type ProfileCard, type ProfileId, type SetActiveResult } from '../storage';
 import { itemById } from '../game/shop';
 import { sfx, say } from '../audio';
 import { $, $$, esc, render } from './dom';
@@ -103,6 +103,22 @@ export const addOutcome = (r: AddProfileResult): AddOutcome =>
   r.ok ? { add: true, id: r.id } : { add: false, hint: ADD_HINTS[r.why] };
 
 /**
+ * The small line under a card's name. `future`/`corrupt` used to fall through to "Not started yet" here — the same
+ * wrong-reason conflation #420/#431 fixed on the grown-ups row, one screen over, just not on this one (#431
+ * review item 2). This screen has no rename/remove controls to withhold, only the label.
+ *
+ * #1295: a bought Dojo title shows instead of the ninja's name. `c.title` is already ownership-checked by
+ * `profileCard` (`ownedTitleId`), so a missing/unowned/non-title id is `null` there already — this is only
+ * display text for an id the card is already sure of.
+ */
+function cardSubtitle(c: ProfileCard, a: ReturnType<typeof avatarOrNull>): string {
+  if (c.state === 'future') return 'Saved by a newer version';
+  if (c.state === 'corrupt') return 'Cannot be read on this device';
+  if (!a || c.state !== 'save' || !c.onboarded) return 'Not started yet';
+  return (c.title ? itemById(c.title)?.name : undefined) ?? a.name;
+}
+
+/**
  * Render the picker. `go` is called with the chosen profile once the store has actually accepted the switch —
  * never before, so a refused write leaves the child on the screen with a reason rather than in a sibling's
  * game. `onNew` is called with the added profile once it is active, for the caller to run onboarding.
@@ -128,19 +144,10 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
         // card borrows the ＋ card's dashed figure, which `.new-ninja` already builds for exactly this
         // meaning, and stays tappable: it leads to the wizard, which is where that child belongs.
         const a = c.state === 'save' ? avatarOrNull(c.avatar) : null, name = cardName(c.state === 'save' ? c.name : '', i + 1);
-        // #1295: a bought Dojo title shows under the child's name instead of the ninja's. `c.title` is already
-        // ownership-checked by `profileCard` (`ownedTitleId`), so a missing/unowned/non-title id is `null`
-        // there already — this is only display text for an id the card is already sure of.
-        const titleName = c.state === 'save' && c.title ? itemById(c.title)?.name ?? null : null;
         return `
         <button class="avatar-card${a ? '' : ' new-ninja'}" data-profile="${c.id}"${a ? ` style="--glow:${a.glow}"` : ''} role="listitem" aria-label="Play as ${esc(name)}">
           <span class="figure">${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
-          <b>${esc(name)}</b><small>${
-            // `future`/`corrupt` used to fall through to "Not started yet" here — the same wrong-reason
-            // conflation #420/#431 fixed on the grown-ups row, one screen over, just not on this one
-            // (#431 review item 2). This screen has no rename/remove controls to withhold, only the label.
-            c.state === 'future' ? 'Saved by a newer version' : c.state === 'corrupt' ? 'Cannot be read on this device' : a && c.state === 'save' && c.onboarded ? (titleName ?? a.name) : 'Not started yet'
-          }</small>
+          <b>${esc(name)}</b><small>${cardSubtitle(c, a)}</small>
         </button>`; }).join('')}
       ${room ? `
         <button class="avatar-card new-ninja" id="new-ninja" role="listitem" aria-label="Add a new ninja">

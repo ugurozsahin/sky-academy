@@ -57,6 +57,14 @@ const KNOWN: [string, Frac][] = [
   // a repeated `?`, used consistently, is one unknown too — isolates line 137's accepting half from its
   // "two different symbols" refusal, which only `'? + n'`-shaped NULLS exercised until now (#1423 round 5)
   ['? + ? = 10', f(5)],
+  // #1443: the largest inputs the bounds still accept — six-digit fraction and mixed-number parts, three decimal
+  // places — so the caps in `readNumber` refuse the first value past them, not the last one inside.
+  ['999999/2 + 1/2 = ?', f(500000)],
+  ['999999 1/2 + 1/2 = ?', f(1000000)],
+  ['0.001 + 1 = ?', f(1001, 1000)],
+  // every part at its cap, so tightening any one of them to five digits fails here and not silently
+  ['1/999999 + 1 = ?', f(1000000, 999999)],
+  ['999999 999999/999999 + 1 = ?', f(1000001)],
 ];
 
 // A prompt this oracle deliberately does not answer: a word problem, an instruction rather than an
@@ -134,6 +142,23 @@ const NULLS = [
   // coefficient (mul(a.coef, b.const) = 3) that reaches ks2Solve's final line and returns a fabricated
   // {n:4,d:3} rather than tripping any other check — confirmed by mutation.
   'n × (n + 3) = 4',
+  // #1443: `readNumber` bounds what it accepts to what KS2 prints. A 400-digit denominator used to overflow
+  // `Number()` to `Infinity` and come back as a non-null `{ n: NaN, d: NaN }`; sixteen decimal places used to
+  // push `10 ** dp` past `MAX_SAFE_INTEGER` so `1 + 10⁻¹⁶` rounded to exactly 1. Both are `null` now. The
+  // digit cap is an OR over the parts of the literal, so each part gets a case of its own (a fraction's
+  // numerator and denominator; a mixed number's whole part, numerator and denominator), seven digits each.
+  '1/' + '9'.repeat(400) + ' = ?',
+  '1234567/2 + 1 = ?',
+  '1/1234567 + 1 = ?',
+  '1234567 1/2 + 1 = ?',
+  '1 1234567/2 + 1 = ?',
+  '1 1/1234567 + 1 = ?',
+  '0.0000000000000001 + 1 = ?',
+  '0.0001 + 1 = ?',
+  // #1443: `readSide`'s refusals are ORs too. An empty side reads as no tokens at all; a stray `)` after a
+  // complete bracketed expression leaves a token over, and `(n + 1) = 5` alone would have answered 4.
+  ' = 5',
+  '(n + 1)) = 5',
   '',
 ];
 

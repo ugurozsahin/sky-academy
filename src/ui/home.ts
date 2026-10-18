@@ -278,12 +278,8 @@ function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgr
   return !list.length ? [] : year.gentle ? [row] : [row, pro];
 }
 
-/** Island: topics for one year group + its Sky Storm. */
-export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths') {
-  const d = load();
-  let subject = subjectInit;
-  const tb = topbar(nav, () => islandScreen(nav, year, subject));
-  const progress = safeRecord<TopicProgress>(d.progress);   // #95: same tolerance as mapScreen's totalStars
+/** The island menu rows; `subject` is read at tap time so a tab switch is honoured without rebuilding it. */
+function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Record<string, TopicProgress>, subject: () => 'maths' | 'writing') {
   const weakest = senseiTopics(topicsFor(year.id), progress, new Date());
   // #95: the four per-year best/count fields have the same hazard as `progress` — a hand-edited or corrupted
   // "Restore" paste can carry any of them as anything, and `d.training[year.id]` throws the moment `d.training`
@@ -293,10 +289,10 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   // #908: Sky Storm, Ninja Sprint and Boss Battle draw only from the open tab's topics — read at tap time via
   // `subject` so a tab switch is honoured without rebuilding the menu. `subjectPool` (#1325) is the one spelling of
   // that pool: `curriculum.test.ts` pins it non-empty, and it degrades to the whole year rather than hand `[]` on.
-  const mixedPool = () => subjectPool(topicsFor(year.id), subject);
+  const mixedPool = () => subjectPool(topicsFor(year.id), subject());
   // The island menu in one table (#26): a mode button is one entry. The battle modes take their title from MODES;
   // Sensei-training, Memory-Match and the Legend run (#932) are separate flows, so they live here too.
-  const menu = menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands
+  return menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
       title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
       go: () => { say(senseiTrainLine(year, d.ks2.schoolYear, weakest)); nav.play({ year, mode: 'mission', pool: weakest }); } },
@@ -306,12 +302,12 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
-      go: () => chooseThenPlay(nav, year, subject, 'sprint', mixedPool(), progress) }, ...trickyRow(nav, year, d.ks2.facts),
+      go: () => chooseThenPlay(nav, year, subject(), 'sprint', mixedPool(), progress) }, ...trickyRow(nav, year, d.ks2.facts),
     { id: 'relaxed', mod: 'relaxed', vport: `<span class="vport emoji">🌱</span>`, title: MODES.relaxed.title, blurb: 'No lives, no clock',   // #937
-      go: () => chooseThenPlay(nav, year, subject, 'relaxed', mixedPool(), progress) },
+      go: () => chooseThenPlay(nav, year, subject(), 'relaxed', mixedPool(), progress) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
-      go: () => bossThenPlay(nav, year, subject, mixedPool(), progress) },
+      go: () => bossThenPlay(nav, year, subject(), mixedPool(), progress) },
     // #1049: Memory Match used to fall back to Reception's decks for a year with none of its own — hidden
     // instead, since `pickTheme` now throws rather than hand a KS2 child a Reception board.
     ...(hasMemoryDecks(year.id) ? [{ id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
@@ -319,8 +315,17 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => nav.memory(year) }] : []),
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
-      go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject), (topic, teams) => { sfx.tap(); nav.duel(year, topic?.id, teams ? 'teams' : undefined); }, { mixed: true, mixedLabel: 'Random', teams: true }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
+      go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject()), (topic, teams) => { sfx.tap(); nav.duel(year, topic?.id, teams ? 'teams' : undefined); }, { mixed: true, mixedLabel: 'Random', teams: true }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
   ], year.id);
+}
+
+/** Island: topics for one year group + its Sky Storm. */
+export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths') {
+  const d = load();
+  let subject = subjectInit;
+  const tb = topbar(nav, () => islandScreen(nav, year, subject));
+  const progress = safeRecord<TopicProgress>(d.progress);   // #95: same tolerance as mapScreen's totalStars
+  const menu = islandMenu(nav, year, d, progress, () => subject);
   render(`
   <section class="screen home island-screen">
     ${tb.html}

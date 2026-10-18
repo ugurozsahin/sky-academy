@@ -5,24 +5,11 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/game/arena.ts::drawBubble": 16,
-    "src/game/arena.ts::drawParticle": 21,
-    "src/game/arena.ts::drawTrail": 19,
-    "src/game/arena.ts::onMove": 19,
-    "src/game/arena.ts::render": 19,
-    "src/game/arena.ts::reveal": 16,
-    "src/game/arena.ts::update": 42,
-    "src/ui/play-results.ts::showResults": 21,
     "src/ui/play.ts::playScreen": 22,
-    "src/ui/profiles.ts::(anonymous)": 16,
-    "src/ui/visuals.ts::coinSVG": 16,
-    "src/ui/visuals.ts::renderVisual": 22,
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/ui/duel.ts::duelScreen": 201,
-    "src/ui/home.ts::islandScreen": 65,
-    "src/ui/play-session.ts::createPlaySession": 186,
+    "src/ui/duel.ts::duelScreen": 160,
     "src/ui/play.ts::playScreen": 197
   },
   "fileLines": {
