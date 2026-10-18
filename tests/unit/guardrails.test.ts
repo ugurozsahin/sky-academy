@@ -1769,7 +1769,7 @@ describe('guard rails', () => {
     const from = play.indexOf('waveId++');
     expect(play.indexOf('const spawn = () =>'), 'play-session.ts must still build its wave in a spawn() closure').toBeGreaterThan(from);
     const body = play.slice(from, play.indexOf('spawnWave(', from));                 // the question's own wave, start to launch
-    expect(body, 'play-session.ts must still capture the wave id the spawn belongs to').toMatch(/=\s*waveId;/);
+    expect(body, 'play-session.ts must still capture the wave id the spawn belongs to').toMatch(/=\s*(st\.)?waveId;/);
     // one check per deferral: the timer/font gate, and the animation frame inside it
     expect((body.match(/waveId !==/g) ?? []).length, 'both deferrals must drop a superseded spawn (#138)')
       .toBeGreaterThanOrEqual(2);
@@ -3134,7 +3134,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/game/arena.ts': 470, 'src/game/bubbles.ts': 521,
-    'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 374, 'src/ui/duel-beats.ts': 187, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
+    'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 374, 'src/ui/duel-beats.ts': 187, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 420,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
