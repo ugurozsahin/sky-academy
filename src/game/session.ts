@@ -227,7 +227,7 @@ export class Session {
       // edit) must not leave the screen frozen mid-question — nothing else ever calls `nextQuestion()`
       // again, so `waiting` would stay stuck while the arena's rAF loop keeps it looking alive. Ending
       // through the normal path pays what was already earned; `won: false` because nothing was completed.
-      console.error(topic ? `Sky Ninja Academy: "${topic.id}" question generator threw` : `Sky Ninja Academy: ${this.o.mode} run for ${this.o.year.id} has no topic to draw from (${this.o.pool ? 'empty pool' : 'no pool given'})`, e);   // #1325: `topic` is unset when `pickTopic()` threw — naming it here would be a second, uncaught throw
+      console.error(topic ? `Sharpwise: "${topic.id}" question generator threw` : `Sharpwise: ${this.o.mode} run for ${this.o.year.id} has no topic to draw from (${this.o.pool ? 'empty pool' : 'no pool given'})`, e);   // #1325: `topic` is unset when `pickTopic()` threw — naming it here would be a second, uncaught throw
       this.end(false, true);
       return;
     }
