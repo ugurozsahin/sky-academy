@@ -669,7 +669,9 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('real swipe slices the correct bubble and scores', { tag: '@smoke' }, async ({ page }) => {
-    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // real time: see the note on the wrong-slice test (#2006)
+    // #2008: real time. At the suite's 8x the `.toast.good` lives ~125 ms (a polled expect can miss it) and the wave can move on
+    // before `swipeAnswer`'s first read finds its target; nothing in this test needs the speed (7 failures in 90 runs at five workers).
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await swipeAnswer(page);
