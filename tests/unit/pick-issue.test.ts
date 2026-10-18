@@ -24,6 +24,13 @@ describe('blockedBy reads the first line and counts another repository as blocke
     ['', [], false],
   ])('%j', (body, numbers, foreign) => expect(blockedBy(body)).toEqual({ numbers, foreign }));
   it('handles a null body', () => expect(blockedBy(null)).toEqual({ numbers: [], foreign: false }));
+  it('a chained split piece is held by its previous piece alone (#2011)', () =>
+    expect(blockedBy('Blocked by #12\n\nPart of #10 — the third of three pieces.')).toEqual({ numbers: [12], foreign: false }));
+  it('the refiner prompt chains split pieces, with an explicit independence line (#2011)', () => {
+    const r = readFileSync(new URL('../../docs/REFINER-PROMPT.md', import.meta.url), 'utf8').replace(/\s+/g, ' ');
+    expect(r).toMatch(/every piece after the first opens with `Blocked by #<previous piece>`/);
+    expect(r).toContain('`Independent of #<piece>`');
+  });
 });
 
 describe('pickIssue applies STEP 3 rules 1-5 (#1374)', () => {
