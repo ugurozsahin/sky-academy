@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "uk.skyninja.academy"
+    namespace = "uk.co.sharpwise"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "uk.skyninja.academy"
+        applicationId "uk.co.sharpwise"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
