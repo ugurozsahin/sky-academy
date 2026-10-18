@@ -12,6 +12,10 @@ describe('GitHub Pages deployment (#1933)', () => {
     expect(wf).toMatch(/uses: actions\/upload-pages-artifact@v\d/);
     expect(wf).toMatch(/uses: actions\/deploy-pages@v\d/);
   });
+  it('is skipped until the owner opts in, so main is not red while Pages is off', () => {
+    expect(wf).toMatch(/^  build:\n    if: vars\.PAGES_ENABLED == 'true'/m);
+    expect(read('docs/WEBSITE.md')).toContain('`PAGES_ENABLED` = `true`');
+  });
   it('has least-privilege permissions and a concurrency group', () => {
     expect(wf).toMatch(/^permissions:\n  contents: read$/m);
     expect(wf).toMatch(/pages: write/);
