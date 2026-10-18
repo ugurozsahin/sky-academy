@@ -54,7 +54,7 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   sounds: 'phonics', soundhunt: 'phonics', syllables: 'phonics', initial: 'phonics', digraphs: 'phonics', alien: 'phonics', build: 'phonics', alphabet: 'phonics',
   rhyme: 'rhymes',
   trace: 'tracing', tracenum: 'tracing',
-  read: 'reading', tricky: 'reading', sentence: 'reading', capitals: 'reading',
+  read: 'reading', storytime: 'reading', tricky: 'reading', sentence: 'reading', capitals: 'reading',
   spelling: 'spelling', spellrules: 'spelling', plurals: 'spelling', suffix: 'spelling', 'suffix-root': 'spelling', prefix: 'spelling', 'prefix-not': 'spelling', wordlist: 'spelling', homophones: 'spelling', ough: 'spelling',
   contractions: 'spelling', 'spell-kn': 'spelling', 'spell-le': 'spelling', 'spell-dge': 'spelling', 'spell-c': 'spelling', 'spell-tion': 'spelling', 'spell-more': 'spelling', spellgap: 'spelling', cious: 'spelling', ant: 'spelling', able: 'spelling', fer: 'spelling', silent: 'spelling', 'sure-ture': 'spelling', shun: 'spelling', origins: 'spelling', proofread: 'spelling',
   punct: 'grammar', wordclass: 'grammar', sentencetype: 'grammar', tense: 'grammar', conjunction: 'grammar', conjunctions: 'grammar', perfect: 'grammar', speech: 'grammar', adverbials: 'grammar',
