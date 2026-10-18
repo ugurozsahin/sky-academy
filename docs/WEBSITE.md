@@ -7,6 +7,7 @@ The manifest (`start_url`, `scope`, `id` are `./`), the worker registration and 
 
 ## Owner steps (once; nothing here can be done from the repo)
 
+0. **Opt in.** Repo Settings, Secrets and variables, Actions, Variables: add `PAGES_ENABLED` = `true`. Until it exists the workflow is skipped, so `main` stays green (the deploy fails with a 404 while Pages is off).
 1. **Enable Pages.** Repo Settings, Pages, Build and deployment, Source: **GitHub Actions**
    ([docs](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-with-a-custom-github-actions-workflow)).
 2. **Run the workflow** once (Actions, Deploy to GitHub Pages, Run workflow), or push to `main`.
