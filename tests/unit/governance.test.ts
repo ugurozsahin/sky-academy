@@ -2,6 +2,8 @@ import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { pinSentence } from './helpers/pin-sentence';
+import { flatten, sliceSkill } from './helpers/slice-skill';
+import { reviewPr, section, ROUND_CAP_ESCAPES, REVIEW_PR_HEADINGS, REVIEW_PR_UNNUMBERED } from './helpers/review-pr';
 
 /**
  * Shared repo-file readers (#536). `doc()`, `unitsOf()` and `unitWith()` used to be redefined per describe
@@ -668,8 +670,7 @@ describe('the browser runs after the agents, not before them (#499)', () => {
   });
 
   it('the review-pr skill opens §2 with the cheap checks and no browser in them', () => {
-    const skill = readFileSync(new URL('.claude/skills/review-pr/SKILL.md', root), 'utf8');
-    const s2 = skill.slice(skill.indexOf('## 2. '), skill.indexOf('## 3. '));
+    const s2 = reviewPr().raw(2);   // sliced by `sliceSkill` (#307): a repeated or moved `## 2.` throws
     expect(s2.length, '§2 must be read from disk, and §3 must still follow it').toBeGreaterThan(500);
     // The FIRST fenced block in §2 is the one a reviewer runs before reading anything. A browser command in
     // it is #499 restored, whatever the prose around it says.
@@ -889,11 +890,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   // #857: the `main` ruleset requires a branch to be up to date before it merges, so a `behind` pull request
   // stalls unless someone brings it up to date. Scoped to §5, the section a reviewer reads just before a merge.
   it('review-pr §5 makes a behind pull request the merging reviewer’s to update, and a conflict the author’s (#857)', () => {
-    const skill = read('.claude/skills/review-pr/SKILL.md');
-    const start = skill.indexOf('\n## 5. '), end = skill.indexOf('\n## 6. ', start + 1);
-    expect(start, 'the review-pr skill has lost its §5').toBeGreaterThan(-1);
-    expect(end, 'and §6 must follow it').toBeGreaterThan(start);
-    const s5 = flat(skill.slice(start, end));
+    const s5 = reviewPr().S(5);
     expect(s5, 'who owns a behind branch').toContain('**Behind `main` is not a fifth condition. It is the last step before the merge, and it is yours (#857).**');
     expect(s5, 'the call').toContain('Call `PUT /repos/ugurozsahin/sky-academy/pulls/<n>/update-branch` with the head SHA you reviewed as `expected_head_sha`');
     expect(s5, 'a merge, never a rebase').toContain('It merges `main` into the branch and never rebases');
@@ -902,10 +899,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   it('the review-pr skill carries the rule: who may supersede a block, who never may, and the phrase the gate keys on', () => {
-    const skill = read('.claude/skills/review-pr/SKILL.md');
-    const start = skill.indexOf('\n## 6. '), end = skill.indexOf('\n## ', start + 1);
-    expect(start, 'the review-pr skill has lost its §6').toBeGreaterThan(-1);
-    const s6 = flat(skill.slice(start, end === -1 ? undefined : end));
+    const s6 = reviewPr().S(6);
     expect(s6, 'who may supersede: a run with no hand in the change')
       .toContain('neither opened the pull request nor pushed a commit to it');
     expect(s6, "the owner's one condition (2026-09-19)").toContain('No session reviews its own change');
@@ -934,10 +928,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * no-time-box sentence out of the closing paragraph.
    */
   it('the review-pr skill says what a block is for and caps the rounds that block (#305)', () => {
-    const skill = read('.claude/skills/review-pr/SKILL.md');
-    const start = skill.indexOf('\n## 7. '), end = skill.indexOf('\n## ', start + 1);
-    expect(start, 'the review-pr skill has lost its §7').toBeGreaterThan(-1);
-    const s7 = flat(skill.slice(start, end === -1 ? undefined : end));
+    const s7 = reviewPr().s7();   // `## 7.` to the closing heading, through `sliceSkill` (#307)
     // Whole operative clauses, not the nouns inside them (PR #306 review round 1): seven single-sentence
     // rewrites inverted §7 while every noun phrase an earlier draft pinned — "the issue's acceptance criteria",
     // "past the third round", "whoever wrote them" — sat unchanged in the inverted sentence.
@@ -975,22 +966,26 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     // with the whole section still quoted verbatim. This is a list of spellings, not a proof: it holds the
     // escapes a run would plausibly write, and a novel wording walks past it (`add-guard-rail` §7). The #161
     // rail three functions above carries its `WINDOW` negative for the same reason.
-    const ESCAPES = [
-      /\bsince the last push\b/i, /\bbinds you\b/i, /\bif you would rather\b/i, /\bthe cap does not apply\b/i,
-      /\bas often as you (need|like)\b/i, /\bat your discretion\b/i, /\b(only|merely) a guideline\b/i,
-      /\bnot a hard\b/i, /\bthree rounds each\b/i,
-    ];
-    for (const escape of ESCAPES)
+    for (const escape of ROUND_CAP_ESCAPES)   // one list, shared with the #310 rail (#395)
       expect(s7, `§7 carries an escape clause that gives the cap back: ${escape}`).not.toMatch(escape);
 
-    // The cap and the depth rule sit next to each other on purpose; neither may be read as the other.
-    const closingAt = skill.indexOf('\n## Reviewing is the work');
-    // Guarded before the slice: `slice(-1)` is the file's last character, and every assertion below would then
-    // fail blaming a deleted sentence when a heading had merely been renamed (PR #306 review, note 1).
-    expect(closingAt, 'the closing section has been renamed or removed — §7 leans on it').toBeGreaterThan(-1);
-    const closing = flat(skill.slice(closingAt));
+    // The cap and the depth rule sit next to each other on purpose; neither may be read as the other. The
+    // closing heading is guarded inside `reviewPr()` before the slice (PR #306 review, note 1: `slice(-1)` is
+    // the file's last character), so a renamed heading fails naming itself, not a deleted sentence.
+    const closing = reviewPr().closing();
     expect(closing, 'the round cap must never read as "review less carefully"').toContain('There is no time box on this');
     expect(closing, 'and the closing paragraph must say which of the two it is').toContain('§7 is about **rounds**');
+  });
+
+  // #307: the half the section pins cannot see. A repeated `## N.` is a decoy (`S()` throws on it), and a title
+  // is pinned because the number was and the title was not — a heading could be rewritten to say the opposite
+  // of the body under it with every pin green (row 3). Unnumbered headings are listed too: one planted before
+  // `## 7.` or between §7 and the closing section moves what a slice contains.
+  it('review-pr slices into its seven numbered sections, each once, under the title it has (#307)', () => {
+    const { SECTIONS, DUPLICATE_HEADINGS, ALL_HEADINGS } = reviewPr();
+    expect(DUPLICATE_HEADINGS, 'a second `## N.` heading makes the pinned section a decoy the reader never sees').toEqual([]);
+    expect([...SECTIONS].map(([n, s]) => [n, s.heading]), 'a numbered section was retitled, renumbered or lost').toEqual(Object.entries(REVIEW_PR_HEADINGS).map(([n, h]) => [Number(n), h]));
+    expect(ALL_HEADINGS.filter((h) => !/^\d+\./.test(h)), 'the unnumbered headings are exactly these two').toEqual(REVIEW_PR_UNNUMBERED);
   });
 
   /**
@@ -1044,7 +1039,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
         + "fresh review does (`review-pr` skill §6).";
 
     // review-pr §7: after the round-cap paragraph's last words, before "A reviewer who reaches the third round".
-    expect(units(read('.claude/skills/review-pr/SKILL.md'), 'queued, not lost.\n', 'A reviewer who reaches the third round'),
+    expect(units(reviewPr().raw(7), 'queued, not lost.\n', 'A reviewer who reaches the third round'),
       'the #761 clause must be the only paragraph there, word for word — reworded on purpose, re-pin it here and '
       + 'say so in the commit').toEqual([CLAUSE]);
     // open-pr §5: after "Then stop." ends, up to the §6 heading — the fix-push paragraph is §5's last.
@@ -1105,18 +1100,15 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     // The anchor has to be UNIQUE: `indexOf` takes the first match, so a decoy copy of this literal planted
     // earlier binds `from` to it, the "slice" spans STEP 2 onwards, the positives are file-wide again and
     // round 1's relocation walks straight back in (round 2, B1). `lastIndexOf` only changes which copy wins.
-    expect(prompt.split(OPENS).length - 1,
-      'rule 4 must open exactly once: renumbered, removed, or a second copy of its opening would start the slice '
-      + 'in the wrong place').toBe(1);
-    const from = prompt.indexOf(OPENS);
-    // And it ends at rule 4's OWN newline. Ending it at the report paragraph made the slice "rule 4 through
-    // the end of the rules block", so the clause could leave rule 4 for a paragraph of its own or a new
+    // The shared `section()` (#395) asserts exactly that: renumbered, removed, or a second copy of the opening
+    // throws. And it ends at rule 4's OWN newline. Ending it at the report paragraph made the slice "rule 4
+    // through the end of the rules block", so the clause could leave rule 4 for a paragraph of its own or a new
     // rule 5 and every positive below still passed, under messages saying it was in rule 4 (round 3, B1).
-    const to = prompt.indexOf('\n', from);
-    expect(to, 'rule 4 must still be one line — the slice below is that line').toBeGreaterThan(from);
+    const line = section(prompt, OPENS, '\n', 'rule 4 of the reviewer prompt');
+    const to = prompt.indexOf(line) + line.length;
     expect(prompt.indexOf('\nReport to the owner only for something noteworthy', to),
       'the four unmergeable rules no longer end at the report paragraph').toBeGreaterThan(to);
-    const rule4 = bare(prompt.slice(from, to));
+    const rule4 = bare(line);
     expect(rule4.length, 'rule 4 has lost most of its body — the slice is meant to be the whole rule')
       .toBeGreaterThan(800);
 
@@ -1138,8 +1130,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     // them unscanned (round 3, note 1).
     const marks = [rule4.indexOf('While a PR is waiting'), rule4.search(/how many times one may block/)];
     expect(Math.min(...marks), 'rule 4 has lost the depth sentence or the §7 pointer').toBeGreaterThan(-1);
-    for (const escape of [/\bnot a hard\b/i, /\bas often as you (need|like)\b/i, /\bat your discretion\b/i,
-      /\b(only|merely) a guideline\b/i, /\bthe cap does not apply\b/i, /\bbinds you\b/i])
+    for (const escape of ROUND_CAP_ESCAPES)   // the one shared list (#395), no rail-specific exclusion needed
       expect(rule4.slice(Math.min(...marks)), `the §7 pointer carries a clause that gives the cap back: ${escape}`)
         .not.toMatch(escape);
 
@@ -1190,7 +1181,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     // The pointer used to ride inside the adoption paragraph of each process file. That paragraph is gone
     // (#161 now has one home, the review-pr skill), so the pointer lives where the superseding clear is
     // written about.
-    expect(flat(read('.claude/skills/review-pr/SKILL.md')), 'the review-pr skill must say a superseding clear carries a session URL')
+    expect(reviewPr().S(6), 'the review-pr skill must say a superseding clear carries a session URL')
       .toMatch(/requires the comment to carry a session URL \(#191\)/);
   });
 
@@ -2113,64 +2104,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
 });
 
 
-/**
- * A skill file sliced on its `## N.` headings, for the two skill rails below (#180, #148).
- *
- * One slicer, not two. The `add-guard-rail` rail copied `open-pr`'s deliberately (its docstring says so) and
- * the copies then diverged: #258 closed the duplicate-heading hole, captured the heading text and grew the
- * unnumbered-heading guard in the copy, and `open-pr`'s stayed as it was — the rail this issue found reporting
- * green about a file whose §6 said the opposite. Two skills' rails now sit behind one piece of code, and that
- * was weighed: a slicer bug hits both, but each block keeps its own vacuity guard (`keys` must be exactly
- * `[1..7]`) against its own file, so a slicer that matched nothing fails both loudly rather than passing both
- * quietly. Divergence, by contrast, fails neither. A third skill rail uses this too, or says why not —
- * the #466 block does (`open-pr` §4), and it is why `slice()` below sits beside this rather than in a third copy.
- *
- * What it returns, and why each is there:
- *  - `SECTIONS` — number → `{ flat, raw, heading }`. `flat` is whitespace-normalised (wrapping is prose, not a
- *    rule); `raw` keeps newlines for a table; `heading` is the title tail, because a rule is reversible in
- *    title form if the slicer throws the title away.
- *  - `DUPLICATE_HEADINGS` — every `N` seen twice. `Map.set` is last-write-wins and the keys are a set, so a
- *    gutted section followed by a verbatim decoy `## N.` at the end of the file is invisible to the keys
- *    guard: the reader meets the gutted one, the rail reads the decoy, and the file is *longer*.
- *  - `ALL_HEADINGS` — every `## ` heading, numbered or not: an `## Appendix` after §7 lands inside §7's slice.
- *  - `PREAMBLE` — everything above `## 1.`, sliced into no section and so covered by no pin unless one is put
- *    there. A missing `## 1.` makes `search` answer -1 and `slice(0, -1)` would hand back the whole document,
- *    turning a scoped pin into whole-file containment; the index is checked rather than trusted.
- *  - `S(n)` — one section's flat text, or a throw. Throws on a duplicated heading **first**, so a decoy fails
- *    every pin rather than only the one `it` that checks for it (an `it.only` elsewhere would skip that one);
- *    then on an absent section; then, separately, on an empty one — `if (!text)` conflated the two, and "no
- *    section 5" sends the next editor looking for a heading that is there.
- */
-/** Whitespace-normalised text, trimmed. `sliceSkill` and the #326/#466 blocks share this one; seven other
- *  `const flat = …` locals in this file do NOT trim and are therefore a different function, so they were left
- *  alone rather than half-merged (PR #469 round 2, note 2). Merging them is its own change, with its own
- *  reading of whether any rail depends on the untrimmed edges. */
-const flatten = (t: string) => t.replace(/\s+/g, ' ').trim();
-
-function sliceSkill(path: string) {
-  const raw = readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
-  /** `open-pr/SKILL.md` in a message, not the whole repo path — the same spelling the two rails always used. */
-  const file = path.replace(/^\.claude\/skills\//, '');
-  const flat = flatten;   // one copy, not two (PR #469 review, note 3): the hoist that closed #258 left its own duplicate directly above it
-  const SECTIONS = new Map<number, { flat: string; raw: string; heading: string }>();
-  const DUPLICATE_HEADINGS: number[] = [];
-  for (const m of raw.matchAll(/^## (\d+)\.([^\n]*)\n([\s\S]*?)(?=^## \d+\.|$(?![\s\S]))/gm)) {
-    const n = Number(m[1]);
-    if (SECTIONS.has(n)) DUPLICATE_HEADINGS.push(n);
-    SECTIONS.set(n, { flat: flat(m[3]), raw: m[3], heading: flat(m[2]) });
-  }
-  const ALL_HEADINGS = [...raw.matchAll(/^## ([^\n]*)/gm)].map((m) => flat(m[1]));
-  const PREAMBLE_END = raw.search(/^## 1\./m);
-  const PREAMBLE = PREAMBLE_END < 0 ? '' : flat(raw.slice(0, PREAMBLE_END));
-  const S = (n: number): string => {
-    if (DUPLICATE_HEADINGS.length) throw new Error(`${file} repeats heading(s) ${DUPLICATE_HEADINGS.join(', ')} — the pinned section may be a decoy`);
-    const s = SECTIONS.get(n);
-    if (!s) throw new Error(`${file} has no section ${n} — the rail cannot hold a section that is not there`);
-    if (!s.flat) throw new Error(`${file} section ${n} is empty — an empty section satisfies every pin that is not a \`toContain\``);
-    return s.flat;
-  };
-  return { raw, flat, SECTIONS, DUPLICATE_HEADINGS, ALL_HEADINGS, PREAMBLE, S };
-}
+// `sliceSkill` and `flatten` live in `./helpers/slice-skill` (#307/#395): the review-pr rails above reach them too.
 
 
 
@@ -5049,7 +4983,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     + "are reserved by the copyright holder, and no permission to use, copy, modify or redistribute them is "
     + "granted by this file:";
   const LICENSE_DIRLIST = "- public/avatars/ the twelve ninja character illustrations - public/icons/ the "
-    + "app and home-screen icons - the name \"Sky Ninja Academy\", and the game's visual identity, including "
+    + "app and home-screen icons - the name \"Sharpwise\", and the game's visual identity, including "
     + "the favicon drawn inline in index.html - the praise lines, character names and other written game "
     + "text";
   const LICENSE_FREDOKA = "- Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the SIL Open "
@@ -5059,7 +4993,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     + "License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.";
   const README_CARVEOUT = "**The artwork and the game's written content are not.** The twelve character "
     + "illustrations under `public/avatars/` and the icons under `public/icons/` are **not licensed**: all "
-    + "rights in them are reserved, along with the name \"Sky Ninja Academy\", the game's visual identity "
+    + "rights in them are reserved, along with the name \"Sharpwise\", the game's visual identity "
     + "and its written text. The split is deliberate and it is the usual one for a game: the engine is worth "
     + "sharing, the characters are not mine to give away twice. `LICENSE` states exactly what falls each "
     + "side of the line.";
@@ -5209,9 +5143,7 @@ describe('a class fix names the population it covers (#526)', () => {
     const g = doc('.claude/rules/guardrails.md');
     expect(() => unitWith(g, 'A fix that addresses a *class*'),
       'the obligation must appear exactly once in guardrails.md').not.toThrow();
-    const skill = doc('.claude/skills/review-pr/SKILL.md');
-    const s7 = skill.slice(skill.indexOf('## 7. '), skill.indexOf('\n## ', skill.indexOf('## 7. ') + 6));
-    expect(skill.indexOf('## 7. '), '§7 must exist').toBeGreaterThan(-1);
+    const s7 = reviewPr().s7();   // `sliceSkill` (#307): §7 must exist, once, bounded by the closing heading
     expect(s7.length, '§7 must be BOUNDED by the next heading — an unbounded slice is satisfied by anything '
       + 'later in the file, which is how a gutted section hid behind a paragraph pasted at the end (#148)')
       .toBeGreaterThan(500);

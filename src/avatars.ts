@@ -71,7 +71,7 @@ export const SENSEI_LINES = {
   tutorial: 'Slice the bubble with your finger!',
   tutorialKs2: 'Slice the bubble with the right answer.',
   locked: 'Earn a star on every topic to play as the Master Ninja.',
-  welcome: "Welcome to Sky Ninja Academy, {name}. I am your Sensei. Slice the bubble with the correct answer to complete each mission. Let's begin.",
+  welcome: "Welcome to Sharpwise, {name}. I am your Sensei. Slice the bubble with the correct answer to complete each mission. Let's begin.",
   welcomeKs2: "Welcome, {name}. I am your Sensei. Each mission is a set of questions: slice the correct answer before it falls. Let's begin.",
 };
 /** Every playable ninja, the Master last. */

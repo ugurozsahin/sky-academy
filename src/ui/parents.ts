@@ -284,7 +284,7 @@ function wireMove(redraw: () => void) {
     if (!paste.value.trim()) { armed = false; say('Paste a code into the box above first.', true); return; }
     if (!armed) { armed = true; say('This replaces all the progress on this device. Tap Restore again to go ahead.', true); return; }
     armed = false;
-    if (!importSave(paste.value.trim())) { say('That code is not a Sky Ninja Academy save.', true); return; }
+    if (!importSave(paste.value.trim())) { say('That code is not a Sharpwise save.', true); return; }
     sfx.correct();
     redraw();
     // `msg` belongs to the dashboard that redraw() just threw away, so the confirmation goes on the new one.
