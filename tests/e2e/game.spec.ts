@@ -719,9 +719,16 @@ test.describe('Sky Ninja Academy', () => {
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-tables');
     await page.waitForFunction(() => window.__sna.bubbles().length > 1);
-    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
-    await expect(page.locator('.toast.bad')).toContainText('Not quite');
-    await expect(page.locator('.lives span.off')).toHaveCount(1);
+    // #2006: read what the slice did in the SAME evaluate that makes it. The suite runs at 8× game speed, so by the
+    // time two polled `expect`s are scheduled under load the rest of the wave has fallen and cost the other lives
+    // (received 3 where 1 was expected): the count is one only at the instant of the slice.
+    const at = await page.evaluate(() => {
+      const sliced = window.__sna.wrong();
+      return { sliced, off: document.querySelectorAll('.lives span.off').length, toast: document.querySelector('.toast.bad')?.textContent ?? '' };
+    });
+    expect(at.sliced).toBe(true);
+    expect(at.off, 'one life lost at the instant of the wrong slice').toBe(1);
+    expect(at.toast).toContain('Not quite');
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
