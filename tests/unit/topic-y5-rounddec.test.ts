@@ -72,9 +72,31 @@ describe('y5-rounddec (#1200)', () => {
     for (const q of draw(3, 300)) { expect(given(q).dp, q.prompt).toBe(2); expect(q.prompt).toMatch(/one decimal place/); }
   });
 
-  it('each difficulty includes a half case, and d3 includes the 3.96 → 4.0 carry', () => {
-    for (const d of [1, 2, 3] as Difficulty[]) expect(draw(d, 100).some(q => /\.5$|\.\d5$|\.50$/.test(q.prompt.match(/Round £?[\d.]+/)![0])), `d${d}`).toBe(true);
+  // #1900: the one loose regex here matched 3.45 at d2 too, and `some()` over 100 cards was satisfied by chance
+  // (a random two-place number ends .50 about once in a hundred), so removing a half case would not have failed.
+  // Each difficulty now needs the half case of its own place, as a SHARE of the cards: one place ends .5, two places
+  // to a whole ends .50, and two places to one place has a second digit 5. Measured over 5,000 draws, with the half
+  // cases on / off: d1 32.6% / 7.9%, d2 25.7% / 0.7%, d3 35.1% / 10.1%; the floors sit between.
+  it('each difficulty includes the half case of its own place in a fair share, and d3 includes the 3.96 → 4.0 carry', () => {
+    const asked = (q: Question) => /Round £?([\d.]+)/.exec(q.prompt)![1];
+    const share = (d: Difficulty, re: RegExp) => draw(d, 1000).filter(q => re.test(asked(q))).length / 1000;
+    expect(share(1, /^\d+\.5$/), 'd1 .5').toBeGreaterThanOrEqual(0.2);
+    expect(share(2, /^\d+\.50$/), 'd2 .50').toBeGreaterThanOrEqual(0.15);
+    expect(share(3, /^\d+\.\d5$/), 'd3 .x5').toBeGreaterThanOrEqual(0.2);
     expect(draw(3, 100).some(q => /\.0$/.test(q.answer) && parseNum(q.answer)!.v === 10 * (given(q).v >= 100 ? Math.ceil(given(q).v / 100) : 1) )).toBe(true);
+  });
+
+  // #1900: `add()` deduped by printed string, so one wrong value could be offered twice, as "35" and "35.0" (about 8.6%
+  // of d3 cards): a free elimination, and two options a child cannot tell apart by value.
+  it('no two options are equal in value, over 30,000 draws per difficulty', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      for (const q of draw(d, 30_000)) {
+        const vals = q.options.map(num);
+        for (let i = 0; i < vals.length; i++) for (let j = i + 1; j < vals.length; j++) {
+          if (compareDec(vals[i], vals[j]) === 0) expect.fail(`${q.prompt} -> ${q.options.join(' | ')}`);   // an expect() per pair is 270,000 calls
+        }
+      }
+    }
   });
 
   it('the cut-off slip is offered when it differs from the answer', () => {
