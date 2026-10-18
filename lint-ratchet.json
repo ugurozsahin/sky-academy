@@ -5,7 +5,6 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/main.ts::(anonymous)": 16,
     "src/ui/play.ts::playScreen": 19,
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
