@@ -6,6 +6,7 @@ import { build } from 'vite';   // #557: the runtime half asks the bundler that 
 import { describe, expect, it, vi } from 'vitest';
 import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
+import { DANGLING_ICON } from './helpers/icons';   // #631: one pattern for this rail and its self-test in pwa-icons.test.ts
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
@@ -2492,10 +2493,9 @@ describe('offline support cannot go stale on its own (#15)', () => {
     const head = root('index.html').match(/<head>([\s\S]*?)<\/head>/)![1];
     expect(head, 'index.html must carry the Apple icon, or the iOS home screen is a screenshot')
       .toMatch(/<link rel="apple-touch-icon"/);
-    // A reference, not the spelling: the comment above the link says the word `icons/` too, and a rail that
-    // could not tell a comment from an `href` would be red on the explanation of why it is green.
+    // The link itself (as the manifest rail asks) and any href/src into icons/, relative or root-absolute (#631).
     expect(stripHead(head), 'the inlined page has no icons/ beside it, wherever it is hosted')
-      .not.toMatch(/(?:href|src)="icons\//);
+      .not.toMatch(DANGLING_ICON);
     // The data-URI favicon is inlined already and must survive: it is the only mark the single page has.
     expect(stripHead(head), 'the inline favicon is not a file and must stay').toMatch(/<link rel="icon" href="data:/);
   });
