@@ -9,7 +9,7 @@ import { scaled } from '../game/speed';
 import { saveKept, recordAccuracy, recordCert, recordDuel, recordGameEnd, touchStreak, type GameEndOutcome } from '../storage';
 import { certToStored, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { say, sfx } from '../audio';
-import { $, esc } from './dom';
+import { $, esc } from './dom'; import { askGrownUp } from './grown-up-gate';   // #1943; one line: at its #714 cap
 import { dojoRowsHTML } from './memory';
 import { stickersHTML, type screenScope } from './screen';
 import type { DuelScreenOpts } from './duel';
@@ -223,7 +223,7 @@ function wireCertificate(deps: ResultsDeps, earned: CertInfo) {
     // otherwise still be sitting there, unread, once the child closes a screen that just worked fine.
     const msg = $('#cert-msg', overlay); msg.hidden = true; msg.textContent = '';
     try {
-      const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+      const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, () => askGrownUp('share the certificate'));
       if (!scope.alive) return;   // torn down mid-delivery — see the comment on `certMsg` above
       if (how === 'shared') certMsg('Certificate shared!');
       else if (how === 'saved' || how === 'downloaded') certMsg('Certificate saved!');
