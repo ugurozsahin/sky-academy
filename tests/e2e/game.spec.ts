@@ -1609,6 +1609,38 @@ test.describe('Sky Ninja Academy', () => {
     expect(await toast.textContent(), 'and must leave no stale text behind for the next toast to inherit').toBe('');
   });
 
+  // #1943 (Apple Kids Category, App Review 1.3): the system share sheet is behind the grown-ups gate. The unit
+  // tests prove the routing with stubs; this proves the real page asks, refuses a wrong answer, and that a child
+  // who says "Not now" still gets the certificate and never reaches the share sheet.
+  test('the certificate button asks a grown-up before any share sheet opens (#1943)', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).__shared = 0;
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: () => { (window as any).__shared++; return Promise.resolve(); } });
+    });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await winMission(page);
+    await page.click('#cert');
+    const ask = page.locator('.gate-ask');
+    await expect(ask).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__shared), 'the sheet must not open before the gate is answered').toBe(0);
+    await page.fill('#ask-input', '1');   // the 6-9 times table never makes 1
+    await page.click('#ask-go');
+    await expect(page.locator('#ask-msg')).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__shared)).toBe(0);
+    await page.click('#ask-no');
+    await expect(ask).toHaveCount(0);
+    expect(await page.evaluate(() => (window as any).__shared), 'saying "Not now" must not share').toBe(0);
+    await expect(page.locator('.results #cert')).toBeEnabled();   // the child is back on the results, certificate still on offer
+    await page.click('#cert');
+    const q = await page.locator('#ask-q').textContent();
+    await page.fill('#ask-input', String(gateProduct(q!)));
+    await page.press('#ask-input', 'Enter');   // the keyboard path of the same gate
+    await expect.poll(() => page.evaluate(() => (window as any).__shared)).toBe(1);
+    await expect(page.locator('.gate-ask')).toHaveCount(0);
+  });
+
   // Every Reception maths topic starred except `unstarred` — derived from the registry, so a new topic cannot
   // leave the #929 tests below with a hand-written list that is one short (#971 r-measure did exactly that).
   const starAllExcept = (...unstarred: string[]) => Object.fromEntries(
