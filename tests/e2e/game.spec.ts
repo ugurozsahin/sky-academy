@@ -1252,6 +1252,23 @@ test.describe('Sky Ninja Academy', () => {
     expect(await answer(page)).toBe(true);
   });
 
+  // #1019: Story Time prints its story on the card and asks the question; the story must fit the shortest phone.
+  test('y2-storytime: the story card and its question reach the shortest phone without overflow (#1019)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-storytime');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    const overflow = await page.locator('.vis.sentence').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed by ${overflow}px`).toBeLessThanOrEqual(1);
+    const q = await page.evaluate(() => window.__sna.session.current);
+    expect(q.story, 'the card holds the story').toBeTruthy();
+    expect(await page.locator('.vis.sentence').innerText()).toContain(q.story!.split('.')[0]);
+    expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(q.prompt);
+    await expect(page.locator('#prompt')).toHaveText(q.prompt);
+    const promptOverflow = await page.locator('#prompt').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
+  });
+
   // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"
   // is unanswerable without the picture and the line, and a unit test of `renderVisual` cannot see whether
   // the SVG is laid out, sized or visible in a browser. Stage 1 is difficulty 1 (`YEARS[year2].diffs` is
