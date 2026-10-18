@@ -113,10 +113,12 @@ function moreOrLess(d: Difficulty, rng: () => number): Question {
   const wrongDirection = base - amt * sign;
   const both = base - otherAmt * sign;
   // A guaranteed same-leading-digit decoy where the named three would all leave the answer's leading digit: every
-  // `amt === 100` card, and a two-digit answer at `amt === 10` (#1766: d3's crossing case, "10 less than 100..109"
-  // gives 90..99, and `otherPower` there is 0..9, `wrongDirection` and `both` are in other hundreds). A three-digit
-  // `amt === 10` answer needs none: `otherPower` already lands in its own hundred.
-  const sameLead = amt === 100 || (answer >= 20 && answer < 100) ? sameLeadDecoy(answer, rng) : null;
+  // `amt === 100` card, and `amt === 10` with a two-digit answer (#1766). That second case is d3's crossing case only,
+  // "10 less than 100..109" asking for 90..99, where `otherPower` is 0..9 and `wrongDirection` and `both` are in other
+  // hundreds, so the card loses the "used 100 instead of 10" slip (a child rejects 0..9 on size alone) and keeps
+  // "more instead of less". A three-digit `amt === 10` answer needs none: `otherPower` lands in its own hundred.
+  const needsSameLead = amt === 100 || (amt === 10 && answer < 100);
+  const sameLead = needsSameLead ? sameLeadDecoy(answer, rng) : null;
   const named = sameLead !== null ? [sameLead, wrongDirection, both] : [otherPower, wrongDirection, both];
   const pool = new Set<number>(named.filter(v => v !== answer && v >= 0 && v <= 1099));
   while (pool.size < 3) {

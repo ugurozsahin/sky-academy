@@ -173,13 +173,13 @@ describe('y3-count (#1050)', () => {
   // `moreOrLess` cards, so the ≤30% ceiling passed with the leak in place: "10 less than 10x" gave 9x with
   // `otherPower`/`wrongDirection`/`both` all in other hundreds (`10 less than 107 = ? -> 97 | 7 207 117`), and
   // #1764's fix for the `amt=100` two-digit answers (a guaranteed `sameLeadDecoy`) was pinned by nothing. So the
-  // same ceiling is held per (`amt`, answer width) bucket over the draws of every difficulty, and the bucket set is
+  // same ceiling is held per (`amt`, answer width) bucket over 60,000 draws at every difficulty (the smallest bucket, `amt=10` two-digit, is a few hundred cards), and the bucket set is
   // asserted so a bucket going missing fails rather than passing by absence.
   it('KS2 leak limit, per amount and answer width: every moreOrLess bucket leaks the leading digit at most 30% (#1766)', () => {
     const buckets = new Map<string, { total: number; leaked: number }>();
     for (const d of [1, 2, 3] as Difficulty[]) {
       const r = rng(1766_000 + d);
-      for (let i = 0; i < 40_000; i++) {
+      for (let i = 0; i < 60_000; i++) {
         const q = topic.gen(d, r);
         const m = /^(10|100) (?:more|less) than /.exec(q.prompt);
         if (!m) continue;   // countRun
@@ -198,6 +198,21 @@ describe('y3-count (#1050)', () => {
       expect(b.total, `${key}: sample`).toBeGreaterThanOrEqual(300);
       expect(b.leaked / b.total, `${key}: ${b.leaked}/${b.total} leaked the leading digit`).toBeLessThanOrEqual(0.30);
     }
+  });
+
+  // #1766: the guaranteed same-lead decoy replaces `otherPower` on a two-digit `amt=10` answer (90..99), and nothing
+  // else: the "more instead of less" slip, base ± 10 the wrong way, is still offered.
+  it('a two-digit "10 less than 10x" card keeps the wrong-direction decoy (#1766)', () => {
+    const r = rng(1766_100);
+    let seen = 0;
+    for (let i = 0; i < 60_000; i++) {
+      const q = topic.gen(3, r);
+      const m = /^10 less than (\d+) = \?$/.exec(q.prompt);
+      if (!m || num(q.answer) >= 100) continue;
+      seen++;
+      expect(q.options, q.prompt).toContain(String(Number(m[1]) + 10));
+    }
+    expect(seen, 'cards seen').toBeGreaterThanOrEqual(100);
   });
 
   // #1454: the same ≤30% ceiling, but for `countRun` cards and PER STEP, not only per difficulty. In aggregate
