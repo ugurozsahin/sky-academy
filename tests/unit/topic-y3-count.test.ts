@@ -199,6 +199,25 @@ describe('y3-count (#1050)', () => {
       }
     }
   });
+  // #1767: a `countRun` option that the prompt already prints is a free elimination. `skipTerm = answer + step`
+  // is by construction the next printed term whenever the gap is interior (d3), and the ±100 slip is the other
+  // neighbour for 100s, so about half those cards carried two printed decoys. The gap positions seen are listed,
+  // so a shape going missing fails rather than passing by absence.
+  it('no countRun option other than the answer is a term the prompt already prints, at any difficulty or gap (#1767)', () => {
+    const seen = new Set<string>();
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1767_000 + d);
+      for (let i = 0; i < 20_000; i++) {
+        const q = topic.gen(d, r);
+        if (!q.prompt.includes(',')) continue;   // moreOrLess
+        const parts = q.prompt.replace(/\s*=\s*\?$/, '').split(', ');
+        seen.add(`d${d} gap${parts.indexOf('?')}`);
+        const printed = new Set(parts.filter(p => p !== '?'));
+        expect(q.options.filter(o => o !== q.answer && printed.has(o)), `${q.prompt} -> ${q.options.join(' | ')}`).toEqual([]);
+      }
+    }
+    expect([...seen].sort()).toEqual(['d1 gap3', 'd2 gap3', 'd3 gap1', 'd3 gap2', 'd3 gap3']);
+  });
 });
 
 describe('Year 3 strand modules (#1050): import direction', () => {
