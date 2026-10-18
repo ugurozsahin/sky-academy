@@ -339,8 +339,8 @@
      `--slot`'s `clamp(22px, …)` floor — which #107 set as a measured minimum for something a child has to COUNT.
      A five-frame star renders at 11.6px on a landscape phone. The alternative was tried and measured: exempting
      `.vis.objs` from the zoom gets 18.7px, but the bar then needs 176px and each arena drops to 214px, which
-     breaks the bound above. On a 390px-tall screen both cannot be had, and which one gives is a legibility
-     judgement for the owner rather than one to settle in a stylesheet. Nothing is CROPPED either way — the budget
+     breaks the bound above. On a 390px-tall screen both cannot be had, and which one gives was the owner's call:
+     DECIDED 2026-10-18 (#683), keep `zoom: 0.62` (star 11.6px, arenas above that bound). Nothing is CROPPED either way — the budget
      fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
   .duel-q .vis { margin: 0; zoom: 0.62; }
   .duel-q .symgrid { width: clamp(120px, 34vw, 150px); height: auto; max-height: calc((var(--duel-vis) - 4px) / 0.62); }   /* #1538, #1642: the zoom shrinks the budget */
