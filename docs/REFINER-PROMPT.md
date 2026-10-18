@@ -278,6 +278,12 @@ yourself (#513 review, round 12).
    so he can change a child's labels if he meant the split to change either (owner, 2026-09-23).
    The `Part of` line is written in the same call that creates the child, so there is no moment where a child
    exists without one.
+
+   **Split pieces that edit the same function, file or ratchet line run in order (#2011):** every piece after the
+   first opens with `Blocked by #<previous piece>`, a chain, so `scripts/pick-issue.mjs` holds it until that
+   piece merges; propose `blocked` as for any blocker. Two pieces with disjoint files may run in parallel: say
+   so on the later one with a line `Independent of #<piece>` and why.
+
 5. **An acceptance criterion where there is none.** One sentence: *what has to be true for this to be
    finished.* Not a design. The developer routine's job is to decide how; this only stops it deciding what.
 6. **A missing area label** — `tests`, `debt`, `curriculum`, `guard-rail`, `mode`, `perf`, and the rest of the
