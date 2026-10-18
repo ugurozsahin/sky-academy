@@ -1269,6 +1269,20 @@ test.describe('Sky Ninja Academy', () => {
     expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
   });
 
+  // #1240: Year 6 Inference prints a three-sentence passage on the card; it must fit the shortest phone.
+  test('y6-inference: the story card and its question fit the shortest phone (#1240)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year6', 'y6-inference');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    const overflow = await page.locator('.vis.sentence').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed by ${overflow}px`).toBeLessThanOrEqual(1);
+    const q = await page.evaluate(() => window.__sna.session.current);
+    expect(q.story, 'the card holds the story').toBeTruthy();
+    const promptOverflow = await page.locator('#prompt').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
+  });
+
   // #1020: Reception Story Time answers by picture, so every bubble label must fit and the card must fit the phone.
   test('r-storytime: the story card fits the shortest phone and every picture bubble fits (#1020)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });
