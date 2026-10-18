@@ -106,7 +106,7 @@ describe('the shared rail readers cannot go blind (#321)', () => {
   it('styleCss() carries every section\'s own heading, once each, in the file\'s original order (#558)', () => {
     const css = styleCss();
     const headings = [
-      '/* Sky Ninja Academy — twilight sky theme. Mobile-first, desktop-friendly. */',  // base.css
+      '/* Sharpwise — twilight sky theme. Mobile-first, desktop-friendly. */',  // base.css
       '/* ---------- backgrounds ---------- */',
       '/* ---------- shared components ---------- */',
       '/* ---------- avatar screen ---------- */',

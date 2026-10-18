@@ -15,7 +15,7 @@ describe('KS2 lines in the copyable summary (#1290)', () => {
   it('a save with no KS2 data gives exactly the five lines it gave before', () => {
     const t = text(DEFAULT).split('\n');
     expect(t).toEqual([
-      'Sky Ninja Academy — progress for Mia, 3 October 2026',
+      'Sharpwise — progress for Mia, 3 October 2026',
       'This week: no play yet.',
       expect.stringMatching(/^Stars: /),
       'Going well: not enough play yet',

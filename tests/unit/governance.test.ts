@@ -5049,7 +5049,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     + "are reserved by the copyright holder, and no permission to use, copy, modify or redistribute them is "
     + "granted by this file:";
   const LICENSE_DIRLIST = "- public/avatars/ the twelve ninja character illustrations - public/icons/ the "
-    + "app and home-screen icons - the name \"Sky Ninja Academy\", and the game's visual identity, including "
+    + "app and home-screen icons - the name \"Sharpwise\", and the game's visual identity, including "
     + "the favicon drawn inline in index.html - the praise lines, character names and other written game "
     + "text";
   const LICENSE_FREDOKA = "- Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the SIL Open "
@@ -5059,7 +5059,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     + "License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.";
   const README_CARVEOUT = "**The artwork and the game's written content are not.** The twelve character "
     + "illustrations under `public/avatars/` and the icons under `public/icons/` are **not licensed**: all "
-    + "rights in them are reserved, along with the name \"Sky Ninja Academy\", the game's visual identity "
+    + "rights in them are reserved, along with the name \"Sharpwise\", the game's visual identity "
     + "and its written text. The split is deliberate and it is the usual one for a game: the engine is worth "
     + "sharing, the characters are not mine to give away twice. `LICENSE` states exactly what falls each "
     + "side of the line.";
