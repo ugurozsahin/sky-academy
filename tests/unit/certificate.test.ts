@@ -383,6 +383,7 @@ interface FakeEl { tagName: string; className: string; src: string; download?: s
 
 function stubBrowser(o: { capacitor?: unknown; canShareFiles?: boolean; shareRejects?: boolean; claude?: unknown } = {}) {
   const created: FakeEl[] = [];
+  let shareCalls = 0;
   const make = (tag: string): FakeEl => {
     const e = {
       tagName: tag, clicked: 0, children: [] as FakeEl[], className: '', alt: '', src: '', textContent: '',
@@ -407,13 +408,14 @@ function stubBrowser(o: { capacitor?: unknown; canShareFiles?: boolean; shareRej
     configurable: true,
     value: {
       canShare: () => !!o.canShareFiles,
-      share: () => (o.shareRejects ? Promise.reject(new Error('cancelled')) : Promise.resolve()),
+      share: () => (shareCalls++, o.shareRejects ? Promise.reject(new Error('cancelled')) : Promise.resolve()),
     },
   });
   g.Image = function Image(this: FakeEl) { return make('img'); } as unknown as typeof globalThis.Image;
   g.URL = { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} };
   return {
     created,
+    shareCalls: () => shareCalls,
     /** Did anything actually get clicked as an `<a download>`? That is the swallowed no-op, made visible. */
     downloadClicks: () => created.filter(e => e.tagName === 'a' && e.clicked > 0).length,
     /**
@@ -442,6 +444,8 @@ const fakeCanvas = () => ({
   toDataURL: () => 'data:image/png;base64,AAA',
 }) as unknown as HTMLCanvasElement;
 
+const OPEN = () => Promise.resolve(true);   // a caller whose grown-ups gate lets the share through (#1943)
+
 describe('deliverCertificate, actually run (#205)', () => {
   let dom: ReturnType<typeof stubBrowser> | null = null;
   afterEach(() => { dom?.restore(); dom = null; });
@@ -459,7 +463,7 @@ describe('deliverCertificate, actually run (#205)', () => {
   // This is the exact path the first version of the fix stepped straight past into triggerDownload.
   it('a cancelled share in the WebView steps down to the view, not to a download', async () => {
     dom = stubBrowser({ capacitor: { getPlatform: () => 'android' }, canShareFiles: true, shareRejects: true });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', OPEN);
     expect(how).toBe('shown');
     expect(dom.downloadClicks(), 'the cancelled-share step-down is where this broke the first time').toBe(0);
     // The positive half, which this scenario's title promised and did not check. Without it, dropping the
@@ -484,7 +488,7 @@ describe('deliverCertificate, actually run (#205)', () => {
   // download, and only a browser that expected its download notices anything went wrong.
   it('a cancelled share in an ordinary browser steps down to the download, not to the view', async () => {
     dom = stubBrowser({ canShareFiles: true, shareRejects: true });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', OPEN);
     expect(how, 'cancelling a share in a browser must still leave the child with the file').toBe('downloaded');
     expect(dom.downloadClicks()).toBe(1);
   });
@@ -508,7 +512,7 @@ describe('deliverCertificate, actually run (#205)', () => {
         },
       },
     });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', OPEN);
     expect(how, 'a working share sheet, not the full-screen fallback, is the point of #110').toBe('shared');
     expect(written).toEqual([{ path: 'cert.png', data: 'AAA', directory: 'CACHE' }]);
     expect(shared).toEqual([{ url: 'file:///cache/cert.png', title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' }]);
@@ -559,5 +563,63 @@ describe('reportText() — the progress picture (#943)', () => {
     const t = reportText({ ...info('Ada'), sm: { ...base, strongest: mk(6), weakest: mk(2) } });
     expect(t.going).toBe('T0, T1, T2, T3');
     expect(t.help).toBe('T0, T1');
+  });
+});
+
+describe('deliverCertificate keeps the share sheet behind the grown-ups gate (#1943)', () => {
+  let dom: ReturnType<typeof stubBrowser> | null = null;
+  afterEach(() => { dom?.restore(); dom = null; });
+  const capacitorShare = (shared: unknown[]) => ({
+    isNativePlatform: () => true,
+    Plugins: {
+      Filesystem: { writeFile: () => Promise.resolve({ uri: 'file:///cache/cert.png' }) },
+      Share: { share: (o: unknown) => { shared.push(o); return Promise.resolve(); } },
+    },
+  });
+
+  it('a caller that passes no gate never reaches Web Share', async () => {
+    dom = stubBrowser({ canShareFiles: true });
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    expect(dom.shareCalls(), 'the child must not reach the system share sheet').toBe(0);
+    expect(how).toBe('downloaded');
+  });
+
+  it('a caller that passes no gate never reaches the Capacitor share sheet', async () => {
+    const shared: unknown[] = [];
+    dom = stubBrowser({ capacitor: capacitorShare(shared) });
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    expect(shared, 'the Android share sheet is the other way out of the app').toEqual([]);
+    expect(how, 'the child still gets the certificate').toBe('shown');
+    expect(dom.shownFullscreen()).toBe(true);
+  });
+
+  it('a gate that says no steps down to save, and says nothing of sharing', async () => {
+    dom = stubBrowser({ canShareFiles: true });
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', () => Promise.resolve(false));
+    expect(dom.shareCalls()).toBe(0);
+    expect(how).toBe('downloaded');
+  });
+
+  it('a gate that says yes shares, and is asked once', async () => {
+    dom = stubBrowser({ canShareFiles: true });
+    let asked = 0;
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', () => (asked++, Promise.resolve(true)));
+    expect(how).toBe('shared');
+    expect(dom.shareCalls()).toBe(1);
+    expect(asked).toBe(1);
+  });
+
+  it('the gate is not asked where there is no share sheet to protect', async () => {
+    dom = stubBrowser({});
+    let asked = 0;
+    await deliverCertificate(fakeCanvas(), 'cert.png', () => (asked++, Promise.resolve(true)));
+    expect(asked, 'a plain download needs no grown-up').toBe(0);
+  });
+
+  it('the Capacitor share sheet opens once the gate says yes', async () => {
+    const shared: unknown[] = [];
+    dom = stubBrowser({ capacitor: capacitorShare(shared) });
+    expect(await deliverCertificate(fakeCanvas(), 'cert.png', OPEN)).toBe('shared');
+    expect(shared).toHaveLength(1);
   });
 });

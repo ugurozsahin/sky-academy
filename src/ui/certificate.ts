@@ -284,21 +284,31 @@ async function saveViaClaude(dl: DownloadsApi, filename: string, blob: Blob, c: 
 }
 
 /**
+ * #1943: a system share sheet reaches other apps, so Kids Category wants a parental gate in front of it. It is offered
+ * only when the caller's gate lets it through, and the default says no, so a caller that forgets the gate cannot
+ * share. Asked once, and only when a share sheet exists at all. Save, view and download are never gated.
+ */
+async function gatedShares(files: boolean, capacitor: boolean, mayShare: () => Promise<boolean>): Promise<{ canShareFiles: boolean; capacitorShare: boolean }> {
+  const ok = files || capacitor ? await mayShare() : false;
+  return { canShareFiles: files && ok, capacitorShare: capacitor && ok };
+}
+
+/**
  * Get the certificate PNG to the child by the best route this runtime allows — it never silently does nothing.
  * Web Share (files) → artifact `downloads` save prompt → full-screen press-and-hold view → `<a download>`,
  * and on a native shell the full-screen view takes the last place instead, because that runtime swallows
  * `<a download>` silently (#205).
  */
-export async function deliverCertificate(c: HTMLCanvasElement, filename: string): Promise<CertOutcome> {
+export async function deliverCertificate(c: HTMLCanvasElement, filename: string, mayShare: () => Promise<boolean> = () => Promise.resolve(false)): Promise<CertOutcome> {
   const blob = await new Promise<Blob | null>(res => c.toBlob(res, 'image/png'));
   if (!blob) throw new Error('certificate: could not encode PNG');
   const file = new File([blob], filename, { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  const canShareFiles = !!nav.canShare?.({ files: [file] });
+  const rawFiles = !!nav.canShare?.({ files: [file] });
   const claudeRuntime = !!(window as { claude?: unknown }).claude;
   const nativeShell = isNativeShell();
   const dl = claudeRuntime ? await claudeDownloads() : null;
-  const capacitorShare = nativeShell && hasCapacitorShare();
+  const { canShareFiles, capacitorShare } = await gatedShares(rawFiles, nativeShell && hasCapacitorShare(), mayShare);
 
   // The one place `<a download>` is chosen, so the runtime that cannot honour it is ruled out in one
   // place too. A cancelled share used to step down past this check straight to `triggerDownload`.
