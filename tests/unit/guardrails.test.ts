@@ -662,15 +662,15 @@ describe('guard rails', () => {
   // named. This keeps the single construction site behind a disposal of the old tracer, and the screen
   // teardown disposing it too. Moving `tracer?.destroy()` after `new Tracer(` (or dropping it) turns it red.
   it('play.ts disposes the previous Tracer before building a new one (#39)', () => {
-    const play = code(SOURCES['/src/ui/play.ts']);
-    const ctors = [...play.matchAll(/mountTracer\(q/g)];               // #1064: built by play-input.ts's mountTracer, called once here
+    const play = code(SOURCES['/src/ui/play.ts']); const beats = code(SOURCES['/src/ui/play-beats.ts']); expect([...play.matchAll(/mountTracer\(/g)].length, 'play.ts mounts no Tracer: startTrace in play-beats.ts is the one site').toBe(0);   // #1503: startTrace lives in play-beats.ts
+    const ctors = [...beats.matchAll(/mountTracer\(q/g)];               // #1064: built by play-input.ts's mountTracer, called once here
     expect(ctors.length + [...code(SOURCES['/src/ui/play-input.ts']).matchAll(/new Tracer\(/g)].length).toBe(2);
-    const start = play.indexOf('function startTrace');
-    const before = play.slice(start, ctors[0].index);
+    const start = beats.indexOf('function startTrace');
+    const before = beats.slice(start, ctors[0].index);
     expect({ inStartTrace: start >= 0 && start < ctors[0].index, disposesFirst: /tracer\??\.destroy\(\)/.test(before) })
       .toEqual({ inStartTrace: true, disposesFirst: true });
     const cleanup = play.slice(play.indexOf('function cleanup'));
-    expect(/tracer\??\.destroy\(\)/.test(cleanup), 'cleanup must dispose the Tracer on screen teardown').toBe(true);
+    expect(/tracer(\(\))?\??\.destroy\(\)/.test(cleanup), 'cleanup must dispose the Tracer on screen teardown').toBe(true);
   });
 
   // #38: the save had a version field (`v`) and a versioned key (`sna:v1`) but neither drove anything — load()
@@ -1740,7 +1740,7 @@ describe('guard rails', () => {
     // beat and the results beat live in play-session.ts now, so a rail scoped to play.ts alone would be green
     // while the file that owns most of the beats went unwatched. play-session.ts has no bare-numeric later()
     // today, so it starts at the floor — this rail costs nothing to widen and stops a whole file drifting.
-    const files = ['/src/ui/play.ts', '/src/ui/play-session.ts'];
+    const files = ['/src/ui/play.ts', '/src/ui/play-session.ts', '/src/ui/play-beats.ts'];   // #1503: the tutorial hold and the taunt moved here
     for (const f of files) expect((SOURCES[f] ?? '').length, `${f} must be read, not a blank import`).toBeGreaterThan(1000);
     const real = files.flatMap(f => code(SOURCES[f] ?? '').split('\n')
       .filter(l => l.includes('later(') && /,\s*\d+\s*\)/.test(l)).map(l => `${f}: ${l.trim()}`));
@@ -3135,7 +3135,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/game/arena.ts': 470, 'src/game/bubbles.ts': 521,
     'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 136, 'src/ui/duel-beats.ts': 187, 'src/ui/duel-results.ts': 237, 'src/ui/duel-hooks.ts': 45, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 420,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 182, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 154, 'src/ui/play-beats.ts': 63, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a

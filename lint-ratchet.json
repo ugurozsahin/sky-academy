@@ -9,7 +9,7 @@
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/ui/play.ts::playScreen": 126
+    "src/ui/play.ts::playScreen": 102
   },
   "fileLines": {
     "tests/unit/arena.test.ts": 948,

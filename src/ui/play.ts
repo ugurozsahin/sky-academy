@@ -1,19 +1,19 @@
-import { avatarById, praiseLine, SENSEI, tutorialLine, VILLAIN, voiced } from '../avatars';
-import { topicsFor, type Question, type Topic } from '../curriculum';
+import { avatarById, SENSEI, VILLAIN, voiced } from '../avatars';
+import { topicsFor, type Topic } from '../curriculum';
 import { Arena } from '../game/arena';
 import type { Miss, Resume, SessionOpts } from '../game/session';
 import { holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options';
 import { scaled } from '../game/speed'; import { calmReduced, playStyleAttr } from '../device-settings';   // #32: test-only time compression; #906; #907
-import type { Tracer } from '../game/tracing'; import { answerableBy } from '../game/pools'; import { createHud, heartCount } from './hud';   // #1065: one pool rule
+import { answerableBy } from '../game/pools'; import { createHud, heartCount } from './hud';   // #1065: one pool rule
 import { load, save, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
-import { canHear, haptic, say, sfx, sliceFx } from '../audio';
+import { canHear, haptic, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
-import { inputFor, inputMarkup, mountPad, mountTracer, type PlayInput } from './play-input'; import { seedRng } from '../game/daily-sprint';   // #1064: how a child answers
+import { createPlayBeats } from './play-beats'; import { inputFor, inputMarkup, mountPad, type PlayInput } from './play-input'; import { seedRng } from '../game/daily-sprint';   // #1064: how a child answers
 import { BOMB, createPlaySession } from './play-session';   // #36
 import { createResultsScreen } from './play-results';   // #896: the results overlay lives in play-results.ts
-import { pressKey } from './key-answer'; import { pauseHTML, stageClearHTML } from './overlays';
+import { pressKey } from './key-answer'; import { pauseHTML } from './overlays';
 import type { PlayHooks } from './hooks';
 import { buildHooks } from './play-hooks'; import { createCommit } from './play-commit'; import { startSprintClock } from './play-clock'; import { modeFlags } from './play-flags';
 
@@ -54,7 +54,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'),
     overlay: $('#overlay'), qcard: $('#qcard'), speak: $('#speak'),
   };
-  let arena: Arena | null = null; let tracer: Tracer | null = null; let paused = false; const pad = mountPad(input, () => session, scaled);   // #884: mirrors the Pause overlay; #1119: the number pad
+  let arena: Arena | null = null; let paused = false; const pad = mountPad(input, () => session, scaled);   // #884: mirrors the Pause overlay; #1119: the number pad
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast, holdTimers, onHidden, onBack } = scope; onHidden(() => playSession.hidden(pauseIfLive)); onBack(pauseIfLive); pushBackGuard();   // #885, #887
   const hud = createHud(els, heartCount(spec.hasLives, o.year.lives), canHear);   // #36: HUD writers live in hud.ts
@@ -79,6 +79,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   });
 
   const commit = createCommit({ o, d, av, training, ps: () => playSession });   // #1504: what a finished game writes
+  // #1503: the beat helpers (tracer mount, tutorial, taunt, repeat, stage-clear cue) live in play-beats.ts; `session` and
+  // `playSession` are assigned below, so they go in as thunks.
+  const beats = createPlayBeats({ session: () => session, playSession: () => playSession, d, yearId: o.year.id, av, els, later, toast });
+  const { startTrace, showTutorial, hideTutorial, repeatPrompt, showTaunt, showStageClear } = beats;
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
@@ -126,38 +130,6 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     });
   }
 
-  function startTrace(q: Question) { tracer?.destroy(); tracer = mountTracer(q, { hit: a => session.hit(a), toast, glow: av.glow }); }
-  /** First-play demo: show the animated hand over the arena; returns how long to hold the first wave (ms). */
-  function showTutorial(): number {
-    const t = $('#tutorial'); if (!t || !t.hidden) return 0;
-    if (load().tutorialSeen || session.questionsAsked > 1) return 0;   // only ever before the very first wave
-    t.hidden = false; say(tutorialLine(d, o.year.id));
-    later(hideTutorial, scaled(9000));            // never block play for long, even if the child just watches
-    // #138: the hold before the first wave is a game beat too. Shortening it at speed is safe now that the
-    // font gate is explicit (#44's gatedSpawn) rather than resting on 1800 ms happening to exceed the cap.
-    return scaled(1800);
-  }
-  function hideTutorial() { const t = $('#tutorial'); if (t) t.hidden = true; }
-  /** Repeat the prompt (tap the question card, or the 🔊 button): aloud, or — on a device that cannot be
-   *  heard — the hidden sentence is shown again (#65). Never a no-op on a silent device (the #205 rule). */
-  function repeatPrompt() {
-    const q = session.current; if (!q) return;
-    if (!playSession.repeat()) say(q.say ?? q.prompt, true);
-    els.qcard.classList.remove('pulse'); void els.qcard.offsetWidth; els.qcard.classList.add('pulse');
-  }
-  function showTaunt() {
-    const t = $('#taunt'); if (!t) return;
-    t.textContent = VILLAIN.taunt[Math.floor(Math.random() * VILLAIN.taunt.length)];
-    t.hidden = false; later(() => (t.hidden = true), scaled(1400));   // #138
-  }
-
-  function showStageClear(stage: number, st: number, acc: number) {
-    playSession.hold(true);                       // #65: the one writer of arena.paused is play-session's syncPaused()
-    const line = praiseLine(av, d.name); say(line);
-    els.overlay.hidden = false;
-    els.overlay.innerHTML = stageClearHTML({ glow: av.glow, img: av.img, name: av.name, line, stage, stages: session.stages, starCount: st, acc, score: session.score });
-    $('#next').addEventListener('click', () => { sfx.tap(); els.overlay.hidden = true; playSession.hold(false); session.nextStage(); });
-  }
   function showPause() {
     playSession.hold(true); paused = true;         // #65: pauses the arena, and stops a sentence peek's clock with it
     els.overlay.hidden = false; els.overlay.innerHTML = pauseHTML();
@@ -171,11 +143,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
   // #35: dispose() stops timers, cancels speech and drops window.__sna.
   function cleanup() {
-    stopClock(); playSession.dispose(); arena?.destroy(); tracer?.destroy(); pad.destroy(); scope.dispose();
+    stopClock(); playSession.dispose(); arena?.destroy(); beats.tracer()?.destroy(); pad.destroy(); scope.dispose();
   }
 
   // Test / accessibility hooks — the typed PlayHooks contract (#34), built in play-hooks.ts (#1504)
-  const hooks: PlayHooks = buildHooks({ session, arena, playSession, pad, tracing, skin, HOLD, tracer: () => tracer, lastCert: commit.lastCert, paused: () => paused });
+  const hooks: PlayHooks = buildHooks({ session, arena, playSession, pad, tracing, skin, HOLD, tracer: () => beats.tracer(), lastCert: commit.lastCert, paused: () => paused });
   window.__sna = hooks;
   session.start();
   return cleanup;                    // the router calls this when it leaves the screen (back button included) — see #73
