@@ -161,7 +161,7 @@ describe('curriculum ranges', () => {
         const big = /longer|longest/.test(q.prompt);
         const vals = q.options.map(o => { expect(INTERVAL[o], `"${o}" is not a Year 2 interval`).toBeDefined(); return INTERVAL[o]; });
         expect(INTERVAL[q.answer], `"${q.prompt}" answered "${q.answer}"`).toBe(big ? Math.max(...vals) : Math.min(...vals));
-        expect(q.options.length, q.prompt).toBe(q.prompt.includes(' the ') ? 3 : 2);
+        expect(q.options.length, q.prompt).toBe(/longest|shortest/.test(q.prompt) ? 3 : 2);
         if (q.options.length === 2) pairs++; else triples++;
         expect(d, `a comparison card at difficulty ${d}`).toBe(2);
       } else if ((m = q.prompt.match(/^It starts at (.+) and lasts (.+)\. When does it end\?$/))) {
