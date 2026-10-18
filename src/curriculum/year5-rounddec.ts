@@ -34,17 +34,19 @@ function decoys(n: Dec, answer: Dec, target: 0 | 1, kind: Kind): string[] {
   const label = show(answer, kind), one = dec(1, target);
   const down = target === 0 ? dec(Math.floor(n.v / 10 ** n.dp), 0) : dec(Math.floor(n.v / 10), 1); // cutting the digits off
   const wrongPlace = target === 0 ? roundTo(n, 0.1) : roundTo(n, 1); // the other place asked for
-  const out: string[] = [];
+  const out: string[] = [], seen: Dec[] = [];   // `seen` is what `out` is worth: "4" and "4.0" are one value (#1900)
+  const fresh = (c: Dec) => compareDec(c, answer) !== 0 && !seen.some(v => compareDec(v, c) === 0);
   const add = (c: Dec) => {
     const s = show(c, kind === 'dp1' && c.dp === 0 ? 'whole' : kind);
-    const sane = c.v >= 0 && compareDec(c, answer) !== 0 && !(kind === 'money' && c.dp > 0);
-    if (out.length < 3 && sane && s !== label && !out.includes(s)) out.push(s);
+    const sane = c.v >= 0 && !(kind === 'money' && c.dp > 0);
+    if (out.length < 3 && sane && fresh(c) && s !== label && !out.includes(s)) { out.push(s); seen.push(c); }
   };
   [down, addDec(down, one), wrongPlace, addDec(answer, one), subDec(answer, one)].forEach(add);
   for (let k = 2; out.length < 3; k++) add(addDec(answer, dec(k, answer.dp)));
   if (!out.some(s => s.slice(-1) === label.slice(-1))) {
-    const ten = dec(10, answer.dp), swap = [addDec(answer, ten), ...(answer.v >= ten.v ? [subDec(answer, ten)] : [])].map(c => show(c, kind)).filter(s => s !== label && !out.includes(s));
-    if (swap.length) out[2] = swap[0];
+    const ten = dec(10, answer.dp);
+    const swap = [addDec(answer, ten), ...(answer.v >= ten.v ? [subDec(answer, ten)] : [])].filter(c => fresh(c) && show(c, kind) !== label && !out.includes(show(c, kind)));
+    if (swap.length) { out[2] = show(swap[0], kind); seen[2] = swap[0]; }
   }
   return out;
 }
