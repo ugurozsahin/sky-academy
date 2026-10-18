@@ -6,6 +6,7 @@ import { mixable, subjectPool } from '../../src/game/pools';
 import { storyBankProblems } from '../../src/curriculum/story-bank';
 import { R_STORIES } from '../../src/curriculum/stories-r';
 import { seededRng } from '../../src/game/duel';
+import { TIPS, tipFor } from '../../src/game/tips';
 
 const topic = TOPICS.find(t => t.id === 'r-storytime')!;
 const D: Difficulty[] = [1, 2, 3];
@@ -58,6 +59,21 @@ describe('r-storytime (#1020)', () => {
       expect(i.word, i.question).toBe(NUM[Number(i.answer)]);
     }
     for (const i of R_STORIES.filter(x => x.d === 3)) expect(i.question, 'd3 is the counting rung').toMatch(/^How many/);
+  });
+
+  it('d1 asks who and d2 asks what, as the issue lays out the ladder', () => {
+    for (const i of R_STORIES.filter(x => x.d === 1)) expect(i.question, 'd1 is the who rung').toMatch(/^Who/);
+    for (const i of R_STORIES.filter(x => x.d === 2)) expect(i.question, 'd2 is the what rung').toMatch(/^What/);
+  });
+
+  it('a count is never muddied by a second number in the story (a decoy that is also true)', () => {
+    const NUMS = /\b(one|two|three|four|five)\b/gi;
+    for (const i of R_STORIES.filter(x => /^How many/.test(x.question)))
+      expect(new Set((i.story.match(NUMS) ?? []).map(w => w.toLowerCase())), `${i.story}: one number only, so no decoy is also true`).toEqual(new Set([i.word]));
+  });
+
+  it('has a help-at-home tip', () => {
+    expect(tipFor('r-storytime')).toBe(TIPS.comprehension);
   });
 
   it('no question asks what happens next (#666: no single right answer)', () => {

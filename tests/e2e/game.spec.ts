@@ -1281,6 +1281,17 @@ test.describe('Sky Ninja Academy', () => {
     const states = await page.evaluate(() => window.__sna.bubbles().map((b: { label: string; labelState: string }) => `${b.label}:${b.labelState}`));
     expect(states.length).toBeGreaterThan(0);
     for (const s of states) expect(s.endsWith(':ok'), `a bubble label did not fit: ${s}`).toBe(true);
+    // The card holds the story and the question is asked, at d1 (pictures) and then at d3 (the digits 1-5).
+    const q1 = await page.evaluate(() => window.__sna.session.current);
+    expect(await page.locator('.vis.sentence').innerText()).toContain(q1.story!.split('.')[0]);
+    expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(q1.prompt);
+    await skipToStage(page, 5);   // Reception's `diffs` are [1, 1, 2, 2, 3]: d3 is the last stage only
+    await waitForTarget(page);
+    const q3 = await page.evaluate(() => window.__sna.session.current);
+    expect(q3.prompt, 'the last stage is the counting rung').toMatch(/^How many/);
+    const digits = await page.evaluate(() => window.__sna.bubbles().map((b: { label: string; labelState: string }) => `${b.label}:${b.labelState}`));
+    expect(digits.length).toBeGreaterThan(0);
+    for (const s of digits) expect(/^[1-5]:ok$/.test(s), `a digit bubble did not fit: ${s}`).toBe(true);
   });
 
   // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"
