@@ -44,9 +44,9 @@ describe('Grammar mix pool (#1234)', () => {
     expect(offeredPool(pool(GRAMMAR_MIN))).toHaveLength(GRAMMAR_MIN);
   });
   it('play.ts passes the title flag to the sprint record and builds its heading through playTitle', () => {
-    const src = readFileSync('src/ui/play.ts', 'utf8');
-    expect(src).toContain("recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed?.startsWith('sprint:'), o.seed)");
-    expect(src).toContain('playTitle(o, spec.staged, training, spec.title)');
+    // #1504: the record call moved to play-commit.ts, the heading to play-flags.ts
+    expect(readFileSync('src/ui/play-commit.ts', 'utf8')).toContain("recordSprintOutcome(o.year, o.topic, r, !!o.title, !!o.seed?.startsWith('sprint:'), o.seed)");
+    expect(readFileSync('src/ui/play-flags.ts', 'utf8')).toContain('playTitle(o, spec.staged, training, spec.title)');
   });
   it('main.ts keeps the pool title on Play again and on the fix-it deck, so a replay never writes the Ninja Sprint best', () => {
     const line = readFileSync('src/main.ts', 'utf8').split('\n').find(l => l.includes('play: ((o: StartOpts)')) ?? '';
