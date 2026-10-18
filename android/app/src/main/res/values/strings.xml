@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Sky Ninja Academy</string>
     <string name="title_activity_main">Sky Ninja Academy</string>
-    <string name="package_name">uk.skyninja.academy</string>
-    <string name="custom_url_scheme">uk.skyninja.academy</string>
+    <string name="package_name">uk.co.sharpwise</string>
+    <string name="custom_url_scheme">uk.co.sharpwise</string>
 </resources>
