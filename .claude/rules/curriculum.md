@@ -10,3 +10,4 @@ paths:
 - Difficulty 1/2/3 = mission stages. Reception is "gentle" (missed bubbles cost no life). Keep numbers within NC
   ranges (R ≤10, Y1 ≤20, Y2 ≤100).
 - See `docs/CURRICULUM.md` for the National Curriculum map this maps onto.
+- A topic added, renamed or removed needs its `docs/CURRICULUM.md` row and `npm run content-map` (regenerates `docs/CONTENT-MAP.md`, `docs/content-map.json`); `tests/unit/content-map.test.ts` fails otherwise (#2031).

@@ -117,8 +117,12 @@ export const y2Money: Generator = (d, rng) => {
  * time with the same words (#298 slice 3); two copies would be free to disagree about `quarter to`, which is
  * the only phrase that names the *next* hour.
  */
-export const clockPhrase = (hh: number, mm: number): string =>
-  mm === 0 ? `${hh} o'clock` : mm === 15 ? `quarter past ${hh}` : mm === 30 ? `half past ${hh}` : mm === 45 ? `quarter to ${hh % 12 + 1}` : mm < 30 ? `${mm} past ${hh}` : `${60 - mm} to ${hh % 12 + 1}`;
+export const clockPhrase = (hour: number, mm: number): string => {
+  // Any whole hour folds onto the 12-hour dial (0 and 24 are 12, 13 is 1), so a caller holding minutes since
+  // midnight passes `Math.floor(t / 60)` and never has to say "0 o'clock" (#660).
+  const hh = (hour + 11) % 12 + 1;
+  return mm === 0 ? `${hh} o'clock` : mm === 15 ? `quarter past ${hh}` : mm === 30 ? `half past ${hh}` : mm === 45 ? `quarter to ${hh % 12 + 1}` : mm < 30 ? `${mm} past ${hh}` : `${60 - mm} to ${hh % 12 + 1}`;
+};
 export const y2Time: Generator = (d, rng) => {
   const h = ri(rng, 1, 12);
   const m = d === 1 ? pick(rng, [0, 15, 30, 45]) : d === 2 ? pick(rng, [0, 5, 10, 15, 30, 45]) : 5 * ri(rng, 0, 11);
