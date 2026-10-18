@@ -26,6 +26,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-sounds | Literacy Writing: sounds→letters | initial/final/medial sound of CVC words; the word and the decoys follow the phase order (d1 phase 2 letters, d2–3 all single-letter sounds). The final (d2) and medial (d3) questions additionally require the letter at the gap to be a genuine single-letter sound (#135): `cow` ends in the digraph `ow` and `fox`/`box` end in the blend `/ks/`, so none of the three is drawn for the final question; `egg`'s middle letter is a consonant, so it is not drawn for the medial question. Each keeps its other (correct) roles — `egg` still teaches its initial sound at d1. |
 | r-syllables | Word Reading: count or clap syllables in a word | "How many beats?": the word is spoken and shown with its picture; hand-keyed 1–2 beat words; d1 options 1–2, d2–3 options 1–3 |
 | r-soundhunt | Word Reading: say a sound for each letter | Sound Hunt: three keyword words are spoken, nothing to read; slice the grapheme (d1 phase 2 sets 1–4, d2 all single letters + qu, d3 phase 3 digraphs/trigraphs); sound-alike graphemes never appear as decoys |
+| r-storytime | Comprehension: understanding what has been read to them | Story Time (#1020): ten very short stories read aloud on the story card (solo, mission only); d1 who, d2 what, d3 how many (up to 5); answered by an emoji bubble or a digit; every question literal, none about what happens next |
 | r-capitals | Word Reading: letters | match A↔a; letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-tricky | Word Reading: common exception words | Letters and Sounds phase 2/3 tricky words, spoken never shown (peek path): d1 phase 2, d2 phase 3, d3 both. d2–3 decoys share a letter with the answer (he/she/the, me/we/be) except `I`, which shares none with any bank word |
 | r-build | Writing: spell by sounds | slice letters in order (CVC); word and decoy letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
@@ -73,6 +74,7 @@ Writing:
 - y1-digraphs
 - y1-alien — Real or Alien?: decode a printed word (not by ear), phonics screening check practice; d1 phase 3, d2 phase 4 adjacent consonants, d3 phase 5 alternatives, half "slice the alien 👾"
 - y1-soundhunt — Sound Hunt by ear: d1 phase 3, d2 phase 5 alternatives ay/ou/ie/ea/oy/ir/ue/aw/wh/ph/ew/oe/au, d3 adds split digraphs a-e/i-e/o-e/u-e
+- y1-storytime — Story Time (#1018): ten short stories read aloud on the story card (solo, mission only); d1 who, d2 what / where / how many, d3 a simple inference with one defensible answer; no prediction questions
 - y1-spelling — 45 CEW
 - y1-spellrules — Spelling Rules: the word is spoken, slice the right spelling of two non-word decoys; d1 ff/ll/ss/zz/ck, d2 adds nk and -ve, d3 adds -tch; hand-curated bank (Y1_SPELL_RULES), no real-word decoys
 - y1-spellrules2 — More Spelling Rules: the word is spoken, slice the right spelling of two non-word decoys; d1 ai/ay and oi/oy, d2 adds -y endings and k before e/i/y, d3 adds ph and wh; hand-curated bank (Y1_SPELL_RULES2), no real-word decoys

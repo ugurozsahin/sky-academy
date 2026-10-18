@@ -16,6 +16,7 @@ import {
 } from './util';
 import { syllableQ } from './syllables';
 import { storyQ } from './story';
+import { y1StoryTime } from './stories-y1';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
 import { y1Compound } from './year1-compound';
 import { y1Contractions } from './year1-contractions';
@@ -573,6 +574,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-digraphs', title: 'Sound Pairs', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: digraphs', gen: y1Digraphs },
   { id: 'y1-alien', title: 'Real or Alien?', icon: '👾', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: decode words containing taught GPCs, including some pseudo-words', gen: y1Alien },
   { id: 'y1-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: respond speedily to graphemes; phase 3 & 5 alternatives, split digraphs', gen: y1SoundHunt },
+  { id: 'y1-storytime', title: 'Story Time', icon: '📚', subject: 'writing', year: 'year1', nc: 'Y1 Comprehension: listening; inference from what is said and done', solo: true, gen: y1StoryTime },
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', sequenceFrom: 3, gen: y1Spelling },
   { id: 'y1-spellrules', title: 'Spelling Rules', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: ff, ll, ss, zz, ck; n before k; -tch; -ve', gen: y1SpellRules },
   { id: 'y1-spellrules2', title: 'More Spelling Rules', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: ai/ay, oi/oy, -y endings, k before e/i/y, ph, wh', gen: y1SpellRules2 },

@@ -1252,6 +1252,48 @@ test.describe('Sky Ninja Academy', () => {
     expect(await answer(page)).toBe(true);
   });
 
+  // #1018: Story Time prints its story on the card and asks the question; the story must fit the shortest phone.
+  test('y1-storytime: the story card and its question reach the shortest phone without overflow (#1018)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-storytime');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    const overflow = await page.locator('.vis.sentence').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed by ${overflow}px`).toBeLessThanOrEqual(1);
+    const q = await page.evaluate(() => window.__sna.session.current);
+    expect(q.story, 'the card holds the story').toBeTruthy();
+    expect(await page.locator('.vis.sentence').innerText()).toContain(q.story!.split('.')[0]);
+    expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(q.prompt);
+    await expect(page.locator('#prompt')).toHaveText(q.prompt);
+    const promptOverflow = await page.locator('#prompt').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
+  });
+
+  // #1020: Reception Story Time answers by picture, so every bubble label must fit and the card must fit the phone.
+  test('r-storytime: the story card fits the shortest phone and every picture bubble fits (#1020)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-storytime');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    const overflow = await page.locator('.vis.sentence').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed by ${overflow}px`).toBeLessThanOrEqual(1);
+    await waitForTarget(page);
+    const states = await page.evaluate(() => window.__sna.bubbles().map((b: { label: string; labelState: string }) => `${b.label}:${b.labelState}`));
+    expect(states.length).toBeGreaterThan(0);
+    for (const s of states) expect(s.endsWith(':ok'), `a bubble label did not fit: ${s}`).toBe(true);
+    // The card holds the story and the question is asked, at d1 (pictures) and then at d3 (the digits 1-5).
+    const q1 = await page.evaluate(() => window.__sna.session.current);
+    expect(await page.locator('.vis.sentence').innerText()).toContain(q1.story!.split('.')[0]);
+    expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(q1.prompt);
+    await skipToStage(page, 5);   // Reception's `diffs` are [1, 1, 2, 2, 3]: d3 is the last stage only
+    await waitForTarget(page);
+    const q3 = await page.evaluate(() => window.__sna.session.current);
+    expect(q3.prompt, 'the last stage is the counting rung').toMatch(/^How many/);
+    const digits = await page.evaluate(() => window.__sna.bubbles().map((b: { label: string; labelState: string }) => `${b.label}:${b.labelState}`));
+    expect(digits.length).toBeGreaterThan(0);
+    for (const s of digits) expect(/^[1-5]:ok$/.test(s), `a digit bubble did not fit: ${s}`).toBe(true);
+  });
+
   // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"
   // is unanswerable without the picture and the line, and a unit test of `renderVisual` cannot see whether
   // the SVG is laid out, sized or visible in a browser. Stage 1 is difficulty 1 (`YEARS[year2].diffs` is
@@ -1590,6 +1632,38 @@ test.describe('Sky Ninja Academy', () => {
     const toast = page.locator('#toast');
     await expect(toast, "the disposed screen's toast() call must not reach into the new mission screen's own #toast").not.toHaveClass(/show/);
     expect(await toast.textContent(), 'and must leave no stale text behind for the next toast to inherit').toBe('');
+  });
+
+  // #1943 (Apple Kids Category, App Review 1.3): the system share sheet is behind the grown-ups gate. The unit
+  // tests prove the routing with stubs; this proves the real page asks, refuses a wrong answer, and that a child
+  // who says "Not now" still gets the certificate and never reaches the share sheet.
+  test('the certificate button asks a grown-up before any share sheet opens (#1943)', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).__shared = 0;
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: () => { (window as any).__shared++; return Promise.resolve(); } });
+    });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await winMission(page);
+    await page.click('#cert');
+    const ask = page.locator('.gate-ask');
+    await expect(ask).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__shared), 'the sheet must not open before the gate is answered').toBe(0);
+    await page.fill('#ask-input', '1');   // the 6-9 times table never makes 1
+    await page.click('#ask-go');
+    await expect(page.locator('#ask-msg')).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__shared)).toBe(0);
+    await page.click('#ask-no');
+    await expect(ask).toHaveCount(0);
+    expect(await page.evaluate(() => (window as any).__shared), 'saying "Not now" must not share').toBe(0);
+    await expect(page.locator('.results #cert')).toBeEnabled();   // the child is back on the results, certificate still on offer
+    await page.click('#cert');
+    const q = await page.locator('#ask-q').textContent();
+    await page.fill('#ask-input', String(gateProduct(q!)));
+    await page.press('#ask-input', 'Enter');   // the keyboard path of the same gate
+    await expect.poll(() => page.evaluate(() => (window as any).__shared)).toBe(1);
+    await expect(page.locator('.gate-ask')).toHaveCount(0);
   });
 
   // Every Reception maths topic starred except `unstarred` — derived from the registry, so a new topic cannot

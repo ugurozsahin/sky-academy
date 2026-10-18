@@ -1,7 +1,7 @@
 // Mission certificate: a printable PNG (landscape, 1200×850) drawn on an offscreen canvas, then shared
 // (Web Share with files, e.g. iOS/Android) or downloaded. No DOM beyond the canvas; text is built by a pure helper.
 import { avatarById, type Avatar } from '../avatars';
-import { esc } from './dom';
+import { esc } from './dom'; import { gatedShares } from './grown-up-gate';   // #1943; one line: at its #714 cap
 import { isNativeShell, plugin } from '../native';
 import type { StoredCert } from '../storage';
 import { certKind } from './cert-kind';
@@ -252,7 +252,7 @@ async function claudeDownloads(): Promise<DownloadsApi | null> {
  * handler below, so it stops the click reaching `wrap`.
  */
 export function showCertificateFullscreen(c: HTMLCanvasElement): void {
-  document.querySelector('.cert-view')?.remove();
+  document.querySelector('.cert-view:not(.gate-ask)')?.remove();   // never the grown-ups gate (#1943): its promise would hang
   const wrap = document.createElement('div'); wrap.className = 'cert-view'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Your certificate');
   const img = new Image(); img.className = 'cert-view-img'; img.alt = 'Your Sky Ninja Academy certificate — tap to zoom'; img.src = c.toDataURL('image/png');
   img.addEventListener('click', e => { e.stopPropagation(); img.classList.toggle('zoomed'); wrap.classList.toggle('zoomed', img.classList.contains('zoomed')); });
@@ -289,16 +289,16 @@ async function saveViaClaude(dl: DownloadsApi, filename: string, blob: Blob, c: 
  * and on a native shell the full-screen view takes the last place instead, because that runtime swallows
  * `<a download>` silently (#205).
  */
-export async function deliverCertificate(c: HTMLCanvasElement, filename: string): Promise<CertOutcome> {
+export async function deliverCertificate(c: HTMLCanvasElement, filename: string, mayShare: () => Promise<boolean> = () => Promise.resolve(false)): Promise<CertOutcome> {
   const blob = await new Promise<Blob | null>(res => c.toBlob(res, 'image/png'));
   if (!blob) throw new Error('certificate: could not encode PNG');
   const file = new File([blob], filename, { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  const canShareFiles = !!nav.canShare?.({ files: [file] });
+  const rawFiles = !!nav.canShare?.({ files: [file] });
   const claudeRuntime = !!(window as { claude?: unknown }).claude;
   const nativeShell = isNativeShell();
   const dl = claudeRuntime ? await claudeDownloads() : null;
-  const capacitorShare = nativeShell && hasCapacitorShare();
+  const { canShareFiles, capacitorShare } = await gatedShares({ files: rawFiles, capacitor: nativeShell && hasCapacitorShare() }, mayShare);
 
   // The one place `<a download>` is chosen, so the runtime that cannot honour it is ruled out in one
   // place too. A cancelled share used to step down past this check straight to `triggerDownload`.
@@ -310,7 +310,7 @@ export async function deliverCertificate(c: HTMLCanvasElement, filename: string)
   switch (certRoute({ canShareFiles, claudeSave: !!dl, claudeRuntime, nativeShell, capacitorShare })) {
     case 'share':
       try { await nav.share!({ files: [file], title: 'Sky Ninja Academy certificate' }); return 'shared'; }
-      catch { /* cancelled → step down to the next best route */ }
+      catch (e) { if ((e as { name?: string }).name !== 'AbortError') console.warn('certificate: share failed, saving instead', e); }   // a cancel steps down quietly
       if (dl) return saveViaClaude(dl, filename, blob, c);
       if (claudeRuntime) { showCertificateFullscreen(c); return 'shown'; }
       return lastResort();
