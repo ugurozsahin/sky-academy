@@ -30,7 +30,8 @@ describe('every outbound call is behind the grown-ups gate (#1943)', () => {
   it('the certificate offers a share sheet only after `mayShare`, and its default says no', () => {
     const src = readFileSync('src/ui/certificate.ts', 'utf8');
     expect(src).toMatch(/mayShare: \(\) => Promise<boolean> = \(\) => Promise\.resolve\(false\)/);
-    expect(src).toMatch(/files \|\| capacitor \? await mayShare\(\) : false/);
+    expect(src).toContain('await gatedShares(');
+    expect(readFileSync('src/ui/grown-up-gate.ts', 'utf8')).toMatch(/files \|\| capacitor \? await mayShare\(\) : false/);
   });
 
   it('each child-facing certificate button asks a grown-up first', () => {

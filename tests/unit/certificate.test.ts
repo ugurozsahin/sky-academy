@@ -7,6 +7,7 @@ import { STICKER_IDS, type SaveData } from '../../src/storage';
 import { DEFAULT } from '../../src/storage/shape';
 import { AVATARS } from '../../src/avatars';
 import type { StoredCert } from '../../src/storage';
+import { fakeCanvas, stubBrowser } from './helpers/cert-browser';
 
 const base = { name: 'Ada', avatar: AVATARS[0], year: 'Year 1', title: 'Number Bonds', stars: 3, score: 340, correct: 30, attempts: 30, date: new Date('2026-09-06T10:00:00Z') };
 
@@ -379,71 +380,6 @@ describe('native shell detection (#205)', () => {
  * There is no jsdom here (it is not a dependency and the unit run must stay browserless), so the globals
  * are stubbed the way `tests/unit/sim/harness.ts` does it, and restored in `afterEach`.
  */
-interface FakeEl { tagName: string; className: string; src: string; download?: string; href?: string; clicked: number; children: FakeEl[] }
-
-function stubBrowser(o: { capacitor?: unknown; canShareFiles?: boolean; shareRejects?: boolean; claude?: unknown } = {}) {
-  const created: FakeEl[] = [];
-  let shareCalls = 0;
-  const make = (tag: string): FakeEl => {
-    const e = {
-      tagName: tag, clicked: 0, children: [] as FakeEl[], className: '', alt: '', src: '', textContent: '',
-      setAttribute() {}, addEventListener() {}, removeEventListener() {}, remove() {},
-      append(...k: FakeEl[]) { e.children.push(...k); }, appendChild(k: FakeEl) { e.children.push(k); },
-      click() { e.clicked++; },
-    } as unknown as FakeEl;
-    created.push(e);
-    return e;
-  };
-  const g = globalThis as unknown as Record<string, unknown>;
-  const saved = {
-    window: g.window, document: g.document, Image: g.Image, URL: g.URL,
-    // `navigator` is an accessor on the Node global, so a plain assignment throws "has only a getter".
-    // It is put back by descriptor for the same reason — deleting it would not restore the real one.
-    navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
-  };
-  const body = make('body');
-  g.document = { createElement: make, querySelector: () => null, body };
-  g.window = { claude: o.claude, Capacitor: o.capacitor };
-  Object.defineProperty(globalThis, 'navigator', {
-    configurable: true,
-    value: {
-      canShare: () => !!o.canShareFiles,
-      share: () => (shareCalls++, o.shareRejects ? Promise.reject(new Error('cancelled')) : Promise.resolve()),
-    },
-  });
-  g.Image = function Image(this: FakeEl) { return make('img'); } as unknown as typeof globalThis.Image;
-  g.URL = { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} };
-  return {
-    created,
-    shareCalls: () => shareCalls,
-    /** Did anything actually get clicked as an `<a download>`? That is the swallowed no-op, made visible. */
-    downloadClicks: () => created.filter(e => e.tagName === 'a' && e.clicked > 0).length,
-    /**
-     * Did the child actually get shown the certificate?
-     *
-     * This used to be `body.children.length > 0`, which is *also* true on the download path, because
-     * `triggerDownload` appends its `<a>` to the body and the stub's `remove()` is a no-op. It happened
-     * to discriminate at its one call site by luck, so it could not carry the assertion below. Look for
-     * the thing it is named after instead: the `.cert-view` dialog, holding an image with a real src.
-     */
-    shownFullscreen: () => created.some(e =>
-      e.className === 'cert-view' && e.children.some(k => k.tagName === 'img' && !!k.src)),
-    restore() {
-      g.window = saved.window;
-      g.document = saved.document;
-      g.Image = saved.Image;
-      g.URL = saved.URL;
-      if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
-    },
-  };
-}
-
-/** A canvas stub with only what `deliverCertificate` and the full-screen view actually read back. */
-const fakeCanvas = () => ({
-  toBlob: (cb: (b: Blob | null) => void) => cb(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' })),
-  toDataURL: () => 'data:image/png;base64,AAA',
-}) as unknown as HTMLCanvasElement;
-
 const OPEN = () => Promise.resolve(true);   // a caller whose grown-ups gate lets the share through (#1943)
 
 describe('deliverCertificate, actually run (#205)', () => {
@@ -563,63 +499,5 @@ describe('reportText() — the progress picture (#943)', () => {
     const t = reportText({ ...info('Ada'), sm: { ...base, strongest: mk(6), weakest: mk(2) } });
     expect(t.going).toBe('T0, T1, T2, T3');
     expect(t.help).toBe('T0, T1');
-  });
-});
-
-describe('deliverCertificate keeps the share sheet behind the grown-ups gate (#1943)', () => {
-  let dom: ReturnType<typeof stubBrowser> | null = null;
-  afterEach(() => { dom?.restore(); dom = null; });
-  const capacitorShare = (shared: unknown[]) => ({
-    isNativePlatform: () => true,
-    Plugins: {
-      Filesystem: { writeFile: () => Promise.resolve({ uri: 'file:///cache/cert.png' }) },
-      Share: { share: (o: unknown) => { shared.push(o); return Promise.resolve(); } },
-    },
-  });
-
-  it('a caller that passes no gate never reaches Web Share', async () => {
-    dom = stubBrowser({ canShareFiles: true });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
-    expect(dom.shareCalls(), 'the child must not reach the system share sheet').toBe(0);
-    expect(how).toBe('downloaded');
-  });
-
-  it('a caller that passes no gate never reaches the Capacitor share sheet', async () => {
-    const shared: unknown[] = [];
-    dom = stubBrowser({ capacitor: capacitorShare(shared) });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
-    expect(shared, 'the Android share sheet is the other way out of the app').toEqual([]);
-    expect(how, 'the child still gets the certificate').toBe('shown');
-    expect(dom.shownFullscreen()).toBe(true);
-  });
-
-  it('a gate that says no steps down to save, and says nothing of sharing', async () => {
-    dom = stubBrowser({ canShareFiles: true });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png', () => Promise.resolve(false));
-    expect(dom.shareCalls()).toBe(0);
-    expect(how).toBe('downloaded');
-  });
-
-  it('a gate that says yes shares, and is asked once', async () => {
-    dom = stubBrowser({ canShareFiles: true });
-    let asked = 0;
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png', () => (asked++, Promise.resolve(true)));
-    expect(how).toBe('shared');
-    expect(dom.shareCalls()).toBe(1);
-    expect(asked).toBe(1);
-  });
-
-  it('the gate is not asked where there is no share sheet to protect', async () => {
-    dom = stubBrowser({});
-    let asked = 0;
-    await deliverCertificate(fakeCanvas(), 'cert.png', () => (asked++, Promise.resolve(true)));
-    expect(asked, 'a plain download needs no grown-up').toBe(0);
-  });
-
-  it('the Capacitor share sheet opens once the gate says yes', async () => {
-    const shared: unknown[] = [];
-    dom = stubBrowser({ capacitor: capacitorShare(shared) });
-    expect(await deliverCertificate(fakeCanvas(), 'cert.png', OPEN)).toBe('shared');
-    expect(shared).toHaveLength(1);
   });
 });

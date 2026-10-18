@@ -1,7 +1,7 @@
 // Mission certificate: a printable PNG (landscape, 1200×850) drawn on an offscreen canvas, then shared
 // (Web Share with files, e.g. iOS/Android) or downloaded. No DOM beyond the canvas; text is built by a pure helper.
 import { avatarById, type Avatar } from '../avatars';
-import { esc } from './dom';
+import { esc } from './dom'; import { gatedShares } from './grown-up-gate';   // #1943; one line: at its #714 cap
 import { isNativeShell, plugin } from '../native';
 import type { StoredCert } from '../storage';
 import { certKind } from './cert-kind';
@@ -281,16 +281,6 @@ async function saveViaClaude(dl: DownloadsApi, filename: string, blob: Blob, c: 
     if ((e as { code?: string })?.code === 'declined') return 'declined';   // the grown-up said no — a friendly toast, no error
     showCertificateFullscreen(c); return 'shown';                            // any other downloads error → the child can still save from the full-screen view
   }
-}
-
-/**
- * #1943: a system share sheet reaches other apps, so Kids Category wants a parental gate in front of it. It is offered
- * only when the caller's gate lets it through, and the default says no, so a caller that forgets the gate cannot
- * share. Asked once, and only when a share sheet exists at all. Save, view and download are never gated.
- */
-async function gatedShares(files: boolean, capacitor: boolean, mayShare: () => Promise<boolean>): Promise<{ canShareFiles: boolean; capacitorShare: boolean }> {
-  const ok = files || capacitor ? await mayShare() : false;
-  return { canShareFiles: files && ok, capacitorShare: capacitor && ok };
 }
 
 /**

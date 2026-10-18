@@ -8,9 +8,8 @@ import { duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadl
 import { scaled } from '../game/speed';
 import { saveKept, recordAccuracy, recordCert, recordDuel, recordGameEnd, touchStreak, type GameEndOutcome } from '../storage';
 import { certToStored, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
-import { askGrownUp } from './grown-up-gate';
 import { say, sfx } from '../audio';
-import { $, esc } from './dom';
+import { $, esc } from './dom'; import { askGrownUp } from './grown-up-gate';   // #1943; one line: at its #714 cap
 import { dojoRowsHTML } from './memory';
 import { stickersHTML, type screenScope } from './screen';
 import type { DuelScreenOpts } from './duel';

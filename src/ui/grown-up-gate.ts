@@ -29,3 +29,13 @@ export function askGrownUp(what: string): Promise<boolean> {
     show(); document.body.appendChild(wrap); input.focus();
   });
 }
+
+/**
+ * #1943: a system share sheet reaches other apps, so Kids Category wants a parental gate in front of it. It is offered
+ * only when the caller's gate lets it through, and the default says no, so a caller that forgets the gate cannot
+ * share. Asked once, and only when a share sheet exists at all. Save, view and download are never gated.
+ */
+export async function gatedShares(files: boolean, capacitor: boolean, mayShare: () => Promise<boolean>): Promise<{ canShareFiles: boolean; capacitorShare: boolean }> {
+  const ok = files || capacitor ? await mayShare() : false;
+  return { canShareFiles: files && ok, capacitorShare: capacitor && ok };
+}
