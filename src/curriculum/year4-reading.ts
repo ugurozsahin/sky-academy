@@ -1,4 +1,4 @@
-// Year 4 reading strand (#1069). Each slot below is a future PR's own ticket; y4-context has landed (#1131).
+// Year 4 reading strand (#1069). y4-context (#1131) and y4-retrieve (#1130) have landed.
 import type { Topic } from './types';
 import { y4Context } from './year4-context';
 import { y4Retrieve } from './stories-y4';

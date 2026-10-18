@@ -25,8 +25,8 @@ export const Y4_NONFICTION: StoryItem[] = [
   lit(2, VOLCANO, 'Which ocean has many volcanoes around it?', 'Pacific', ['Atlantic', 'Indian'], 'around the Pacific Ocean'),
   lit(3, VOLCANO, 'On which part of a volcano is the hole?', 'top', ['base', 'side'], 'hole at the top'),
   lit(1, WATER, 'What heats the sea?', 'sun', ['moon', 'wind'], 'The sun heats the sea'),
-  lit(2, WATER, 'What does the vapour form when it cools?', 'clouds', ['snow', 'fog'], 'forms clouds'),
-  lit(3, WATER, 'What comes down after the clouds form?', 'rain', ['snow', 'hail'], 'Then rain falls'),
+  lit(2, WATER, 'What does the vapour form when it cools?', 'clouds', ['dust', 'sand'], 'forms clouds'),
+  lit(3, WATER, 'What comes down after the clouds form?', 'rain', ['leaves', 'stars'], 'Then rain falls'),
   lit(1, TEETH, 'Which teeth bite food?', 'sharp', ['flat', 'small'], 'Sharp teeth at the front bite food'),
   lit(2, TEETH, 'How many baby teeth do children have?', 'twenty', ['ten', 'thirty'], 'twenty baby teeth'),
   lit(3, TEETH, 'Which teeth do the chewing?', 'flat', ['sharp', 'loose'], 'Flat teeth at the back chew it'),
@@ -47,7 +47,7 @@ export const Y4_NONFICTION: StoryItem[] = [
   lit(3, CAMEL, 'What can camels go without for many days?', 'drink', ['sleep', 'air'], 'without a drink'),
   lit(1, THAMES, 'Which river flows through London?', 'Thames', ['Severn', 'Trent'], 'The River Thames flows through London'),
   lit(2, THAMES, 'Which sea does the Thames run into?', 'North', ['Irish', 'Black'], 'into the North Sea'),
-  lit(3, THAMES, 'What do boats carry along the river?', 'people', ['sheep', 'pirates'], 'Boats carry people'),
+  lit(3, THAMES, 'Who do boats carry along the river?', 'people', ['pirates', 'knights'], 'Boats carry people'),
 ];
 
 export const y4Retrieve = storyGen(Y4_NONFICTION);
