@@ -54,7 +54,8 @@ export function iconPage(src, size, maskable) {
 }
 
 /**
- * Every icon the manifest declares, and how each is drawn. Keep this and the manifest in step (a rail does).
+ * Every icon the manifest declares, and how each is drawn. Keep this and the manifest in step: the rail is
+ * `tests/unit/pwa-icons.test.ts`, which matches this list to `manifest.icons` by file, size and purpose (#630).
  *
  * The three the manifest points at are `.webp`, and that is a size decision with a real number behind it: as
  * lossless PNGs the four came to 733 KB, against a `dist/` that was 1.26 MB — a 58% heavier first install,
@@ -73,6 +74,39 @@ export const ICONS = [
 
 /** Quality for the WebP re-encode. 0.92 is visually lossless on flat art at these sizes and ~6× smaller. */
 export const WEBP_QUALITY = 0.92;
+
+/**
+ * Pixel size and format straight out of a PNG's IHDR or a WebP's header (VP8X, lossy VP8, lossless VP8L): the
+ * three forms `canvas.toDataURL('image/webp')` can emit, which one depends on whether the source has alpha.
+ * `w`/`h` are 0 for anything unrecognised.
+ */
+export function imageSize(b) {
+  const tag = (from, to) => b.subarray(from, to).toString('latin1');
+  if (tag(1, 4) === 'PNG') return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), kind: 'image/png' };
+  if (tag(0, 4) !== 'RIFF' || tag(8, 12) !== 'WEBP') return { w: 0, h: 0, kind: 'unknown' };
+  const kind = 'image/webp';
+  const le24 = (at) => b[at] | (b[at + 1] << 8) | (b[at + 2] << 16);
+  switch (tag(12, 16)) {
+    case 'VP8X': return { w: 1 + le24(24), h: 1 + le24(27), kind };
+    case 'VP8 ': return { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff, kind };
+    case 'VP8L': { const bits = b.readUInt32LE(21); return { w: (bits & 0x3fff) + 1, h: ((bits >> 14) & 0x3fff) + 1, kind }; }
+    default: return { w: 0, h: 0, kind };
+  }
+}
+
+/**
+ * Returns `bytes` if they really are a `size`x`size` image of the format `file`'s extension claims, else
+ * throws (#630). The size the generator prints used to be echoed from the request: `deviceScaleFactor: 2`
+ * wrote 384px, 1024px, 1024px and 360px files and still reported 192, 512, 512 and 180.
+ */
+export function checkedBytes(file, size, bytes) {
+  const { w, h, kind } = imageSize(bytes);
+  const want = file.endsWith('.webp') ? 'image/webp' : 'image/png';
+  if (kind !== want || w !== size || h !== size) {
+    throw new Error(`${file}: expected ${size}x${size} ${want}, produced ${w}x${h} ${kind}`);
+  }
+  return bytes;
+}
 
 /** Re-encode a PNG screenshot as WebP, 1:1, in the page that produced it. */
 async function toWebp(page, png, quality = WEBP_QUALITY) {
@@ -120,7 +154,7 @@ async function main() {
       // out again in arithmetic, and then the icon would only match the game's CSS for as long as two
       // separate pieces of code agreed. This way the pixels are the ones the browser laid out.
       const bytes = file.endsWith('.webp') ? await toWebp(page, png) : png;
-      writeFileSync(fileURLToPath(new URL(file, out)), bytes);
+      writeFileSync(fileURLToPath(new URL(file, out)), checkedBytes(file, size, bytes));
       await page.close();
       console.log(`wrote public/icons/${file} (${size}px${maskable ? ', maskable' : ''}) from ${id}`);
     }
