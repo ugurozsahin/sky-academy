@@ -28,7 +28,7 @@ function round(x: number, whole: boolean): Dec {
 }
 const value = (d: Dec) => d.v / 10 ** d.dp;
 
-/** The first three decoys from the named slips that are ≥ 40 % from `exact`, nonzero once rounded and distinct. */
+/** The first three decoys from the named slips that are ≥ 40 % from `exact`, within 100× either way of it (#1902), nonzero once rounded and distinct. */
 function decoys(source: number, answer: Dec, exact: number, whole: boolean, forward: boolean, f: number, others: number[]): string[] {
   const op = (x: number, y: number) => forward ? x * y : x / y;
   const inverse = (x: number, y: number) => forward ? x / y : x * y;
@@ -36,7 +36,7 @@ function decoys(source: number, answer: Dec, exact: number, whole: boolean, forw
   const out: string[] = [], seen = new Set([fmt(answer)]);
   for (const c of named) {
     const d = round(c, whole), s = fmt(d), v = value(d);
-    if (out.length < 3 && d.v !== 0 && !seen.has(s) && Math.abs(v - exact) >= 0.4 * exact) { out.push(s); seen.add(s); }
+    if (out.length < 3 && d.v !== 0 && !seen.has(s) && Math.abs(v - exact) >= 0.4 * exact && v <= 100 * exact && v >= exact / 100) { out.push(s); seen.add(s); }
   }
   return out;
 }
