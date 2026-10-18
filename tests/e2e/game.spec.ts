@@ -3435,6 +3435,18 @@ test.describe('Sky Ninja Academy', () => {
     });
   }
 
+  // #1983: the tutorial's hand and bubble loop forever (`infinite`), so they are the loops reduced motion most
+  // needs to stop. Both share `.tut-*` at the list's own (0,1,0) specificity; nothing overrides them.
+  for (const [reduced, want] of [[true, ['none', 'none']], [false, ['tutHand', 'tutPop']]] as const) {
+    test(`guard rail: the tutorial's hand and bubble ${reduced ? 'stop under' : 'still loop without'} reduced motion (#1983)`, async ({ page }) => {
+      if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
+      await seedPlayer(page);                                       // a fresh save: tutorialSeen is false, so the overlay is rendered
+      await startTopic(page, 'year1', 'y1-add');
+      await expect(page.locator('.tut-hand')).toBeAttached();       // attached, not visible: the overlay may be hidden, its computed animation still reads
+      expect(await page.evaluate(() => ['.tut-hand', '.tut-bubble'].map(s => getComputedStyle(document.querySelector(s)!).animationName))).toEqual(want);
+    });
+  }
+
   // #32: the suite runs at 8× (the beforeEach above), which compresses the outcome holds. This one test forces
   // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
   // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a
