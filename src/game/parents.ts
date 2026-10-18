@@ -222,7 +222,7 @@ export function progressText(sm: ParentSummary, name: string, now: Date = new Da
     ? `This week: ${w.days}/7 days played, ${w.questions} questions${w.accuracy === null ? '' : `, ${pct(w.accuracy)}% right`}.`
     : 'This week: no play yet.';
   return [
-    `Sky Ninja Academy — progress for ${who}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`,
+    `Sharpwise — progress for ${who}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`,
     week,
     `Stars: ${sm.years.map(y => `${y.title} ${y.stars}/${y.maxStars}`).join(' · ')} (${sm.starsEarned}/${sm.starsMax} in all)`,
     `Going well: ${sm.strongest.length ? titles(sm.strongest) : 'not enough play yet'}`,
