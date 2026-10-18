@@ -91,23 +91,34 @@ function fracWord(n: number, d: number): string {
 
 /** cm²/m²/km/mm/mg are not in `UNIT_WORD` (util.ts:211); everything else — cm, m, g, ml, kg, l — is. */
 const EXTRA_UNIT_WORD: Record<string, string> = {
-  'cm²': 'square centimetres', 'm²': 'square metres', km: 'kilometres', mm: 'millimetres', mg: 'milligrams',
+  'cm²': 'square centimetres', 'm²': 'square metres', 'km²': 'square kilometres', 'mm²': 'square millimetres',
+  'cm³': 'cubic centimetres', 'm³': 'cubic metres', km: 'kilometres', mm: 'millimetres', mg: 'milligrams',
+  'km/h': 'kilometres per hour', 'm/s': 'metres per second',
 };
 const unitWord = (u: string): string => EXTRA_UNIT_WORD[u] ?? UNIT_WORD[u] ?? u;
 // A multi-letter unit code is unambiguous wherever it stands alone (no ordinary KS2 word is exactly "kg"
 // or "cm²"), so it is always notation. "m"/"g"/"l" alone are also real algebra variables, so they only
 // count as notation immediately after a digit — see `singleLetterUnitOK`.
-const MULTI_LETTER_UNITS = new Set(['cm²', 'm²', 'km', 'mm', 'ml', 'mg', 'kg', 'cm']);
+const MULTI_LETTER_UNITS = new Set(['cm²', 'm²', 'km²', 'mm²', 'cm³', 'm³', 'km', 'mm', 'ml', 'mg', 'kg', 'cm']);
 const SINGLE_LETTER_UNITS = new Set(['m', 'g', 'l']);
 const singleLetterUnitOK = (text: string, start: number): boolean => /[0-9] ?$/.test(text.slice(0, start));
 
-type TokKind = 'text' | 'digit' | 'dimension' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'unit' | 'roman';
+export type TokKind = 'text' | 'digit' | 'dimension' | 'compound' | 'power' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'money' | 'malformed' | 'unit' | 'roman';
 /** Numerals the caller declares (whole canonical numerals only — see the header). */
 export interface Ks2SayOpts { readonly roman?: readonly string[]; }
-interface Tok { readonly kind: TokKind; readonly start: number; readonly end: number; readonly raw: string; readonly spoken: string; }
-// Everything but plain prose and a bare digit run (out of scope on its own — "347 + 128 = ?" is meant to
-// stay "347") is a span `ks2Say` must render and `sayIsSafe` must never find un-rendered.
-const NOTATION: ReadonlySet<TokKind> = new Set(['dimension', 'mixedFraction', 'fraction', 'time', 'decimal', 'unit']);
+export interface Tok { readonly kind: TokKind; readonly start: number; readonly end: number; readonly raw: string; readonly spoken: string; }
+// What is *not* notation: plain prose, a bare digit run (out of scope on its own — "347 + 128 = ?" is meant to
+// stay "347"), a declared Roman numeral, and the idioms `ks2Say` rewrites but a raw author may still write:
+// "3-digit", a price ("£3.50" — speech engines read a pound sign right, so it is converted, never refused), and
+// "5²" (`sayIsSafe` catches that one through its `²` backstop). Every other kind is a span
+// `ks2Say` must render and `sayIsSafe` must never find un-rendered. The table is a `Record<TokKind, boolean>`, so
+// a kind added to `TokKind` does not compile until someone has decided which side it is on (#1465: the set used
+// to be a list of the prose kinds and could drift).
+const IS_NOTATION: Record<TokKind, boolean> = {
+  text: false, digit: false, roman: false, compound: false, power: false, money: false,
+  dimension: true, mixedFraction: true, fraction: true, time: true, decimal: true, malformed: true, unit: true,
+};
+export const NOTATION = (k: TokKind): boolean => IS_NOTATION[k];
 
 const romanTok = (raw: string, start: number): Tok =>
   ({ kind: 'roman', start, end: start + raw.length, raw, spoken: `Roman numeral ${[...raw].join(', ')}` });
@@ -133,7 +144,7 @@ function decomposeUnits(s: string): string[] | null {
 // `raw` keeps whatever case the input used (so the token's span still matches the source text exactly);
 // the word lookup always runs on the lower-cased form, since `unitWord`'s tables are lower-case keyed and
 // a capitalised unit code ("KG", "5 CM") is ordinary label text, not a different unit (PR #1430 round 7).
-const unitTok = (raw: string, start: number): Tok => ({ kind: 'unit', start, end: start + raw.length, raw, spoken: unitWord(raw.toLowerCase()) });
+const unitTok = (raw: string, start: number, code = raw.toLowerCase()): Tok => ({ kind: 'unit', start, end: start + raw.length, raw, spoken: unitWord(code) });
 
 /** A run of 2+ unit codes glued together with nothing else ("kgcm", "5kgcm") — PR #1430 round 8: this used
  *  to fall through to `text` and round-trip completely unconverted and unflagged. A single matched code
@@ -172,55 +183,117 @@ function classifyLetterRun(run: string, start: number, text: string, roman: Read
   if (MULTI_LETTER_UNITS.has(lower) || (SINGLE_LETTER_UNITS.has(lower) && singleLetterUnitOK(text, start))) {
     return [unitTok(run, start)];
   }
-  return gluedRoman(run, start, roman) ?? bareUnitChain(run, start)
+  // "5kgs", "20cms": a plural written with a trailing s is the same unit (#1465). Three letters or more, so a
+  // two-letter run like "ms" is never read as "m" plus an s.
+  if (lower.length > 2 && lower.endsWith('s') && MULTI_LETTER_UNITS.has(lower.slice(0, -1))) return [unitTok(run, start, lower.slice(0, -1))];
+  // A bare chain of codes is only a chain when it is written in lower case: "Mmm, nice" is a sentence, not
+  // millimetres and metres (#1465); a capitalised code beside a digit still converts, above.
+  return gluedRoman(run, start, roman) ?? (run === lower ? bareUnitChain(run, start) : null)
     ?? [{ kind: 'text', start, end: start + run.length, raw: run, spoken: run }];
 }
 
+/** "£3.50" -> "three pounds fifty"; "£0.05" -> "five pence"; "£1" -> "one pound". `frac` is the digits after the point. */
+function moneyWords(pounds: number, frac: string | undefined): string {
+  const pence = frac === undefined ? 0 : Number(frac.padEnd(2, '0'));
+  const p = pounds === 1 ? 'pound' : 'pounds';
+  if (pounds === 0 && pence > 0) return `${cardinal(pence)} ${pence === 1 ? 'penny' : 'pence'}`;
+  return pence === 0 ? `${cardinal(pounds)} ${p}` : `${cardinal(pounds)} ${p} ${cardinal(pence)}`;
+}
+
+/** A clock time. 24-hour unless `suffix` ("am"/"pm") says otherwise: "14:05" -> "fourteen oh five", "00:07" ->
+ *  "seven minutes past midnight", "24:00" -> "midnight", "1:30pm" -> "one thirty p m". */
+function timeWords(h: number, mm: number, suffix: string | undefined): string {
+  const oh = mm < 10 ? `oh ${cardinal(mm)}` : cardinal(mm);
+  if (suffix) return `${cardinal(h)} ${mm === 0 ? "o'clock" : oh} ${suffix[0]} m`;
+  if (h === 24 || (h === 0 && mm === 0)) return 'midnight';
+  if (h === 0) return `${cardinal(mm)} minute${mm === 1 ? '' : 's'} past midnight`;
+  return mm === 0 ? `${cardinal(h)} hundred hours` : `${cardinal(h)} ${oh}`;
+}
+
+/** What a rule finds at the front of the remaining text: the span's kind, its source text and how it is spoken. */
+interface Hit { readonly kind: TokKind; readonly raw: string; readonly spoken: string }
+/** A notation rule: `rest` is the text from the scan position, `before` everything ahead of it. */
+type Rule = (rest: string, before: string) => Hit | null;
+const hit = (kind: TokKind, m: RegExpMatchArray, spoken: string): Hit => ({ kind, raw: m[0], spoken });
+const afterDigit = (before: string): boolean => /[0-9] ?$/.test(before);
+
+// The National Curriculum's "2-D"/"3-D shape" idiom: read as "the digit, then the letter D", never as
+// subtraction (`symSay`'s own hyphen-to-"minus" rule would otherwise split the digit from its D).
+const dimensionRule: Rule = rest => { const m = rest.match(/^(\d+)-([Dd])\b/); return m && hit('dimension', m, `${m[1]} ${m[2]}`); };
+// "3-digit", "5-minute": a digit joined to a lower-case word is a compound modifier, never subtraction (#1465).
+// A run that is only unit codes ("5-cm") is left to the unit rules; a capitalised name ("10-Diego") is not a modifier.
+const compoundRule: Rule = rest => {
+  const m = rest.match(/^(\d+)-([a-z]{2,})\b/);
+  return m && !decomposeUnits(m[2]) ? hit('compound', m, `${m[1]} ${m[2]}`) : null;
+};
+// Money: "£3.50" is three pounds fifty, never "three point five zero".
+const moneyRule: Rule = rest => {
+  const m = rest.match(/^£(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?(?![\d]|\.\d)/);
+  return m && hit('money', m, moneyWords(Number(m[1].replace(/,/g, '')), m[2]));
+};
+// Shapes that look like notation but are not any: "1.5.2", "3/4.5", "£3.505" (more than two decimal places is
+// no price). Left raw, so `sayIsSafe` fails them.
+const malformedRule: Rule = rest => {
+  // "4/ 3" and "4 /3": a slash spaced on one side only is neither a tight fraction nor a division.
+  const m = rest.match(/^(?:\d+(?:\.\d+){2,}|\d+\s*\/\s*\d+\.\d|£\d+\.\d{3,}|\d+ \/(?! )\d|\d+\/ \d)/);
+  return m && hit('malformed', m, m[0]);
+};
+// A denominator of 0 or 1 is no spoken fraction ("one first", "one zeroth") and stays raw.
+const mixedRule: Rule = rest => {
+  const m = rest.match(/^(\d+) (\d+)\s*\/\s*(\d+)/);
+  return m && hit('mixedFraction', m, Number(m[3]) <= 1 ? m[0] : `${cardinal(Number(m[1]))} and ${fracWord(Number(m[2]), Number(m[3]))}`);
+};
+// A slash with space either side after a number that is not smaller than what follows is division ("12 / 3 =
+// ?"), not a fraction; an improper fraction is written tight ("7/4").
+const fractionRule: Rule = rest => {
+  const m = rest.match(/^(\d+)(\s*)\/(\s*)(\d+)/);
+  if (!m || ((m[2] || m[3]) && Number(m[1]) >= Number(m[4]))) return null;
+  return hit('fraction', m, Number(m[4]) <= 1 ? m[0] : fracWord(Number(m[1]), Number(m[4])));
+};
+const timeRule: Rule = rest => {
+  const m = rest.match(/^(24(?=\s*:\s*00(?!\d))|[01]?\d|2[0-3])\s*:\s*([0-5]\d)(?:\s?([ap]m)\b|\b)/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  return m[3] && (h < 1 || h > 12) ? hit('malformed', m, m[0]) : hit('time', m, timeWords(h, Number(m[2]), m[3]));
+};
+const decimalRule: Rule = rest => {
+  const m = rest.match(/^(\d{1,3}(?:,\d{3})+)\.(\d+)/) ?? rest.match(/^(\d+)\.(\d+)/);
+  return m && hit('decimal', m, `${cardinal(Number(m[1].replace(/,/g, '')))} point ${[...m[2]].map(c => cardinal(Number(c))).join(' ')}`);
+};
+// Speed: "km/h" is a unit wherever it stands; "m/s" only after a digit, as a single "m" is.
+const speedRule: Rule = (rest, before) => {
+  const m = rest.match(/^km\/h\b/) ?? (afterDigit(before) ? rest.match(/^m\/s\b/) : null);
+  return m && hit('unit', m, EXTRA_UNIT_WORD[m[0]]);
+};
+// "5 m2", "9 cm3" typed without the superscript, straight after a digit.
+const asciiPowerRule: Rule = (rest, before) => {
+  const m = afterDigit(before) ? rest.match(/^(cm|km|mm|m)([23])(?![0-9])/) : null;
+  return m && hit('unit', m, unitWord(`${m[1]}${m[2] === '2' ? '²' : '³'}`));
+};
+const powerRule: Rule = rest => { const m = rest.match(/^(\d+)([²³])/); return m && hit('power', m, `${m[1]} ${m[2] === '²' ? 'squared' : 'cubed'}`); };
+// Order matters: the first rule that matches claims the span. `malformedRule` goes before `decimalRule`, which would
+// otherwise take the "1.5" of "1.5.2" and leave ".2" behind; the dimension and compound idioms go first because a
+// digit and a hyphen are all they need. The tokenize tests pin the pairs that depend on it.
+const RULES: readonly Rule[] = [dimensionRule, compoundRule, moneyRule, malformedRule, mixedRule, fractionRule, timeRule,
+  decimalRule, speedRule, asciiPowerRule, powerRule];
+
 /** One left-to-right scan claiming the longest notation match at each position; everything else is a
- *  digit run (kept bare — plain numerals are out of this module's scope) or one plain character. */
-function tokenize(text: string, roman: ReadonlySet<string> = new Set()): Tok[] {
+ *  digit run (kept bare — plain numerals are out of this module's scope) or one plain character.
+ *  Exported for the tests only (the tiling and rule-order checks); callers use `ks2Say` and `sayIsSafe`. */
+export function tokenize(text: string, roman: ReadonlySet<string> = new Set()): Tok[] {
   const toks: Tok[] = [];
   let i = 0;
   while (i < text.length) {
-    const rest = text.slice(i);
-    let m: RegExpMatchArray | null;
-    // The National Curriculum's "2-D"/"3-D shape" idiom: read as "the digit, then the letter D", never as
-    // subtraction (`symSay`'s own hyphen-to-"minus" rule would otherwise split the digit from its D).
-    if ((m = rest.match(/^(\d+)-([Dd])\b/))) {
-      toks.push({ kind: 'dimension', start: i, end: i + m[0].length, raw: m[0], spoken: `${m[1]} ${m[2]}` });
-      i += m[0].length; continue;
-    }
-    if ((m = rest.match(/^(\d+) (\d+)\s*\/\s*(\d+)/))) {
-      const spoken = `${cardinal(Number(m[1]))} and ${fracWord(Number(m[2]), Number(m[3]))}`;
-      toks.push({ kind: 'mixedFraction', start: i, end: i + m[0].length, raw: m[0], spoken });
-      i += m[0].length; continue;
-    }
-    if ((m = rest.match(/^(\d+)\s*\/\s*(\d+)/))) {
-      toks.push({ kind: 'fraction', start: i, end: i + m[0].length, raw: m[0], spoken: fracWord(Number(m[1]), Number(m[2])) });
-      i += m[0].length; continue;
-    }
-    if ((m = rest.match(/^([01]?\d|2[0-3])\s*:\s*([0-5]\d)\b/))) {
-      const mm = Number(m[2]);
-      const spoken = mm === 0 ? `${cardinal(Number(m[1]))} hundred hours`
-        : `${cardinal(Number(m[1]))} ${mm < 10 ? `oh ${cardinal(mm)}` : cardinal(mm)}`;
-      toks.push({ kind: 'time', start: i, end: i + m[0].length, raw: m[0], spoken });
-      i += m[0].length; continue;
-    }
-    if ((m = rest.match(/^(\d+)\.(\d+)/))) {
-      const spoken = `${cardinal(Number(m[1]))} point ${[...m[2]].map(c => cardinal(Number(c))).join(' ')}`;
-      toks.push({ kind: 'decimal', start: i, end: i + m[0].length, raw: m[0], spoken });
-      i += m[0].length; continue;
-    }
-    if ((m = rest.match(/^[a-zA-Z]+²?/))) {
-      for (const tok of classifyLetterRun(m[0], i, text, roman)) toks.push(tok);
-      i += m[0].length; continue;
-    }
-    if ((m = rest.match(/^\d+/))) {
-      toks.push({ kind: 'digit', start: i, end: i + m[0].length, raw: m[0], spoken: m[0] });
-      i += m[0].length; continue;
-    }
-    toks.push({ kind: 'text', start: i, end: i + 1, raw: text[i], spoken: text[i] });
-    i += 1;
+    const rest = text.slice(i), before = text.slice(0, i);
+    let found: Hit | null = null;
+    for (const rule of RULES) { found = rule(rest, before); if (found) break; }
+    const letters = found ? null : rest.match(/^[a-zA-Z]+[²³]?/);
+    if (found) { toks.push({ ...found, start: i, end: i + found.raw.length }); i += found.raw.length; continue; }
+    if (letters) { toks.push(...classifyLetterRun(letters[0], i, text, roman)); i += letters[0].length; continue; }
+    const digits = rest.match(/^\d+/);
+    const raw = digits ? digits[0] : text[i];
+    toks.push({ kind: digits ? 'digit' : 'text', start: i, end: i + raw.length, raw, spoken: raw });
+    i += raw.length;
   }
   return toks;
 }
@@ -229,6 +302,13 @@ function tokenize(text: string, roman: ReadonlySet<string> = new Set()): Tok[] {
  * Turns KS2 notation in `text` into words: a unit code, a mixed or plain fraction, a 24-hour time, a
  * decimal (read digit by digit after the point), and the NC "N-D shape" idiom. `symSay`'s operator words
  * then run over what is left. A numeral is spoken as letters only when the caller declares it in `opts.roman` (see the header).
+ *
+ * Also spoken (#1465): a price ("£3.50" -> "three pounds fifty"), a comma-grouped decimal, cubic and area units,
+ * "km/h" and "m/s", a unit written plural or without its superscript ("5kgs", "5 m2"), "5²", a lone "1" before a
+ * unit (singular), a spaced division slash, a time range, "00:07" and "24:00" (midnight), a 12-hour "1:30pm", a
+ * lower-case "3-digit" compound, and `>` / `<`. **Refused, by being left raw so `sayIsSafe` says no:** a
+ * denominator of 0 or 1, a malformed number ("1.5.2", "3/4.5", "£3.505"), a time that is not one ("25:10",
+ * "7:5", a ratio like "3:4"), and a single-letter unit with no unit across an "=" ("2 m = 6" is an equation in m).
  *
  * Two tokens glued together with nothing between them in the input always get exactly one space between
  * their spoken forms in the output, whichever one (or both) was notation — "5kg3cm", every unit but the
@@ -255,6 +335,33 @@ function normalizeWs(text: string): string {
   return text.replace(/\s+/g, ' ');
 }
 
+/** The unit for exactly one of it: "kilograms" -> "kilogram" (#1465). */
+const singular = (spoken: string): string => spoken.replace(/(metre|gram|litre)s\b/, '$1');
+
+/** A unit spoken for exactly one of it ("1 kilograms" -> "1 kilogram"); a fraction right before it makes it "of a
+ *  metre" ("3/4 m" -> "three quarters of a metre"); and a single-letter unit that is the only unit in a sentence
+ *  with an "=" in it is left raw, because "2 m = 6" and "3m + 1 = 7" are equations in m and `sayIsSafe` should
+ *  refuse them (while "3 m = ? cm" and "5 m + 3 m = 8 m" are still measurements, there being another unit). */
+function unitSpoken(toks: readonly Tok[], idx: number, norm: string): string {
+  const tok = toks[idx], prev = toks[idx - 1];
+  if (tok.raw.length === 1 && norm.includes('=') && toks.filter(t => t.kind === 'unit').length === 1) return tok.raw;
+  const before = prev?.raw === ' ' ? toks[idx - 2] : prev;
+  if (before?.kind === 'fraction') return `of a ${singular(tok.spoken)}`;
+  return before?.kind === 'digit' && before.raw === '1' ? singular(tok.spoken) : tok.spoken;
+}
+
+/** Plain text: a spaced slash is "divided by", a hyphen between two times is "to", `>` and `<` are spoken, the rest goes through `symSay`. */
+function textSpoken(toks: readonly Tok[], idx: number, norm: string): string {
+  const tok = toks[idx];
+  if (tok.raw === '/' && norm[tok.start - 1] === ' ' && norm[tok.end] === ' ') return 'divided by';
+  if ((tok.raw === '-' || tok.raw === '–') && toks[idx - 1]?.kind === 'time' && toks[idx + 1]?.kind === 'time') return 'to';
+  if (tok.raw === '>' || tok.raw === '<') return tok.raw === '>' ? 'greater than' : 'less than';
+  return tok.raw.trim() !== '' ? symSay(tok.raw) : tok.spoken;
+}
+
+const spokenIn = (toks: readonly Tok[], idx: number, norm: string): string =>
+  toks[idx].kind === 'unit' ? unitSpoken(toks, idx, norm) : toks[idx].kind === 'text' ? textSpoken(toks, idx, norm) : toks[idx].spoken;
+
 export function ks2Say(text: string, opts: Ks2SayOpts = {}): string {
   const norm = normalizeWs(text);
   // Only canonical numerals count: a declaration that is not one ("IIII", "Xavier") is ignored, not trusted.
@@ -262,17 +369,17 @@ export function ks2Say(text: string, opts: Ks2SayOpts = {}): string {
   const toks = tokenize(norm, roman);
   let out = '';
   let prevSpoken = '';
-  for (const tok of toks) {
+  toks.forEach((_tok, idx) => {
     // `symSay` runs per plain-text span, never over a notation span's own rendering — otherwise its
     // hyphen-to-"minus" rule would mangle a hyphen `ks2Say` itself just wrote ("twenty-three").
-    const spoken = tok.kind === 'text' && tok.raw.trim() !== '' ? symSay(tok.raw) : tok.spoken;
+    const spoken = spokenIn(toks, idx, norm);
     // Two spans glued with nothing between them in the input get exactly one space if joining their
     // rendered forms directly would run two words/numbers together — never for ordinary trailing
     // punctuation ("5 kg," needs no space before the comma just because "kg" became "kilograms").
     if (prevSpoken && /[a-zA-Z0-9]$/.test(prevSpoken) && /^[a-zA-Z0-9]/.test(spoken)) out += ' ';
     out += spoken;
     prevSpoken = spoken;
-  }
+  });
   // `symSay` can still introduce its own irregular spacing (a word substitution padded on either side), so
   // this stays as a defensive second pass — `norm` above is what classification reads, not a promise about
   // what every spoken substitution produces.
@@ -287,10 +394,10 @@ export function ks2Say(text: string, opts: Ks2SayOpts = {}): string {
  */
 export function sayIsSafe(text: string): boolean {
   const norm = normalizeWs(text);
-  if (norm.includes('²')) return false;
+  if (norm.includes('²') || norm.includes('³')) return false;
   if (/\d ?: ?\d/.test(norm)) return false; // a colon with a digit on both sides (one optional space either
   // side, since `norm` never has more than one) is a time or ratio the tokenizer's time token did not match, so
   // this stays as a direct backstop; a label colon ("Solve: 3 + 4") has a digit on one side only and passes
   const toks = tokenize(norm);
-  return toks.every(t => !NOTATION.has(t.kind));
+  return toks.every(t => !NOTATION(t.kind));
 }
