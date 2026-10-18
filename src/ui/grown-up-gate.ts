@@ -6,8 +6,10 @@ import { isKs2, shownYears } from '../curriculum';
 import { sfx } from '../audio';
 import { esc } from './dom';
 
+let open: ((ok: boolean) => void) | null = null;
+
 export function askGrownUp(what: string): Promise<boolean> {
-  document.querySelector('.cert-view.gate-ask')?.remove();
+  open?.(false);   // a second ask while one is showing (a double tap) closes the first, so its promise never hangs
   return new Promise(resolve => {
     let gate = gateChallenge(Math.random, shownYears().some(y => isKs2(y.id)));
     const wrap = document.createElement('div');
@@ -18,7 +20,8 @@ export function askGrownUp(what: string): Promise<boolean> {
       <button class="btn big" id="ask-no">Not now</button>`;
     const q = wrap.querySelector('#ask-q')!, input = wrap.querySelector<HTMLInputElement>('#ask-input')!, msg = wrap.querySelector<HTMLElement>('#ask-msg')!;
     const show = () => { q.textContent = gate.prompt; input.value = ''; };
-    const done = (ok: boolean) => { wrap.remove(); resolve(ok); };
+    const done = (ok: boolean) => { wrap.remove(); open = null; resolve(ok); };
+    open = done;
     const submit = () => {
       if (checkGate(input.value, gate.answer)) { sfx.correct(); done(true); return; }
       sfx.wrong(); gate = gateChallenge(Math.random, shownYears().some(y => isKs2(y.id))); msg.hidden = false; show();
@@ -35,7 +38,10 @@ export function askGrownUp(what: string): Promise<boolean> {
  * only when the caller's gate lets it through, and the default says no, so a caller that forgets the gate cannot
  * share. Asked once, and only when a share sheet exists at all. Save, view and download are never gated.
  */
-export async function gatedShares(files: boolean, capacitor: boolean, mayShare: () => Promise<boolean>): Promise<{ canShareFiles: boolean; capacitorShare: boolean }> {
+export async function gatedShares({ files, capacitor }: { files: boolean; capacitor: boolean }, mayShare: () => Promise<boolean>): Promise<{ canShareFiles: boolean; capacitorShare: boolean }> {
   const ok = files || capacitor ? await mayShare() : false;
   return { canShareFiles: files && ok, capacitorShare: capacitor && ok };
 }
+
+/** For a caller that is already behind the grown-ups gate (the dashboard): a named bypass, so a grep finds every one. */
+export const ALREADY_GATED = (): Promise<boolean> => Promise.resolve(true);

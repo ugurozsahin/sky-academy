@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import { deliverCertificate } from '../../src/ui/certificate';
+import { gatedShares } from '../../src/ui/grown-up-gate';
 import { fakeCanvas, stubBrowser } from './helpers/cert-browser';
 
 const OPEN = () => Promise.resolve(true);   // a caller whose grown-ups gate lets the share through
@@ -59,5 +60,19 @@ describe('deliverCertificate keeps the share sheet behind the grown-ups gate (#1
     dom = stubBrowser({ capacitor: capacitorShare(shared) });
     expect(await deliverCertificate(fakeCanvas(), 'cert.png', OPEN)).toBe('shared');
     expect(shared).toHaveLength(1);
+  });
+});
+
+describe('gatedShares (#1943)', () => {
+  const never = () => Promise.reject(new Error('asked with no share sheet to protect'));
+  it('is not asked when neither share sheet exists', async () => {
+    expect(await gatedShares({ files: false, capacitor: false }, never)).toEqual({ canShareFiles: false, capacitorShare: false });
+  });
+  it('lets exactly the sheets that exist through when the gate says yes', async () => {
+    expect(await gatedShares({ files: true, capacitor: false }, OPEN)).toEqual({ canShareFiles: true, capacitorShare: false });
+    expect(await gatedShares({ files: false, capacitor: true }, OPEN)).toEqual({ canShareFiles: false, capacitorShare: true });
+  });
+  it('closes both when the gate says no', async () => {
+    expect(await gatedShares({ files: true, capacitor: true }, () => Promise.resolve(false))).toEqual({ canShareFiles: false, capacitorShare: false });
   });
 });

@@ -4,6 +4,7 @@ import { plugin } from '../native';
 import { sfx } from '../audio';
 import { progressText, summaryRoute, type ParentSummary } from '../game/parents';
 import { deliverCertificate, type CapShare } from './certificate';
+import { ALREADY_GATED } from './grown-up-gate';
 import { drawProgressReport } from './report';
 import { avatarById } from '../avatars';
 import { $ } from './dom';
@@ -43,7 +44,7 @@ export function bindShare(sm: ParentSummary, name: string, avatarId = '') {
     pic.disabled = true; sfx.tap();
     try {
       const now = new Date(), day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const out = await deliverCertificate(await drawProgressReport({ sm, name, avatar: avatarById(avatarId), date: now }), `sky-ninja-progress-${day}.png`, () => Promise.resolve(true));   // the dashboard is already behind the grown-ups gate (#1943)
+      const out = await deliverCertificate(await drawProgressReport({ sm, name, avatar: avatarById(avatarId), date: now }), `sky-ninja-progress-${day}.png`, ALREADY_GATED);   // the dashboard is already behind the grown-ups gate (#1943)
       if (out !== 'shown') say(out === 'declined' ? 'Not saved.' : out === 'downloaded' ? 'Saved to your downloads.' : 'Done.');
     } catch (e) { console.warn('progress picture failed', e); say('Could not make the picture. Please try again.'); }
     finally { pic.disabled = false; }

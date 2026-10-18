@@ -1619,8 +1619,9 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#cert');
     const q = await page.locator('#ask-q').textContent();
     await page.fill('#ask-input', String(gateProduct(q!)));
-    await page.click('#ask-go');
+    await page.press('#ask-input', 'Enter');   // the keyboard path of the same gate
     await expect.poll(() => page.evaluate(() => (window as any).__shared)).toBe(1);
+    await expect(page.locator('.gate-ask')).toHaveCount(0);
   });
 
   // Every Reception maths topic starred except `unstarred` — derived from the registry, so a new topic cannot
