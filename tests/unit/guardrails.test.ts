@@ -1740,7 +1740,7 @@ describe('guard rails', () => {
     // beat and the results beat live in play-session.ts now, so a rail scoped to play.ts alone would be green
     // while the file that owns most of the beats went unwatched. play-session.ts has no bare-numeric later()
     // today, so it starts at the floor — this rail costs nothing to widen and stops a whole file drifting.
-    const files = ['/src/ui/play.ts', '/src/ui/play-session.ts'];
+    const files = ['/src/ui/play.ts', '/src/ui/play-session.ts', '/src/ui/play-beats.ts']   // #1503: the tutorial hold and the taunt moved here;
     for (const f of files) expect((SOURCES[f] ?? '').length, `${f} must be read, not a blank import`).toBeGreaterThan(1000);
     const real = files.flatMap(f => code(SOURCES[f] ?? '').split('\n')
       .filter(l => l.includes('later(') && /,\s*\d+\s*\)/.test(l)).map(l => `${f}: ${l.trim()}`));
