@@ -3133,7 +3133,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // file at or past the 300-line bar this table is scoped to — joins it rather than going unbudgeted;
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
-    'src/style.css': 1870, 'src/game/arena.ts': 476, 'src/game/bubbles.ts': 521,
+    'src/style.css': 1870, 'src/game/arena.ts': 470, 'src/game/bubbles.ts': 521,
     'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
   };
