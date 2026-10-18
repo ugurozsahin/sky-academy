@@ -202,7 +202,8 @@ your first finding and the only one you can report.
    looks plausible and is wrong: that endpoint takes `actor`, `branch`, `event`, `status`, `created`,
    `head_sha`, `check_suite_id` and `exclude_pull_requests`, and **silently ignores anything else**, so
    `?workflow=` hands you the newest run in the whole repository — here, with a routine every hour,
-   almost always a `CI` or `Review gate` run.
+   almost always a `CI` or `Review gate` run. `?head_sha=` has the same shape: an abbreviated SHA answers 200
+   with an empty list, which reads as "CI never ran" (#537), so pass all 40 characters.
    **The branch filter is what makes the answer about `main`.** This workflow's `pull_request:` trigger is its
    only frequent one, so an unfiltered list is dominated by pull-request runs on somebody's branch. Without
    `?branch=main` the newest run is usually a green pull request sitting on top of a red `main` — which is not

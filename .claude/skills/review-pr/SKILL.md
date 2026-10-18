@@ -93,6 +93,14 @@ The reviews that missed something here all read the diff for whether it works. R
     evidence of nothing.
   - **Restore the tree before you run anything else.** A mutation left behind makes every later green in that
     checkout meaningless, including the one you are about to quote in your review.
+  - **Clear the transform cache between runs and keep a control mutation in every battery (#339).** Rewriting
+    one file in place, run after run, makes Vite serve a stale transform, so a killed mutant reads `94 passed`.
+    Run `rm -rf node_modules/.vite` or pass `--no-cache` each time; the control is a mutation whose kill is
+    certain, and a green control means the harness is broken, not the code sound. Re-run a suspicious green by hand.
+  - **A rail pinning text under `.claude/` cannot be mutated in place (#449).** #342 refuses an unattended write
+    there by design: do not route around it. Mutate an in-memory copy instead and run the rail's own
+    assertions against it. That is evidence only with a baseline that reproduces the real suite's green and a
+    control mutation that goes red, and it checks the assertions as transcribed, so a rail you omit is unseen.
 - **Suspect a test that cannot fail.** Work out, algebraically, whether the assertion is an identity. A test
   named for a property is not evidence that the property is pinned — and a pull request body that *claims* a
   property is covered is a claim to check, not to quote.
@@ -103,7 +111,8 @@ The reviews that missed something here all read the diff for whether it works. R
   class to find it: every topic, every spelling, every route. A reviewer run develops nothing and may not
   push, so the enumeration goes in an issue titled `sweep: <the class>` — the list itself, or the script that
   produces it — labelled `tests`, `priority:P3` and `routine-ok` so the developer query can reach it, and
-  linked from your review comment. A sweep described only in a comment is
+  linked from your review comment. A review subagent files nothing (§4 rule 1): it returns the enumeration
+  with the finding and the parent files the issue. A sweep described only in a comment is
   re-derived from scratch next round, by you or by whoever supersedes you, and that re-derivation is most of
   what a four-round pull request costs (#466).
 - **Check the pull request body against the code**, especially "this only documents existing behaviour" and
@@ -188,8 +197,8 @@ is pure overhead for a single waiting pull request — and one diff is where the
    confident, specific, wrong greens. Concurrency needs a worktree each (`using-git-worktrees`); until one
    exists, sequential.
 4. **What comes back**, and nothing else — no working context: the verdict; each finding as `file:line` plus
-   what breaks; **the head SHA it judged**; the exact commands it ran and their results, `e2e not run (env)`
-   included; and one line per review agent. §6's merge comment and §7's bar are written from those, so **the
+   what breaks, **with its enumeration when the finding came from a sweep**; **the head SHA it judged**; the
+   exact commands it ran and their results, `e2e not run (env)` included; and one line per review agent. §6's merge comment and §7's bar are written from those, so **the
    parent posts nothing it did not receive** — a gap filled from assumption ("mobile", "tests pass", "the
    agents found nothing") is the falsification §2 forbids, arriving one level up. Pass down what a fresh
    context cannot know, too: §1's gate needs which pull requests this run opened or pushed to (usually none),
@@ -203,8 +212,9 @@ what produced #292; the fix is to make many reviews *safe* (#326).
 Check all four, every time. This is the checklist; `docs/decisions/002-routine-prompt-is-flow-only.md` has the
 incidents behind each.
 
-1. **CI is not green on the tree you are about to merge.** Read the **newest** run for the full head SHA; a
-   tick from before `main` moved is evidence about a tree that no longer exists. Queued or in progress means
+1. **CI is not green on the tree you are about to merge.** Read the **newest** run for the full 40-character
+   head SHA: `?head_sha=` with an abbreviated one answers 200 and an empty list, which reads as "CI never
+   ran" (#537). A tick from before `main` moved is evidence about a tree that no longer exists. Queued or in progress means
    wait, not merge. A missing `CI` run on any pull request — docs-only included — is a red light (#176). A
    green run whose *e2e step* reads "skipped" is a pass; check the summary says so and say which it was. The
    step is skipped when the diff touches none of the paths in `GAME_PATHS` in `.github/workflows/ci.yml` — the
