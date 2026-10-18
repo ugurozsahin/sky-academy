@@ -252,21 +252,25 @@ describe('ks2num', () => {
 
     // guard rail (#1333, rebuilt on the AST in #1746): the check is an invariant only if every Dec the module hands out
     // passes through dec(). Before #1333 eleven raw `{ v, dp }` literals in eight functions bypassed it. A literal is an
-    // ObjectLiteralExpression with a `v` or `dp` key (assigned or shorthand), so a spread of a call
-    // (`{ ...toDec(n), dp: 0 }`) is caught, and destructuring (`const { v, dp } = a`), a type literal, a comment or a
-    // template hole is not — the regex this replaced got all of those wrong. It also says *where* the literal is.
+    // ObjectLiteralExpression with a `v` or `dp` key (assigned, shorthand, string or computed-string), so a spread of a
+    // call (`{ ...toDec(n), dp: 0 }`) is caught, and destructuring (`const { v, dp } = a`), a type literal, a comment or
+    // a template hole is not — the regex this replaced got all of those wrong. A cast to Dec (`x as Dec`, `<Dec>x`) is
+    // the other way to mint one without a literal, so it counts too. Each hit says where it is: the top-level function
+    // declaration around it (null for an arrow or anything else, which the real-file assertion then rejects).
     const decLiterals = (src: string): { fn: string | null; text: string }[] => {
       const file = ts.createSourceFile('ks2num.ts', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+      const keyName = (n: ts.PropertyName): string | null =>
+        ts.isIdentifier(n) || ts.isStringLiteral(n) ? n.text : ts.isComputedPropertyName(n) && ts.isStringLiteral(n.expression) ? n.expression.text : null;
       const isDecKey = (p: ts.ObjectLiteralElementLike): boolean =>
-        (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p))
-        && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) && (p.name.text === 'v' || p.name.text === 'dp');
+        (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) && ['v', 'dp'].includes(keyName(p.name) ?? '');
       const enclosingFunction = (n: ts.Node): string | null => {
-        for (let up = n.parent; up; up = up.parent) if (ts.isFunctionDeclaration(up) && up.name) return up.name.text;
+        for (let up = n.parent; up; up = up.parent) if (ts.isFunctionDeclaration(up) && up.name && ts.isSourceFile(up.parent)) return up.name.text;
         return null;
       };
       const found: { fn: string | null; text: string }[] = [];
       const visit = (n: ts.Node): void => {
-        if (ts.isObjectLiteralExpression(n) && n.properties.some(isDecKey)) found.push({ fn: enclosingFunction(n), text: n.getText(file) });
+        const castToDec = (ts.isAsExpression(n) || ts.isTypeAssertionExpression(n)) && n.type.getText(file) === 'Dec';
+        if (castToDec || (ts.isObjectLiteralExpression(n) && n.properties.some(isDecKey))) found.push({ fn: enclosingFunction(n), text: n.getText(file) });
         ts.forEachChild(n, visit);
       };
       visit(file);
@@ -276,11 +280,16 @@ describe('ks2num', () => {
     it('the literal finder sees every shape a raw Dec can take, and nothing that only mentions v or dp', () => {
       const inF = (body: string) => decLiterals(`function f(a: Dec, n: number, x: number) { ${body} }`);
       for (const raw of ['return { v, dp };', 'return { dp: 0, v: n };', 'return { ...a, v: x };', 'return { ...toDec(n), dp: 0 };',
-        'return { ...clone(a), v: a.v * x };', "return { 'v': x, dp: 0 };"]) expect(inF(raw), raw).toHaveLength(1);
+        'return { ...clone(a), v: a.v * x };', "return { 'v': x, dp: 0 };", "return { ['v']: x };", 'return ({}) as Dec;', 'return <Dec>JSON.parse(String(n));',
+      ]) expect(inF(raw), raw).toHaveLength(1);
       expect(inF('return { ...toDec(n), dp: 0 };')[0].fn).toBe('f');
       for (const fine of ['const { v, dp } = a; return v + dp;', 'return dec(a.v, a.dp);', 'const dp = a.dp - n; return dec(x ? -a.v : a.v, -dp);',
-        'type T = { v: number; dp: number }; return null;', '// { v, dp } in a comment\n return null;', 'return `got v=${a.v}, dp=${a.dp}`;']) expect(inF(fine), fine).toHaveLength(0);
+        'type T = { v: number; dp: number }; return null;', '// { v, dp } in a comment\n return null;', 'return `got v=${a.v}, dp=${a.dp}`;',
+        'return a as unknown;']) expect(inF(fine), fine).toHaveLength(0);
       expect(decLiterals('function fmt({ v, dp }: Dec) { return v + dp; }')).toHaveLength(0);
+      // where it is: an arrow has no declaration name, and a helper called `dec` inside another function is that function's
+      expect(decLiterals('const g = () => ({ v: 1, dp: 0 });').map(l => l.fn)).toEqual([null]);
+      expect(decLiterals('function outer() { function dec() { return { v: 1, dp: 0 }; } return dec(); }').map(l => l.fn)).toEqual(['outer']);
     });
 
     it('guard rail: ks2num.ts builds a Dec literal only inside dec()', () => {
