@@ -14,6 +14,7 @@ import {
 } from './util';
 import { syllableQ } from './syllables';
 import { storyQ } from './story';
+import { rStoryTime } from './stories-r';
 
 // ---------- Reception maths ----------
 const rCount: Generator = (d, rng) => {
@@ -385,6 +386,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-sounds', title: 'Letter Sounds', icon: '🔊', subject: 'writing', year: 'reception', nc: 'ELG Writing: sounds to letters', gen: rLetterSound },
   { id: 'r-syllables', title: 'How Many Beats?', icon: '👏', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: count or clap syllables in a word', gen: (d, rng) => syllableQ(rng, d, 2) },
   { id: 'r-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear', gen: rSoundHunt },
+  { id: 'r-storytime', title: 'Story Time', icon: '📚', subject: 'writing', year: 'reception', nc: 'ELG Comprehension: understanding what has been read to them', solo: true, gen: rStoryTime },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },
   { id: 'r-tricky', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: common exception words', gen: rTricky },
   { id: 'r-build', title: 'Build a Word', icon: '🧱', subject: 'writing', year: 'reception', nc: 'ELG Writing: spell by sounds (CVC)', sequenceFrom: 1, gen: rBuild },

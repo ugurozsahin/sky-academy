@@ -1269,6 +1269,20 @@ test.describe('Sky Ninja Academy', () => {
     expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
   });
 
+  // #1020: Reception Story Time answers by picture, so every bubble label must fit and the card must fit the phone.
+  test('r-storytime: the story card fits the shortest phone and every picture bubble fits (#1020)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-storytime');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    const overflow = await page.locator('.vis.sentence').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed by ${overflow}px`).toBeLessThanOrEqual(1);
+    await waitForTarget(page);
+    const states = await page.evaluate(() => window.__sna.bubbles().map((b: { label: string; labelState: string }) => `${b.label}:${b.labelState}`));
+    expect(states.length).toBeGreaterThan(0);
+    for (const s of states) expect(s.endsWith(':ok'), `a bubble label did not fit: ${s}`).toBe(true);
+  });
+
   // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"
   // is unanswerable without the picture and the line, and a unit test of `renderVisual` cannot see whether
   // the SVG is laid out, sized or visible in a browser. Stage 1 is difficulty 1 (`YEARS[year2].diffs` is
