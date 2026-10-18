@@ -223,11 +223,11 @@ const dimensionRule: Rule = rest => { const m = rest.match(/^(\d+)-([Dd])\b/); r
 // "3-digit", "5-minute": a digit joined to a lower-case word is a compound modifier, never subtraction (#1465).
 // A run that is only unit codes ("5-cm") is left to the unit rules; a capitalised name ("10-Diego") is not a modifier.
 const compoundRule: Rule = rest => {
-  const m = rest.match(/^(\d+)-([a-z]{2,})\b/);
+  const m = rest.match(/^(\d+)-([a-z]{2,})\b(?!\/)/);
   if (!m) return null;
   // A hyphenated unit run ("5-kg", "5-kgs") is spoken as the quantity it is (#1992); one letter plus an s ("5-ms")
   // is no such run and stays an ordinary modifier.
-  const units = decomposeUnits(m[2]) ?? (m[2].length > 2 ? decomposeUnits(m[2].slice(0, -1)) : null);
+  const units = decomposeUnits(m[2]) ?? (/s$/.test(m[2]) && m[2].length > 2 ? decomposeUnits(m[2].slice(0, -1)) : null);
   if (units && m[2].length > 1 && !(units.length === 1 && units[0].length === 1 && units[0] !== m[2])) {
     const words = units.map(u => unitWord(u.toLowerCase()));
     return hit('compound', m, `${m[1]} ${m[1] === '1' ? singular(words.join(' ')) : words.join(' ')}`);
@@ -270,8 +270,8 @@ const decimalRule: Rule = rest => {
 };
 // Speed: "km/h" is a unit wherever it stands; "m/s" only after a digit, as a single "m" is.
 const speedRule: Rule = (rest, before) => {
-  const m = rest.match(/^km\/h\b/) ?? (afterDigit(before) ? rest.match(/^m\/s(?:[2²](?!\d))?\b|^m\/s[2²](?!\d)/) : null);
-  return m && hit('unit', m, /s[2²]$/.test(m[0]) ? 'metres per second squared' : EXTRA_UNIT_WORD[m[0]]);
+  const m = rest.match(/^km\/h\b/) ?? (afterDigit(before) ? rest.match(/^m\/s(?:2(?!\d))?\b|^m\/s2(?!\d)/) : null);
+  return m && hit('unit', m, /s2$/.test(m[0]) ? 'metres per second squared' : EXTRA_UNIT_WORD[m[0]]);
 };
 // "5 m2", "9 cm3" typed without the superscript, straight after a digit.
 const asciiPowerRule: Rule = (rest, before) => {

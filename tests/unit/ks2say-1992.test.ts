@@ -18,7 +18,7 @@ describe('ks2say.ts: misreadings found after #1989 (#1992)', () => {
   });
   it.each([
     ['5-kgs', '5 kilograms'], ['5-kg', '5 kilograms'], ['1-kg', '1 kilogram'], ['5-cm', '5 centimetres'],
-    ['5-ft', '5 ft'], ['5-ms', '5 ms'],
+    ['5-ft', '5 ft'], ['5-ms', '5 ms'], ['3-kgx', '3 kgx'], ['5-km/h', '5 minus kilometres per hour'],
   ])('ks2Say(%j) is %j and safe to speak', (text, spoken) => {
     expect(ks2Say(text)).toBe(spoken);
     expect(sayIsSafe(ks2Say(text))).toBe(true);
