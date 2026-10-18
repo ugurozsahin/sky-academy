@@ -11,8 +11,17 @@ import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Files that must never be precached, whatever is in `dist/`. */
-const EXCLUDE = new Set(['sw.js']);
+/**
+ * Files that must never be precached, whatever is in `dist/`.
+ *
+ * `icons/apple-touch-icon.png` is out by decision (#632). `cache.addAll` is all-or-nothing, so every precached
+ * file is one more way for a 404 to fail the whole install, and the symptom of that is offline play silently
+ * never working. The other three icons earn their place (the manifest's, small WebPs, and a page can show
+ * them); this one is 56 KB, 28% of the icon payload, and is fetched only by iOS's "Add to Home Screen"
+ * machinery, over the network, outside the worker. The game never reads it. To put it back, delete the line
+ * and the assertion in tests/unit/pwa-icons.test.ts together.
+ */
+const EXCLUDE = new Set(['sw.js', 'icons/apple-touch-icon.png']);
 
 /**
  * Every file under `dir`, as forward-slashed paths relative to it, sorted. Sorted because the cache name is

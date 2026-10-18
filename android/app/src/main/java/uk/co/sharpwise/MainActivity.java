@@ -1,4 +1,4 @@
-package uk.skyninja.academy;
+package uk.co.sharpwise;
 
 import com.getcapacitor.BridgeActivity;
 
