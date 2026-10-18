@@ -1,9 +1,9 @@
 // Year 4 reading strand (#1069). Each slot below is a future PR's own ticket; y4-context has landed (#1131).
-// import: y4-retrieve
 import type { Topic } from './types';
 import { y4Context } from './year4-context';
+import { y4Retrieve } from './stories-y4';
 
 export const Y4_READING: Topic[] = [
-  // slot: y4-retrieve
+  { id: 'y4-retrieve', title: 'Retrieving Information', icon: '📰', subject: 'writing', year: 'year4', nc: 'Y3–4 Comprehension: retrieve and record information from non-fiction', solo: true, gen: y4Retrieve },
   { id: 'y4-context', title: 'Words in Context', icon: '🔎', subject: 'writing', year: 'year4', nc: 'Y3–4 Comprehension: explaining the meaning of words in context', gen: y4Context },
 ];
