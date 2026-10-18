@@ -27,7 +27,8 @@ function runTerms(d: Difficulty, step: Step, rng: () => number): { terms: number
   return { terms, gapIndex, localStep };
 }
 
-/** Misconception decoys first (#1050 KS2 rule): the term after next (a skipped term), and a column slip that
+/** Misconception decoys first (#1050 KS2 rule): the term after next (a skipped term; at an interior gap it is printed,
+ *  so it is dropped for further multiples of the step, #1767), and a column slip that
  *  keeps the units digit (±10 for 4s/8s, ±100 for 50s/100s); `nearby`-style fill only tops up the rest.
  *  Two shapes leaked the leading digit past the KS2 ≤30% ceiling per step (#1454): in 100s both named decoys
  *  are ±100 and so always leave the answer's hundred (measured 36-38% at d1-d3), and a two-digit answer
@@ -35,17 +36,27 @@ function runTerms(d: Difficulty, step: Step, rng: () => number): { terms: number
  *  (51% at d2). Those two shapes get a `sameLeadDecoy` guaranteed in the pool, as `moreOrLess` does. Only
  *  those: the rule counts answers ≥20, and a ±1/±2 decoy on a 50s/100s card (answer 0 or 50) or beside 4, 8
  *  or 12 would be a non-multiple a child never reaches by counting (silent-failure-hunter, round 1). */
-function runDecoys(answer: number, step: Step, localStep: number, rng: () => number): number[] {
+function runDecoys(answer: number, step: Step, localStep: number, printed: ReadonlySet<number>, rng: () => number): number[] {
   const skipTerm = answer + localStep;
   const slipAmount = step === 50 || step === 100 ? 100 : 10;
   const slipTerm = rng() < 0.5 ? answer + slipAmount : answer - slipAmount;
   const needsLead = step === 100 ? answer >= 100 : (step === 4 || step === 8) && answer >= 20 && answer < 100;
   const sameLead = needsLead ? sameLeadDecoy(answer, rng) : null;
+  // #1767: nothing the prompt already prints may be offered — it is a free elimination. With an interior gap
+  // (d3) `skipTerm` is the next printed term, so it drops out. Each named shape lost that way is replaced by a
+  // further multiple of the step (counted two or three steps too far, or too few), which a child can still fall
+  // for, before any random neighbour is drawn. Only the ones lost: when nothing printed is dropped the pool is
+  // exactly what it was, so #1454's leading-digit rail still sees the random top-up it was measured with.
   const named = sameLead !== null ? [sameLead, skipTerm, slipTerm] : [skipTerm, slipTerm];
-  const pool = new Set<number>(named.filter(v => v !== answer && v >= 0 && v <= 1099));
+  const inRange = (v: number) => v !== answer && v >= 0 && v <= 1099;
+  const ok = (v: number) => inRange(v) && !printed.has(v);
+  const pool = new Set<number>(named.filter(ok));
+  const lost = new Set(named.filter(v => inRange(v) && printed.has(v))).size;
+  // Nearest first: two steps on, two back, three on, three back.
+  [2, -2, 3, -3].map(k => answer + k * localStep).filter(v => ok(v) && !pool.has(v)).slice(0, lost).forEach(v => pool.add(v));
   while (pool.size < 3) {
     const v = answer + ri(rng, -Math.max(step, 10), Math.max(step, 10));
-    if (v !== answer && v >= 0 && v <= 1099 && !pool.has(v)) pool.add(v);
+    if (ok(v) && !pool.has(v)) pool.add(v);
   }
   return [...pool].slice(0, 3);
 }
@@ -55,7 +66,8 @@ function countRun(d: Difficulty, rng: () => number): Question {
   const { terms, gapIndex, localStep } = runTerms(d, step, rng);
   const answer = terms[gapIndex];
   const prompt = terms.map((t, i) => i === gapIndex ? '?' : fmtN(t)).join(', ');
-  const options = shuffle(rng, [answer, ...runDecoys(answer, step, localStep, rng)]).map(fmtN);
+  const printed = new Set(terms.filter((_, i) => i !== gapIndex));
+  const options = shuffle(rng, [answer, ...runDecoys(answer, step, localStep, printed, rng)]).map(fmtN);
   return { prompt: `${prompt} = ?`, say: `Count in ${step}s. ${prompt.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options };
 }
 
