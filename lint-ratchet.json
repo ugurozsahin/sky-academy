@@ -9,7 +9,6 @@
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/ui/duel.ts::duelScreen": 160,
     "src/ui/play.ts::playScreen": 126
   },
   "fileLines": {
