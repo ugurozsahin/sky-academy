@@ -17,8 +17,8 @@ import {
 } from './particles';
 import type { Particle, Shot, FxKind } from './particles';
 import { drawBubble, drawParticle, drawTrail } from './arena-draw';
-import { segCircle } from './slicing';
-import { relaunchBubble } from './arena-step';
+import { advanceStroke, slicedBy } from './slicing';
+import { relaunchBubble, markOutcome, ghostX } from './arena-step';
 import type { Stroke } from './slicing';
 
 export * from './bubbles';
@@ -186,19 +186,12 @@ export class Arena {
   /** Freeze the wave and show the outcome: the sliced bubble stays put with a ✓ (or ✗ beside the glowing right answer),
    *  the rest fade. If the right answer is no longer on screen (it fell, or is still queued) it pops in as a ghost bubble. */
   reveal(o: { good?: string; bad?: string }) {
-    this.frozen = true; const now = performance.now(); let shown = false;
-    for (const b of this.bubbles) {
-      if (b.dead) continue;
-      if (!b.launched) { b.dead = true; continue; }                       // still queued: never launch
-      if (o.good !== undefined && b.label === o.good && !shown) { b.mark = 'good'; b.markAt = now; shown = true; }
-      else if (o.bad !== undefined && b.label === o.bad && b.hit && !b.mark) { b.mark = 'bad'; b.markAt = now; }
-      else b.fade = true;
-    }
+    this.frozen = true; const now = performance.now();
+    const shown = markOutcome(this.bubbles, o, now);
     if (o.good !== undefined && !shown) {
       const r = this.radius(o.good.length > 3);
-      let x = this.W / 2; const y = this.topInset + (this.H - this.topInset) * 0.42;
-      const bad = this.bubbles.find(b => b.mark === 'bad' && !b.dead);
-      if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
+      const y = this.topInset + (this.H - this.topInset) * 0.42;
+      const x = ghostX(this.W, r, this.bubbles.find(b => b.mark === 'bad' && !b.dead), y);   // don't sit on the ✗ bubble
       const fit = fitLabelLines(o.good, r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });
       warnUnfitLabel(o.good, r, fit);
       this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize: fit.fs, lines: fit.lines, labelState: fit.state, ox: x, ovx: 0, ovy: 0, relaunches: 0 });
@@ -279,16 +272,17 @@ export class Arena {
     // Hit-test against the last pointer position, not the visual trail: the trail fades after 280ms,
     // so a finger that pauses mid-stroke (or slow pointer events) must not lose its slice segment.
     const prev = s.lastPt;
-    const d = Math.hypot(p.x - prev.x, p.y - prev.y); s.moved += d; if (d < 2) return;
-    s.lastPt = p;
-    if (e.pointerId === this.mostRecentId) {         // #561: only the most recent stroke draws — the shared trail, its swish, its wake
-      this.trail.push({ ...p, t: performance.now() });
-      if (this.trail.length > 24) this.trail.shift();
-      if (s.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
-      if (!this.reducedMotion && ++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);   // #900: no wake sparks
-    }
-    for (const b of this.bubbles) { if (this.frozen) break; if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true); }
+    if (!advanceStroke(s, p)) return;
+    if (e.pointerId === this.mostRecentId) this.extendTrail(s, p, prev);   // #561: only the most recent stroke draws
+    for (const b of slicedBy(this.bubbles, prev, p)) { if (this.frozen) break; this.hitBubble(b, true); }
   };
+  /** The shared trail, its swish and its wake follow the newest finger only (#561). */
+  private extendTrail(s: Stroke, p: { x: number; y: number }, prev: { x: number; y: number }) {
+    this.trail.push({ ...p, t: performance.now() });
+    if (this.trail.length > 24) this.trail.shift();
+    if (s.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
+    if (!this.reducedMotion && ++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);   // #900: no wake sparks
+  }
   // `pointerup`/`pointercancel` are WINDOW listeners, so every arena hears every lift; only the pointer that
   // went down on this canvas has an entry to remove (#16, PR #295's foreign-lift rule). #561's own Stroke per
   // pointer closes PR #295's named follow-up: no single stroke is left for a second finger to take and strand.
