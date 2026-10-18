@@ -66,6 +66,30 @@ describe('pinSentence holds a sentence to its boundary (#771)', () => {
       .toThrow(/something follows .* ", mostly"/);
   });
 
+  // #1807: a fragment that ends with a terminator has closed its own sentence, so only closers and whitespace may
+  // follow it. A doubled terminator used to fall back to "the rest of the sentence", find the NEXT stop at index 0,
+  // and pass with the hedge in between.
+  it('rejects a fragment whose own terminator is followed by anything but closers and whitespace', () => {
+    expect(() => pinSentence('Must never.. though not every one. Next.', 'Must never.')).toThrow(/something follows .* "\. though not every one"/);
+    expect(() => pinSentence('Is it done?! though not. Next.', 'Is it done?')).toThrow(/something follows .* "! though not"/);
+    // the shapes the strict rule must keep: a closer, a space, the end of the text, a bold close
+    expect(() => pinSentence('**Must never.** Next.', '**Must never.**')).not.toThrow();
+    expect(() => pinSentence('**Must never.** Next.', '**Must never.')).not.toThrow();
+    expect(() => pinSentence('Say "done." Next.', 'Say "done."')).not.toThrow();
+    expect(() => pinSentence('The end.', 'The end.')).not.toThrow();
+  });
+
+  // #1807: `TERMINATOR` accepts closers after the stop (it must: `**Must never.** Next`), so a stop that sits inside
+  // a quote or a code span reads as the sentence end. The documented hole, beside the `e.g.` one; `tail` is the remedy.
+  it('reads a quoted or back-ticked stop inside the sentence as its end — a documented hole, and `tail` its remedy', () => {
+    const quoted = 'Reply "done." though only when asked. Next.';
+    expect(() => pinSentence(quoted, 'Reply "done')).not.toThrow();                                       // the hole
+    expect(() => pinSentence(quoted, 'Reply "done', { tail: '." though only when asked.' })).not.toThrow();
+    expect(() => pinSentence(quoted.replace('asked.', 'asked, mostly.'), 'Reply "done', { tail: '." though only when asked' }))
+      .toThrow(/something follows .* ", mostly"/);
+    expect(() => pinSentence('Run `npm test.` first, then ship. Next.', 'Run `npm test')).not.toThrow();   // the same hole, back-ticked
+  });
+
   it('rejects a missing fragment, a duplicate and an empty one', () => {
     expect(() => pinSentence(text, 'every colour')).toThrow(/is not in the text/);
     expect(() => pinSentence(`${text} ${text}`, 'every route.')).toThrow(/appears 2 times, expected exactly once/);
@@ -180,5 +204,27 @@ describe('the four #771 pins reject the insertion listed against each (#771)', (
     const counted = unanchoredPins(source);
     for (const piece of pieces)
       expect(counted.filter((p) => p.includes(piece.slice(0, -1))), `no unanchored pin on "${piece}" is left`).toEqual([]);
+  });
+});
+
+// #1807: `ANCHORED_REGEX` read two endings as anchors that are not. `\$` is a literal dollar, not the end of the
+// string, and `\\.` is an escaped backslash followed by the wildcard, not an escaped full stop. A pin ending either
+// way holds nothing in place, so the ratchet must count it.
+describe('unanchoredPins: what is, and is not, an anchor (#1807)', () => {
+  const counted = (pin: string) => unanchoredPins(`expect(s)${pin};`);
+  it('counts an escaped dollar and an escaped backslash before a wildcard as unanchored', () => {
+    expect(counted(String.raw`.toMatch(/price in \$/)`)).toEqual([String.raw`/price in \$/`]);
+    expect(counted(String.raw`.toMatch(/path x\\./)`)).toEqual([String.raw`/path x\\./`]);
+  });
+  it('still reads a real end anchor, an escaped stop, and an escaped backslash then an escaped stop as anchored', () => {
+    expect(counted(String.raw`.toMatch(/ends here$/)`)).toEqual([]);
+    expect(counted(String.raw`.toMatch(/ends here\./)`)).toEqual([]);
+    expect(counted(String.raw`.toMatch(/ends here\!\*\*/)`)).toEqual([]);
+    expect(counted(String.raw`.toMatch(/backslash \\\./)`)).toEqual([]);
+    expect(counted(String.raw`.toMatch(/escaped dollar then end \$$/)`)).toEqual([]);
+  });
+  it('reads an abbreviation as anchored — the documented limit, as in pinSentence', () => {
+    expect(counted(String.raw`.toMatch(/costs e\.g\./)`)).toEqual([]);
+    expect(counted(`.toContain('e.g.')`)).toEqual([]);
   });
 });

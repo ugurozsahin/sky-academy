@@ -74,7 +74,8 @@ describe('unanchored fragment pins in governance.test.ts only go down (#771)', (
       ? `unanchored pins rose to ${n}: a new pin ends at a sentence boundary or goes through pinSentence() — never raise the ceiling`
       : `unanchored pins fell to ${n}: if this commit migrated exactly ${fell} pin(s) to pinSentence() or an end anchor, lower `
         + `UNANCHORED_PINS_CEILING to ${n} in the same commit; if it did not, the counter has gone blind — a pin moved into a `
-        + 'variable, new RegExp(), a ${} template or a + concatenation is invisible, not migrated — fix the counter, do not lower the ceiling')
+        + 'variable, new RegExp(), a ${} template or a + concatenation is invisible, not migrated (as is a pin written `expect(/x/.test(doc)).toBe(true)` or '
+        + "`expect(doc.includes('x')).toBe(true)`) — fix the counter, do not lower the ceiling")
       .toBe(UNANCHORED_PINS_CEILING);
   });
 
