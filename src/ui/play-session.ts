@@ -23,7 +23,7 @@ import { createGhost } from './ghost'; import { fontReady } from './font';   // 
 import { correctionLine, hintText, promptHTML, promptMode, setHint, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
 import { createMissionPill } from './mission-pill';
-import { createPeek, NO_VOICE_PEEK_MS } from './play-peek';
+import { createPeek, NO_VOICE_PEEK_MS } from './play-peek'; import { holdForStory, storyVisual } from './story-card';
 import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
@@ -235,7 +235,7 @@ function questionCallbacks(c: BeatCtx) {
         if (deps.training && t) $('.ttl').textContent = `${t.icon} ${t.title}`;
         const firstLine = firstQuestionLine(q, opts.topic, session.questionsAsked, !!opts.practice, st.activeQuestion); st.activeQuestion = q; st.readThrough = false;
         const peeking = renderQuestion(c, q, false);
-        els.vis.innerHTML = renderVisual(q.visual);
+        els.vis.innerHTML = renderVisual(storyVisual(q));
         c.solid.show(q, session.currentTopic?.id);
         st.lastOutcome = 'none'; st.waveId++; els.qcard.classList.remove('good', 'bad');
         if (deps.tracing || deps.startPad) { say(firstLine); (deps.startPad ?? deps.startTrace)(q); return; }
@@ -260,7 +260,7 @@ function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: stri
   const spawn = () => {
     if (st.waveId !== myWave) return;                                 // superseded while we waited
     const arena = deps.arena()!;
-    say(firstLine); session.armQuestionClock(scaled); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
+    if (!q.story) say(firstLine); session.armQuestionClock(scaled); const a = opts.practice && correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true });
     requestAnimationFrame(() => {
       if (st.waveId !== myWave) return;
       arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
@@ -277,7 +277,7 @@ function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: stri
     fontReady().then(() => deps.later(() => { if (deps.mounted()) spawn(); }, scaled(0)));   // never into a torn-down screen
   };
   const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
-  if (peeking) c.peek.show(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
+  if (peeking) c.peek.show(q, launch); else if (q.story) holdForStory(deps.later, firstLine, launch); else launch();   // #65, #1352: the peek (or the story) owns the launch
 }
 
 /** The three outcomes: each is a sound, a toast and the shared `settle()` beat. */

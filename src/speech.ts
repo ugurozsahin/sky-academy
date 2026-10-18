@@ -242,24 +242,33 @@ export function hush(synth?: SynthLike | null, o: { engine?: SpeechEngine } = {}
  * `startSilence`/`stopSilence` above. Once the launch already reads `yes`, a line is still spoken but no
  * longer probed — nothing left to learn, and `recordVoice('yes')` on an already-`yes` launch is a no-op.
  *
+ * `onEnd` runs once when the engine reports the line `ended` or `failed`, and never for one cancelled or
+ * replaced (#1352); a line that is never attempted (no engine) reports nothing, so a caller keeps its own fallback.
+ *
  * `synth` and `engine` are the same seam at two levels: production code passes neither, so `o.synth` is
  * `undefined` and `speechEngine()` picks native-then-web itself (#881). `synth` is the older, web-shaped
  * test seam (`tests/unit/audio.test.ts`'s `SynthLike` fakes); `engine` lets a test drive the `SpeechEngine`
  * contract itself, with no `SynthLike` or `SpeechSynthesisUtterance` involved. Passing both is not a real
  * call shape — `engine` wins.
  */
-export function say(text: string, force = false, o: { queue?: boolean; synth?: SynthLike | null; engine?: SpeechEngine } = {}) {
+export function say(text: string, force = false, o: { queue?: boolean; onEnd?: () => void; synth?: SynthLike | null; engine?: SpeechEngine } = {}) {
   if (!force && !load().speech) return;
   const engine = o.engine ?? speechEngine(o.synth);
   if (!engine) { recordVoice('no'); return; }                              // no engine at all — the one verdict that needs no probe
   const token = {};
   if (observedVoice !== 'yes') startSilence(token);
+  let over = false;   // #1352: `onEnd` fires once, for a line that finished or failed — never one taken back by another
+  const end = () => { if (!over) { over = true; o.onEnd?.(); } };
   const events: SpeechEvents = {
     started: () => recordVoice('yes'),
-    ended: () => { if (pendingToken === token) recordVoice('yes'); },
+    ended: () => { if (pendingToken === token) recordVoice('yes'); end(); },
     // `canceled`/`interrupted` from the line taken back by `say()` itself; anything else leaves the clock
     // running — a later line may still start, and if none does the device really cannot be heard.
-    failed: reason => { if (pendingToken === token && (reason === 'canceled' || reason === 'interrupted')) stopSilence(); },
+    failed: reason => {
+      const taken = reason === 'canceled' || reason === 'interrupted';
+      if (pendingToken === token && taken) stopSilence();
+      if (!taken) end();
+    },
   };
   const attempted = engine.speak(text, { lang: 'en-GB', rate: 0.9, pitch: 1.08, queue: o.queue }, events);
   if (!attempted) recordVoice('no');
