@@ -25,11 +25,11 @@
  * `opts.label` names the pin in the error, the way `expect(x, label)` would.
  *
  * What it cannot see: an abbreviation ("e.g. this") reads as a sentence end, so a sentence carrying one is
- * pinned with `tail`; so does a stop inside a quote or a code span (`Reply "done." though only when asked`), since a
- * terminator may be followed by closers — pinned with `tail` the same way (#1807); an insertion *before* the fragment (member 3 of #771) is only caught when the fragment
- * starts before the gap; a change *inside* the fragment is a plain missing-fragment failure; and a new
- * sentence appended *after* the full stop is a new sentence, which is the governance PR's diff review to
- * judge, not this helper's.
+ * pinned with `tail`. So is a stop inside a quote or a code span (`Reply "done." though only when asked`): a
+ * terminator may be followed by closers, which `**Must never.** Next` needs, so `."` reads as the end (#1807). An
+ * insertion *before* the fragment (member 3 of #771) is only caught when the fragment starts before the gap; a
+ * change *inside* the fragment is a plain missing-fragment failure; and a new sentence appended *after* the
+ * full stop is a new sentence, which is the governance PR's diff review to judge, not this helper's.
  */
 export type PinSentenceOptions = { label?: string; tail?: string };
 
@@ -90,7 +90,8 @@ export function pinNormalised(flatText: string, fragment: string, opts: PinSente
   // terminator ("never.. though not every one.") with the hedge in between; the stray character is named with what follows.
   const closed = ENDS_WITH_TERMINATOR.test(flatFragment);
   if (closed && CLOSERS_THEN_SPACE.test(rest)) return;
-  const trailing = closed ? rest.slice(0, 1) + sentenceRest(rest.slice(1)) : sentenceRest(rest);
+  const stray = rest.slice(0, 1);
+  const trailing = closed ? stray + sentenceRest(rest.slice(1)) : sentenceRest(rest);
   if (trailing.trim() !== '') {
     throw new Error(`${who}something follows "${flatFragment}" inside its own sentence: "${trailing.trim()}" — `
       + 'a hedge appended at the match boundary, or a pin that stops mid-sentence (give the exact remainder as `tail`)');
@@ -117,9 +118,6 @@ export function pinNormalised(flatText: string, fragment: string, opts: PinSente
  * is the guard there, as before this ratchet. A literal-only count is still the whole of the class #771
  * names, which was all literals.
  *
- * An abbreviation ending (`/costs e\.g\./`, `'e.g.'`) reads as anchored, as it does in `pinSentence`; an escaped dollar
- * (`/price in \$/`) and an escaped backslash before a wildcard (`/x\\./`) do not (#1807).
- *
  * Known limits, counted knowingly (PR #1805 review): a literal that is not a sentence at all — an identifier,
  * a label, a path, `'owner-session'`, `/labels=routine-ok/` — is counted when it lacks a terminator (64 of
  * the 372 today), so a new `toContain('some-id')` raises the count and is anchored by using `pinSentence` on
@@ -130,7 +128,7 @@ export function pinNormalised(flatText: string, fragment: string, opts: PinSente
  */
 const PIN = /(\.not\s*)?\.(?:toMatch|toContain)\(\s*(?:\/((?:\\.|\[(?:\\.|[^\]\n])*\]|[^/\\\n])+)\/[a-z]*|'((?:\\.|[^'\\\n])*)'|"((?:\\.|[^"\\\n])*)"|`((?:\\.|(?!\$\{)[^`\\])*)`)\s*\)/g;
 // An end anchor or an escaped stop — each only when the backslashes before it pair off: `\$` is a literal dollar and
-// `\\.` an escaped backslash then the wildcard, so neither anchors anything (#1807). `e\.g\.` still reads as one (see below).
+// `\\.` an escaped backslash then the wildcard, so neither anchors anything (#1807). `e\.g\.` still reads as one, as an abbreviation does in `pinSentence`.
 const ANCHORED_REGEX = /(?:(?<!\\)(?:\\\\)*\\[.!?]|(?<!\\)(?:\\\\)*\$)(?:\\\*\\\*|\\\)|\\\]|["'`])*$/;
 const ANCHORED_STRING = /[.!?](?:\*\*|[)\]"'`])*$/;
 
