@@ -93,7 +93,7 @@ describe('y5-rounddec (#1200)', () => {
       for (const q of draw(d, 30_000)) {
         const vals = q.options.map(num);
         for (let i = 0; i < vals.length; i++) for (let j = i + 1; j < vals.length; j++) {
-          expect(compareDec(vals[i], vals[j]), `${q.prompt} -> ${q.options.join(' | ')}`).not.toBe(0);
+          if (compareDec(vals[i], vals[j]) === 0) expect.fail(`${q.prompt} -> ${q.options.join(' | ')}`);   // an expect() per pair is 270,000 calls
         }
       }
     }
