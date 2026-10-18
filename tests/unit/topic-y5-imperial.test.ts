@@ -25,6 +25,17 @@ const UNITS = /\b(in|foot|feet|kg|lb|cm|pints?|ml)\b/g;
 describe('y5-imperial (#1204)', () => {
   it('is registered for Year 5 maths in the measure strand', () => { expect(topic.year).toBe('year5'); expect(topic.subject).toBe('maths'); expect(topic.strand).toBe('measure'); });
 
+  it('no decoy is more than 100x or less than 1/100 of the exact conversion (#1902)', () => {
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d, 600)) {
+      if (!CONV.test(q.prompt)) continue;
+      seen++;
+      const e = exactOf(q);
+      for (const o of q.options) { expect(val(o), `${q.prompt} ${o}`).toBeLessThanOrEqual(100 * e); expect(val(o), `${q.prompt} ${o}`).toBeGreaterThanOrEqual(e / 100); }
+    }
+    expect(seen).toBeGreaterThan(100);
+  });
+
   it('conversion cards: four distinct options, answer within 10 % of the exact value, every decoy at least 40 % away', () => {
     let seen = 0;
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
