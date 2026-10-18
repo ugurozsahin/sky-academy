@@ -9,26 +9,38 @@
 // and teaches Sensei what Player 1 found hard on this topic, files a certificate when Player 1 wins, and
 // records the match itself in the duel history the rewards screen lists.
 import { avatarById } from '../avatars';
-import { topicsFor, type Question, type YearInfo } from '../curriculum';
-import { Arena, hittable } from '../game/arena';
+import { topicsFor, type YearInfo } from '../curriculum';
+import { Arena } from '../game/arena';
 import { Duel, DUEL_PLAYERS, duelHistoryLine, duelPool, type DuelPlayer } from '../game/duel';
-import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { load, type StoredDuel } from '../storage';
-import { certWords, drawCertificate } from './certificate';
 import { haptic, hush, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { pauseHTML } from './overlays';
-import { createDuelBeats, DUEL_TOAST_LONGEST, HOLD } from './duel-beats';
+import { createDuelBeats, DUEL_TOAST_LONGEST } from './duel-beats';
+import { createDuelHooks } from './duel-hooks';
 import { createDuelResults } from './duel-results';
 import { duelTopic } from '../game/duel-topic'; import { calmReduced } from '../device-settings';
-import type { DuelHooks } from './hooks';
 
 export { DUEL_TOAST_LONGEST };   // moved to duel-beats.ts with the toasts it measures (#1499); importers unchanged
 
 export interface DuelScreenOpts { year: YearInfo; topic?: string; labels?: 'players' | 'teams' }   // #958: 'teams' names the seats Team A / Team B
 const PLAYERS = DUEL_PLAYERS;
 const NAMES: Record<'players' | 'teams', Record<DuelPlayer, string>> = { players: { a: 'Player 1', b: 'Player 2' }, teams: { a: 'Team A', b: 'Team B' } };
+
+/** One `Arena` per seat, on that seat's canvas. A duel has no lives: a fallen bubble is just a bubble nobody sliced. */
+function mountArenas(arenas: Record<DuelPlayer, Arena>, av: ReturnType<typeof avatarById>, duel: Duel, waveEnd: (p: DuelPlayer) => void): void {
+  for (const p of PLAYERS) {
+    arenas[p] = new Arena($(`#arena-${p}`) as HTMLCanvasElement, {
+      onHit(b, viaSwipe) {
+        const r = duel.hit(p, b.label);
+        if (r !== 'ignored' && viaSwipe) { sfx.slice(); haptic('slice'); }
+      },
+      onFall() { /* no lives in a duel: a fallen bubble is just a bubble nobody sliced */ },
+      onWaveEnd: () => waveEnd(p),
+    }, { trailColor: av.glow, fx: av.fx, reducedMotion: calmReduced(), onSwish: () => sfx.swish(), onThrow: () => sfx.whoosh(), onLand: () => sfx.slice() });
+  }
+}
 
 export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar); const NAME = NAMES[o.labels ?? 'players'];
@@ -70,16 +82,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   const duel = new Duel({ topic, difficulty }, beats.callbacks); beats.bind(duel);
   const { waveEnd, hold } = beats;
 
-  for (const p of PLAYERS) {
-    arenas[p] = new Arena($(`#arena-${p}`) as HTMLCanvasElement, {
-      onHit(b, viaSwipe) {
-        const r = duel.hit(p, b.label);
-        if (r !== 'ignored' && viaSwipe) { sfx.slice(); haptic('slice'); }
-      },
-      onFall() { /* no lives in a duel: a fallen bubble is just a bubble nobody sliced */ },
-      onWaveEnd: () => waveEnd(p),
-    }, { trailColor: av.glow, fx: av.fx, reducedMotion: calmReduced(), onSwish: () => sfx.swish(), onThrow: () => sfx.whoosh(), onLand: () => sfx.slice() });
-  }
+  mountArenas(arenas, av, duel, waveEnd);
   // The settlement and the results overlay (#1500) sit in duel-results.ts; they need the beats' `hold`, and the beats
   // need their `commitOnce`/`showResults` (thunks above), so they are created here, after both sides exist.
   const results = createDuelResults({ o, topic, NAME, d, av, overlay, scope, hold, cleanup, goHome, replay });
@@ -97,29 +100,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   // #73: a route change tears the arenas down — two rAF loops leaked across screens would be twice the incident.
   function cleanup() { for (const p of PLAYERS) arenas[p].destroy(); scope.dispose(); }
 
-  const target = (p: DuelPlayer, wrong: boolean): string | undefined => {
-    const q: Question | null = duel.current; if (!q) return undefined;
-    if (!wrong) return q.answer;
-    return arenas[p].bubbles.find(x => hittable(x) && x.label !== q.answer)?.label;
-  };
-  const hooks: DuelHooks = {
-    duel, arenas,
-    answer: p => { const t = target(p, false); return t !== undefined && arenas[p].hitLabel(t); },
-    wrong: p => { const t = target(p, true); return t !== undefined && arenas[p].hitLabel(t); },
-    bubbles: p => arenas[p].bubbles.filter(hittable).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })),
-    state: () => ({
-      mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
-      decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
-      hint: beats.hintLine, coins: m.paid, dojoCoins: m.dojoPaid, taught: m.taught, paused,
-    }),
-    certificate: async () => m.cert ? (await drawCertificate(m.cert)).toDataURL('image/png') : null,
-    // The words that go on the drawn certificate. A byte count cannot tell one ninja's signature from another,
-    // which is how a wrong `avatar` survived round 1's rails (#397 round 2, B1).
-    certWords: () => m.cert ? certWords(m.cert) : null,
-    setSpeed: k => { setGameSpeed(k); },
-    timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw), miss: scaled(HOLD.miss) } }),
-  };
-  window.__sna = hooks;
+  window.__sna = createDuelHooks({ duel, arenas, topic, beats, m, paused: () => paused });   // #1500: the test hooks live in duel-hooks.ts
   duel.start();
   return cleanup;
 }
