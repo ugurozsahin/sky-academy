@@ -154,25 +154,26 @@ function statsAnswer(rng: Rng, c: { survey: Survey; counts: number[]; i: number;
  *
  * What replaces it, by stage: d1 the four facts below, d2 comparing intervals, d3 an end time.
  */
-const DUR_FACTS: [string, number][] = [['minutes in an hour', 60], ['hours in a day', 24], ['minutes in half an hour', 30], ['minutes in a quarter of an hour', 15]];
+/** Each table has its own shape, so none can be passed for another (#661): a fact is a count, the rest are minutes. */
+export const DUR_FACTS: { phrase: string; n: number }[] = [{ phrase: 'minutes in an hour', n: 60 }, { phrase: 'hours in a day', n: 24 }, { phrase: 'minutes in half an hour', n: 30 }, { phrase: 'minutes in a quarter of an hour', n: 15 }];
 /**
  * The intervals a comparison card draws from. Every phrase here is a **bubble label**, so each is kept as
  * short as `y2-time`'s longest (`quarter past 12`) — which is why `half an hour` appears and
  * `a quarter of an hour` does not. The values are distinct, so "the longest" of any subset is never a tie.
  */
-const INTERVALS: [string, number][] = [['10 minutes', 10], ['15 minutes', 15], ['20 minutes', 20], ['half an hour', 30], ['40 minutes', 40], ['50 minutes', 50], ['1 hour', 60]];
+export const INTERVALS: { label: string; mins: number }[] = [{ label: '10 minutes', mins: 10 }, { label: '15 minutes', mins: 15 }, { label: '20 minutes', mins: 20 }, { label: 'half an hour', mins: 30 }, { label: '40 minutes', mins: 40 }, { label: '50 minutes', mins: 50 }, { label: '1 hour', mins: 60 }];
 /** Durations that land the end time back on Year 2's o'clock / quarter / half grid, so it has a clock phrase. */
-const GRID_DURATIONS: [string, number][] = [['a quarter of an hour', 15], ['half an hour', 30], ['three quarters of an hour', 45], ['an hour', 60]];
+export const GRID_DURATIONS: { phrase: string; mins: number }[] = [{ phrase: 'a quarter of an hour', mins: 15 }, { phrase: 'half an hour', mins: 30 }, { phrase: 'three quarters of an hour', mins: 45 }, { phrase: 'an hour', mins: 60 }];
 /** Compare `n` intervals: which takes the longest, or the shortest. `n === 2` is the comparative form. */
 function intervalCompare(rng: Rng, n: number): Question {
   const chosen = shuffle(rng, INTERVALS).slice(0, n);
   const big = rng() < 0.5;
-  const target = chosen.reduce((best, cur) => (big ? cur[1] > best[1] : cur[1] < best[1]) ? cur : best);
+  const target = chosen.reduce((best, cur) => (big ? cur.mins > best.mins : cur.mins < best.mins) ? cur : best);
   const ask = n === 2 ? (big ? 'Which takes longer?' : 'Which takes less time?') : (big ? 'Which takes the longest?' : 'Which takes the shortest?');
   // No hint: the bubbles *are* the durations, so a hint listing them again would only repeat the question —
   // and a hint is the one line a landscape phone can hide (#328). `optionsAreContent` tells `repeatKey`
   // (#451) that this generator's question lives in `options`, since no other field carries it.
-  return wordQ(rng, ask, target[0], chosen.filter(c => c !== target).map(c => c[0]), { say: `${chosen.map(c => c[0]).join(', ')}. ${ask}`, optionsAreContent: true });
+  return wordQ(rng, ask, target.label, chosen.filter(c => c !== target).map(c => c.label), { say: `${chosen.map(c => c.label).join(', ')}. ${ask}`, optionsAreContent: true });
 }
 /**
  * "It starts at 3 o'clock and lasts half an hour. When does it end?" — a start on the quarter grid plus a
@@ -182,8 +183,8 @@ function intervalCompare(rng: Rng, n: number): Question {
  */
 function endTime(rng: Rng): Question {
   const h = ri(rng, 1, 12), m = pick(rng, [0, 15, 30, 45]);
-  const [phrase, mins] = pick(rng, GRID_DURATIONS);
-  const at = (t: number) => clockPhrase((Math.floor(t / 60) - 1) % 12 + 1, t % 60);
+  const { phrase, mins } = pick(rng, GRID_DURATIONS);
+  const at = (t: number) => clockPhrase(Math.floor(t / 60), t % 60);
   const start = h * 60 + m;
   const ans = at(start + mins);
   const ds: string[] = [];
@@ -198,7 +199,7 @@ function endTime(rng: Rng): Question {
 }
 export const y2Duration: Generator = (d, rng) => {
   if (d === 1) {
-    const [phrase, n] = pick(rng, DUR_FACTS);
+    const { phrase, n } = pick(rng, DUR_FACTS);
     return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 100, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n === 60 ? 30 : n * 2] });
   }
   if (d === 2) return intervalCompare(rng, rng() < 0.5 ? 2 : 3);
