@@ -287,7 +287,7 @@ describe('guard rails', () => {
   // The `window.__sna` hooks are the e2e contract (CLAUDE.md); losing one breaks every test at runtime only.
   // Substring check: it catches a hook being dropped or renamed, not one that stops working.
   it('the window.__sna test hooks still exist', () => {
-    const play = SOURCES['/src/ui/play.ts'];
+    const play = SOURCES['/src/ui/play.ts'] + SOURCES['/src/ui/play-hooks.ts'];   // #1504: the hooks object is built in play-hooks.ts
     expect(play).toContain('__sna');
     for (const hook of ['answer:', 'wrong:', 'bubbles:', 'state:', 'certificate:']) expect(play).toContain(hook);
     for (const hook of ['__sna', 'cards:', 'flip', 'state:']) expect(SOURCES['/src/ui/memory.ts']).toContain(hook);
@@ -1750,7 +1750,7 @@ describe('guard rails', () => {
     // the one thing the multiplier must never touch, restated here because #32's whole premise rests on it
     const speed = code(SOURCES['/src/game/speed.ts'] ?? '');
     expect(speed, 'scaled() divides a duration; it never multiplies a clock').toContain('ms / factor');
-    expect(SOURCES['/src/ui/play.ts'], 'the sprint clock still samples the real clock, not a scaled one')
+    expect(SOURCES['/src/ui/play-clock.ts'], 'the sprint clock still samples the real clock, not a scaled one')   // #1504
       .toContain('performance.now()');
   });
 
@@ -3135,7 +3135,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/game/arena.ts': 470, 'src/game/bubbles.ts': 521,
     'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 374, 'src/ui/duel-beats.ts': 187, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 420,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 182, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a
