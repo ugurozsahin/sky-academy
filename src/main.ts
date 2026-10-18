@@ -23,6 +23,7 @@ import { backGuard } from './ui/screen';
 import { topicById, topicsFor, YEARS, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
 import { needsSchoolYear, placementYear } from './school-year';
+import { queueLink, stripLinkParams, takeLink, wireDeepLinks } from './deeplink-open';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
 // Each screen below the map pushes a history entry, so the browser's back button steps back one screen —
@@ -63,10 +64,17 @@ const finishWizard = (go: boolean) => { save({ onboarded: true }); pendingFirstM
 const renderIntro = () => introScreen(() => finishWizard(true), () => finishWizard(false));
 /** The first Mission of the ninja's current island: its first Maths topic, never a tracing one. */
 const startFirstMission = (chosen?: YearInfo) => {
+  if (openLink()) return;   // #2027: a pending link outranks the default first mission
   const y = chosen ?? YEARS.find(i => i.id === (placementYear(load()) ?? 'reception')), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
   if (!y || !topic) { nav.map(); return; }
   year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
   nav.play({ year: y, mode: 'mission', topic });
+};
+/** #2027: open the pending deep link, once (`takeLink` clears it), as [map, island?, play?] so Back unwinds it. False when none. */
+const openLink = (): boolean => {
+  const l = takeLink(); if (!l) return false;
+  if (l.topic) { year = l.year; enter('island'); nav.play({ year: l.year, mode: 'mission', topic: l.topic }); } else nav.island(l.year);
+  return true;
 };
 const renderName = () => nameScreen(() => { enter('onboard-intro'); renderIntro(); });
 /** #1297: a Pro run plays `proYear(year)`; `o.year` stays canonical for Next topic, Play again and the island Back. */
@@ -77,7 +85,7 @@ const nav = {
     if (load().onboarded) { changeAvatarScreen(() => nav.map()); return; }
     chooseNinjaScreen(() => { enter('onboard-name'); renderName(); });
   },
-  map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
+  map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); openLink(); },
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
   play: ((o: StartOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(played(o), up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, pro: o.pro, seed: replaySeed(o.topic, o.seed), input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : o.mode === 'paper' ? paperDeck(Math.random) : o.title === DAILY_TEN_TITLE ? dailyTenDeck(topicsFor(o.year.id), Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend, pro: o.pro })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
@@ -225,6 +233,8 @@ wireBackButton({
 // ?reset=1 clears saved progress (used by tests).
 const params = new URLSearchParams(location.search);
 if (params.get('reset')) { try { localStorage.clear(); } catch { /* ignore */ } }
+queueLink(location.href); stripLinkParams();   // #2027: the link waits for a profile; the address bar drops it so reload and back never replay it
+wireDeepLinks(() => { if (load().onboarded) relaunch(); });
 document.addEventListener('visibilitychange', () => restClock.show(document.visibilityState === 'visible'));   // #940: hidden time never counts toward the rest prompt
 applyCalm();   // #906: the grown-ups' Calm motion switch, as a class on <html> before the first screen
 initGameSpeed();   // #32: test-only `?fast=N` time compression; default 1 (ordinary play)
