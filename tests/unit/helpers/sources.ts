@@ -202,6 +202,7 @@ export const code = (src: string): string => {
   return assemble(src, spans);
 };
 
-/** The Ninja Duel screen is two files since #1499: `duel.ts` (what pays and shows the match) and `duel-beats.ts`
- *  (the `Duel`'s callbacks and the wave beat). Rails about the screen read both, as one text. */
-export const duelSource = (): string => `${SOURCES['/src/ui/duel.ts'] ?? ''}\n${SOURCES['/src/ui/duel-beats.ts'] ?? ''}`;
+/** The Ninja Duel screen is four files since #1499 and #1500: `duel.ts` (the setup and the pause), `duel-beats.ts` (the
+ *  `Duel`'s callbacks and the wave beat), `duel-results.ts` (what pays and shows the match) and `duel-hooks.ts` (the
+ *  `window.__sna` hooks). Rails about the screen read all four, as one text. */
+export const duelSource = (): string => ['duel', 'duel-beats', 'duel-results', 'duel-hooks'].map(f => SOURCES[`/src/ui/${f}.ts`] ?? '').join('\n');
