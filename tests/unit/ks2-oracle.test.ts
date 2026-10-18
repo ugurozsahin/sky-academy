@@ -11,6 +11,8 @@ const f = (n: number, d = 1): Frac => ({ n, d });
 // letter equations, including the STA 2025 arithmetic paper's own four items (#1045's evidence section).
 const KNOWN: [string, Frac][] = [
   ['5 + 3 = ?', f(8)],
+  // #1986 boundary: every product is safe and so is the numerator they sum to (8.845e15 < 2^53 ≈ 9.007e15)
+  ['66000001 ÷ 67000003 + 67000003 ÷ 66000001 = ?', f(66000001 ** 2 + 67000003 ** 2, 67000003 * 66000001)],
   ['999999/999998 × 999999/999997 = ?', f(999999 * 999999, 999998 * 999997)],   // #1986: just inside the safe range
   ['12 − 5 = ?', f(7)],
   ['1,004,235 − 52,346 = ?', f(951889)],
@@ -163,6 +165,11 @@ const NULLS = [
   '',
   // #1986: each literal passes the #1443 caps, but the arithmetic after it outgrows MAX_SAFE_INTEGER
   '10,000,000.123 × 10,000,000.123 = ?',
+  // each cross-product is a safe integer but their sum is not (9.11e15 > 2^53): add, sub and the coefficient difference
+  // (the shared factor 1000 lets simplify() shrink the rounded numerator back to a safe-looking value, so only the pre-check refuses these)
+  '67000001 ÷ 67001000 + 68000003 ÷ 68001000 = ?',
+  '67000001 ÷ 67001000 − −68000003 ÷ 68001000 = ?',
+  '67000001 ÷ 67001000 × ? = −68000003 ÷ 68001000 × ? + 1',
   '1/999999 + 1/999998 + 1/999997 = ? + 1/999996',
   '999999/999998 × 999999/999997 × 999999/999996 × 999999/999995 = ?',
 ];
@@ -206,7 +213,7 @@ describe('sameValue', () => {
     expect(sameValue('9,999,999.999', f(9999999999, 10 ** 10))).toBe(false);   // dp 3 is fine; n·d ≈ 1e20 is not
   });
   it('refuses an answer with more decimal places than the oracle reads (#1986)', () => {
-    expect(sameValue('0.0000000001', f(1, 10 ** 10))).toBe(false);
+    expect(sameValue('0.0001', f(1, 10000))).toBe(false);   // only the dp guard refuses this: the products are tiny
   });
   it('rejects a value that disagrees', () => { expect(sameValue('6', f(7))).toBe(false); });
   it('is false for text it cannot read at all', () => {

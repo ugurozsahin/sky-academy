@@ -34,13 +34,13 @@ export function solve(prompt: string): number | null {
 
 /** #1986: `fractions.ts` checks nothing about its results, and past 2^53 `gcd`/`simplify` quietly return a plausible
  * but wrong value. The oracle's own arithmetic is therefore checked: every product a step forms must be a safe
- * integer, else the step throws `Overflow`, which `ks2Solve` and `sameValue` turn into `null` — the oracle
+ * integer (the numerator an add/sub forms included, since two safe products can sum past 2^53), else the step throws `Overflow`, which `ks2Solve` and `sameValue` turn into `null` — the oracle
  * refuses, it never answers wrongly. Only this test helper checks; the game's own `fractions.ts` is untouched. */
 class Overflow extends Error {}
 const safe = (...xs: number[]) => { if (!xs.every(Number.isSafeInteger)) throw new Overflow('beyond MAX_SAFE_INTEGER'); };
 function checked(a: Frac, b: Frac) { safe(a.n * b.d, b.n * a.d, a.d * b.d, a.n * b.n); }
-const add = (a: Frac, b: Frac): Frac => { checked(a, b); const r = fAdd(a, b); safe(r.n, r.d); return r; };
-const sub = (a: Frac, b: Frac): Frac => { checked(a, b); const r = fSub(a, b); safe(r.n, r.d); return r; };
+const add = (a: Frac, b: Frac): Frac => { checked(a, b); safe(a.n * b.d + b.n * a.d); const r = fAdd(a, b); safe(r.n, r.d); return r; };
+const sub = (a: Frac, b: Frac): Frac => { checked(a, b); safe(a.n * b.d - b.n * a.d); const r = fSub(a, b); safe(r.n, r.d); return r; };
 const mul = (a: Frac, b: Frac): Frac => { checked(a, b); const r = fMul(a, b); safe(r.n, r.d); return r; };
 
 const ZERO: Frac = { n: 0, d: 1 };
