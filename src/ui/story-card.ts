@@ -20,8 +20,9 @@ const wordCount = (line: string): number => line.split(/\s+/).filter(Boolean).le
 export function holdForStory(later: (fn: () => void, ms: number) => void, line: string, go: () => void): void {
   let done = false;
   const once = () => { if (!done) { done = true; go(); } };
-  const read = STORY_WORD_MS * wordCount(line);
-  if (!canHear()) { later(once, scaled(read)); return; }
-  say(line, false, { onEnd: () => later(once, scaled(0)) });   // through `later`: an end heard behind the pause overlay waits for it
-  later(once, scaled(read + VOICE_START_MS));
+  const read = STORY_WORD_MS * wordCount(line), hear = canHear();
+  // Spoken either way: `canHear()` is false on the APK (no web synth) though the native engine is heard, and a
+  // verdict of `no` could never flip back if the line were never offered. `say()` does nothing with speech off.
+  say(line, false, hear ? { onEnd: () => later(once, scaled(0)) } : {});   // through `later`: an end heard behind the pause overlay waits for it
+  later(once, scaled(hear ? read + VOICE_START_MS : read));
 }

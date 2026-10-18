@@ -256,11 +256,11 @@ function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: stri
   const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
   const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle);
   const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
-  const myWave = st.waveId;
+  const storyLine = !!q.story && !peeking, myWave = st.waveId;   // #1352: holdForStory speaks a story's line
   const spawn = () => {
     if (st.waveId !== myWave) return;                                 // superseded while we waited
     const arena = deps.arena()!;
-    if (!q.story) say(firstLine); session.armQuestionClock(scaled); const a = opts.practice && correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true });
+    if (!storyLine) say(firstLine); session.armQuestionClock(scaled); const a = opts.practice && correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true });
     requestAnimationFrame(() => {
       if (st.waveId !== myWave) return;
       arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
@@ -277,7 +277,7 @@ function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: stri
     fontReady().then(() => deps.later(() => { if (deps.mounted()) spawn(); }, scaled(0)));   // never into a torn-down screen
   };
   const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
-  if (peeking) c.peek.show(q, launch); else if (q.story) holdForStory(deps.later, firstLine, launch); else launch();   // #65, #1352: the peek (or the story) owns the launch
+  if (peeking) c.peek.show(q, launch); else if (storyLine) holdForStory(deps.later, firstLine, launch); else launch();   // #65, #1352: the peek (or the story) owns the launch
 }
 
 /** The three outcomes: each is a sound, a toast and the shared `settle()` beat. */
