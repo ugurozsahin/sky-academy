@@ -6,13 +6,12 @@
   },
   "complexity": {
     "src/main.ts::(anonymous)": 16,
-    "src/ui/play.ts::playScreen": 22,
+    "src/ui/play.ts::playScreen": 19,
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/ui/duel.ts::duelScreen": 123,
-    "src/ui/play-session.ts::createPlaySession": 186,
-    "src/ui/play.ts::playScreen": 197
+    "src/ui/duel.ts::duelScreen": 83,
+    "src/ui/play.ts::playScreen": 126
   },
   "fileLines": {
     "tests/unit/arena.test.ts": 948,

@@ -8,20 +8,22 @@
 // below, exactly as before the move. The pieces the screen builds *after* the session (the arena, the
 // `window.__sna` hooks) are read through the function-valued deps, so the order in play.ts is unchanged.
 import { cheerLine, type Avatar } from '../avatars';
-import { STAGE_NAMES, type Question } from '../curriculum';
+import type { Question } from '../curriculum';
 import type { Arena } from '../game/arena';
 import type { DojoOutcome } from '../game/dojo';
-import { Session, type SessionOpts, type SessionResult } from '../game/session';
+import { Session, type SessionEvents, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { waveOptsFor } from './wave-opts';
 import { canHear, haptic, hush, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate'; import { firstQuestionLine, type ResultCandidate } from './results';   // #897; one line: at its #714 cap
 import { createFactLog } from '../fact-record';
-import { $, esc } from './dom';
+import { $ } from './dom';
 import { freezeUntilVisible } from './hidden-hold';
 import { createGhost } from './ghost'; import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
-import { correctionLine, hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
+import { correctionLine, hintText, promptHTML, promptMode, setHint, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
+import { createMissionPill } from './mission-pill';
+import { createPeek, NO_VOICE_PEEK_MS } from './play-peek';
 import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
@@ -118,8 +120,7 @@ export interface PlaySession {
   dispose(): void;
 }
 
-/** A visual equivalent of hearing a sentence once: look, remember, then build. */
-export const NO_VOICE_PEEK_MS = 3000;
+export { NO_VOICE_PEEK_MS };   // moved to play-peek.ts with the peek (#1501); importers unchanged
 /** The 🔊 button's labels per prompt mode; `read` hides it — the words are already on the card. */
 const SPEAK_LABEL = {
   hear: { aria: 'Read the question aloud', title: 'Tap the card to hear it again' },
@@ -147,205 +148,190 @@ const OUTCOME = {
   miss: { seg: 'bad', taunt: true, hold: 'miss', advance: 1200 },
 } as const;
 
-/** Build the session and its callbacks for one play screen. */
-export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): PlaySession {
-  const { els, hud, hold } = deps, facts = createFactLog();
-  const mission = opts.mode === 'mission' && !opts.deck;   // only missions show the stage pill and its segments; a deck run (#930) counts plainly instead
-  let lastOutcome: Outcome | 'none' = 'none';
-  let waveId = 0; let revealUntil = 0;
-  // #484: set by `onCommit` when a staged mission's last question is decided ahead of `onEnd` — so `onEnd`
-  // reuses that payout instead of committing (and so paying) the game a second time.
-  let earlyPayout: ResultPayout | null = null;
-  let activeQuestion: Question | null = null;
-  // The peek (#65): a sentence shown for NO_VOICE_PEEK_MS of un-paused time, then hidden. `peekLeft` is the
-  // time still to run, `peekSince` when the current run started, `peekDone` what the hide releases (the wave
-  // launch, for the first peek of a question). `holdOpen` mirrors the pause overlay; `readThrough` marks a
-  // question whose verdict arrived after its bubbles launched, so its sentence stays readable instead.
-  let peekToken = 0; let peekActive = false; let peekLeft = 0; let peekSince = 0;
-  let peekDone: (() => void) | null = null; let holdOpen = false; let readThrough = false;
-  let prevLives = opts.year.lives;
-  // #44: false only until Fredoka is usable (or the capped wait gives up). The first wave is held back that
-  // long so its labels are measured and drawn in the real face; every wave after it spawns synchronously.
-  let fontsReady = false; fontReady().then(() => { fontsReady = true; });
-  const solid = createSolidSlot(() => els.vis);   // #684: three loads on the first 3-D Shapes card, never before
-  // Mission progress (#55): stage name + one segment per question (green = right, red = slip, pulsing = current) + a small "3/6".
-  let segStage = 0; let segs: ('good' | 'bad' | '')[] = [];
-  function drawStage(stage: number, index: number, total: number) {
-    if (!mission) { els.stage.textContent = `Q${session.questionsAsked}`; return; }
-    if (stage !== segStage) { segStage = stage; segs = Array.from({ length: total }, () => ''); }
-    els.stage.innerHTML = stageHTML(STAGE_NAMES[stage - 1] ?? `Stage ${stage}`, segs, index, total);
-  }
-  const markSeg = (k: 'good' | 'bad') => {
-    if (mission) { segs[session.index] = k; drawStage(session.stage, session.index, session.perStage); }
-  };
-  const endWave = (ms: number) => {                // freeze the wave while the outcome is on screen
-    const id = waveId; revealUntil = performance.now() + ms;
-    deps.later(() => { if (waveId === id) deps.arena()?.clearWave('#ffffff'); }, ms);
-  };
-  /** The beat every outcome shares. `reveal` is what the arena spotlights: the right answer, and the wrong bubble if one was cut. */
-  function settle(kind: Outcome, q: Question, reveal: { good: string; bad?: string }) {
-    const rule = OUTCOME[kind];
-    lastOutcome = kind; markSeg(rule.seg); facts.note(q, kind, opts.mode === 'mtc' ? session.lastAnswerMs || undefined : undefined);   // #1122: ms only in a timed Tables Check
-    if (rule.taunt) deps.showTaunt();
-    const arena = deps.arena();
-    if (!arena) { if (rule.advance) deps.later(() => session.advance(), scaled(rule.advance)); return; }   // #138: the tracing path's own beat, scaled like every other
-    arena.reveal(reveal); hud.showOutcome(kind, q); endWave(scaled(hold[rule.hold]));
-  }
+type QuestionInfo = Parameters<SessionEvents['onQuestion']>[1];
 
-  /** `arena.paused` has ONE writer outside arena.ts, and this is it (a guard rail counts): the screen's overlays
-   *  (`hold()`) and the peek are reasons, and this is the sum of them — plus a finished game, which the results
-   *  overlay pauses for good and nothing here may undo. */
-  function syncPaused() {
-    const arena = deps.arena();
-    if (arena) arena.paused = holdOpen || peekActive || session.ended;
-  }
-  /** Drop a peek without finishing it — a new question, a slice, or teardown made it moot. */
-  function releasePeek() {
-    if (!peekActive) return;
-    peekToken++; peekActive = false; peekDone = null;
-    syncPaused();
-  }
-  /** Show the sentence and start (or resume) its clock. `then` runs when it hides — nothing, for a repeat. */
-  function showPeek(q: Question, then: (() => void) | null) {
-    els.prompt.innerHTML = esc(q.listen!);
-    setHint(els, 'Look, remember, then build it');
-    peekActive = true; peekLeft = scaled(NO_VOICE_PEEK_MS); peekDone = then;
-    syncPaused();
-    if (!holdOpen) runPeek(q);
-  }
-  function runPeek(q: Question) {
-    const token = ++peekToken; peekSince = performance.now();
-    deps.later(() => {
-      if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
-      els.prompt.innerHTML = promptHTML(q, session.seqIndex, false, session.remaining());
-      setHint(els, q.peekHint ?? 'Slice the words in order');
-      const then = peekDone; peekActive = false; peekDone = null;
-      syncPaused();
-      then?.();
-    }, peekLeft);
-  }
+/** The small mutable state only the callbacks and the screen's `PlaySession` methods touch. */
+interface BeatState {
+  lastOutcome: Outcome | 'none'; waveId: number; revealUntil: number;
+  // #484: set by `onCommit` so `onEnd` reuses that payout instead of paying the game a second time.
+  earlyPayout: ResultPayout | null;
+  activeQuestion: Question | null;
+  // `holdOpen` mirrors the pause overlay; `readThrough`: verdict arrived after the bubbles launched, so no peek (#65).
+  holdOpen: boolean; readThrough: boolean;
+  prevLives: number;
+  // #44: false only until Fredoka is usable (or the capped wait gives up); the first wave waits for it.
+  fontsReady: boolean;
+}
 
-  /**
-   * Put the prompt on the card for the device's voice verdict (#65). Returns true when a peek is holding the
-   * wave back — the caller launches when it ends. `launched` says the bubbles are already up (a verdict that
-   * landed mid-wave): a peek cannot start under a live wave — "hide it before the bubbles launch" is the
-   * contract in types.ts — so that question reads its sentence through instead.
-   */
-  function renderQuestion(q: Question, launched: boolean): boolean {
-    const mode = promptMode(q, canHear());
-    releasePeek();
-    if (mode === 'peek' && launched) readThrough = true;
-    const reveal = mode === 'read' || readThrough;
-    els.speak.hidden = reveal;
-    if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
-    if (mode === 'peek' && !launched) return true;
-    els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal, session.remaining());
-    // Both halves: the generator says this hint is data, AND it is the hint that reached the card. The second
-    // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
-    // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
-    const line = hintText(q, { reveal, tracing: deps.tracing, keypad: !!deps.startPad });
-    setHint(els, line, !!q.hint && !!q.hintIsData);
-    return false;
-  }
+/** What every callback group shares. `session` is filled in right after `new Session(...)` — callbacks only run later. */
+interface BeatCtx {
+  opts: SessionOpts; deps: PlaySessionDeps; st: BeatState; facts: ReturnType<typeof createFactLog>;
+  pill: ReturnType<typeof createMissionPill>; peek: ReturnType<typeof createPeek>; solid: ReturnType<typeof createSolidSlot>;
+  ghost: ReturnType<typeof createGhost>; session: Session;
+}
 
-  const ghost = createGhost(opts); const session = new Session(opts, {
-    onQuestion(q, info) {
+/** `arena.paused` has ONE writer outside arena.ts, and this is it (a guard rail counts): the screen's overlays
+ *  (`hold()`) and the peek are reasons, and this is the sum of them — plus a finished game, which the results
+ *  overlay pauses for good and nothing here may undo. */
+function syncPaused(c: BeatCtx) {
+  const { deps, peek, session } = c, { holdOpen } = c.st;
+  const arena = deps.arena();
+  if (arena) arena.paused = holdOpen || peek.active || session.ended;
+}
+
+/** Freeze the wave while the outcome is on screen. */
+function holdWave(c: BeatCtx, ms: number) {
+  const { deps, st } = c, id = st.waveId; st.revealUntil = performance.now() + ms;
+  deps.later(() => { if (st.waveId === id) deps.arena()?.clearWave('#ffffff'); }, ms);
+}
+
+/** The beat every outcome shares. `reveal` is what the arena spotlights: the right answer, and the wrong bubble if one was cut. */
+function settle(c: BeatCtx, kind: Outcome, q: Question, reveal: { good: string; bad?: string }) {
+  const { opts, deps, st, session } = c, rule = OUTCOME[kind], endWave = (ms: number) => holdWave(c, ms);
+  st.lastOutcome = kind; c.pill.mark(rule.seg, session.stage, session.index, session.perStage);
+  c.facts.note(q, kind, opts.mode === 'mtc' ? session.lastAnswerMs || undefined : undefined);   // #1122: ms only in a timed Tables Check
+  if (rule.taunt) deps.showTaunt();
+  const arena = deps.arena();
+  if (!arena) { if (rule.advance) deps.later(() => session.advance(), scaled(rule.advance)); return; }   // #138: the tracing path's own beat, scaled like every other
+  arena.reveal(reveal); c.deps.hud.showOutcome(kind, q); endWave(scaled(deps.hold[rule.hold]));
+}
+
+/**
+ * Put the prompt on the card for the device's voice verdict (#65). Returns true when a peek is holding the
+ * wave back — the caller launches when it ends. `launched` says the bubbles are already up (a verdict that
+ * landed mid-wave): a peek cannot start under a live wave — "hide it before the bubbles launch" is the
+ * contract in types.ts — so that question reads its sentence through instead.
+ */
+function renderQuestion(c: BeatCtx, q: Question, launched: boolean): boolean {
+  const { deps, st, session } = c, { els } = deps;
+  const mode = promptMode(q, canHear());
+  c.peek.release();
+  if (mode === 'peek' && launched) st.readThrough = true;
+  const reveal = mode === 'read' || st.readThrough;
+  els.speak.hidden = reveal;
+  if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
+  if (mode === 'peek' && !launched) return true;
+  els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal, session.remaining());
+  // Both halves: the generator says this hint is data, AND it is the hint that reached the card. The second
+  // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
+  // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
+  const line = hintText(q, { reveal, tracing: deps.tracing, keypad: !!deps.startPad });
+  setHint(els, line, !!q.hint && !!q.hintIsData);
+  return false;
+}
+
+/** The question beat: the stage pill, the card, the visual, then the wave. */
+function questionCallbacks(c: BeatCtx) {
+  const { opts, deps, st } = c, { els } = deps;
+  return {
+    onQuestion(q: Question, info: QuestionInfo) {
+      const { session } = c;
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
-      const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { deps.later(() => show(), wait + scaled(450)); return; } show();
+      const wait = Math.max(0, st.revealUntil - performance.now()); if (wait > 0) { deps.later(() => show(), wait + scaled(450)); return; } show();
       function show() {
-        drawStage(info.stage, info.index, info.total);
+        c.pill.draw(info.stage, info.index, info.total);
         // Sensei: name the topic of each question
         const t = session.currentTopic;
         if (deps.training && t) $('.ttl').textContent = `${t.icon} ${t.title}`;
-        const firstLine = firstQuestionLine(q, opts.topic, session.questionsAsked, !!opts.practice, activeQuestion); activeQuestion = q; readThrough = false;
-        const peek = renderQuestion(q, false);
+        const firstLine = firstQuestionLine(q, opts.topic, session.questionsAsked, !!opts.practice, st.activeQuestion); st.activeQuestion = q; st.readThrough = false;
+        const peeking = renderQuestion(c, q, false);
         els.vis.innerHTML = renderVisual(q.visual);
-        solid.show(q, session.currentTopic?.id);
-        lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
+        c.solid.show(q, session.currentTopic?.id);
+        st.lastOutcome = 'none'; st.waveId++; els.qcard.classList.remove('good', 'bad');
         if (deps.tracing || deps.startPad) { say(firstLine); (deps.startPad ?? deps.startTrace)(q); return; }
-        const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
-        const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle);
-        const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
-        // #138: a spawn can be queued — behind the tutorial hold, or behind the font gate — and the session
-        // can move on while it waits, so it must check that its own question is still the one on screen.
-        // Without this, a wave that was superseded lands on top of the wave that replaced it: spawnWave()
-        // empties the array first, so the child is left holding the PREVIOUS question's bubbles — asked one
-        // question and handed another's answers. It was only ever reachable because the tutorial hold was
-        // 1.8 s of real time, longer than anything that raced with it; scaling that hold (play.ts) shortened
-        // the gap and the race came out. The rAF is checked too — it is a second deferral, and the frame
-        // after a queued spawn is exactly when a fast session moves on. Same idiom as endWave, other end.
-        const myWave = waveId;
-        const spawn = () => {
-          if (waveId !== myWave) return;                                 // superseded while we waited
-          const arena = deps.arena()!;
-          say(firstLine); session.armQuestionClock(scaled); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
-          requestAnimationFrame(() => {
-            if (waveId !== myWave) return;
-            arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
-            arena.spawnWave({ ...waveOpts, labels });
-          });
-        };
-        const demo = deps.showTutorial();           // first ever play: animated hand first, bubbles a moment later
-        // #44: the very first wave waits for Fredoka. A bubble's label size is fitted once at spawn (#28) and
-        // every frame draws it with fillText, so a wave launched before the font lands is measured against the
-        // fallback face and then changes shape in mid-air while the child is reading it. Only the first wave
-        // pays: fontReady() caches, and `fontsReady` keeps every later spawn synchronous, exactly as before.
-        // The tutorial branch goes through the same gate (review of #139): `demo` is the child's first ever
-        // play, the one launch certain to have a cold font cache, and it used to be waved through on nothing
-        // but the coincidence that showTutorial()'s 1800 ms happens to exceed the 1200 ms cap.
-        const gatedSpawn = () => {
-          if (fontsReady) { spawn(); return; }
-          // Through `later(..., 0)` and not straight out of the promise (PR #474 review, B2). `mounted()` is
-          // the only guard a raw continuation has and it does not read the hold, so a pause pressed inside
-          // this gate — up to the 1200ms cap, on a cold font cache — let `say()` speak the question behind
-          // the overlay and `spawnWave` land with `launchAt` already past. That is #301 word for word, in the
-          // one place the fix did not reach. A 0ms beat defers rather than drops: frozen at 0 remaining and
-          // re-armed at 0 on resume, so the wave goes up when the child comes back rather than never.
-          // `scaled(0)` rather than a bare `0`: it is 0 either way, and #138's rail is right that a beat belongs
-          // on the scaled clock — this one is a "next task", not a wait, and says so by going through it.
-          fontReady().then(() => deps.later(() => { if (deps.mounted()) spawn(); }, scaled(0)));   // never into a torn-down screen
-        };
-        const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
-        if (peek) showPeek(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
+        launchWave(c, q, info, firstLine, peeking);
       }
     },
-    onCorrect(q, points, combo) {
-      sfx.correct(); els.score.textContent = String(session.score); solid.cheer();   // #740: the card's solid cheers
-      const c = ghost.beat(session.correct) ?? cheerLine(deps.av); deps.toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', scaled(hold.correct) + 300);
+  };
+}
+
+/**
+ * The wave for a question: queued behind the tutorial hold and the font gate, launched when the peek (if any)
+ * hides. #138: a spawn can be queued and the session can move on while it waits, so it checks that its own
+ * question is still the one on screen — without that, a superseded wave lands on top of the wave that replaced
+ * it and the child is handed the PREVIOUS question's bubbles. The rAF is checked too: it is a second deferral.
+ */
+function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: string, peeking: boolean) {
+  const { opts, deps, st, session } = c, { els } = deps;
+  const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
+  const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle);
+  const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
+  const myWave = st.waveId;
+  const spawn = () => {
+    if (st.waveId !== myWave) return;                                 // superseded while we waited
+    const arena = deps.arena()!;
+    say(firstLine); session.armQuestionClock(scaled); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
+    requestAnimationFrame(() => {
+      if (st.waveId !== myWave) return;
+      arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
+      arena.spawnWave({ ...waveOpts, labels });
+    });
+  };
+  const demo = deps.showTutorial();           // first ever play: animated hand first, bubbles a moment later
+  // #44: the very first wave waits for Fredoka — labels are fitted once at spawn (#28), so a wave launched before
+  // the font lands would change shape in mid-air. Only the first wave pays; the tutorial goes through the same gate (#139).
+  const gatedSpawn = () => {
+    if (st.fontsReady) { spawn(); return; }
+    // Through `later(..., 0)`, not straight out of the promise (PR #474 review, B2): `mounted()` does not read the
+    // hold, so a pause inside this gate let `say()` speak behind the overlay (#301). `scaled(0)` keeps #138's rail satisfied.
+    fontReady().then(() => deps.later(() => { if (deps.mounted()) spawn(); }, scaled(0)));   // never into a torn-down screen
+  };
+  const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
+  if (peeking) c.peek.show(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
+}
+
+/** The three outcomes: each is a sound, a toast and the shared `settle()` beat. */
+function outcomeCallbacks(c: BeatCtx) {
+  const { opts, deps } = c, { hold } = deps;
+  return {
+    onCorrect(q: Question, points: number, combo: number) {
+      const { session } = c;
+      sfx.correct(); deps.els.score.textContent = String(session.score); c.solid.cheer();   // #740: the card's solid cheers
+      const line = c.ghost.beat(session.correct) ?? cheerLine(deps.av); deps.toast(combo >= 3 ? `${line} Combo ×${combo}` : line, 'good', scaled(hold.correct) + 300);
       const arena = deps.arena();
       if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, deps.av.glow);
       // a finished sequence spotlights its last letter; everything else spotlights the answer itself
-      settle('correct', q, { good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
+      settle(c, 'correct', q, { good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
     },
     // #893: relies on tracing never reaching onWrong/onMiss at all (startTrace()'s tracer only ever hits a
     // pass) rather than checking deps.tracing itself — a future tracing "give up" path needs its own gate.
-    onWrong(q, hit) {
+    onWrong(q: Question, hit: string) {
+      const { session } = c;
       sfx.wrong(); haptic('wrong'); deps.toast('Not quite!', 'bad', scaled(hold.wrong));
-      settle('wrong', q, { good: q.sequence ? session.remaining()[0] : q.answer, bad: hit });
-      if (opts.mode !== 'sprint') hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
+      settle(c, 'wrong', q, { good: q.sequence ? session.remaining()[0] : q.answer, bad: hit });
+      if (opts.mode !== 'sprint') deps.hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
     },
-    onMiss(q) {
+    onMiss(q: Question) {
+      const { session } = c;
       sfx.miss(); deps.toast('Missed!', 'bad', scaled(hold.miss));
-      settle('miss', q, { good: q.sequence ? session.remaining()[0] : q.answer });
-      if (opts.mode !== 'sprint') hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
+      settle(c, 'miss', q, { good: q.sequence ? session.remaining()[0] : q.answer });
+      if (opts.mode !== 'sprint') deps.hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
     },
-    onProgress(label, done, total) {
-      releasePeek();
+  };
+}
+
+/** Spelling progress, lives, stages, the sprint clock, the boss, and the end of the game. */
+function flowCallbacks(c: BeatCtx) {
+  const { deps, st } = c, { hud } = deps, { els } = deps;
+  return {
+    onProgress(label: string, done: number, total: number) {
+      const { session } = c;
+      c.peek.release();
       sfx.slice();
       const arena = deps.arena();
       // the next word is earned: bring it up now instead of making the child wait for its batch
       if (done < total) arena?.rush(session.remaining()[0]);
       const q = session.current!;
-      els.prompt.innerHTML = promptHTML(q, done, promptMode(q, canHear()) === 'read' || readThrough, session.remaining());
+      els.prompt.innerHTML = promptHTML(q, done, promptMode(q, canHear()) === 'read' || st.readThrough, session.remaining());
       if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, deps.av.glow);
       // queued, never interrupting: sliced letters arrive faster than they can be spoken, and a plain say()
       // cuts each one off to start the next, so the child hears fragments instead of the word (#40)
       if (done < total) say(label, false, { queue: true });
     },
-    onLives(n) { hud.drawLives(n); if (n < prevLives) { sfx.life(); haptic('life'); } prevLives = n; },
-    onStageClear(stage, st, acc) { sfx.stage(); haptic('stage'); deps.showStageClear(stage, st, acc); },
-    onTime(s) { hud.drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
-    onBoss(hp, max, kind) {
+    onLives(n: number) { hud.drawLives(n); if (n < st.prevLives) { sfx.life(); haptic('life'); } st.prevLives = n; },
+    onStageClear(stage: number, stars: number, acc: number) { sfx.stage(); haptic('stage'); deps.showStageClear(stage, stars, acc); },
+    onTime(s: number) { hud.drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
+    onBoss(hp: number, max: number, kind: 'hit' | 'heal') {
       hud.drawHp(hp, max);
       const v = $('#villain'); if (!v) return;
       v.classList.remove('hit', 'heal'); void v.offsetWidth; v.classList.add(kind);
@@ -358,56 +344,77 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     // fires synchronously at that true decision point (`session.ts`) and commits there; this reuses its
     // payout instead of committing a second time. Every other mode (Endless, Sprint, Boss, Memory Match's
     // own `commit()`) never fires `onCommit` at all, so `earlyPayout` stays null and this commits as before.
-    onCommit(r) { earlyPayout = deps.commitResult(r); },
+    onCommit(r: SessionResult) { st.earlyPayout = deps.commitResult(r); },
     // #138: the floor and the breath after it are game beats and scale; `revealUntil - now` is real time
     // already remaining on a hold that was itself scaled when it started, so it must NOT be scaled again.
     // #484: for every mode but a staged mission's last stage, the writes are committed here, in the same
     // synchronous call as `end()` — before the overlay's own timer is even scheduled — so a quit during the
     // wait below can only ever cancel the DRAWING of the results, never the payout itself.
-    onEnd(r) {
-      const payout = earlyPayout ?? deps.commitResult(r);
-      earlyPayout = null;
-      const wait = lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(scaled(900), revealUntil - performance.now() + scaled(300));
+    onEnd(r: SessionResult) {
+      const payout = st.earlyPayout ?? deps.commitResult(r);
+      st.earlyPayout = null;
+      const wait = st.lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(scaled(900), st.revealUntil - performance.now() + scaled(300));
       deps.later(() => deps.showResults(r, payout), wait);
     },
-  });
+  };
+}
 
-  // Registered after `session` exists: `recordVoice` dispatches synchronously, and this reads the session. A
-  // verdict that lands mid-peek is left alone — the sentence is on the card and the wave launches when it hides.
-  const stopWatchingVoice = onVoiceStateChange(() => {
-    if (activeQuestion && !session.waiting && !peekActive && deps.mounted()) renderQuestion(activeQuestion, true);
-  });
-
+/** The screen-facing methods of a `PlaySession` — what play.ts calls on the live session. */
+function screenMethods(c: BeatCtx): Omit<PlaySession, 'session' | 'facts' | 'dispose'> {
+  const { deps, st, peek, solid } = c;
   return {
-    session, facts,
     waveEnd() {   // let the outcome finish showing (the reveal may still be on screen), then a breath before the next question
-      const gap = scaled(lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650);
-      deps.later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
+      const gap = scaled(st.lastOutcome === 'correct' ? 450 : st.lastOutcome === 'none' ? 0 : 650);
+      deps.later(() => c.session.waveEnd(), Math.max(0, st.revealUntil - performance.now()) + gap);
     },
-    hidden: (pauseIfLive) => { hush(); if (!pauseIfLive() && session.ended && !holdOpen) freezeUntilVisible(deps.holdTimers); },
+    hidden: (pauseIfLive) => { hush(); if (!pauseIfLive() && c.session.ended && !st.holdOpen) freezeUntilVisible(deps.holdTimers); },
     hold(open, beats = true) {
-      if (open === holdOpen) return;
-      holdOpen = open;
+      if (open === st.holdOpen) return;
+      st.holdOpen = open;
       // The screen's beats freeze with the arena (#301). The peek's own clock below already worked this way —
       // #65 stopped it so a child pausing mid-sentence found the sentence still there — and the outcome hold,
       // the inter-question gap and the results cue were the ones still running behind the overlay.
       if (beats) deps.holdTimers(open);
-      if (peekActive && activeQuestion) {
-        if (open) { peekLeft = Math.max(0, peekLeft - (performance.now() - peekSince)); peekToken++; }   // stop the clock
-        else runPeek(activeQuestion);                                                                 // and restart it
-      }
-      syncPaused();
+      peek.pause(open);
+      syncPaused(c);
     },
     repeat() {
-      const q = activeQuestion;
-      if (!q || session.waiting || readThrough || promptMode(q, canHear()) !== 'peek' || !deps.mounted()) return false;
-      if (!peekActive) showPeek(q, null);   // bubbles already up stay frozen while the child looks; nothing waits on it
+      const q = st.activeQuestion;
+      if (!q || c.session.waiting || st.readThrough || promptMode(q, canHear()) !== 'peek' || !deps.mounted()) return false;
+      if (!peek.active) peek.show(q, null);   // bubbles already up stay frozen while the child looks; nothing waits on it
       return true;
     },
     solid: () => solid.state(),
     bubbleArt: (label, colour, phase) => solid.bubbleArt(label, colour, phase),
     solidArt: () => solid.art(),
-    dispose() { releasePeek(); stopWatchingVoice(); solid.dispose(); },
   };
 }
 
+/** Build the session and its callbacks for one play screen. */
+export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): PlaySession {
+  const { els } = deps, facts = createFactLog();
+  const mission = opts.mode === 'mission' && !opts.deck;   // only missions show the stage pill and its segments; a deck run (#930) counts plainly instead
+  const st: BeatState = {
+    lastOutcome: 'none', waveId: 0, revealUntil: 0, earlyPayout: null, activeQuestion: null,
+    holdOpen: false, readThrough: false, prevLives: opts.year.lives, fontsReady: false,
+  };
+  fontReady().then(() => { st.fontsReady = true; });
+  const c = {
+    opts, deps, st, facts, ghost: createGhost(opts),
+    solid: createSolidSlot(() => els.vis),   // #684: three loads on the first 3-D Shapes card, never before
+    pill: createMissionPill(els.stage, mission, () => c.session.questionsAsked),   // mission progress (#55)
+    peek: createPeek({
+      els, later: deps.later, mounted: deps.mounted, current: () => st.activeQuestion, held: () => st.holdOpen,
+      sync: () => syncPaused(c), hiddenHTML: q => promptHTML(q, c.session.seqIndex, false, c.session.remaining()),
+    }),
+  } as BeatCtx;
+  c.session = new Session(opts, { ...questionCallbacks(c), ...outcomeCallbacks(c), ...flowCallbacks(c) });
+
+  // Registered after `session` exists: `recordVoice` dispatches synchronously, and this reads the session. A
+  // verdict that lands mid-peek is left alone — the sentence is on the card and the wave launches when it hides.
+  const stopWatchingVoice = onVoiceStateChange(() => {
+    if (st.activeQuestion && !c.session.waiting && !c.peek.active && deps.mounted()) renderQuestion(c, st.activeQuestion, true);
+  });
+
+  return { session: c.session, facts, ...screenMethods(c), dispose() { c.peek.release(); stopWatchingVoice(); c.solid.dispose(); } };
+}

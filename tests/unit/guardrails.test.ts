@@ -9,7 +9,7 @@ import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
-import { SOURCES, STORAGE_SRC, inDir, code, workflow, styleCss } from './helpers/sources';
+import { SOURCES, STORAGE_SRC, inDir, code, workflow, styleCss, duelSource } from './helpers/sources';
 import { edges } from './helpers/edges';   // #714's import-edge reader, moved out in #841 so its tests can grow beside it
 import { YEARS } from '../../src/curriculum/types';   // #392: the rail below holds docs/CURRICULUM.md's per-year headers to this table
 import { TOPICS } from '../../src/curriculum';   // #766: the registry the wordQ-collision sweep below iterates
@@ -109,8 +109,8 @@ describe('guard rails', () => {
       .filter(([f]) => f !== '/src/game/arena.ts')
       .flatMap(([f, s]) => code(s).split('\n').filter(l => /\.paused\s*=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
     expect(writers, 'route a new pause reason through the screen\'s hold()/syncPaused(), never a direct write').toEqual([
-      '/src/ui/duel.ts: const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };',
-      '/src/ui/play-session.ts: if (arena) arena.paused = holdOpen || peekActive || session.ended;',
+      '/src/ui/duel-beats.ts: const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };',
+      '/src/ui/play-session.ts: if (arena) arena.paused = holdOpen || peek.active || session.ended;',
     ]);
   });
 
@@ -287,7 +287,7 @@ describe('guard rails', () => {
   // The `window.__sna` hooks are the e2e contract (CLAUDE.md); losing one breaks every test at runtime only.
   // Substring check: it catches a hook being dropped or renamed, not one that stops working.
   it('the window.__sna test hooks still exist', () => {
-    const play = SOURCES['/src/ui/play.ts'];
+    const play = SOURCES['/src/ui/play.ts'] + SOURCES['/src/ui/play-hooks.ts'];   // #1504: the hooks object is built in play-hooks.ts
     expect(play).toContain('__sna');
     for (const hook of ['answer:', 'wrong:', 'bubbles:', 'state:', 'certificate:']) expect(play).toContain(hook);
     for (const hook of ['__sna', 'cards:', 'flip', 'state:']) expect(SOURCES['/src/ui/memory.ts']).toContain(hook);
@@ -846,7 +846,7 @@ describe('guard rails', () => {
     const files = ['/src/ui/play-session.ts', '/src/ui/play.ts'];
     for (const f of files) expect((SOURCES[f] ?? '').length, `${f} must be read, not a blank import`).toBeGreaterThan(1000);
     const beat = files.map(f => code(SOURCES[f] ?? '')).join('\n');
-    for (const call of ['showOutcome(', 'endWave(scaled(', 'arena.reveal(', 'markSeg(']) {
+    for (const call of ['showOutcome(', 'endWave(scaled(', 'arena.reveal(', 'pill.mark(']) {
       const n = beat.split(call).length - 1;
       expect(n, `${call} belongs to settle() alone — put a new outcome in the OUTCOME table`).toBe(1);
     }
@@ -1186,8 +1186,8 @@ describe('guard rails', () => {
   it('the duel spawns both halves from one draw, one clock origin and equal geometry (#389/#400)', () => {
     // #400: the anti-vacuity convention the #425 rail below this one uses (`?? ''` plus a length assertion) —
     // a bare `SOURCES[...]` read here would pass vacuously on a blank import, matching nothing.
-    const duelSrc = SOURCES['/src/ui/duel.ts'] ?? '';
-    expect(duelSrc.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const duelSrc = duelSource();
+    expect(duelSrc.length, 'duel.ts and duel-beats.ts must be read, not a blank import').toBeGreaterThan(1000);
     const duel = code(duelSrc);
     const handlerFrom = duel.indexOf('onQuestion(q, info) {');
     expect({ handler: handlerFrom >= 0 }).toEqual({ handler: true });
@@ -1234,7 +1234,7 @@ describe('guard rails', () => {
    * #425 was opened about: "the guard rail that should have caught it did not".
    */
   it('the duel e2e probes the longest verdict the screen can actually raise (#425)', () => {
-    const src = SOURCES['/src/ui/duel.ts'] ?? '';
+    const src = duelSource();
     expect(src.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
     // Read out of the source rather than imported: `src/ui/duel.ts` pulls the arena, the certificate canvas
     // and the audio graph in behind it, and a rail about a string is not a reason to stand all that up here.
@@ -1295,7 +1295,7 @@ describe('guard rails', () => {
   // still there — it cannot see a throw actually being swallowed at runtime (no jsdom here,
   // `.claude/rules/guardrails.md`). duel.ts is at the #714 ratchet's line cap, hence the dense lines.
   it('a throw from commitOnce cannot hang a duel at any of its three commit points (#508)', () => {
-    const src = SOURCES['/src/ui/duel.ts'] ?? '';
+    const src = duelSource();
     const body = code(src);
     expect(body.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
     // commitOnce itself catches and returns null on failure, rather than throwing or trusting a caller-side
@@ -1303,7 +1303,7 @@ describe('guard rails', () => {
     expect(body, 'commitOnce must return GameEndOutcome | null, not GameEndOutcome — a caller must be able to see failure')
       .toMatch(/const commitOnce = \(r: DuelResult\): GameEndOutcome \| null => \{/);
     expect(body, 'commitOnce must try/catch commitMatch itself, not leave it to a wrapper')
-      .toMatch(/try \{ payout = commitMatch\(r\); \}\s*catch \(e\) \{/);
+      .toMatch(/try \{ m\.payout = commitMatch\(r\); \}\s*catch \(e\) \{/);   // #1500: the payout lives on `m` in duel-results.ts
     // All three call sites go through the one function — nothing calls commitMatch directly, and nothing
     // still routes through the retired commitOrToast wrapper.
     expect(body, 'onRoundWon, right before endWave, must call commitOnce').toMatch(/if \(duel\.onLastRound\) commitOnce\(duel\.result\(\)\);\s*endWave\(/);
@@ -1677,7 +1677,7 @@ describe('guard rails', () => {
     // #896: showResults (the terminal hold, the results-screen jingle) moved out of play.ts into its own
     // module, the same split #36 already made for the Session callbacks — this rail follows it there.
     const playResults = code(SOURCES['/src/ui/play-results.ts'] ?? '');
-    const duel = code(SOURCES['/src/ui/duel.ts'] ?? '');
+    const duel = code(duelSource());
     expect({ play: play.length > 1000, playSession: playSession.length > 1000, playResults: playResults.length > 500, duel: duel.length > 1000 },
       'all four must be read, not blank imports').toEqual({ play: true, playSession: true, playResults: true, duel: true });
     // Wired at all: the pause hold reaches the beat clock on both screens.
@@ -1709,7 +1709,7 @@ describe('guard rails', () => {
    * check: it holds that the two known gates go through the beat clock, not that no third way to spawn exists.
    */
   it('the font-gated first spawn goes through the beat clock, not straight out of the promise (#301, PR #474 review B2)', () => {
-    for (const [name, path] of [['play-session.ts', '/src/ui/play-session.ts'], ['duel.ts', '/src/ui/duel.ts']] as const) {
+    for (const [name, path] of [['play-session.ts', '/src/ui/play-session.ts'], ['duel-beats.ts', '/src/ui/duel-beats.ts']] as const) {
       const src = code(SOURCES[path] ?? '');
       expect(src.length, `${name} must be read, not a blank import`).toBeGreaterThan(1000);
       // EVERY occurrence, not the first. `play-session.ts` has two — `fontReady().then(() => { fontsReady =
@@ -1750,7 +1750,7 @@ describe('guard rails', () => {
     // the one thing the multiplier must never touch, restated here because #32's whole premise rests on it
     const speed = code(SOURCES['/src/game/speed.ts'] ?? '');
     expect(speed, 'scaled() divides a duration; it never multiplies a clock').toContain('ms / factor');
-    expect(SOURCES['/src/ui/play.ts'], 'the sprint clock still samples the real clock, not a scaled one')
+    expect(SOURCES['/src/ui/play-clock.ts'], 'the sprint clock still samples the real clock, not a scaled one')   // #1504
       .toContain('performance.now()');
   });
 
@@ -1769,7 +1769,7 @@ describe('guard rails', () => {
     const from = play.indexOf('waveId++');
     expect(play.indexOf('const spawn = () =>'), 'play-session.ts must still build its wave in a spawn() closure').toBeGreaterThan(from);
     const body = play.slice(from, play.indexOf('spawnWave(', from));                 // the question's own wave, start to launch
-    expect(body, 'play-session.ts must still capture the wave id the spawn belongs to').toMatch(/=\s*waveId;/);
+    expect(body, 'play-session.ts must still capture the wave id the spawn belongs to').toMatch(/=\s*(st\.)?waveId;/);
     // one check per deferral: the timer/font gate, and the animation frame inside it
     expect((body.match(/waveId !==/g) ?? []).length, 'both deferrals must drop a superseded spawn (#138)')
       .toBeGreaterThanOrEqual(2);
@@ -3134,8 +3134,8 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/game/arena.ts': 470, 'src/game/bubbles.ts': 521,
-    'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 286, 'src/ui/duel-results.ts': 237, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 304, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
+    'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 156, 'src/ui/duel-beats.ts': 187, 'src/ui/duel-results.ts': 237, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 420,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 182, 'src/ui/certificate.ts': 327, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a
