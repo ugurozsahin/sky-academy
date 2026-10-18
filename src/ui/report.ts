@@ -13,7 +13,7 @@ const list = (ts: readonly { title: string }[]) => ts.slice(0, 4).map(t => t.tit
 export function reportText(i: ReportInfo): ReportText {
   const w = i.sm.week;
   return {
-    heading: 'Sky Ninja Academy', title: 'Progress report', child: i.name.trim() || 'Your ninja',
+    heading: 'Sharpwise', title: 'Progress report', child: i.name.trim() || 'Your ninja',
     date: Number.isNaN(i.date.getTime()) ? '' : i.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
     week: w.days ? `This week: ${w.days}/7 days played, ${w.questions} questions${w.accuracy === null ? '' : `, ${pct(w.accuracy)}% right`}` : 'This week: no play yet',
     islands: i.sm.years.map(y => ({ label: y.title, stars: y.stars, max: y.maxStars })),
