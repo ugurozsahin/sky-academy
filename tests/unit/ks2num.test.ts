@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { dec, addDec, subDec, mulDecByInt, mulPow10, divPow10, compareDec, fmt, parseNum, roundTo, digitAt, digitValue } from '../../src/curriculum/ks2num';
 import type { Place, RoundUnit } from '../../src/curriculum/ks2num';
@@ -249,27 +250,42 @@ describe('ks2num', () => {
       expect(parseNum('9,007,199,254,740,992')).toBeNull();                        // 2^53: representable, not safe
     });
 
-    // guard rail (#1333): the check is an invariant only if every Dec the module hands out passes through dec().
-    // Before #1333 eleven raw `{ v, dp }` literals in eight functions bypassed it. An object literal carrying a `v`
-    // or `dp` key in any position counts. A literal's first key comes before any `(` or `;`, which is what tells it
-    // from a function body passing `dp` or `-v` as an argument; a `.v`/`.dp` read never counts. Comments (the header
-    // and `fmt` quote one in prose), `${…}` template holes and interface bodies are stripped first, since they carry
-    // the same spellings without building anything.
-    const decLiterals = (src: string): string[] => src
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-      .replace(/\$\{[^}]*\}/g, '').replace(/\binterface\b[^{]*\{[^}]*\}/g, '')
-      .match(/\{[^{}();]*(?<![.\w])(v|dp)\s*[:,}]/g) ?? [];
+    // guard rail (#1333, rebuilt on the AST in #1746): the check is an invariant only if every Dec the module hands out
+    // passes through dec(). Before #1333 eleven raw `{ v, dp }` literals in eight functions bypassed it. A literal is an
+    // ObjectLiteralExpression with a `v` or `dp` key (assigned or shorthand), so a spread of a call
+    // (`{ ...toDec(n), dp: 0 }`) is caught, and destructuring (`const { v, dp } = a`), a type literal, a comment or a
+    // template hole is not — the regex this replaced got all of those wrong. It also says *where* the literal is.
+    const decLiterals = (src: string): { fn: string | null; text: string }[] => {
+      const file = ts.createSourceFile('ks2num.ts', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+      const isDecKey = (p: ts.ObjectLiteralElementLike): boolean =>
+        (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p))
+        && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) && (p.name.text === 'v' || p.name.text === 'dp');
+      const enclosingFunction = (n: ts.Node): string | null => {
+        for (let up = n.parent; up; up = up.parent) if (ts.isFunctionDeclaration(up) && up.name) return up.name.text;
+        return null;
+      };
+      const found: { fn: string | null; text: string }[] = [];
+      const visit = (n: ts.Node): void => {
+        if (ts.isObjectLiteralExpression(n) && n.properties.some(isDecKey)) found.push({ fn: enclosingFunction(n), text: n.getText(file) });
+        ts.forEachChild(n, visit);
+      };
+      visit(file);
+      return found;
+    };
+
+    it('the literal finder sees every shape a raw Dec can take, and nothing that only mentions v or dp', () => {
+      const inF = (body: string) => decLiterals(`function f(a: Dec, n: number, x: number) { ${body} }`);
+      for (const raw of ['return { v, dp };', 'return { dp: 0, v: n };', 'return { ...a, v: x };', 'return { ...toDec(n), dp: 0 };',
+        'return { ...clone(a), v: a.v * x };', "return { 'v': x, dp: 0 };"]) expect(inF(raw), raw).toHaveLength(1);
+      expect(inF('return { ...toDec(n), dp: 0 };')[0].fn).toBe('f');
+      for (const fine of ['const { v, dp } = a; return v + dp;', 'return dec(a.v, a.dp);', 'const dp = a.dp - n; return dec(x ? -a.v : a.v, -dp);',
+        'type T = { v: number; dp: number }; return null;', '// { v, dp } in a comment\n return null;', 'return `got v=${a.v}, dp=${a.dp}`;']) expect(inF(fine), fine).toHaveLength(0);
+      expect(decLiterals('function fmt({ v, dp }: Dec) { return v + dp; }')).toHaveLength(0);
+    });
 
     it('guard rail: ks2num.ts builds a Dec literal only inside dec()', () => {
-      // The matcher must itself catch the shapes the rail exists for, or a regex tweak could make it match nothing.
-      expect(decLiterals('return { v, dp };')).toHaveLength(1);
-      expect(decLiterals('return { dp: 0, v: n };')).toHaveLength(1);
-      expect(decLiterals('return { ...a, v: x };')).toHaveLength(1);
-      expect(decLiterals('{ return dec(a.v, a.dp); }')).toHaveLength(0);
-      expect(decLiterals('{ const dp = a.dp - n; return dec(sign ? -v : v, -dp); }')).toHaveLength(0);
-      expect(decLiterals('`got v=${v}, dp=${dp}`; interface Dec { readonly v: number; readonly dp: number }')).toHaveLength(0);
       const literals = decLiterals(readFileSync(new URL('../../src/curriculum/ks2num.ts', import.meta.url), 'utf8'));
-      expect(literals, `raw Dec literals: ${literals.length}`).toHaveLength(1);
+      expect(literals.map(l => l.fn), `raw Dec literals outside dec(): ${literals.map(l => l.text).join(' | ')}`).toEqual(['dec']);
     });
   });
 
