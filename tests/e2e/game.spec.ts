@@ -1264,6 +1264,9 @@ test.describe('Sky Ninja Academy', () => {
     expect(q.story, 'the card holds the story').toBeTruthy();
     expect(await page.locator('.vis.sentence').innerText()).toContain(q.story!.split('.')[0]);
     expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(q.prompt);
+    await expect(page.locator('#prompt')).toHaveText(q.prompt);
+    const promptOverflow = await page.locator('#prompt').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
   });
 
   // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"

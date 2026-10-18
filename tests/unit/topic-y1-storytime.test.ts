@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
+import { duelPool } from '../../src/game/duel';
+import { mixable, subjectPool } from '../../src/game/pools';
 import { storyBankProblems } from '../../src/curriculum/story-bank';
 import { Y1_STORIES } from '../../src/curriculum/stories-y1';
 import { seededRng } from '../../src/game/duel';
@@ -16,9 +18,16 @@ describe('y1-storytime (#1018)', () => {
     expect(ids.indexOf('y1-storytime')).toBe(ids.indexOf('y1-soundhunt') + 1);
   });
 
+  it('never reaches a mixed mode or the duel, and is still a mission (#1017 solo rule)', () => {
+    expect(mixable(topic)).toBe(false);
+    expect(subjectPool(TOPICS, 'writing').map(t => t.id)).not.toContain('y1-storytime');
+    expect(duelPool(TOPICS.filter(t => t.year === 'year1'), 1).map(t => t.id)).not.toContain('y1-storytime');
+  });
+
   it('the bank breaks none of the story rules, and has ten stories', () => {
     expect(storyBankProblems(Y1_STORIES)).toEqual([]);
     expect(new Set(Y1_STORIES.map(i => i.story)).size).toBe(10);
+    for (const i of Y1_STORIES) expect(i.story.split(/[.!?]+(?:\s|$)/).filter(x => x.trim()).length, i.story).toBeLessThanOrEqual(3);
   });
 
   it.each(D)('d%i has at least six questions, so repeat avoidance has room', d => {

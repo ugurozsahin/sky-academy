@@ -15,11 +15,12 @@ const PUP = 'Ravi has a pup. The pup ran in the mud. Now Ravi fills the bath.';
 
 const lit = (d: 1 | 2 | 3, story: string, question: string, answer: string, decoys: string[], evidence: string): StoryItem =>
   ({ story, question, answer, decoys, evidence, kind: 'literal', d });
+// Inferences are d3 only: d1 and d2 stay literal, so the ladder runs from what is said to what it means.
 const inf = (story: string, question: string, answer: string, decoys: string[], evidence: string): StoryItem =>
   ({ story, question, answer, decoys, evidence, kind: 'inference', d: 3 });
 
 export const Y1_STORIES: StoryItem[] = [
-  lit(1, HAT, 'Who lost the hat?', 'Tom', ['Mum', 'Dan'], 'Tom has a red hat'),
+  lit(1, HAT, 'Who lost the hat?', 'Tom', ['Mum', 'Dan'], 'Tom has a red hat. He lost it'),
   lit(1, HAT, 'Who found the hat?', 'Mum', ['Tom', 'Dan'], 'Mum found it'),
   lit(2, HAT, 'Where did Tom lose the hat?', 'park', ['shop', 'house'], 'lost it in the park'),
   lit(2, HAT, 'What colour is the hat?', 'red', ['blue', 'green'], 'red hat'),
@@ -32,7 +33,7 @@ export const Y1_STORIES: StoryItem[] = [
   lit(1, SHOP, 'Who went to the shop with Ben?', 'Dad', ['Mum', 'Gran'], 'with Dad'),
   lit(2, SHOP, 'Where did Ben go?', 'shop', ['park', 'farm'], 'went to the shop'),
   lit(2, SHOP, 'What did Ben carry?', 'eggs', ['milk', 'loaf'], 'Ben carried the eggs'),
-  lit(1, SNOW, 'Who ran out to play?', 'Lily', ['Mum', 'Tom'], 'Lily put on her coat'),
+  lit(1, SNOW, 'Who ran out to play?', 'Lily', ['Mum', 'Tom'], 'Lily put on her coat, hat and gloves. Then she ran out'),
   inf(SNOW, 'What is the weather like?', 'cold', ['hot', 'warm'], 'coat, hat and gloves'),
   lit(1, BED, 'Who turns off the light?', 'Mum', ['Jack', 'Dad'], 'Mum turns off the light'),
   lit(2, BED, 'Where is Jack?', 'bed', ['car', 'bath'], 'Jack is in bed'),
@@ -47,7 +48,7 @@ export const Y1_STORIES: StoryItem[] = [
   lit(2, CAKE, 'What did they make?', 'cake', ['pie', 'bread'], 'made a cake'),
   lit(2, CAKE, 'Where did they put the cake?', 'oven', ['fridge', 'box'], 'in the oven'),
   lit(1, PUP, 'Who has a pup?', 'Ravi', ['Zoe', 'Sam'], 'Ravi has a pup'),
-  inf(PUP, 'Why does the pup need a bath?', 'muddy', ['sleepy', 'hungry'], 'The pup ran in the mud'),
+  inf(PUP, 'How is the pup now?', 'muddy', ['sleepy', 'hungry'], 'The pup ran in the mud'),
 ];
 
 export const y1StoryTime = storyGen(Y1_STORIES);
