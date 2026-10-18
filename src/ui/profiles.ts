@@ -135,7 +135,7 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
   render(`
   <section class="screen avatar-screen profile-screen">
     ${onBack ? `<button class="icon-btn" id="back" aria-label="Back">←</button>` : ''}
-    <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag" id="who-heading" tabindex="-1">Who is playing?</p></header>
+    <header class="brand"><span class="kanji">忍</span><h1>Sharp<span>wise</span></h1><p class="tag" id="who-heading" tabindex="-1">Who is playing?</p></header>
     <div class="avatar-grid" role="list">
       ${cards.map((c, i) => {
         // `avatarOrNull`, not `avatarById`: a slot with no ninja chosen is a state this screen must *draw*,

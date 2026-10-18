@@ -211,7 +211,7 @@ export function duelPool(topics: Topic[], difficulty: Difficulty = 1): Topic[] {
       // #444: a generator that throws (the same floor rail #433 can trip on a future curriculum edit) must
       // not stop Ninja Duel opening at all for the whole year — a topic that cannot be drawn safely is
       // excluded the same way a sequence-flagged one is.
-      console.error(`Sky Ninja Academy: "${t.id}" question generator threw while building the duel pool`, e);
+      console.error(`Sharpwise: "${t.id}" question generator threw while building the duel pool`, e);
       return false;
     }
     return true;

@@ -95,7 +95,7 @@ describe('certAlbumHTML ("My certificates", #110)', () => {
 describe('mission certificate text', () => {
   it('names the child, the mission, the island, the stars and a British long date', () => {
     const t = certificateText(base);
-    expect(t.heading).toBe('Sky Ninja Academy'); expect(t.child).toBe('Ada');
+    expect(t.heading).toBe('Sharpwise'); expect(t.child).toBe('Ada');
     expect(t.reason).toBe('completed the Number Bonds mission on Year 1 Island');
     expect(t.detail).toBe('30/30 correct (100%) · score 340');
     expect(t.stars).toBe('★★★'); expect(t.date).toBe('6 September 2026');
@@ -451,7 +451,7 @@ describe('deliverCertificate, actually run (#205)', () => {
     const how = await deliverCertificate(fakeCanvas(), 'cert.png', OPEN);
     expect(how, 'a working share sheet, not the full-screen fallback, is the point of #110').toBe('shared');
     expect(written).toEqual([{ path: 'cert.png', data: 'AAA', directory: 'CACHE' }]);
-    expect(shared).toEqual([{ url: 'file:///cache/cert.png', title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' }]);
+    expect(shared).toEqual([{ url: 'file:///cache/cert.png', title: 'Sharpwise certificate', dialogTitle: 'Share your certificate' }]);
     expect(dom.downloadClicks()).toBe(0);
   });
 

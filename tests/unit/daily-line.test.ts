@@ -8,8 +8,8 @@ import { dailyLine, dailyLineFor, forgetDailyLine, keepDailyLine } from '../../s
 
 describe('Daily Sprint result line (#925)', () => {
   it('prints year, date, correct count and stars, exactly', () => {
-    expect(dailyLine({ correct: 14, stars: 3 }, 'Year 1', '2026-09-28')).toBe('Sky Ninja Academy · Daily Sprint · Year 1 · 2026-09-28 · 14 correct · ⭐⭐⭐');
-    expect(dailyLine({ correct: 0, stars: 0 }, 'Year 2', '2026-09-28')).toBe('Sky Ninja Academy · Daily Sprint · Year 2 · 2026-09-28 · 0 correct');
+    expect(dailyLine({ correct: 14, stars: 3 }, 'Year 1', '2026-09-28')).toBe('Sharpwise · Daily Sprint · Year 1 · 2026-09-28 · 14 correct · ⭐⭐⭐');
+    expect(dailyLine({ correct: 0, stars: 0 }, 'Year 2', '2026-09-28')).toBe('Sharpwise · Daily Sprint · Year 2 · 2026-09-28 · 0 correct');
   });
   it('is kept per profile and day, and only in memory', () => {
     keepDailyLine('p1', '2026-09-28', 'line');

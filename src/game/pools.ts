@@ -28,6 +28,6 @@ export const subjectTopics = (topics: Topic[], subject: Topic['subject']): Topic
 export function subjectPool(topics: Topic[], subject: Topic['subject']): Topic[] {
   const own = subjectTopics(topics, subject);
   if (own.length) return own;
-  console.warn(`Sky Ninja Academy: no ${subject} bubble topic on this island — drawing from the whole year (#1325)`);   // a degrade a child would not notice must still leave a trace
+  console.warn(`Sharpwise: no ${subject} bubble topic on this island — drawing from the whole year (#1325)`);   // a degrade a child would not notice must still leave a trace
   return topics.filter(t => answerableBy(t, 'mixed'));
 }
