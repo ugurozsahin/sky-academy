@@ -241,9 +241,10 @@ describe('Legend run (#932)', () => {
 // stars or hearts. The rail reads play.ts's own source; the tables run the real code.
 describe('a new mode cannot fall through to another mode (#1117)', () => {
   const play = SOURCES['/src/ui/play.ts'];
-  it("play.ts's record chain has no catch-all writer", () => {
-    expect(play.split('\n').filter(l => /^\s*else\s+(newBest\s*=\s*)?record\w+\(/.test(l))).toEqual([]);
-    expect(play).toContain("else if (o.mode === 'endless') recordEndless(");
+  const commit = SOURCES['/src/ui/play-commit.ts'];   // #1504: the record chain moved out of play.ts
+  it("the play screen's record chain has no catch-all writer", () => {
+    expect(commit.split('\n').filter(l => /^\s*else\s+(newBest\s*=\s*)?record\w+\(/.test(l))).toEqual([]);
+    expect(commit).toContain("else if (o.mode === 'endless') recordEndless(");
   });
   it('every mode names its medal and its result stars', () => {
     for (const m of Object.keys(MODES) as Mode[]) {   // every MODES key, so a new mode cannot be skipped
