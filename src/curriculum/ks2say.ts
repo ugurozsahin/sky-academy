@@ -202,12 +202,12 @@ function moneyWords(pounds: number, frac: string | undefined): string {
 
 /** A clock time. 24-hour unless `suffix` ("am"/"pm") says otherwise: "14:05" -> "fourteen oh five", "00:07" ->
  *  "seven minutes past midnight", "24:00" -> "midnight", "1:30pm" -> "one thirty p m". */
-function timeWords(h: number, mm: number, suffix: string | undefined): string {
+function timeWords(h: number, mm: number, suffix: string | undefined, padded = false): string {
   const oh = mm < 10 ? `oh ${cardinal(mm)}` : cardinal(mm);
   if (suffix) return `${cardinal(h)} ${mm === 0 ? "o'clock" : oh} ${suffix[0]} m`;
   if (h === 24 || (h === 0 && mm === 0)) return 'midnight';
   if (h === 0) return `${cardinal(mm)} minute${mm === 1 ? '' : 's'} past midnight`;
-  return mm === 0 ? `${cardinal(h)} hundred hours` : `${cardinal(h)} ${oh}`;
+  return mm === 0 ? (h <= 12 && !padded ? `${cardinal(h)} o'clock` : `${cardinal(h)} hundred hours`) : `${cardinal(h)} ${oh}`;
 }
 
 /** What a rule finds at the front of the remaining text: the span's kind, its source text and how it is spoken. */
@@ -223,8 +223,16 @@ const dimensionRule: Rule = rest => { const m = rest.match(/^(\d+)-([Dd])\b/); r
 // "3-digit", "5-minute": a digit joined to a lower-case word is a compound modifier, never subtraction (#1465).
 // A run that is only unit codes ("5-cm") is left to the unit rules; a capitalised name ("10-Diego") is not a modifier.
 const compoundRule: Rule = rest => {
-  const m = rest.match(/^(\d+)-([a-z]{2,})\b/);
-  return m && !decomposeUnits(m[2]) ? hit('compound', m, `${m[1]} ${m[2]}`) : null;
+  const m = rest.match(/^(\d+)-([a-z]{2,})\b(?!\/)/);
+  if (!m) return null;
+  // A hyphenated unit run ("5-kg", "5-kgs") is spoken as the quantity it is (#1992); one letter plus an s ("5-ms")
+  // is no such run and stays an ordinary modifier.
+  const units = decomposeUnits(m[2]) ?? (/s$/.test(m[2]) && m[2].length > 2 ? decomposeUnits(m[2].slice(0, -1)) : null);
+  if (units && m[2].length > 1 && !(units.length === 1 && units[0].length === 1 && units[0] !== m[2])) {
+    const words = units.map(u => unitWord(u.toLowerCase()));
+    return hit('compound', m, `${m[1]} ${m[1] === '1' ? singular(words.join(' ')) : words.join(' ')}`);
+  }
+  return hit('compound', m, `${m[1]} ${m[2]}`);
 };
 // Money: "£3.50" is three pounds fifty, never "three point five zero".
 const moneyRule: Rule = rest => {
@@ -235,13 +243,13 @@ const moneyRule: Rule = rest => {
 // no price). Left raw, so `sayIsSafe` fails them.
 const malformedRule: Rule = rest => {
   // "4/ 3" and "4 /3": a slash spaced on one side only is neither a tight fraction nor a division.
-  const m = rest.match(/^(?:\d+(?:\.\d+){2,}|\d+\s*\/\s*\d+\.\d|£\d+\.\d{3,}|\d+ \/(?! )\d|\d+\/ \d)/);
+  const m = rest.match(/^(?:\d+(?:\.\d+){2,}|\d+\s*\/\s*\d+\.\d|£\d+\.\d{3,}|\d+ \/(?! )\d|\d+\/ \d|\d+\/\d+\/\d{4}\b|\d+\.\d\d ?[ap]m\b)/);
   return m && hit('malformed', m, m[0]);
 };
 // A denominator of 0 or 1 is no spoken fraction ("one first", "one zeroth") and stays raw.
 const mixedRule: Rule = rest => {
   const m = rest.match(/^(\d+) (\d+)\s*\/\s*(\d+)/);
-  return m && hit('mixedFraction', m, Number(m[3]) <= 1 ? m[0] : `${cardinal(Number(m[1]))} and ${fracWord(Number(m[2]), Number(m[3]))}`);
+  return m && hit('mixedFraction', m, Number(m[3]) <= 1 || (Number(m[2]) >= Number(m[3]) && !m[0].includes(' /')) ? m[0] : `${cardinal(Number(m[1]))} and ${fracWord(Number(m[2]), Number(m[3]))}`);
 };
 // A slash with space either side after a number that is not smaller than what follows is division ("12 / 3 =
 // ?"), not a fraction; an improper fraction is written tight ("7/4").
@@ -254,7 +262,7 @@ const timeRule: Rule = rest => {
   const m = rest.match(/^(24(?=\s*:\s*00(?!\d))|[01]?\d|2[0-3])\s*:\s*([0-5]\d)(?:\s?([ap]m)\b|\b)/);
   if (!m) return null;
   const h = Number(m[1]);
-  return m[3] && (h < 1 || h > 12) ? hit('malformed', m, m[0]) : hit('time', m, timeWords(h, Number(m[2]), m[3]));
+  return m[3] && (h < 1 || h > 12) ? hit('malformed', m, m[0]) : hit('time', m, timeWords(h, Number(m[2]), m[3], m[1].startsWith('0')));
 };
 const decimalRule: Rule = rest => {
   const m = rest.match(/^(\d{1,3}(?:,\d{3})+)\.(\d+)/) ?? rest.match(/^(\d+)\.(\d+)/);
@@ -262,8 +270,8 @@ const decimalRule: Rule = rest => {
 };
 // Speed: "km/h" is a unit wherever it stands; "m/s" only after a digit, as a single "m" is.
 const speedRule: Rule = (rest, before) => {
-  const m = rest.match(/^km\/h\b/) ?? (afterDigit(before) ? rest.match(/^m\/s\b/) : null);
-  return m && hit('unit', m, EXTRA_UNIT_WORD[m[0]]);
+  const m = rest.match(/^km\/h\b/) ?? (afterDigit(before) ? rest.match(/^m\/s(?:2(?!\d))?\b|^m\/s2(?!\d)/) : null);
+  return m && hit('unit', m, /s2$/.test(m[0]) ? 'metres per second squared' : EXTRA_UNIT_WORD[m[0]]);
 };
 // "5 m2", "9 cm3" typed without the superscript, straight after a digit.
 const asciiPowerRule: Rule = (rest, before) => {
@@ -354,7 +362,8 @@ function unitSpoken(toks: readonly Tok[], idx: number, norm: string): string {
 function textSpoken(toks: readonly Tok[], idx: number, norm: string): string {
   const tok = toks[idx];
   if (tok.raw === '/' && norm[tok.start - 1] === ' ' && norm[tok.end] === ' ') return 'divided by';
-  if ((tok.raw === '-' || tok.raw === '–') && toks[idx - 1]?.kind === 'time' && toks[idx + 1]?.kind === 'time') return 'to';
+  const gap = (i: number, d: number): Tok | undefined => toks[toks[i + d]?.raw === ' ' ? i + 2 * d : i + d];
+  if ((tok.raw === '-' || tok.raw === '–') && gap(idx, -1)?.kind === 'time' && gap(idx, 1)?.kind === 'time') return 'to';
   if (tok.raw === '>' || tok.raw === '<') return tok.raw === '>' ? 'greater than' : 'less than';
   return tok.raw.trim() !== '' ? symSay(tok.raw) : tok.spoken;
 }
