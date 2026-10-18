@@ -212,6 +212,10 @@ describe('sameValue', () => {
   it('refuses a value whose cross-product outgrows MAX_SAFE_INTEGER (#1986)', () => {
     expect(sameValue('9,999,999.999', f(9999999999, 10 ** 10))).toBe(false);   // dp 3 is fine; n·d ≈ 1e20 is not
   });
+  it('refuses a pair that differs but whose cross-products collide past 2^53 (#1986)', () => {
+    // 2^53 + 1 reads as 2^53, so unguarded `equal` calls these two equal; only the `checked` guard says false.
+    expect(sameValue('9007199254740993', f(9007199254740992))).toBe(false);
+  });
   it('refuses an answer with more decimal places than the oracle reads (#1986)', () => {
     expect(sameValue('0.0001', f(1, 10000))).toBe(false);   // only the dp guard refuses this: the products are tiny
   });
