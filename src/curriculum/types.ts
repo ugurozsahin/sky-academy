@@ -71,6 +71,7 @@ export type Visual =
 interface QuestionCore {
   prompt: string;         // shown on the question card ("7 + 5 = ?")
   say?: string;           // spoken form (Web Speech), defaults to prompt
+  story?: string;         // a short passage the question is about (#1017): the card for it is part 2 (#1352)
   answer: string;         // correct option OR, for 'sequence', the letters joined
   options: string[];      // bubble labels (shuffled, includes answer / all sequence letters)
   /**
@@ -159,6 +160,7 @@ export interface Topic {
   year: YearId;
   nc: string;             // curriculum reference (short)
   input?: 'bubbles' | 'tracing' | 'keypad';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
+  solo?: true;            // mission only (#1017): never drawn by a mixed mode, Sensei or the Duel
   drill?: true;           // a narrow practice topic (#915): offered by the Sprint chooser only, never counted, mixed or duelled
   sequenceFrom?: Difficulty;   // draws a `Question.sequence` from this difficulty up — the truth `duelPool()` reads (#562)
   strand?: Strand;        // NC strand heading for long island tabs (#1068); every KS2 row sets it

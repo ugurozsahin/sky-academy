@@ -9,9 +9,13 @@ export type Surface = 'mission' | 'mixed' | 'duel';
  *  on purpose: a Session can ask sequence questions, only a two-player duel cannot. */
 export function answerableBy(topic: Topic, surface: Surface, d?: Difficulty): boolean {
   if (surface === 'mission') return true;
+  if (topic.solo) return false;   // #1017: a story topic is a mission only
   if (topic.input === 'tracing' || topic.input === 'keypad') return false;
   return surface !== 'duel' || topic.sequenceFrom === undefined || (d !== undefined && d < topic.sequenceFrom);
 }
+
+/** A topic a mixed mode may draw (#1017): the one predicate Sprint, Storm, Boss and Sensei filter by. */
+export const mixable = (t: Topic): boolean => answerableBy(t, 'mixed');
 
 /** A year's bubble topics for one subject, in registry order (#908) — what the island's Mixed modes draw from and the
  *  chooser lists. Pure over `topics` (a `topicsFor(year.id)` list), the shape `weakestTopics` and `duelPool` take. */

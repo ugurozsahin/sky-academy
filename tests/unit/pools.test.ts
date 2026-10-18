@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi } from 'vitest';
-import { answerableBy, subjectPool, subjectTopics, type Surface } from '../../src/game/pools';
+import { answerableBy, mixable, subjectPool, subjectTopics, type Surface } from '../../src/game/pools';
 import type { Topic } from '../../src/curriculum';
 import { duelPool } from '../../src/game/duel';
 import { weakestTopics } from '../../src/game/sensei';
@@ -8,6 +8,20 @@ import { chooserEligible } from '../../src/ui/chooser';
 
 const topic = (extra: Partial<Topic>): Topic => ({ id: 't', name: 't', icon: '', gen: () => { throw new Error('unused'); }, ...extra }) as Topic;
 const SURFACES: Surface[] = ['mission', 'mixed', 'duel'];
+
+describe('a solo topic (#1017)', () => {
+  const solo = topic({ id: 'solo', solo: true });
+  it('is a mission only: mixable() and the duel reject it', () => {
+    expect(SURFACES.map(s => answerableBy(solo, s, 1))).toEqual([true, false, false]);
+    expect(mixable(solo)).toBe(false);
+    expect(mixable(topic({}))).toBe(true);
+  });
+  it('is never picked by Sensei, the chooser or the duel pool', () => {
+    expect(weakestTopics([solo], {}, 3)).toEqual([]);
+    expect(chooserEligible(solo)).toBe(false);
+    expect(duelPool([solo], 1)).toEqual([]);
+  });
+});
 
 describe('answerableBy (#1065)', () => {
   it('a keypad topic is its own mission only', () => {
