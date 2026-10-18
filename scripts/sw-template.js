@@ -33,6 +33,9 @@ function precache(cache) {
  * a game the network would have served. Every handler below takes `null` as "go to the network": a storage
  * failure degrades to no worker at all, never to an error. `install` still uses `caches.open` directly: a
  * worker that cannot store its precache must fail to install, so the previous one (or none) keeps control.
+ * `tests/unit/pwa.test.ts` pins that: `.then(c => c && precache(c))` here would install with an empty cache (#633).
+ *
+ * @returns {Promise<Cache | null>}
  */
 async function open(name) {
   try { return await caches.open(name); } catch { return null; }
@@ -61,8 +64,8 @@ self.addEventListener('activate', (e) => {
  * the query string, not the path, so relying on it would quietly turn this into network-first and only show
  * itself as a slow first paint. Every one of those URLs is the same document.
  *
- * IT DOES NOT REVALIDATE, and that is deliberate. CACHE is per-deployment, so writing a fresher `index.html`
- * into it would put a shell referencing `assets/index-NEW.js` into a cache that holds only `…-OLD.js`. That
+ * A HIT DOES NOT REVALIDATE, and that is deliberate. CACHE is per-deployment, so writing a fresher `index.html`
+ * into it on its own would put a shell referencing `assets/index-NEW.js` into a cache that holds only `…-OLD.js`. That
  * is harmless while the new worker installs and `activate` drops the old cache — and permanent when it does
  * not: one non-ok response in `addAll`, or the player closing the tab between the 2 kB shell and the ~1.2 MB
  * precache, leaves the old worker alive with a cache whose shell asks for assets it will never hold. The
@@ -71,6 +74,12 @@ self.addEventListener('activate', (e) => {
  * Versioning already makes the refresh unnecessary: a new deployment brings a new worker, a new cache name
  * and a full precache, so a shell in a versioned cache is consistent with its own assets by construction.
  * (Raised in review of this PR.)
+ *
+ * The one other writer is the rebuild below, and it does not break that rule: it runs only on a MISS, when
+ * there is no shell to be inconsistent with, and it fills the shell and every asset together in one atomic
+ * `addAll` (all or nothing), so what it stores is one fetch of the deployment the server serves now. Its
+ * residual risk is a host that still serves superseded hashed assets under the old cache name; nothing deploys
+ * that way today (#281 item 5, parked until a web deploy exists).
  *
  * A MISS means the browser evicted the cache (#116 item 5). A worker only handles fetches once it is active,
  * and `install` cannot complete without the precache, so under a controlling worker the shell is either there
@@ -89,7 +98,9 @@ async function shell(e) {
   return fetch(SHELL).catch(() => Response.error());
 }
 
-/** The one rebuild in flight, so two tabs missing the shell together do not download the game twice. */
+/** The one rebuild in flight, so two tabs missing the shell together do not download the game twice. It
+ *  ignores `cache` after the first call, which is safe only because `CACHE` is a single constant: a second
+ *  cache name must not reuse it. */
 let rebuilding = null;
 function rebuild(cache) {
   if (!rebuilding) {
