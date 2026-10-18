@@ -7,6 +7,7 @@ import { STICKER_IDS, type SaveData } from '../../src/storage';
 import { DEFAULT } from '../../src/storage/shape';
 import { AVATARS } from '../../src/avatars';
 import type { StoredCert } from '../../src/storage';
+import { fakeCanvas, stubBrowser } from './helpers/cert-browser';
 
 const base = { name: 'Ada', avatar: AVATARS[0], year: 'Year 1', title: 'Number Bonds', stars: 3, score: 340, correct: 30, attempts: 30, date: new Date('2026-09-06T10:00:00Z') };
 
@@ -379,68 +380,7 @@ describe('native shell detection (#205)', () => {
  * There is no jsdom here (it is not a dependency and the unit run must stay browserless), so the globals
  * are stubbed the way `tests/unit/sim/harness.ts` does it, and restored in `afterEach`.
  */
-interface FakeEl { tagName: string; className: string; src: string; download?: string; href?: string; clicked: number; children: FakeEl[] }
-
-function stubBrowser(o: { capacitor?: unknown; canShareFiles?: boolean; shareRejects?: boolean; claude?: unknown } = {}) {
-  const created: FakeEl[] = [];
-  const make = (tag: string): FakeEl => {
-    const e = {
-      tagName: tag, clicked: 0, children: [] as FakeEl[], className: '', alt: '', src: '', textContent: '',
-      setAttribute() {}, addEventListener() {}, removeEventListener() {}, remove() {},
-      append(...k: FakeEl[]) { e.children.push(...k); }, appendChild(k: FakeEl) { e.children.push(k); },
-      click() { e.clicked++; },
-    } as unknown as FakeEl;
-    created.push(e);
-    return e;
-  };
-  const g = globalThis as unknown as Record<string, unknown>;
-  const saved = {
-    window: g.window, document: g.document, Image: g.Image, URL: g.URL,
-    // `navigator` is an accessor on the Node global, so a plain assignment throws "has only a getter".
-    // It is put back by descriptor for the same reason — deleting it would not restore the real one.
-    navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
-  };
-  const body = make('body');
-  g.document = { createElement: make, querySelector: () => null, body };
-  g.window = { claude: o.claude, Capacitor: o.capacitor };
-  Object.defineProperty(globalThis, 'navigator', {
-    configurable: true,
-    value: {
-      canShare: () => !!o.canShareFiles,
-      share: () => (o.shareRejects ? Promise.reject(new Error('cancelled')) : Promise.resolve()),
-    },
-  });
-  g.Image = function Image(this: FakeEl) { return make('img'); } as unknown as typeof globalThis.Image;
-  g.URL = { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} };
-  return {
-    created,
-    /** Did anything actually get clicked as an `<a download>`? That is the swallowed no-op, made visible. */
-    downloadClicks: () => created.filter(e => e.tagName === 'a' && e.clicked > 0).length,
-    /**
-     * Did the child actually get shown the certificate?
-     *
-     * This used to be `body.children.length > 0`, which is *also* true on the download path, because
-     * `triggerDownload` appends its `<a>` to the body and the stub's `remove()` is a no-op. It happened
-     * to discriminate at its one call site by luck, so it could not carry the assertion below. Look for
-     * the thing it is named after instead: the `.cert-view` dialog, holding an image with a real src.
-     */
-    shownFullscreen: () => created.some(e =>
-      e.className === 'cert-view' && e.children.some(k => k.tagName === 'img' && !!k.src)),
-    restore() {
-      g.window = saved.window;
-      g.document = saved.document;
-      g.Image = saved.Image;
-      g.URL = saved.URL;
-      if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
-    },
-  };
-}
-
-/** A canvas stub with only what `deliverCertificate` and the full-screen view actually read back. */
-const fakeCanvas = () => ({
-  toBlob: (cb: (b: Blob | null) => void) => cb(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' })),
-  toDataURL: () => 'data:image/png;base64,AAA',
-}) as unknown as HTMLCanvasElement;
+const OPEN = () => Promise.resolve(true);   // a caller whose grown-ups gate lets the share through (#1943)
 
 describe('deliverCertificate, actually run (#205)', () => {
   let dom: ReturnType<typeof stubBrowser> | null = null;
@@ -459,7 +399,7 @@ describe('deliverCertificate, actually run (#205)', () => {
   // This is the exact path the first version of the fix stepped straight past into triggerDownload.
   it('a cancelled share in the WebView steps down to the view, not to a download', async () => {
     dom = stubBrowser({ capacitor: { getPlatform: () => 'android' }, canShareFiles: true, shareRejects: true });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', OPEN);
     expect(how).toBe('shown');
     expect(dom.downloadClicks(), 'the cancelled-share step-down is where this broke the first time').toBe(0);
     // The positive half, which this scenario's title promised and did not check. Without it, dropping the
@@ -484,7 +424,7 @@ describe('deliverCertificate, actually run (#205)', () => {
   // download, and only a browser that expected its download notices anything went wrong.
   it('a cancelled share in an ordinary browser steps down to the download, not to the view', async () => {
     dom = stubBrowser({ canShareFiles: true, shareRejects: true });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', OPEN);
     expect(how, 'cancelling a share in a browser must still leave the child with the file').toBe('downloaded');
     expect(dom.downloadClicks()).toBe(1);
   });
@@ -508,7 +448,7 @@ describe('deliverCertificate, actually run (#205)', () => {
         },
       },
     });
-    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png', OPEN);
     expect(how, 'a working share sheet, not the full-screen fallback, is the point of #110').toBe('shared');
     expect(written).toEqual([{ path: 'cert.png', data: 'AAA', directory: 'CACHE' }]);
     expect(shared).toEqual([{ url: 'file:///cache/cert.png', title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' }]);
