@@ -20,7 +20,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - name: Build the game for /play/
-        run: npx tsc --noEmit && npx vite build --base=/play/--outDir site/play --emptyOutDir && node scripts/build-sw.mjs site/play
+        run: npx tsc --noEmit && npx vite build --base=/play/ --outDir site/play --emptyOutDir && node scripts/build-sw.mjs site/play
       - name: Add the site pages, CNAME and .nojekyll
         run: cp -a website/. site/
       - uses: actions/upload-pages-artifact@v4

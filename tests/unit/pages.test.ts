@@ -8,8 +8,7 @@ const wf = read('.github/workflows/pages.yml');
 
 describe('GitHub Pages deployment (#1933)', () => {
   it('builds the game with base /play/ and deploys with the official actions', () => {
-    expect(wf).toContain('--base=/play/');
-    expect(wf).toContain('--outDir site/play');
+    expect(wf).toContain('npx vite build --base=/play/ --outDir site/play --emptyOutDir && node scripts/build-sw.mjs site/play');
     expect(wf).toMatch(/uses: actions\/upload-pages-artifact@v\d/);
     expect(wf).toMatch(/uses: actions\/deploy-pages@v\d/);
   });

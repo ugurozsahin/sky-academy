@@ -10,7 +10,7 @@ The manifest (`start_url`, `scope`, `id` are `./`), the worker registration and 
 1. **Enable Pages.** Repo Settings, Pages, Build and deployment, Source: **GitHub Actions**
    ([docs](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-with-a-custom-github-actions-workflow)).
 2. **Run the workflow** once (Actions, Deploy to GitHub Pages, Run workflow), or push to `main`.
-3. **Custom domain.** Settings, Pages, Custom domain: `sharpwise.co.uk`, Save. The `CNAME` file in `website/` is deployed with the site and records the same name
+3. **Custom domain.** Settings, Pages, Custom domain: `sharpwise.co.uk`, Save. With a GitHub Actions publishing source GitHub ignores a `CNAME` file, so this setting is what counts; the file in `website/` only records the name for readers
    ([docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)).
 4. **DNS for sharpwise.co.uk, at the registrar**
    ([docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site#configuring-an-apex-domain)):
