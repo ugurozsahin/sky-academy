@@ -13,7 +13,7 @@
 // `N% of X` and `F of X` are not part of the +−×÷ grammar, so both are rewritten before tokenising: `N%`
 // becomes the literal fraction `(N/100)` and the word `of` becomes `×` — "15% of 360" reads exactly like
 // "(15/100) × 360". This is a textual rewrite, not a new code path.
-import { type Frac, add, sub, mul, simplify, parseFrac, equal } from '../../../src/curriculum/fractions';
+import { type Frac, add as fAdd, sub as fSub, mul as fMul, simplify, parseFrac, equal } from '../../../src/curriculum/fractions';
 import { parseNum, type Dec } from '../../../src/curriculum/ks2num';
 
 /** Independently evaluate simple arithmetic prompts like "7 + 5 = ?" / "? × 2 = 8" / "12 − ? = 5" — the
@@ -31,6 +31,17 @@ export function solve(prompt: string): number | null {
   if (b === '?') return op === '+' ? +c - +a : op === '-' ? +a - +c : op === '×' ? +c / +a : +a / +c;
   return null;
 }
+
+/** #1986: `fractions.ts` checks nothing about its results, and past 2^53 `gcd`/`simplify` quietly return a plausible
+ * but wrong value. The oracle's own arithmetic is therefore checked: every product a step forms must be a safe
+ * integer (the numerator an add/sub forms included, since two safe products can sum past 2^53), else the step throws `Overflow`, which `ks2Solve` and `sameValue` turn into `null` — the oracle
+ * refuses, it never answers wrongly. Only this test helper checks; the game's own `fractions.ts` is untouched. */
+class Overflow extends Error {}
+const safe = (...xs: number[]) => { if (!xs.every(Number.isSafeInteger)) throw new Overflow('beyond MAX_SAFE_INTEGER'); };
+function checked(a: Frac, b: Frac) { safe(a.n * b.d, b.n * a.d, a.d * b.d, a.n * b.n); }
+const add = (a: Frac, b: Frac): Frac => { checked(a, b); safe(a.n * b.d + b.n * a.d); const r = fAdd(a, b); safe(r.n, r.d); return r; };
+const sub = (a: Frac, b: Frac): Frac => { checked(a, b); safe(a.n * b.d - b.n * a.d); const r = fSub(a, b); safe(r.n, r.d); return r; };
+const mul = (a: Frac, b: Frac): Frac => { checked(a, b); const r = fMul(a, b); safe(r.n, r.d); return r; };
 
 const ZERO: Frac = { n: 0, d: 1 };
 const isZero = (f: Frac) => f.n === 0;
@@ -77,7 +88,7 @@ function decToFrac(d: Dec): Frac { return simplify({ n: d.v, d: 10 ** d.dp }); }
  * are left to `parseNum`'s safe-integer check, since the NC's numbers go to 10,000,000. Past the caps, `Number()`
  * overflows to `Infinity` or `10 ** dp` and the `add`/`mul` arithmetic after it round silently — a non-null,
  * wrong `Frac` — so the oracle refuses instead. The caps bound each literal only: a long chain of products can
- * still outgrow `MAX_SAFE_INTEGER`, which is a separate question (see the PR for #1443). */
+ * still outgrow `MAX_SAFE_INTEGER`, which the checked `add`/`sub`/`mul` above refuse (#1986). */
 const MAX_PART_DIGITS = 6;
 const MAX_DP = 3;
 const tooLong = (...parts: string[]) => parts.some(p => p.length > MAX_PART_DIGITS);
@@ -246,12 +257,14 @@ export function ks2Solve(prompt: string): Frac | null {
   const eq = rewritten.indexOf('=');
   if (eq === -1) return null;
   const letterOf: LetterState = { letter: null };
-  const lhs = readSide(rewritten.slice(0, eq), letterOf);
-  const rhs = readSide(rewritten.slice(eq + 1), letterOf);
-  if (!lhs || !rhs) return null;
-  const coefDiff = sub(lhs.coef, rhs.coef);
-  if (isZero(coefDiff)) return null;   // no unknown at all (not this oracle's job), or it cancelled out
-  return mul(sub(rhs.const, lhs.const), reciprocal(coefDiff));
+  try {
+    const lhs = readSide(rewritten.slice(0, eq), letterOf);
+    const rhs = readSide(rewritten.slice(eq + 1), letterOf);
+    if (!lhs || !rhs) return null;
+    const coefDiff = sub(lhs.coef, rhs.coef);
+    if (isZero(coefDiff)) return null;   // no unknown at all (not this oracle's job), or it cancelled out
+    return mul(sub(rhs.const, lhs.const), reciprocal(coefDiff));
+  } catch (e) { if (e instanceof Overflow) return null; throw e; }   // #1986: a chain that outgrew 2^53
 }
 
 /** `answer` (a decimal, a comma-grouped whole number, a plain or mixed fraction, signed with U+2212 or a
@@ -259,8 +272,10 @@ export function ks2Solve(prompt: string): Frac | null {
  * "2/4" all agree. `false` for an answer this cannot read at all. */
 export function sameValue(answer: string, value: Frac): boolean {
   const trimmed = answer.trim();
-  const f = parseFrac(trimmed) ?? (() => { const d = parseNum(trimmed); return d ? decToFrac(d) : null; })();
-  return f !== null && equal(f, value);
+  const f = parseFrac(trimmed) ?? (() => { const d = parseNum(trimmed); return d && d.dp <= MAX_DP ? decToFrac(d) : null; })();   // #1986: same dp refusal as readNumber
+  if (f === null) return false;
+  try { checked(f, value); } catch (e) { if (e instanceof Overflow) return false; throw e; }   // `equal` cross-multiplies unguarded
+  return equal(f, value);
 }
 
 /** The generic per-topic loop's one arithmetic check for a card (#1045): a KS2 topic tries the exact

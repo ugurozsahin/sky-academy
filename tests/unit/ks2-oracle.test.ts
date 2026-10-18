@@ -11,6 +11,9 @@ const f = (n: number, d = 1): Frac => ({ n, d });
 // letter equations, including the STA 2025 arithmetic paper's own four items (#1045's evidence section).
 const KNOWN: [string, Frac][] = [
   ['5 + 3 = ?', f(8)],
+  // #1986 boundary: every product is safe and so is the numerator they sum to (8.845e15 < 2^53 ≈ 9.007e15)
+  ['66000001 ÷ 67000003 + 67000003 ÷ 66000001 = ?', f(66000001 ** 2 + 67000003 ** 2, 67000003 * 66000001)],
+  ['999999/999998 × 999999/999997 = ?', f(999999 * 999999, 999998 * 999997)],   // #1986: just inside the safe range
   ['12 − 5 = ?', f(7)],
   ['1,004,235 − 52,346 = ?', f(951889)],
   ['0.1 + 0.2 = ?', f(3, 10)],
@@ -160,6 +163,15 @@ const NULLS = [
   ' = 5',
   '(n + 1)) = 5',
   '',
+  // #1986: each literal passes the #1443 caps, but the arithmetic after it outgrows MAX_SAFE_INTEGER
+  '10,000,000.123 × 10,000,000.123 = ?',
+  // each cross-product is a safe integer but their sum is not (9.11e15 > 2^53): add, sub and the coefficient difference
+  // (the shared factor 1000 lets simplify() shrink the rounded numerator back to a safe-looking value, so only the pre-check refuses these)
+  '67000001 ÷ 67001000 + 68000003 ÷ 68001000 = ?',
+  '67000001 ÷ 67001000 − −68000003 ÷ 68001000 = ?',
+  '67000001 ÷ 67001000 × ? = −68000003 ÷ 68001000 × ? + 1',
+  '1/999999 + 1/999998 + 1/999997 = ? + 1/999996',
+  '999999/999998 × 999999/999997 × 999999/999996 × 999999/999995 = ?',
 ];
 
 describe('ks2Solve', () => {
@@ -197,6 +209,16 @@ describe('sameValue', () => {
   // own way would have been marked wrong by the very oracle built to check it. Fixed in fractions.ts.
   it('reads a U+2212-signed fraction', () => { expect(sameValue('−3/4', f(-3, 4))).toBe(true); });
   it('reads a U+2212-signed mixed number', () => { expect(sameValue('−1 1/2', f(-3, 2))).toBe(true); });
+  it('refuses a value whose cross-product outgrows MAX_SAFE_INTEGER (#1986)', () => {
+    expect(sameValue('9,999,999.999', f(9999999999, 10 ** 10))).toBe(false);   // dp 3 is fine; n·d ≈ 1e20 is not
+  });
+  it('refuses a pair that differs but whose cross-products collide past 2^53 (#1986)', () => {
+    // 2^53 + 1 reads as 2^53, so unguarded `equal` calls these two equal; only the `checked` guard says false.
+    expect(sameValue('9007199254740993', f(9007199254740992))).toBe(false);
+  });
+  it('refuses an answer with more decimal places than the oracle reads (#1986)', () => {
+    expect(sameValue('0.0001', f(1, 10000))).toBe(false);   // only the dp guard refuses this: the products are tiny
+  });
   it('rejects a value that disagrees', () => { expect(sameValue('6', f(7))).toBe(false); });
   it('is false for text it cannot read at all', () => {
     expect(sameValue('abc', f(1))).toBe(false);
