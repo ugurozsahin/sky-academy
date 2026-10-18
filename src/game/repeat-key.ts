@@ -152,7 +152,7 @@ const contentList = (s: string) => {
  * deliberately, so that narrowing `contentList` goes red once a generator actually uses the dropped
  * separator, not on its own (round 2, B2; #465).
  */
-export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : ''].join('\u0000');
+export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : '', ...(q.story ? [q.story] : [])].join('\u0000');
 
 /**
  * Draw with `draw()`, re-rolling up to `tries` times while the result's `repeatKey` still matches
