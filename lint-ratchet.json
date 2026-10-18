@@ -5,12 +5,6 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/game/arena.ts::drawBubble": 16,
-    "src/game/arena.ts::drawParticle": 21,
-    "src/game/arena.ts::drawTrail": 19,
-    "src/game/arena.ts::onMove": 19,
-    "src/game/arena.ts::render": 19,
-    "src/game/arena.ts::reveal": 16,
     "src/main.ts::(anonymous)": 16,
     "src/ui/play.ts::playScreen": 22,
     "tests/unit/curriculum.test.ts::(anonymous)": 28

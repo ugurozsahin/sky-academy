@@ -43,9 +43,8 @@ export const BOLT_HALO = hexA('#2ea8ff', 0.4), STAR_HALO = hexA('#ffd23a', 0.4);
 /** The 8-point star silhouette a thrown star or a star particle's halo is filled with, at the current
  *  transform — a shuriken uses a tighter 4-point version of the same shape. Defined once (not a per-frame
  *  closure) so a star can be filled twice (a scaled halo copy, then the crisp copy) without allocating each
- *  frame (#29). Named `starPath` twice in this game on purpose: `Arena`'s own private copy draws the fixed
- *  8-point particle star from `drawParticle`, and never takes a point count — the two never collide because
- *  the class always spells its own as `this.starPath`. */
+ *  frame (#29). `arena-draw.ts` keeps its own fixed 8-point `starShape` for the star particle, which never
+ *  takes a point count. */
 export function starPath(c: CanvasRenderingContext2D, points: number, ro: number, ri: number) {
   c.beginPath();
   for (let i = 0; i < points * 2; i++) { const r = i % 2 ? ri : ro, a = i * Math.PI / points; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }

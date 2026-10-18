@@ -7,17 +7,18 @@ import { gentleRelaunchSet } from './gentleRelaunch';   // #742: which bubbles a
 import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
 import type { Rng } from '../curriculum/types';
 import {
-  hittable, GOOD, BAD, GOOD_HALO, BAD_HALO, RELAUNCH_DELAY, MAX_RELAUNCHES, COLLIDE,
-  layoutWave, reanchorBubble, bubbleRadius, resolveCollisions, glowSprite, bodySprite,
-  fitLabelLines, warnUnfitLabel, labelFont, hexA,
+  hittable, GOOD, RELAUNCH_DELAY, MAX_RELAUNCHES, COLLIDE,
+  layoutWave, reanchorBubble, bubbleRadius, resolveCollisions,
+  fitLabelLines, warnUnfitLabel,
 } from './bubbles';
 import type { Bubble, WaveOpts, ArenaBox, ClampCounts } from './bubbles';
 import {
-  FX_PARTICLE, FX_COLORS, MAX_PARTICLES, SHOT_FLIGHT, SHOT_STYLE, shotPose, starPath, compact, BOLT_HALO, STAR_HALO, ELEMENTS, burstParticles, prefersReducedMotion, stepParticle,
+  FX_PARTICLE, FX_COLORS, MAX_PARTICLES, SHOT_FLIGHT, SHOT_STYLE, shotPose, starPath, compact, ELEMENTS, burstParticles, prefersReducedMotion, stepParticle,
 } from './particles';
 import type { Particle, Shot, FxKind } from './particles';
-import { segCircle } from './slicing';
-import { relaunchBubble } from './arena-step';
+import { drawBubble, drawParticle, drawTrail } from './arena-draw';
+import { advanceStroke, slicedBy } from './slicing';
+import { relaunchBubble, markOutcome, ghostX } from './arena-step';
 import type { Stroke } from './slicing';
 
 export * from './bubbles';
@@ -185,19 +186,12 @@ export class Arena {
   /** Freeze the wave and show the outcome: the sliced bubble stays put with a ✓ (or ✗ beside the glowing right answer),
    *  the rest fade. If the right answer is no longer on screen (it fell, or is still queued) it pops in as a ghost bubble. */
   reveal(o: { good?: string; bad?: string }) {
-    this.frozen = true; const now = performance.now(); let shown = false;
-    for (const b of this.bubbles) {
-      if (b.dead) continue;
-      if (!b.launched) { b.dead = true; continue; }                       // still queued: never launch
-      if (o.good !== undefined && b.label === o.good && !shown) { b.mark = 'good'; b.markAt = now; shown = true; }
-      else if (o.bad !== undefined && b.label === o.bad && b.hit && !b.mark) { b.mark = 'bad'; b.markAt = now; }
-      else b.fade = true;
-    }
+    this.frozen = true; const now = performance.now();
+    const shown = markOutcome(this.bubbles, o, now);
     if (o.good !== undefined && !shown) {
       const r = this.radius(o.good.length > 3);
-      let x = this.W / 2; const y = this.topInset + (this.H - this.topInset) * 0.42;
-      const bad = this.bubbles.find(b => b.mark === 'bad' && !b.dead);
-      if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
+      const y = this.topInset + (this.H - this.topInset) * 0.42;
+      const x = ghostX(this.W, r, this.bubbles.find(b => b.mark === 'bad' && !b.dead), y);   // don't sit on the ✗ bubble
       const fit = fitLabelLines(o.good, r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });
       warnUnfitLabel(o.good, r, fit);
       this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize: fit.fs, lines: fit.lines, labelState: fit.state, ox: x, ovx: 0, ovy: 0, relaunches: 0 });
@@ -278,16 +272,17 @@ export class Arena {
     // Hit-test against the last pointer position, not the visual trail: the trail fades after 280ms,
     // so a finger that pauses mid-stroke (or slow pointer events) must not lose its slice segment.
     const prev = s.lastPt;
-    const d = Math.hypot(p.x - prev.x, p.y - prev.y); s.moved += d; if (d < 2) return;
-    s.lastPt = p;
-    if (e.pointerId === this.mostRecentId) {         // #561: only the most recent stroke draws — the shared trail, its swish, its wake
-      this.trail.push({ ...p, t: performance.now() });
-      if (this.trail.length > 24) this.trail.shift();
-      if (s.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
-      if (!this.reducedMotion && ++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);   // #900: no wake sparks
-    }
-    for (const b of this.bubbles) { if (this.frozen) break; if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true); }
+    if (!advanceStroke(s, p)) return;
+    if (e.pointerId === this.mostRecentId) this.extendTrail(s, p, prev);   // #561: only the most recent stroke draws
+    for (const b of slicedBy(this.bubbles, prev, p)) { if (this.frozen) break; this.hitBubble(b, true); }
   };
+  /** The shared trail, its swish and its wake follow the newest finger only (#561). */
+  private extendTrail(s: Stroke, p: { x: number; y: number }, prev: { x: number; y: number }) {
+    this.trail.push({ ...p, t: performance.now() });
+    if (this.trail.length > 24) this.trail.shift();
+    if (s.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
+    if (!this.reducedMotion && ++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);   // #900: no wake sparks
+  }
   // `pointerup`/`pointercancel` are WINDOW listeners, so every arena hears every lift; only the pointer that
   // went down on this canvas has an entry to remove (#16, PR #295's foreign-lift rule). #561's own Stroke per
   // pointer closes PR #295's named follow-up: no single stroke is left for a second finger to take and strand.
@@ -407,16 +402,24 @@ export class Arena {
     // Nothing to draw, or nothing that can change: keep the rAF loop alive (the e2e frame-rate rail counts
     // frames, and the loop is what tears down cleanly) but leave the canvas alone. While paused the arena is
     // frozen under an overlay, so the pixels already there are the correct picture (#31).
-    const empty = !this.bubbles.length && !this.particles.length && !this.shots.length && !this.trail.length;
+    const empty = this.isEmpty();
     if (!this.dirty && (this.paused || (empty && !this.painted))) return;
     const c = this.ctx; c.clearRect(0, 0, this.W, this.H);
     this.painted = !empty; this.dirty = false;
-    if (empty) return;
-    for (const b of this.bubbles) { if (b.dead || !b.launched || b.mark) continue; this.drawBubble(c, b, now); }
+    if (!empty) this.drawScene(c, now);
+  }
+  private isEmpty() { return !this.bubbles.length && !this.particles.length && !this.shots.length && !this.trail.length; }
+  private drawScene(c: CanvasRenderingContext2D, now: number) {
+    for (const b of this.bubbles) { if (!b.dead && b.launched && !b.mark) this.drawBubble(c, b, now); }
     for (const b of this.bubbles) { if (!b.dead && b.launched && b.mark) this.drawBubble(c, b, now); }   // spotlighted on top
-    for (const p of this.particles) this.drawParticle(c, p);
+    for (const p of this.particles) drawParticle(c, p);
     for (const s of this.shots) this.drawShot(c, s);
-    this.drawTrail(c, now);
+    drawTrail(c, this.trail, { fx: this.fx, color: this.trailColor, core: this.trailCore }, now);
+  }
+  private drawBubble(c: CanvasRenderingContext2D, b: Bubble, now: number) {
+    // #684: a 3-D Shapes bubble draws its solid instead of the glyph, once the screen has baked one; the phase is
+    // offset by id so a wave does not turn in lock-step. Anything else, or a solid not baked yet, keeps its label.
+    drawBubble(c, b, now, this.labelArt ? this.labelArt(b.label, b.color, now / 1000 + b.id * 0.37) : null);
   }
   /** The projectile in flight, in the avatar's element (#48): a spinning shuriken for Kai / Dusk / the Master,
    *  a fireball, a water orb, a bolt… No shadowBlur here — the #29 rail forbids it in a per-frame path. */
@@ -461,105 +464,6 @@ export class Arena {
       c.rotate(angle); c.strokeStyle = cols[0]; c.lineCap = 'round'; c.lineWidth = 7;
       c.beginPath(); c.moveTo(-r * 1.2, 0); c.lineTo(r * 1.2, 0); c.stroke();
       c.strokeStyle = cols[1]; c.lineWidth = 2.5; c.stroke();
-    }
-    c.restore();
-  }
-  private drawBubble(c: CanvasRenderingContext2D, b: Bubble, now: number) {
-    const wob = Math.sin(b.wobble) * 0.04;
-    c.save(); c.translate(b.x, b.y);
-    let scale = 1;
-    if (b.fade) { c.globalAlpha = 0.28; scale *= 0.9; }
-    if (b.mark) {                                    // outcome spotlight: pop in, gentle pulse, a shake for a wrong slice
-      const age = Math.max(0, now - (b.markAt ?? now)) / 1000;
-      scale *= Math.min(1, age / 0.16) * (1.18 + 0.05 * Math.sin(age * 9));
-      if (b.mark === 'bad') c.translate(Math.sin(age * 45) * 6 * Math.max(0, 0.45 - age) / 0.45, 0);
-    }
-    c.rotate(b.mark ? 0 : wob); c.scale(scale, scale);
-    if (b.mark) {
-      const col = b.mark === 'good' ? GOOD : BAD;
-      // #29: a soft translucent underlay ring instead of shadowBlur (per-pixel blur is too slow on low-end phones).
-      c.beginPath(); c.arc(0, 0, b.r + 7, 0, Math.PI * 2);
-      c.strokeStyle = b.mark === 'good' ? GOOD_HALO : BAD_HALO; c.lineWidth = 18; c.stroke();   // the halo
-      c.strokeStyle = col; c.lineWidth = 6; c.stroke();                // the crisp ring
-    }
-    // glow + body: both cached offscreen sprites keyed `color|round(r)`. A per-frame radial gradient (two colour
-    // strings + a gradient object per bubble) and a shadowBlur are too slow on low-end devices (#28/#29).
-    const g = glowSprite(b.color, b.r); c.drawImage(g, -g.width / 2, -g.height / 2);
-    const body = bodySprite(b.color, b.r); c.drawImage(body, -body.width / 2, -body.height / 2);
-    // #684: a 3-D Shapes bubble draws its solid instead of the glyph, once the screen has baked one; the phase is
-    // offset by id so a wave does not turn in lock-step. Anything else, or a solid not baked yet, keeps its label.
-    const art = this.labelArt ? this.labelArt(b.label, b.color, now / 1000 + b.id * 0.37) : null;
-    if (art) { const s = b.r * 1.5; c.drawImage(art.img, art.sx, 0, art.size, art.size, -s / 2, -s / 2, s, s); }
-    else {
-      // label — font size and line break fitted once at spawn (#28/#348), never in this per-frame path
-      const lines = b.lines; const fs = b.fontSize;
-      c.font = labelFont(fs);
-      c.textAlign = 'center'; c.textBaseline = 'middle';
-      const lh = fs * 1.02, top = 2 - (lines.length - 1) * lh / 2;   // the block of lines stays centred on the disc
-      c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)';
-      for (let i = 0; i < lines.length; i++) c.strokeText(lines[i], 0, top + i * lh);
-      c.fillStyle = '#fff';
-      for (let i = 0; i < lines.length; i++) c.fillText(lines[i], 0, top + i * lh);
-    }
-    if (b.mark) {                                    // ✓ / ✗ badge
-      const col = b.mark === 'good' ? GOOD : BAD, br = b.r * 0.36, bx = b.r * 0.74, by = -b.r * 0.74;
-      c.fillStyle = col; c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();
-      c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke();
-      // No Fredoka here on purpose: it has no ✓ or ✗ glyph, so this text has always come from the fallback
-      // stack, where 900 is a real designed weight. Naming Fredoka only invited someone to "fix" the 900.
-      c.font = `900 ${br * 1.5}px "Baloo 2", system-ui, sans-serif`; c.lineWidth = 0; c.fillStyle = '#fff'; c.fillText(b.mark === 'good' ? '✓' : '✗', bx, by + 1);
-    }
-    c.restore();
-  }
-  // The 8-point star silhouette, built at the current transform. Defined once (not a per-frame closure) so the
-  // star particle can fill it twice — a scaled halo copy then the crisp copy — without allocating each frame (#29).
-  private starPath(c: CanvasRenderingContext2D, size: number) {
-    c.beginPath();
-    for (let i = 0; i < 8; i++) { const r = i % 2 ? size * 0.35 : size; const a = i * Math.PI / 4; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
-    c.closePath();
-  }
-  private drawParticle(c: CanvasRenderingContext2D, p: Particle) {
-    const k = 1 - p.life / p.max;
-    c.save(); c.globalAlpha = Math.max(0, k);
-    if (p.kind === 'ring') { c.strokeStyle = p.color; c.lineWidth = 4 * k + 1; c.beginPath(); c.arc(p.x, p.y, p.size + (1 - k) * 90, 0, Math.PI * 2); c.stroke(); }
-    else if (p.kind === 'text') { c.font = `700 ${p.size}px "Fredoka", "Baloo 2", system-ui, sans-serif`; c.textAlign = 'center'; c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,.6)'; c.strokeText(p.text!, p.x, p.y); c.fillStyle = p.color; c.fillText(p.text!, p.x, p.y); }
-    else if (p.kind === 'shard') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 6); c.fillStyle = p.color; c.fillRect(-p.size, -p.size / 2, p.size * 2, p.size); }
-    else if (p.kind === 'ember') { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size); g.addColorStop(0, '#fff6c0'); g.addColorStop(0.4, p.color); g.addColorStop(1, 'rgba(255,60,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, p.size * (0.6 + 0.6 * k), 0, Math.PI * 2); c.fill(); }
-    else if (p.kind === 'drop') { c.translate(p.x, p.y); c.rotate(Math.atan2(p.vy, p.vx) + Math.PI / 2); c.fillStyle = p.color; c.beginPath(); c.moveTo(0, -p.size * 1.6); c.quadraticCurveTo(p.size, 0, 0, p.size); c.quadraticCurveTo(-p.size, 0, 0, -p.size * 1.6); c.fill(); c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.arc(-p.size * 0.3, -p.size * 0.2, p.size * 0.25, 0, Math.PI * 2); c.fill(); }
-    else if (p.kind === 'bolt') { c.translate(p.x, p.y); c.rotate(p.rot ?? 0); c.lineJoin = 'miter'; c.beginPath(); c.moveTo(-p.size, 0); c.lineTo(-p.size * 0.3, -p.size * 0.5); c.lineTo(p.size * 0.1, p.size * 0.3); c.lineTo(p.size, -p.size * 0.4); c.strokeStyle = BOLT_HALO; c.lineWidth = 7; c.stroke(); c.strokeStyle = p.color; c.lineWidth = 2.5; c.stroke(); }   // #29: halo underlay, not shadowBlur
-    else if (p.kind === 'rock') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 4); c.fillStyle = p.color; c.beginPath(); c.moveTo(-p.size, -p.size * 0.4); c.lineTo(-p.size * 0.3, -p.size); c.lineTo(p.size * 0.8, -p.size * 0.6); c.lineTo(p.size, p.size * 0.4); c.lineTo(p.size * 0.1, p.size); c.lineTo(-p.size * 0.9, p.size * 0.5); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1.5; c.stroke(); }
-    else if (p.kind === 'leaf') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + Math.sin(p.life * 6)); c.fillStyle = p.color; c.beginPath(); c.moveTo(0, -p.size); c.quadraticCurveTo(p.size, 0, 0, p.size); c.quadraticCurveTo(-p.size, 0, 0, -p.size); c.fill(); c.strokeStyle = 'rgba(0,80,40,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -p.size * 0.8); c.lineTo(0, p.size * 0.8); c.stroke(); }
-    else if (p.kind === 'crystal') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 3); c.fillStyle = p.color; c.beginPath(); c.moveTo(0, -p.size * 1.4); c.lineTo(p.size * 0.6, 0); c.lineTo(0, p.size * 1.4); c.lineTo(-p.size * 0.6, 0); c.closePath(); c.fill(); c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 1; c.stroke(); }
-    else if (p.kind === 'star') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 2); c.fillStyle = STAR_HALO; c.save(); c.scale(1.35, 1.35); this.starPath(c, p.size); c.fill(); c.restore(); c.fillStyle = p.color; this.starPath(c, p.size); c.fill(); }   // #29: halo = a scaled fill of the star, NOT a stroke — stroking this concave path is slower than the old shadowBlur (measured)
-    else if (p.kind === 'smoke') { c.globalAlpha = Math.max(0, k) * 0.55; c.fillStyle = p.color; c.beginPath(); c.arc(p.x, p.y, p.size * (0.5 + (1 - k)), 0, Math.PI * 2); c.fill(); }
-    else if (p.kind === 'pixel') { c.fillStyle = p.color; c.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size); }
-    else if (p.kind === 'slash') { c.translate(p.x, p.y); c.rotate(p.rot ?? 0); c.strokeStyle = p.color; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-p.size, 0); c.lineTo(p.size, 0); c.stroke(); }
-    else { c.fillStyle = p.color; c.beginPath(); c.arc(p.x, p.y, p.size * k, 0, Math.PI * 2); c.fill(); }
-    c.restore();
-  }
-  private drawTrail(c: CanvasRenderingContext2D, now: number) {
-    if (this.trail.length < 2) return;
-    const fx = this.fx; const cols = FX_COLORS[fx];
-    c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
-    const wide = fx === 'fire' || fx === 'shadow' || fx === 'water' ? 22 : fx === 'blade' ? 8 : 14;
-    const core = fx === 'blade' ? 2 : fx === 'electric' ? 3 : 5;
-    for (let pass = 0; pass < 2; pass++) {
-      for (let i = 1; i < this.trail.length; i++) {
-        const a = this.trail[i - 1], b = this.trail[i];
-        const age = Math.max(0, 1 - (now - b.t) / 280);
-        const w = (pass === 0 ? wide : core) * age * (i / this.trail.length);
-        c.strokeStyle = pass === 0 ? hexA(this.trailColor, (fx === 'shadow' ? 0.5 : 0.35) * age) : this.trailCore ? hexA(this.trailCore, 0.9 * age) : (fx === 'fire' ? `rgba(255,230,150,${0.9 * age})` : fx === 'shadow' ? hexA(cols[1], 0.9 * age) : `rgba(255,255,255,${0.9 * age})`);
-        c.lineWidth = Math.max(0.5, w);
-        c.beginPath();
-        if (fx === 'electric' && pass === 1) { // jagged lightning core
-          c.moveTo(a.x, a.y); const mx = (a.x + b.x) / 2 + (Math.random() - 0.5) * 14, my = (a.y + b.y) / 2 + (Math.random() - 0.5) * 14; c.lineTo(mx, my); c.lineTo(b.x, b.y);
-        } else { c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); }
-        c.stroke();
-      }
-    }
-    if (fx === 'blade') { // red edge highlight on the katana slash
-      const last = this.trail[this.trail.length - 1], prev = this.trail[Math.max(0, this.trail.length - 4)];
-      c.strokeStyle = 'rgba(255,59,92,.8)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(prev.x, prev.y + 3); c.lineTo(last.x, last.y + 3); c.stroke();
     }
     c.restore();
   }
