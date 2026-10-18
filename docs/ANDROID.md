@@ -12,7 +12,7 @@ The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in
 4. Tagging a commit `vX.Y.Z` also attaches the APK to a GitHub Release.
 
 ## The app id changed (old Sky Ninja id → `uk.co.sharpwise`, #1930)
-Android treats a different application id as a different app. A build with the new id installs **beside** any build with the old id and starts with no saved progress; it does not update it. Nothing has been published to a store (the APK is debug-signed), so the only installs affected are test tablets. To carry progress across: in the **old** app open the parents' area → **Move to another device** → copy the save code; in the **new** app paste it into **Restore**. Then uninstall the old app. The id is fixed from the first store upload, so this is the cheap moment to change it.
+Android treats a different application id as a different app. A build with the new id installs **beside** any build with the old id and starts with no saved progress; it does not update it. Nothing has been published to a store (the APK is debug-signed), so the only installs affected are test tablets. To carry progress across: in the **old** app open the parents' area → **Move to another device** → copy the save code; in the **new** app paste it into **Restore**. Then uninstall the old app. The id is fixed from the first store upload, so this is the cheap moment to change it. **Unverified:** no device install and no old-to-new save-code round trip has been done yet; that is a step for someone with a tablet, and the Android APK workflow only proves the build.
 
 ## Build locally (optional)
 Android Studio (or the SDK command-line tools) + JDK 21:
