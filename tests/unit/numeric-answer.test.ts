@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseNumericAnswer } from './helpers/numeric-answer';
 
 describe('parseNumericAnswer', () => {
-  it('parses the forms Sky Ninja Academy writes a numeric answer in', () => {
+  it('parses the forms Sharpwise writes a numeric answer in', () => {
     const cases: [string, number | null][] = [
       ['3', 3],
       ['−3', -3],   // U+2212, the sign KS2 labels use

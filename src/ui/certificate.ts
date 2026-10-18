@@ -114,12 +114,12 @@ export function certificateText(i: CertInfo): CertText {
   // one device, and "completed the Counting mission" would be the wrong claim on a printed, kept record.
   const reason = {
     duel: `won a Ninja Duel on ${i.year} Island`,
-    belt: `earned the ${i.title} at Sky Ninja Academy`, island: `starred every topic on ${i.year} Island`,
+    belt: `earned the ${i.title} at Sharpwise`, island: `starred every topic on ${i.year} Island`,
     sensei: `completed Sensei training on ${i.year} Island`,
     mission: `completed the ${i.title} mission on ${i.year} Island`,
   }[certKind(i)];
   return {
-    heading: 'Sky Ninja Academy', awarded: 'Certificate of Achievement', child: i.name.trim() || 'Ninja',
+    heading: 'Sharpwise', awarded: 'Certificate of Achievement', child: i.name.trim() || 'Ninja',
     reason,
     detail: certKind(i) === 'belt' ? `★ ${i.score} stars across the islands` : certKind(i) === 'island' ? `${i.attempts} topics · ★ ${i.score}/${i.attempts * 3}` : `${i.correct}/${i.attempts} correct (${acc}%) · score ${i.score}`,
     stars: '★'.repeat(Math.max(0, Math.min(3, i.stars))) + '☆'.repeat(3 - Math.max(0, Math.min(3, i.stars))),
@@ -225,7 +225,7 @@ async function shareViaCapacitor(c: HTMLCanvasElement, filename: string): Promis
     const dataUrl = c.toDataURL('image/png');
     const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
     const { uri } = await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
-    await Share.share({ url: uri, title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' });
+    await Share.share({ url: uri, title: 'Sharpwise certificate', dialogTitle: 'Share your certificate' });
     return true;
   } catch { return false; }
 }
@@ -254,7 +254,7 @@ async function claudeDownloads(): Promise<DownloadsApi | null> {
 export function showCertificateFullscreen(c: HTMLCanvasElement): void {
   document.querySelector('.cert-view:not(.gate-ask)')?.remove();   // never the grown-ups gate (#1943): its promise would hang
   const wrap = document.createElement('div'); wrap.className = 'cert-view'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Your certificate');
-  const img = new Image(); img.className = 'cert-view-img'; img.alt = 'Your Sky Ninja Academy certificate — tap to zoom'; img.src = c.toDataURL('image/png');
+  const img = new Image(); img.className = 'cert-view-img'; img.alt = 'Your Sharpwise certificate — tap to zoom'; img.src = c.toDataURL('image/png');
   img.addEventListener('click', e => { e.stopPropagation(); img.classList.toggle('zoomed'); wrap.classList.toggle('zoomed', img.classList.contains('zoomed')); });
   const hint = document.createElement('p'); hint.className = 'cert-view-hint'; hint.textContent = 'Tap to zoom · Press and hold to save 📥';
   const done = document.createElement('button'); done.className = 'btn big'; done.textContent = 'Done';
@@ -309,7 +309,7 @@ export async function deliverCertificate(c: HTMLCanvasElement, filename: string,
 
   switch (certRoute({ canShareFiles, claudeSave: !!dl, claudeRuntime, nativeShell, capacitorShare })) {
     case 'share':
-      try { await nav.share!({ files: [file], title: 'Sky Ninja Academy certificate' }); return 'shared'; }
+      try { await nav.share!({ files: [file], title: 'Sharpwise certificate' }); return 'shared'; }
       catch (e) { if ((e as { name?: string }).name !== 'AbortError') console.warn('certificate: share failed, saving instead', e); }   // a cancel steps down quietly
       if (dl) return saveViaClaude(dl, filename, blob, c);
       if (claudeRuntime) { showCertificateFullscreen(c); return 'shown'; }

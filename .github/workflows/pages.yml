@@ -12,6 +12,7 @@ concurrency:
   cancel-in-progress: false   # let a running deployment finish; GitHub keeps only the newest queued one
 jobs:
   build:
+    if: vars.PAGES_ENABLED == 'true'   # the owner turns this on after enabling Pages (docs/WEBSITE.md step 1); until then main stays green
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -26,7 +27,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with: { path: site }
   deploy:
-    needs: build
+    needs: build   # skipped with it while PAGES_ENABLED is unset
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
