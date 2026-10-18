@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
-import { coinLabel, coinSay } from '../../src/curriculum/util';
+import { coinLabel, coinSay, unitQ } from '../../src/curriculum/util';
 import { pickTheme } from '../../src/game/memory';
 import { SOURCES, code } from './helpers/sources';
 
@@ -41,6 +41,14 @@ describe('money: one written form, one spoken form (#349, #651, #652, #653)', ()
       [...code(s).matchAll(/£\$\{[^}]*\/\s*100|\$\{[^}]*\/\s*100\}\s*pounds?|\.toFixed\(2\)/g)].map(m => `${f}: ${m[0]}`));
     // vis-axis-chart / vis-pie round chart geometry with toFixed(2); that is not money.
     expect(bad.filter(b => !/\/src\/ui\/vis-/.test(b))).toEqual([]);
+  });
+
+  // The spoken question must not say "pence" for an answer written in pounds.
+  it('unitQ speaks "money" for 100p or more and "pence" below it', () => {
+    expect(unitQ(rng(1), 105, [5, 50, 50]).say).toBe('How much money altogether?');
+    expect(unitQ(rng(1), 100, [50, 50]).say).toBe('How much money altogether?');
+    expect(unitQ(rng(1), 30, [20, 10]).say).toBe('How many pence altogether?');
+    expect(unitQ(rng(1), 99, [50, 20, 20, 5, 2, 2]).say).toBe('How many pence altogether?');
   });
 
   // #653: a "How much money?" card must be worth what its coins add up to.
