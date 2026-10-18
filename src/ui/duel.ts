@@ -8,7 +8,7 @@
 // (item 5's coins and stickers), marks the daily streak (#355), tells the Daily Dojo what the device answered
 // and teaches Sensei what Player 1 found hard on this topic, files a certificate when Player 1 wins, and
 // records the match itself in the duel history the rewards screen lists.
-import { avatarById } from '../avatars';
+import { avatarById, type Avatar } from '../avatars';
 import { topicsFor, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
 import { Duel, DUEL_PLAYERS, duelHistoryLine, duelPool, type DuelPlayer } from '../game/duel';
@@ -29,7 +29,7 @@ const PLAYERS = DUEL_PLAYERS;
 const NAMES: Record<'players' | 'teams', Record<DuelPlayer, string>> = { players: { a: 'Player 1', b: 'Player 2' }, teams: { a: 'Team A', b: 'Team B' } };
 
 /** One `Arena` per seat, on that seat's canvas. A duel has no lives: a fallen bubble is just a bubble nobody sliced. */
-function mountArenas(arenas: Record<DuelPlayer, Arena>, av: ReturnType<typeof avatarById>, duel: Duel, waveEnd: (p: DuelPlayer) => void): void {
+function mountArenas(arenas: Record<DuelPlayer, Arena>, av: Avatar, duel: Duel, waveEnd: (p: DuelPlayer) => void): void {
   for (const p of PLAYERS) {
     arenas[p] = new Arena($(`#arena-${p}`) as HTMLCanvasElement, {
       onHit(b, viaSwipe) {

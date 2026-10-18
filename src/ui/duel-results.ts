@@ -2,7 +2,7 @@
 // the overlay that shows them and the certificate a Player 1 win earns, moved out of `duelScreen` in
 // `duel.ts` with their comments. The live bindings `window.__sna`'s `state()`, `certificate()` and
 // `certWords()` read are the fields of `m`, written by `commitMatch` exactly as the `let`s were.
-import { SENSEI, type avatarById } from '../avatars';
+import { SENSEI, type Avatar } from '../avatars';
 import type { Topic } from '../curriculum';
 import { duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelStars, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { scaled } from '../game/speed';
@@ -15,7 +15,7 @@ import { stickersHTML, type screenScope } from './screen';
 import type { DuelScreenOpts } from './duel';
 
 export interface ResultsDeps {
-  o: DuelScreenOpts; topic: Topic; NAME: Record<DuelPlayer, string>; d: { name: string }; av: ReturnType<typeof avatarById>;
+  o: DuelScreenOpts; topic: Topic; NAME: Record<DuelPlayer, string>; d: { name: string }; av: Avatar;
   overlay: HTMLElement; scope: ReturnType<typeof screenScope>; hold: (open: boolean, beats?: boolean) => void;
   cleanup: () => void; goHome: () => void; replay: () => void;
 }

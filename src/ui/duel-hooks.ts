@@ -14,7 +14,9 @@ import type { DuelHooks } from './hooks';
 
 export interface DuelHookDeps {
   duel: Duel; arenas: Record<DuelPlayer, Arena>; topic: Topic;
-  beats: { readonly hintLine: string }; m: Settled; paused: () => boolean;
+  beats: { readonly hintLine: string }; paused: () => boolean;
+  /** Read live, never written here: the settlement owns `committed` and `payout`, which the commit-once guarantee rests on. */
+  m: Readonly<Pick<Settled, 'paid' | 'dojoPaid' | 'taught' | 'cert'>>;
 }
 
 export function createDuelHooks({ duel, arenas, topic, beats, m, paused }: DuelHookDeps): DuelHooks {
