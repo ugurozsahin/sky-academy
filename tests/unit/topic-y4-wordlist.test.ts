@@ -113,9 +113,9 @@ describe('y4-wordlist (#1157)', () => {
   });
 
   // play-session.test.ts is frozen at its length (#1388) and its peek harness is private to it, so the hint
-  // fallback is pinned at the source: a card's own hint after the peek, else Story Sentences' line.
+  // fallback is pinned at the source (play-peek.ts since #1501): a card's own hint after the peek, else Story Sentences' line.
   it('the peek hides to the card\'s own peekHint, falling back to "Slice the words in order"', () => {
-    expect(readFileSync(join('src', 'ui', 'play-session.ts'), 'utf8')).toContain("setHint(els, q.peekHint ?? 'Slice the words in order');");
+    expect(readFileSync(join('src', 'ui', 'play-peek.ts'), 'utf8')).toContain("setHint(d.els, q.peekHint ?? 'Slice the words in order');");
   });
 
   it('the shared builders are declared exactly once, so a later list topic cannot fork them', () => {
