@@ -6,6 +6,7 @@
 // built from `callbacks` and then given back through `bind()`, because the callbacks read it (its scores, its
 // `ended`) and it cannot exist before they do.
 import type { Avatar } from '../avatars';
+import type { YearInfo } from '../curriculum';
 import type { Arena } from '../game/arena';
 import { DUEL_PLAYERS, seededRng, spokenQuestion, type Duel, type DuelEvents, type DuelPlayer, type DuelResult } from '../game/duel';
 import { scaled } from '../game/speed';
@@ -17,7 +18,6 @@ import { hintText, promptHTML, promptMode } from './hud';
 import { waveOptsFor } from './play-session';
 import type { ScreenScope } from './screen';
 import { renderVisual } from './visuals';
-import type { DuelScreenOpts } from './duel';
 
 const PLAYERS = DUEL_PLAYERS;
 /** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
@@ -42,7 +42,7 @@ export const DUEL_TOAST_LONGEST = 'Nobody sliced it — no point';
 
 /** What the beats need from the screen around them. The arenas are filled in by the screen after the beats exist. */
 export interface DuelBeatDeps {
-  o: Pick<DuelScreenOpts, 'year'>;
+  o: { year: YearInfo };
   av: Avatar;
   NAME: Record<DuelPlayer, string>;
   scope: ScreenScope;
@@ -60,7 +60,7 @@ export function createDuelBeats(d: DuelBeatDeps) {
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
-  let duel!: Duel;
+  let duel!: Duel; let bound = false;   // the `Duel` constructor fires no event; `start()` does, after `bind()`
   const callbacks: DuelEvents = {
     onQuestion(q, info) {
       $('#round').textContent = `Round ${info.round} of ${info.total}`;
@@ -178,7 +178,7 @@ export function createDuelBeats(d: DuelBeatDeps) {
   return {
     callbacks,
     /** Hand over the `Duel` built from `callbacks`. */
-    bind(built: Duel) { duel = built; },
+    bind(built: Duel) { if (bound) throw new Error('createDuelBeats: bind() called twice'); bound = true; duel = built; },
     waveEnd, hold,
     get hintLine() { return hintLine; },
   };
