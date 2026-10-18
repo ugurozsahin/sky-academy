@@ -85,21 +85,24 @@ function number(words: string[], stop: number): 'sg' | 'pl' | '?' {
   if (DET.has((words[stop - 2] ?? '').toLowerCase())) return w.endsWith('s') || w === 'children' ? 'pl' : 'sg';
   return w.endsWith('s') && w.length > 3 || w === 'children' ? 'pl' : '?';
 }
+function progressiveFaults(frame: string, tense: string): string[] {
+  const words = frame.split(' '), out: string[] = [];
+  const ai = words.findIndex(w => w.toLowerCase() in AUX);
+  if (ai < 0) return [`${frame} — a progressive frame needs is/are/was/were`];
+  const aux = AUX[words[ai].toLowerCase()], n = number(words, ai);
+  if (aux !== tense) out.push(`${frame} — auxiliary says ${aux}, label says ${tense}`);
+  const sing = ['is', 'was'].includes(words[ai].toLowerCase());
+  if (n !== '?' && (n === 'sg') !== sing) out.push(`${frame} — auxiliary does not agree with its subject`);
+  return out;
+}
 function frameFaults([frame, col, tense]: Frame): string[] {
   const out: string[] = [];
   const words = frame.split(' ');
   const gap = words.findIndex(w => w.startsWith('___'));
   if (frame.match(/___/g)?.length !== 1) return [`${frame} — needs exactly one gap`];
+  if (col === 3) return progressiveFaults(frame, tense);
   const past = PAST_PHRASE.test(frame), pres = PRESENT_PHRASE.test(frame);
   const aux = words.map(w => AUX[w.toLowerCase()]).find(Boolean);
-  if (col === 3) {
-    if (!aux) return [`${frame} — a progressive frame needs is/are/was/were`];
-    if (aux !== tense) out.push(`${frame} — auxiliary says ${aux}, label says ${tense}`);
-    const ai = words.findIndex(w => w.toLowerCase() in AUX), n = number(words, ai);
-    const sing = ['is', 'was'].includes(words[ai].toLowerCase());
-    if (n !== '?' && (n === 'sg') !== sing) out.push(`${frame} — auxiliary does not agree with its subject`);
-    return out;
-  }
   // A simple frame is answerable only through its time phrase; without one two of the four forms fit the gap.
   if (aux) out.push(`${frame} — a simple frame must not carry an auxiliary`);
   if (past === pres) out.push(`${frame} — a simple frame must carry exactly one time phrase, or its gap has two answers`);
@@ -181,13 +184,8 @@ function isExclamationSentence(s: string): boolean {
   if (!/^(What|How)$/.test(w[0]) || !s.endsWith('!')) return false;
   return w.slice(1).some(x => FINITE.has(x.toLowerCase()) || /[a-z]ed$/.test(x));
 }
-function typeFaults([sent, type]: readonly [string, string]): string[] {
+function fullStopFaults(sent: string, type: string): string[] {
   const out: string[] = [], first = sent.split(' ')[0].toLowerCase();
-  const excl = isExclamationSentence(sent);
-  if (type === 'exclamation' && !excl) out.push(`${sent} — not an exclamation sentence`);
-  if (type !== 'exclamation' && /^(what|how) .*!$/i.test(sent)) out.push(`${sent} — is an exclamation`);
-  if (type === 'question' && !sent.endsWith('?')) out.push(`${sent} — a question ends with ?`);
-  if (type !== 'question' && sent.includes('?')) out.push(`${sent} — only a question has ?`);
   if (type === 'command') {
     if (SUBJECT_OPENERS.has(first)) out.push(`${sent} — opens with a subject, so it is a statement`);
     if (!COMMAND_VERBS.has(first)) out.push(`${sent} — a command opens with an imperative verb`);
@@ -199,6 +197,15 @@ function typeFaults([sent, type]: readonly [string, string]): string[] {
     if (!sent.endsWith('.')) out.push(`${sent} — a statement ends with a full stop`);
   }
   return out;
+}
+function typeFaults([sent, type]: readonly [string, string]): string[] {
+  const out: string[] = [];
+  const excl = isExclamationSentence(sent);
+  if (type === 'exclamation' && !excl) out.push(`${sent} — not an exclamation sentence`);
+  if (type !== 'exclamation' && /^(what|how) .*!$/i.test(sent)) out.push(`${sent} — is an exclamation`);
+  if (type === 'question' && !sent.endsWith('?')) out.push(`${sent} — a question ends with ?`);
+  if (type !== 'question' && sent.includes('?')) out.push(`${sent} — only a question has ?`);
+  return [...out, ...fullStopFaults(sent, type)];
 }
 
 describe('y2-sentencetype statement/command and exclamation checks (#668)', () => {
