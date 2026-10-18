@@ -1,0 +1,40 @@
+# Deploys the site to GitHub Pages (#1933): website/ at `/`, the game built with base /play/ at `/play/`.
+# `npm run build` is unchanged (Android still embeds a root-based dist/). One-off owner steps: docs/WEBSITE.md.
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false   # let a running deployment finish; GitHub keeps only the newest queued one
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Build the game for /play/
+        run: npx tsc --noEmit && npx vite build --base=/play/--outDir site/play --emptyOutDir && node scripts/build-sw.mjs site/play
+      - name: Add the site pages, CNAME and .nojekyll
+        run: cp -a website/. site/
+      - uses: actions/upload-pages-artifact@v4
+        with: { path: site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write       # deploy-pages publishes the artifact
+      id-token: write    # and proves where it came from
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
