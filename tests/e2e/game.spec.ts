@@ -1282,6 +1282,8 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#prompt')).toHaveText(q.prompt);
     const promptOverflow = await page.locator('#prompt').evaluate(el => el.scrollWidth - el.clientWidth);
     expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
+  });
+
   // #1020: Reception Story Time answers by picture, so every bubble label must fit and the card must fit the phone.
   test('r-storytime: the story card fits the shortest phone and every picture bubble fits (#1020)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });
