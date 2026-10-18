@@ -10,7 +10,7 @@
     "tests/unit/curriculum.test.ts::(anonymous)": 28
   },
   "lines": {
-    "src/ui/duel.ts::duelScreen": 201,
+    "src/ui/duel.ts::duelScreen": 160,
     "src/ui/play-session.ts::createPlaySession": 156,
     "src/ui/play.ts::playScreen": 197
   },
