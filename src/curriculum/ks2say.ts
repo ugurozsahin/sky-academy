@@ -224,8 +224,15 @@ const dimensionRule: Rule = rest => { const m = rest.match(/^(\d+)-([Dd])\b/); r
 // A run that is only unit codes ("5-cm") is left to the unit rules; a capitalised name ("10-Diego") is not a modifier.
 const compoundRule: Rule = rest => {
   const m = rest.match(/^(\d+)-([a-z]{2,})\b/);
-  // A unit with a plural s ("5-kgs") and a run with no vowel are not words either (#1992): left to the unit rules.
-  return m && !decomposeUnits(m[2].replace(/s$/, '')) && /[aeiouy]/.test(m[2]) ? hit('compound', m, `${m[1]} ${m[2]}`) : null;
+  if (!m) return null;
+  // A hyphenated unit run ("5-kg", "5-kgs") is spoken as the quantity it is (#1992); one letter plus an s ("5-ms")
+  // is no such run and stays an ordinary modifier.
+  const units = decomposeUnits(m[2]) ?? (m[2].length > 2 ? decomposeUnits(m[2].slice(0, -1)) : null);
+  if (units && m[2].length > 1 && !(units.length === 1 && units[0].length === 1 && units[0] !== m[2])) {
+    const words = units.map(u => unitWord(u.toLowerCase()));
+    return hit('compound', m, `${m[1]} ${m[1] === '1' ? singular(words.join(' ')) : words.join(' ')}`);
+  }
+  return hit('compound', m, `${m[1]} ${m[2]}`);
 };
 // Money: "£3.50" is three pounds fifty, never "three point five zero".
 const moneyRule: Rule = rest => {
