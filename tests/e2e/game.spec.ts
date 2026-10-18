@@ -716,12 +716,23 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('wrong slice loses a life and shows the answer; correct then continues', { tag: '@smoke' }, async ({ page }) => {
+    // #2006: at the suite's 8× the first wave can expire before this test's first round trip under load (two lives
+    // already gone, measured with the before-count below), and nothing here needs the speed: real time, as the #32 test does.
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-tables');
     await page.waitForFunction(() => window.__sna.bubbles().length > 1);
-    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
-    await expect(page.locator('.toast.bad')).toContainText('Not quite');
-    await expect(page.locator('.lives span.off')).toHaveCount(1);
+    // #2006: read what the slice did in the SAME evaluate that makes it. The suite runs at 8× game speed, so by the
+    // time two polled `expect`s are scheduled under load the rest of the wave has fallen and cost the other lives
+    // (received 3 where 1 was expected): the count is one only at the instant of the slice.
+    const at = await page.evaluate(() => {
+      const lost = () => document.querySelectorAll('.lives span.off').length;
+      const before = lost(), sliced = window.__sna.wrong();
+      return { sliced, before, off: lost(), toast: document.querySelector('.toast.bad')?.textContent ?? '' };
+    });
+    expect(at.sliced).toBe(true);
+    expect([at.before, at.off], 'no life lost before the slice, exactly one at the instant of it').toEqual([0, 1]);
+    expect(at.toast).toContain('Not quite');
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
