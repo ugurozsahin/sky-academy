@@ -12,7 +12,7 @@
   "lines": {
     "src/ui/duel.ts::duelScreen": 160,
     "src/ui/play-session.ts::createPlaySession": 156,
-    "src/ui/play.ts::playScreen": 197
+    "src/ui/play.ts::playScreen": 173
   },
   "fileLines": {
     "tests/unit/arena.test.ts": 948,

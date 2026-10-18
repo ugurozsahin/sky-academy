@@ -662,15 +662,15 @@ describe('guard rails', () => {
   // named. This keeps the single construction site behind a disposal of the old tracer, and the screen
   // teardown disposing it too. Moving `tracer?.destroy()` after `new Tracer(` (or dropping it) turns it red.
   it('play.ts disposes the previous Tracer before building a new one (#39)', () => {
-    const play = code(SOURCES['/src/ui/play.ts']);
-    const ctors = [...play.matchAll(/mountTracer\(q/g)];               // #1064: built by play-input.ts's mountTracer, called once here
+    const play = code(SOURCES['/src/ui/play.ts']); const beats = code(SOURCES['/src/ui/play-beats.ts']);   // #1503: startTrace lives in play-beats.ts
+    const ctors = [...beats.matchAll(/mountTracer\(q/g)];               // #1064: built by play-input.ts's mountTracer, called once here
     expect(ctors.length + [...code(SOURCES['/src/ui/play-input.ts']).matchAll(/new Tracer\(/g)].length).toBe(2);
-    const start = play.indexOf('function startTrace');
-    const before = play.slice(start, ctors[0].index);
+    const start = beats.indexOf('function startTrace');
+    const before = beats.slice(start, ctors[0].index);
     expect({ inStartTrace: start >= 0 && start < ctors[0].index, disposesFirst: /tracer\??\.destroy\(\)/.test(before) })
       .toEqual({ inStartTrace: true, disposesFirst: true });
     const cleanup = play.slice(play.indexOf('function cleanup'));
-    expect(/tracer\??\.destroy\(\)/.test(cleanup), 'cleanup must dispose the Tracer on screen teardown').toBe(true);
+    expect(/tracer(\(\))?\??\.destroy\(\)/.test(cleanup), 'cleanup must dispose the Tracer on screen teardown').toBe(true);
   });
 
   // #38: the save had a version field (`v`) and a versioned key (`sna:v1`) but neither drove anything — load()
