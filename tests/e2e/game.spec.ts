@@ -669,6 +669,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('real swipe slices the correct bubble and scores', { tag: '@smoke' }, async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // real time: see the note on the wrong-slice test (#2006)
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await swipeAnswer(page);
