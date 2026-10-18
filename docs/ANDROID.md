@@ -1,6 +1,6 @@
 # Android build (tablet APK)
 
-The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in `dist/` is embedded in the APK, so it runs **offline** on a tablet or phone. App id `uk.co.sharpwise`, name "Sky Ninja Academy".
+The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in `dist/` is embedded in the APK, so it runs **offline** on a tablet or phone. App id `uk.co.sharpwise`, name "Sharpwise".
 
 ## Get the APK (no tools needed)
 1. GitHub → **Actions** → workflow **Android APK** → **Run workflow** on `main`, and wait ~3 minutes.

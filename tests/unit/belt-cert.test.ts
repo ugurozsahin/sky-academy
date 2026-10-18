@@ -20,7 +20,7 @@ describe('Belt certificate (#953)', () => {
   });
   it('prints the belt reason and a stars-total detail line', () => {
     const t = certificateText(belt);
-    expect(t.reason).toBe('earned the Yellow belt at Sky Ninja Academy');
+    expect(t.reason).toBe('earned the Yellow belt at Sharpwise');
     expect(t.detail).toBe('★ 3 stars across the islands');
     expect(t.stars).toBe('★★★');
     expect(certKind(belt)).toBe('belt');
