@@ -28,6 +28,7 @@ export const TIPS: Readonly<Record<string, string>> = {
   reading: 'Read a few lines together every day and ask your child to point to the tricky words.',
   spelling: 'Choose three words a night: look, cover, write, check, and then say what makes each one tricky.',
   grammar: 'Look at a favourite book together and spot the full stops, question marks and describing words.',
+  comprehension: 'After a bedtime story, ask who it was about, what happened and where, then how many or why.',
   vocab: 'Choose a word of the day and take turns using it in a sentence, or finding a word that means the same.',
 };
 
@@ -54,11 +55,12 @@ const ALIAS: Readonly<Record<string, keyof typeof TIPS>> = {
   sounds: 'phonics', soundhunt: 'phonics', syllables: 'phonics', initial: 'phonics', digraphs: 'phonics', alien: 'phonics', build: 'phonics', alphabet: 'phonics',
   rhyme: 'rhymes',
   trace: 'tracing', tracenum: 'tracing',
-  read: 'reading', storytime: 'reading', tricky: 'reading', sentence: 'reading', capitals: 'reading',
+  read: 'reading', tricky: 'reading', sentence: 'reading', capitals: 'reading',
   spelling: 'spelling', spellrules: 'spelling', plurals: 'spelling', suffix: 'spelling', 'suffix-root': 'spelling', prefix: 'spelling', 'prefix-not': 'spelling', wordlist: 'spelling', homophones: 'spelling', ough: 'spelling',
   contractions: 'spelling', 'spell-kn': 'spelling', 'spell-le': 'spelling', 'spell-dge': 'spelling', 'spell-c': 'spelling', 'spell-tion': 'spelling', 'spell-more': 'spelling', spellgap: 'spelling', cious: 'spelling', ant: 'spelling', able: 'spelling', fer: 'spelling', silent: 'spelling', 'sure-ture': 'spelling', shun: 'spelling', origins: 'spelling', proofread: 'spelling',
   punct: 'grammar', wordclass: 'grammar', sentencetype: 'grammar', tense: 'grammar', conjunction: 'grammar', conjunctions: 'grammar', perfect: 'grammar', speech: 'grammar', adverbials: 'grammar',
   'plural-poss': 'grammar', relative: 'grammar', verbs: 'grammar', verbprefix: 'grammar', commas: 'grammar', modal: 'grammar', parenthesis: 'grammar', passive: 'grammar', subjunctive: 'grammar', clauses: 'grammar', lists: 'grammar', hyphen: 'grammar', subjectobject: 'grammar', an: 'grammar', standard: 'grammar',
+  storytime: 'comprehension',
   formal: 'vocab', synonyms: 'vocab', consistency: 'grammar', factopinion: 'reading', figurative: 'reading',
 };
 

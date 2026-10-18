@@ -1,0 +1,8433 @@
+{
+ "generated": "scripts/content-map.mjs",
+ "topicCount": 341,
+ "byYear": [
+  {
+   "year": "reception",
+   "title": "Reception",
+   "maths": 17,
+   "writing": 13
+  },
+  {
+   "year": "year1",
+   "title": "Year 1",
+   "maths": 30,
+   "writing": 20
+  },
+  {
+   "year": "year2",
+   "title": "Year 2",
+   "maths": 43,
+   "writing": 21
+  },
+  {
+   "year": "year3",
+   "title": "Year 3",
+   "maths": 30,
+   "writing": 13
+  },
+  {
+   "year": "year4",
+   "title": "Year 4",
+   "maths": 35,
+   "writing": 16
+  },
+  {
+   "year": "year5",
+   "title": "Year 5",
+   "maths": 38,
+   "writing": 15
+  },
+  {
+   "year": "year6",
+   "title": "Year 6",
+   "maths": 35,
+   "writing": 15
+  }
+ ],
+ "topics": [
+  {
+   "id": "r-count",
+   "title": "Count It",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: count objects to 10",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-numeral",
+   "title": "Match the Number",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: link the numeral with its cardinal value",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-subitise",
+   "title": "Quick Dots",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: subitise to 5",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-compare",
+   "title": "More or Fewer",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Patterns: compare quantities",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-onemore",
+   "title": "One More, One Less",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: composition to 10",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-measure",
+   "title": "Taller, Heavier, Holds More",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Patterns: compare length, weight and capacity",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-bonds",
+   "title": "Number Bonds",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: bonds to 5 and 10",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-add",
+   "title": "Adding",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: composition, addition to 10",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-sub",
+   "title": "Taking Away",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: subtraction facts",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-counton",
+   "title": "What Comes Next?",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Patterns: count beyond 20",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-order",
+   "title": "Order Up!",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Patterns: compare and order to 10",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Chalk a number line on the path and hop along it, asking where a number sits between two others.",
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-patterns",
+   "title": "Pattern Party",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "Development Matters: continue repeating patterns",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-balance",
+   "title": "Balance the Scales",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Number: composition, equal amounts",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "r-m-number"
+   ]
+  },
+  {
+   "id": "r-doubles",
+   "title": "Doubles",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Patterns: double facts within 10",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-shapes",
+   "title": "Shape Spotter",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "EYFS Spatial reasoning: circle, square, triangle, rectangle",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "r-m-spatial"
+   ]
+  },
+  {
+   "id": "r-share",
+   "title": "Share It Out",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Patterns: distribute equally between two",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Share a bowl of grapes fairly between family members and ask how many each, and how many are left.",
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-oddeven",
+   "title": "Partners",
+   "year": "reception",
+   "subject": "maths",
+   "nc": "ELG Patterns: evens and odds",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "r-m-patterns"
+   ]
+  },
+  {
+   "id": "r-rhyme",
+   "title": "Rhyme Time",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Word Reading: spot and suggest rhymes (Development Matters phonological awareness)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Take turns thinking of words that rhyme with cat, sun or log, and clap the beats in names.",
+   "strands": [
+    "r-e-word-reading"
+   ]
+  },
+  {
+   "id": "r-sounds",
+   "title": "Letter Sounds",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Writing: sounds to letters",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "r-e-writing"
+   ]
+  },
+  {
+   "id": "r-syllables",
+   "title": "How Many Beats?",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Word Reading: count or clap syllables in a word",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "r-e-word-reading"
+   ]
+  },
+  {
+   "id": "r-soundhunt",
+   "title": "Sound Hunt",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "r-e-word-reading"
+   ]
+  },
+  {
+   "id": "r-storytime",
+   "title": "Story Time",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Comprehension: understanding what has been read to them",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": 20,
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "r-e-comprehension"
+   ]
+  },
+  {
+   "id": "r-capitals",
+   "title": "Big & Small Letters",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Word Reading: letters",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "r-e-word-reading"
+   ]
+  },
+  {
+   "id": "r-tricky",
+   "title": "Tricky Words",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Word Reading: common exception words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "r-e-word-reading"
+   ]
+  },
+  {
+   "id": "r-build",
+   "title": "Build a Word",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Writing: spell by sounds (CVC)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "r-e-writing"
+   ]
+  },
+  {
+   "id": "r-read",
+   "title": "Read It!",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Word Reading: read words by sound-blending",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "r-e-word-reading"
+   ]
+  },
+  {
+   "id": "r-sentence",
+   "title": "Story Sentences",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Writing: simple sentences",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "r-e-writing"
+   ]
+  },
+  {
+   "id": "r-storyorder",
+   "title": "Story Order",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Comprehension: anticipate key events in stories",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "r-e-comprehension"
+   ]
+  },
+  {
+   "id": "r-trace",
+   "title": "Trace Letters",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Writing: form letters",
+   "mode": "tracing",
+   "input": "tracing",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Write big letters and numbers in flour, sand or with a finger on a steamy window.",
+   "strands": [
+    "r-e-writing"
+   ]
+  },
+  {
+   "id": "r-initial",
+   "title": "Starts Like",
+   "year": "reception",
+   "subject": "writing",
+   "nc": "ELG Word Reading: words with the same initial sound (Development Matters)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "r-e-word-reading"
+   ]
+  },
+  {
+   "id": "y1-bonds",
+   "title": "Number Bonds",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: bonds within 20",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-bonds-10",
+   "title": "Bonds to 10",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: bonds to 10",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-bonds-20",
+   "title": "Bonds to 20",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: bonds to 20",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-add",
+   "title": "Adding to 20",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: add within 20",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-story",
+   "title": "Story Sums",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: one-step problems, objects and pictures",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-sub",
+   "title": "Subtracting",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: subtract within 20",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-missing",
+   "title": "Missing Number",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: missing number problems",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-doubles",
+   "title": "Doubles",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: doubles",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-doubles-halves",
+   "title": "Doubles and halves",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: doubles and halves",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-skip",
+   "title": "Count in 2s, 5s, 10s",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 NPV: count in multiples",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "y1-m-npv"
+   ]
+  },
+  {
+   "id": "y1-moreless",
+   "title": "One More, One Less",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 NPV: one more/less, counting back, to 100",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "y1-m-npv"
+   ]
+  },
+  {
+   "id": "y1-words",
+   "title": "Number Words",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 NPV: numbers to 20 in words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y1-m-npv"
+   ]
+  },
+  {
+   "id": "y1-half",
+   "title": "Halves & Quarters",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Fractions: half, quarter",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Share a bowl of grapes fairly between family members and ask how many each, and how many are left.",
+   "strands": [
+    "y1-m-frac"
+   ]
+  },
+  {
+   "id": "y1-arrays",
+   "title": "Arrays",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 M&D: arrays, grouping",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y1-m-md"
+   ]
+  },
+  {
+   "id": "y1-share",
+   "title": "Share & Group",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 M&D: grouping, sharing",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Share a bowl of grapes fairly between family members and ask how many each, and how many are left.",
+   "strands": [
+    "y1-m-md"
+   ]
+  },
+  {
+   "id": "y1-coins",
+   "title": "Coins",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: coins & notes",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Let your child pay with real coins at the shop and work out the change together.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-time",
+   "title": "O'clock & Half Past",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: time",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-timewords",
+   "title": "Time Words",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: time words, hours/minutes/seconds",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-order",
+   "title": "Order Up!",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 NPV: order numbers to 20",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Chalk a number line on the path and hop along it, asking where a number sits between two others.",
+   "strands": [
+    "y1-m-npv"
+   ]
+  },
+  {
+   "id": "y1-compare",
+   "title": "More, Fewer, Equal",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 NPV: equal to, more than, less than (fewer), most, least",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "y1-m-npv"
+   ]
+  },
+  {
+   "id": "y1-line",
+   "title": "Number Line",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 NPV: number line",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Chalk a number line on the path and hop along it, asking where a number sits between two others.",
+   "strands": [
+    "y1-m-npv"
+   ]
+  },
+  {
+   "id": "y1-shapes",
+   "title": "2-D Shapes",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Geometry: 2-D shapes",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y1-m-shapes"
+   ]
+  },
+  {
+   "id": "y1-shapes3d",
+   "title": "3-D Shapes",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Geometry: name common 3-D shapes",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y1-m-shapes"
+   ]
+  },
+  {
+   "id": "y1-position",
+   "title": "Left, Right & Turns",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Geometry: position (between, next to, first, last), direction, turns",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y1-m-position"
+   ]
+  },
+  {
+   "id": "y1-length",
+   "title": "Long & Tall",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: length & height",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-mass",
+   "title": "Heavy & Light",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: mass/weight",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-capacity",
+   "title": "Full & Empty",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: capacity & volume",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-months",
+   "title": "Days & Months",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: time (days, weeks, months)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-when",
+   "title": "My Day",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 Measurement: sequence events (morning, afternoon, evening; yesterday, today, tomorrow; before, after)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y1-m-measure"
+   ]
+  },
+  {
+   "id": "y1-balance",
+   "title": "Balance the Scales",
+   "year": "year1",
+   "subject": "maths",
+   "nc": "Y1 A&S: equals sign, missing number",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y1-m-as"
+   ]
+  },
+  {
+   "id": "y1-contractions",
+   "title": "Joined-up Words",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Word Reading: contractions (I'm, I'll, we'll)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y1-e-word-reading"
+   ]
+  },
+  {
+   "id": "y1-digraphs",
+   "title": "Sound Pairs",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: digraphs",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-alien",
+   "title": "Real or Alien?",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Word Reading: decode words containing taught GPCs, including some pseudo-words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "y1-e-word-reading"
+   ]
+  },
+  {
+   "id": "y1-soundhunt",
+   "title": "Sound Hunt",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Word Reading: respond speedily to graphemes; phase 3 & 5 alternatives, split digraphs",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "y1-e-word-reading"
+   ]
+  },
+  {
+   "id": "y1-storytime",
+   "title": "Story Time",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Comprehension: listening; inference from what is said and done",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": 29,
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y1-e-comprehension"
+   ]
+  },
+  {
+   "id": "y1-spelling",
+   "title": "Tricky Words",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 common exception words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-spellrules",
+   "title": "Spelling Rules",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: ff, ll, ss, zz, ck; n before k; -tch; -ve",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-spellrules2",
+   "title": "More Spelling Rules",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: ai/ay, oi/oy, -y endings, k before e/i/y, ph, wh",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": null,
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-plurals",
+   "title": "Plurals -s -es",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: plurals",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-compound",
+   "title": "Join the Words",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: compound words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-suffix",
+   "title": "Endings -ing -ed -er",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: suffixes",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-prefix",
+   "title": "Un- Words",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: the prefix un-",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-punct",
+   "title": "Fix the Sentence",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Grammar: capitals, . ? !",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y1-e-grammar"
+   ]
+  },
+  {
+   "id": "y1-alphabet",
+   "title": "Alphabet Order",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: name the letters of the alphabet in order",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-days",
+   "title": "Days of the Week",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: days",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-syllables",
+   "title": "How Many Beats?",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Spelling: division of words into syllables",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "y1-e-spelling"
+   ]
+  },
+  {
+   "id": "y1-sentence",
+   "title": "Story Sentences",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Writing: sequence words into sentences, and",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "y1-e-composition"
+   ]
+  },
+  {
+   "id": "y1-storyorder",
+   "title": "Story Order",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Writing: sequence sentences to form short narratives",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y1-e-composition"
+   ]
+  },
+  {
+   "id": "y1-trace",
+   "title": "Trace Letters",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Handwriting",
+   "mode": "tracing",
+   "input": "tracing",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Write big letters and numbers in flour, sand or with a finger on a steamy window.",
+   "strands": [
+    "y1-e-handwriting"
+   ]
+  },
+  {
+   "id": "y1-tracenum",
+   "title": "Trace Numbers",
+   "year": "year1",
+   "subject": "writing",
+   "nc": "Y1 Handwriting: form digits 0-9",
+   "mode": "tracing",
+   "input": "tracing",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Write big letters and numbers in flour, sand or with a finger on a steamy window.",
+   "strands": [
+    "y1-e-handwriting"
+   ]
+  },
+  {
+   "id": "y2-pv",
+   "title": "Tens & Ones",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 NPV: place value",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y2-m-npv"
+   ]
+  },
+  {
+   "id": "y2-compare",
+   "title": "Compare < > =",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 NPV: compare to 100",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "y2-m-npv"
+   ]
+  },
+  {
+   "id": "y2-skip",
+   "title": "Count in 2s, 3s, 5s, 10s",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 NPV: count in steps",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "y2-m-npv"
+   ]
+  },
+  {
+   "id": "y2-add",
+   "title": "Adding to 100",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S: 2-digit addition",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y2-m-as"
+   ]
+  },
+  {
+   "id": "y2-sub",
+   "title": "Subtracting",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S: 2-digit subtraction",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y2-m-as"
+   ]
+  },
+  {
+   "id": "y2-related",
+   "title": "Related Facts",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S: derive and use related facts up to 100",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y2-m-as"
+   ]
+  },
+  {
+   "id": "y2-three",
+   "title": "Three Numbers",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S: add three 1-digit",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y2-m-as"
+   ]
+  },
+  {
+   "id": "y2-inverse",
+   "title": "Missing Number",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S: inverse, missing number",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y2-m-as"
+   ]
+  },
+  {
+   "id": "y2-story-add",
+   "title": "Story Sums",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S: solve problems with addition and subtraction in context",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y2-m-as"
+   ]
+  },
+  {
+   "id": "y2-anyorder",
+   "title": "Swap It Round",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S, M&D: addition and multiplication can be done in any order; subtraction and division cannot",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y2-m-as",
+    "y2-m-md"
+   ]
+  },
+  {
+   "id": "y2-tables",
+   "title": "2, 5, 10 Times Tables",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 M&D: 2, 5, 10 tables ×÷",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y2-m-md"
+   ]
+  },
+  {
+   "id": "y2-tables-2",
+   "title": "2× table",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 M&D: 2 times table",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y2-m-md"
+   ]
+  },
+  {
+   "id": "y2-tables-5",
+   "title": "5× table",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 M&D: 5 times table",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y2-m-md"
+   ]
+  },
+  {
+   "id": "y2-tables-10",
+   "title": "10× table",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 M&D: 10 times table",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y2-m-md"
+   ]
+  },
+  {
+   "id": "y2-story-times",
+   "title": "Story Times",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 M&D: solve problems in contexts using the 2, 5 and 10 tables",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y2-m-md"
+   ]
+  },
+  {
+   "id": "y2-oddeven",
+   "title": "Odd or Even",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 M&D: odd and even",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": null,
+   "strands": [
+    "y2-m-md"
+   ]
+  },
+  {
+   "id": "y2-fractions",
+   "title": "Fractions",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Fractions: 1/3 1/4 2/4 3/4",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y2-m-frac"
+   ]
+  },
+  {
+   "id": "y2-equiv",
+   "title": "Same Fraction",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Fractions: equivalence of 2/4 and 1/2",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y2-m-frac"
+   ]
+  },
+  {
+   "id": "y2-money",
+   "title": "Money £ and p",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: money, change",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Let your child pay with real coins at the shop and work out the change together.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-story-money",
+   "title": "Shop Stories",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: money problems in a practical context, including change",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Let your child pay with real coins at the shop and work out the change together.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-coincombo",
+   "title": "Coin Combinations",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: find different combinations of coins that equal the same amounts of money",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Let your child pay with real coins at the shop and work out the change together.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-time",
+   "title": "Telling Time",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: time to 5 min",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-words",
+   "title": "Number Words",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 NPV: numbers to 100 in words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y2-m-npv"
+   ]
+  },
+  {
+   "id": "y2-order",
+   "title": "Order Up!",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 NPV: order numbers to 100",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Chalk a number line on the path and hop along it, asking where a number sits between two others.",
+   "strands": [
+    "y2-m-npv"
+   ]
+  },
+  {
+   "id": "y2-line",
+   "title": "Number Line",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 NPV: number line, steps",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Chalk a number line on the path and hop along it, asking where a number sits between two others.",
+   "strands": [
+    "y2-m-npv"
+   ]
+  },
+  {
+   "id": "y2-estimate",
+   "title": "Estimate the Number",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 NPV: estimate numbers on a number line",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y2-m-npv"
+   ]
+  },
+  {
+   "id": "y2-shapes",
+   "title": "3-D Shapes",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Geometry: 3-D shapes — faces, edges, vertices",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y2-m-shapes"
+   ]
+  },
+  {
+   "id": "y2-objects3d",
+   "title": "Shapes Around Us",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Geometry: compare and sort common 3-D shapes and everyday objects",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y2-m-shapes"
+   ]
+  },
+  {
+   "id": "y2-faces",
+   "title": "Faces of Shapes",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Geometry: identify 2-D shapes on the surface of 3-D shapes",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y2-m-shapes"
+   ]
+  },
+  {
+   "id": "y2-symmetry",
+   "title": "Mirror Lines",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Geometry: line symmetry in a vertical line",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y2-m-shapes"
+   ]
+  },
+  {
+   "id": "y2-patterns",
+   "title": "What Comes Next?",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Geometry: order and arrange objects in patterns and sequences",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "y2-m-position"
+   ]
+  },
+  {
+   "id": "y2-position",
+   "title": "Turns & Right Angles",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Geometry: position, direction, rotation as right angles",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y2-m-position"
+   ]
+  },
+  {
+   "id": "y2-length",
+   "title": "Length: cm & m",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: length (cm/m)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-mass",
+   "title": "Mass: g & kg",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: mass (g/kg)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-capacity",
+   "title": "Capacity: ml & l",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: capacity (ml/l)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-measure-compare",
+   "title": "Compare Measures < > =",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: compare measures and record using >, < and =",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-temp",
+   "title": "Temperature",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: temperature (°C)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-scales",
+   "title": "Read the Scale",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: read a ruler, scale, thermometer or jug",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-duration",
+   "title": "Time & Durations",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Measurement: compare and sequence intervals of time",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y2-m-measure"
+   ]
+  },
+  {
+   "id": "y2-balance",
+   "title": "Balance the Scales",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 A&S: equivalence, inverse, tables",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y2-m-as"
+   ]
+  },
+  {
+   "id": "y2-stats",
+   "title": "Charts & Tallies",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Statistics: pictograms, tally charts, block diagrams",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y2-m-stats"
+   ]
+  },
+  {
+   "id": "y2-stats-order",
+   "title": "Most to Least",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Statistics: sort the categories by quantity",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y2-m-stats"
+   ]
+  },
+  {
+   "id": "y2-stats-table",
+   "title": "Read the Table",
+   "year": "year2",
+   "subject": "maths",
+   "nc": "Y2 Statistics: interpret simple tables",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y2-m-stats"
+   ]
+  },
+  {
+   "id": "y2-storytime",
+   "title": "Story Time",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Comprehension: listening; inference; answering questions",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": 49,
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y2-e-comprehension"
+   ]
+  },
+  {
+   "id": "y2-spelling",
+   "title": "Tricky Words",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 common exception words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-contractions",
+   "title": "Contractions don't",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: contractions",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-suffix",
+   "title": "Endings -ful -ly",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: suffixes",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-nouns",
+   "title": "Naming Words",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Grammar: nouns formed with -er and by compounding",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y2-e-grammar"
+   ]
+  },
+  {
+   "id": "y2-suffix-root",
+   "title": "Changing Endings",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: suffixes that change the root (drop e, double, y→i)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-homophones",
+   "title": "Sound-alike Words",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: homophones",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-spell-kn",
+   "title": "Silent Letters",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: /n/ spelt kn and gn, /r/ spelt wr at the start of words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-spell-le",
+   "title": "Word Endings",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: the /l/ or /əl/ sound spelt -le, -el, -al and -il at the end of words",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-spell-dge",
+   "title": "Badge or Cage?",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: the /dʒ/ sound spelt -dge and -ge at the end of words, and g before e, i and y",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-spell-c",
+   "title": "City or Sity?",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: the /s/ sound spelt c before e, i and y",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-spell-tion",
+   "title": "Station or Stashin?",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: words ending in -tion",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-spell-more",
+   "title": "Walk or Wawk?",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Spelling: a before l, o for /ʌ/, -ey, a after w and qu, or and ar after w, s for /ʒ/",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y2-e-spelling"
+   ]
+  },
+  {
+   "id": "y2-wordclass",
+   "title": "Word Detective",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Grammar: nouns, verbs, adjectives, adverbs",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y2-e-grammar"
+   ]
+  },
+  {
+   "id": "y2-sentencetype",
+   "title": "Sentence Types",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Grammar: statements, questions, commands and exclamations",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y2-e-grammar"
+   ]
+  },
+  {
+   "id": "y2-tense",
+   "title": "Then & Now",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Grammar: present and past tense, including the progressive",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y2-e-grammar"
+   ]
+  },
+  {
+   "id": "y2-punct",
+   "title": "Fix the Sentence",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Grammar: commas, apostrophes",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y2-e-grammar"
+   ]
+  },
+  {
+   "id": "y2-sentence",
+   "title": "Story Sentences",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Writing: word order, conjunctions, noun phrases",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "y2-e-composition"
+   ]
+  },
+  {
+   "id": "y2-conjunction",
+   "title": "Joining Words",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Grammar: co-ordination (and, or, but) and subordination (because, when, if, that)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y2-e-grammar"
+   ]
+  },
+  {
+   "id": "y2-infer",
+   "title": "What Happened?",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Reading: making inferences on the basis of what is being said and done",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y2-e-comprehension"
+   ]
+  },
+  {
+   "id": "y2-trace",
+   "title": "Trace Words",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Handwriting",
+   "mode": "tracing",
+   "input": "tracing",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Write big letters and numbers in flour, sand or with a finger on a steamy window.",
+   "strands": [
+    "y2-e-handwriting"
+   ]
+  },
+  {
+   "id": "y3-count",
+   "title": "Count in 4s, 8s, 50s and 100s",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 NPV: count in 4s, 8s, 50s, 100s; 10 or 100 more or less",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "y3-m-npv"
+   ]
+  },
+  {
+   "id": "y3-pv",
+   "title": "Hundreds, Tens and Ones",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 NPV: place value of each digit, partitioning (3M2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y3-m-npv"
+   ]
+  },
+  {
+   "id": "y3-compare",
+   "title": "Compare and Order to 1,000",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 NPV: compare and order numbers to 1,000 (3M3)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "y3-m-npv"
+   ]
+  },
+  {
+   "id": "y3-line",
+   "title": "Number Line to 1,000",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 NPV: identify, represent and estimate numbers (3M4)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Chalk a number line on the path and hop along it, asking where a number sits between two others.",
+   "strands": [
+    "y3-m-npv"
+   ]
+  },
+  {
+   "id": "y3-words",
+   "title": "Numbers to 1,000 in Words",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 NPV: read and write numbers to 1,000 in numerals and words (3M5)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y3-m-npv"
+   ]
+  },
+  {
+   "id": "y3-mental",
+   "title": "Mental Adding and Subtracting",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 A&S: 3-digit number and 1s, 10s, 100s mentally (3M7)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y3-m-as"
+   ]
+  },
+  {
+   "id": "y3-column",
+   "title": "Column Adding and Subtracting",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 A&S: columnar addition and subtraction to 3 digits (3M8)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y3-m-as"
+   ]
+  },
+  {
+   "id": "y3-check",
+   "title": "Estimate and Check",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 A&S: estimate, and check with inverse operations (3M9)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y3-m-as"
+   ]
+  },
+  {
+   "id": "y3-missing",
+   "title": "Missing Numbers to 1,000",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 A&S: missing number problems (3M10)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Lay out 10 spoons and ask how many more make 10.",
+   "strands": [
+    "y3-m-as"
+   ]
+  },
+  {
+   "id": "y3-story-as",
+   "title": "Adding and Subtracting Problems",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 A&S: one- and two-step problems within 1,000 (3M10)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y3-m-as"
+   ]
+  },
+  {
+   "id": "y3-tables",
+   "title": "3, 4 and 8 Times Tables",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 M&D: 3, 4 and 8 tables, × and ÷ (3M11)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y3-m-md"
+   ]
+  },
+  {
+   "id": "y3-tables-3",
+   "title": "3× table",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 M&D: 3 times table (3M11)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y3-m-md"
+   ]
+  },
+  {
+   "id": "y3-tables-4",
+   "title": "4× table",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 M&D: 4 times table (3M11)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y3-m-md"
+   ]
+  },
+  {
+   "id": "y3-tables-8",
+   "title": "8× table",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 M&D: 8 times table (3M11)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y3-m-md"
+   ]
+  },
+  {
+   "id": "y3-multiply",
+   "title": "2-Digit × 1-Digit",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 M&D: 2-digit × 1-digit, related facts (3M12)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y3-m-md"
+   ]
+  },
+  {
+   "id": "y3-story",
+   "title": "Times-as-Many Problems",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 M&D: scaling and correspondence problems (3M13)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y3-m-md"
+   ]
+  },
+  {
+   "id": "y3-tenths",
+   "title": "Counting in Tenths",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Fractions: count in tenths, ÷ 10 (3M14)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y3-m-frac"
+   ]
+  },
+  {
+   "id": "y3-fracof",
+   "title": "Fractions of Amounts",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Fractions: unit and non-unit fractions of a set (3M15)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y3-m-frac"
+   ]
+  },
+  {
+   "id": "y3-fracline",
+   "title": "Fractions on a Number Line",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Fractions: fractions as numbers on a line (3M16)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Chalk a number line on the path and hop along it, asking where a number sits between two others.",
+   "strands": [
+    "y3-m-frac"
+   ]
+  },
+  {
+   "id": "y3-fracequiv",
+   "title": "Equivalent Fractions",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Fractions: equivalent fractions with diagrams (3M17)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y3-m-frac"
+   ]
+  },
+  {
+   "id": "y3-fracadd",
+   "title": "Adding and Subtracting Fractions",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Fractions: add and subtract, same denominator, within one whole (3M18)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y3-m-frac"
+   ]
+  },
+  {
+   "id": "y3-fraccompare",
+   "title": "Compare and Order Fractions",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Fractions: compare and order unit and same-denominator fractions (3M19)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "y3-m-frac"
+   ]
+  },
+  {
+   "id": "y3-measures",
+   "title": "Length, Mass and Capacity",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Measurement: measure, compare, add and subtract lengths, mass, capacity (3M21)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y3-m-measure"
+   ]
+  },
+  {
+   "id": "y3-perimeter",
+   "title": "Perimeter",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Measurement: perimeter of simple 2-D shapes (3M22)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y3-m-measure"
+   ]
+  },
+  {
+   "id": "y3-money",
+   "title": "Money and Change",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Measurement: add and subtract money, give change, £ and p (3M23)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Let your child pay with real coins at the shop and work out the change together.",
+   "strands": [
+    "y3-m-measure"
+   ]
+  },
+  {
+   "id": "y3-time",
+   "title": "Time to the Minute",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Measurement: time to the minute, am/pm, 12- and 24-hour clocks (3M24, 3M25)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y3-m-measure"
+   ]
+  },
+  {
+   "id": "y3-roman",
+   "title": "Roman Numerals to XII",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Measurement: Roman numerals I to XII (3M24)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y3-m-measure"
+   ]
+  },
+  {
+   "id": "y3-calendar",
+   "title": "Calendar and Durations",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Measurement: seconds, days in months and years, compare durations (3M26, 3M27)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": null,
+   "strands": [
+    "y3-m-measure"
+   ]
+  },
+  {
+   "id": "y3-angles",
+   "title": "Right Angles and Lines",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Geometry: right angles, turns, horizontal, vertical, parallel and perpendicular lines (3M29–31)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y3-m-shapes"
+   ]
+  },
+  {
+   "id": "y3-charts",
+   "title": "Bar Charts and Pictograms",
+   "year": "year3",
+   "subject": "maths",
+   "nc": "Y3 Statistics: scaled bar charts and pictograms, one- and two-step questions (3M32, 3M33)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y3-m-stats"
+   ]
+  },
+  {
+   "id": "y3-wordlist",
+   "title": "Year 3–4 Word List",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: words often misspelt, Appendix 1 words 1–50",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y3-prefix",
+   "title": "More Prefixes",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: further prefixes dis–, mis–, re–, sub–, inter–, super–, anti–, auto–",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y3-suffix",
+   "title": "Suffixes -ly and -ation",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: the suffixes -ly (and its exceptions) and -ation",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y3-double",
+   "title": "Doubling Letters",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: doubling the last consonant when the last syllable is stressed (forgetting, gardening)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": null,
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y3-sounds",
+   "title": "Tricky Sounds",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: the /ɪ/ sound spelt y (myth) and the /ʌ/ sound spelt ou (young)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Say a word slowly, sound by sound, and ask your child to blend the sounds back into the word.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y3-homophones",
+   "title": "Homophones, Part 1",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: further homophones and near-homophones, accept/except to knot/not",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y3-dictionary",
+   "title": "Dictionary Order",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: use the first 2 or 3 letters of a word to check its spelling in a dictionary",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": null,
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y3-dictation",
+   "title": "Dictation",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: write from memory simple sentences, dictated by the teacher, that include words and punctuation taught so far",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y34-e-spelling",
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y3-an",
+   "title": "A or An",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3 English grammar: a or an according to whether the next word begins with a consonant or a vowel (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y3-wordfamily",
+   "title": "Word Families",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3 English grammar: word families based on common words, showing how words are related in form and meaning (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": null,
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y3-conjunctions",
+   "title": "Time, Place and Cause",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3 Grammar: conjunctions, adverbs and prepositions to express time, place and cause",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y3-perfect",
+   "title": "Has Gone or Went",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3 English grammar: the present perfect form of verbs in contrast to the past tense (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y3-speech",
+   "title": "Inverted Commas",
+   "year": "year3",
+   "subject": "writing",
+   "nc": "Y3 English punctuation: introduction to inverted commas to punctuate direct speech (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y4-count",
+   "title": "Count in 6s, 7s, 9s, 25s and 1,000s",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 NPV: count in 6s, 7s, 9s, 25s, 1,000s; 1,000 more or less",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "y4-m-npv"
+   ]
+  },
+  {
+   "id": "y4-negative",
+   "title": "Negative Numbers",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 NPV: count backwards through 0 to negative numbers",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y4-m-npv"
+   ]
+  },
+  {
+   "id": "y4-pv",
+   "title": "Place Value, Compare & Order",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 NPV: place value of 4-digit numbers; compare and order beyond 1,000",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y4-m-npv"
+   ]
+  },
+  {
+   "id": "y4-round",
+   "title": "Rounding & Estimating",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 NPV: round to the nearest 10, 100 or 1,000; estimate on a number line",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y4-m-npv"
+   ]
+  },
+  {
+   "id": "y4-roman",
+   "title": "Roman Numerals to 100",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 NPV: Roman numerals to 100 (I to C); zero and place value",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y4-m-npv"
+   ]
+  },
+  {
+   "id": "y4-column",
+   "title": "Column Add & Subtract",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 A&S: column addition and subtraction to 4 digits; inverse to check",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y4-m-as"
+   ]
+  },
+  {
+   "id": "y4-mistake",
+   "title": "Spot the mistake",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 A&S: find the column with the mistake in a worked addition or subtraction (4M10, 4M11)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y4-m-as"
+   ]
+  },
+  {
+   "id": "y4-story",
+   "title": "Two-Step Problems",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 A&S: two-step problems in contexts, deciding which operations to use",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y4-m-as"
+   ]
+  },
+  {
+   "id": "y4-whichop",
+   "title": "Which operation?",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 A&S/M&D: decide which operation solves a one-step problem, and why (4M12)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y4-m-as",
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-tables",
+   "title": "Times Tables to 12 × 12",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: multiplication and division facts to 12 × 12",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-tables-6",
+   "title": "6× table",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: 6 times table (4M13)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-tables-7",
+   "title": "7× table",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: 7 times table (4M13)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-tables-9",
+   "title": "9× table",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: 9 times table (4M13)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-tables-11",
+   "title": "11× table",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: 11 times table (4M13)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-tables-12",
+   "title": "12× table",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: 12 times table (4M13)",
+   "mode": "drill",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-mental",
+   "title": "Mental Multiplying",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: × 0, × 1, ÷ 1, derived facts, three numbers",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-factorpairs",
+   "title": "Factor Pairs",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: factor pairs and commutativity in mental calculations (4M15)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Arrange 12 buttons into equal rows in different ways and see which sizes fit.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-shortmult",
+   "title": "Short Multiplication",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: 2- and 3-digit × 1-digit, formal written method",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-story-md",
+   "title": "Multiply & Scale Problems",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 M&D: distributive law, scaling and correspondence problems",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y4-m-md"
+   ]
+  },
+  {
+   "id": "y4-fracequiv",
+   "title": "Equivalent Fractions",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions: families of equivalent fractions, using diagrams",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y4-m-frac"
+   ]
+  },
+  {
+   "id": "y4-hundredths",
+   "title": "Hundredths",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions: count in hundredths; tenths ÷ 10",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y4-m-frac"
+   ]
+  },
+  {
+   "id": "y4-fracof",
+   "title": "Fractions of Amounts",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions: fractions of quantities, including non-unit fractions",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y4-m-frac"
+   ]
+  },
+  {
+   "id": "y4-fracadd",
+   "title": "Add & Subtract Fractions",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions: add and subtract, same denominator, beyond one whole",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y4-m-frac"
+   ]
+  },
+  {
+   "id": "y4-decimals",
+   "title": "Decimals & Fractions",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions: decimal equivalents of tenths, hundredths, 1/4, 1/2, 3/4",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Read prices and measurements aloud: say what the digit after the point means, in tenths or hundredths.",
+   "strands": [
+    "y4-m-frac"
+   ]
+  },
+  {
+   "id": "y4-div10",
+   "title": "Divide by 10 & 100",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions: ÷ 10 and ÷ 100; ones, tenths and hundredths",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y4-m-frac"
+   ]
+  },
+  {
+   "id": "y4-comparedec",
+   "title": "Compare & Round Decimals",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions: round 1-dp decimals; compare and order to 2 dp",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "y4-m-frac"
+   ]
+  },
+  {
+   "id": "y4-money",
+   "title": "Pounds & Pence",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Fractions/Measurement: money in decimals to 2 dp; money problems",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Let your child pay with real coins at the shop and work out the change together.",
+   "strands": [
+    "y4-m-frac",
+    "y4-m-measure"
+   ]
+  },
+  {
+   "id": "y4-convert",
+   "title": "Converting Units",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Measurement: convert between units (4M28, 4M33)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y4-m-measure"
+   ]
+  },
+  {
+   "id": "y4-area",
+   "title": "Area and Perimeter",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Measurement: area by counting squares, perimeter (4M29–30)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y4-m-measure"
+   ]
+  },
+  {
+   "id": "y4-time",
+   "title": "12- and 24-hour Time",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Measurement: analogue, 12- and 24-hour clocks (4M32)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y4-m-measure"
+   ]
+  },
+  {
+   "id": "y4-shapes",
+   "title": "Triangles and Quadrilaterals",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Geometry: classify triangles and quadrilaterals (4M34)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y4-m-shapes"
+   ]
+  },
+  {
+   "id": "y4-angles",
+   "title": "Acute and Obtuse Angles",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Geometry: acute, obtuse, compare and order angles (4M35)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y4-m-shapes"
+   ]
+  },
+  {
+   "id": "y4-symmetry",
+   "title": "Lines of Symmetry",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Geometry: lines of symmetry, complete a symmetric figure (4M36–37)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y4-m-shapes"
+   ]
+  },
+  {
+   "id": "y4-coords",
+   "title": "Coordinates",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Geometry: describe positions as coordinates in the first quadrant, translate a point, complete a polygon (4M38–40)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y4-m-position"
+   ]
+  },
+  {
+   "id": "y4-graphs",
+   "title": "Bar Charts & Time Graphs",
+   "year": "year4",
+   "subject": "maths",
+   "nc": "Y4 Statistics: read bar charts, time graphs and tables; comparison, sum and difference problems",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y4-m-stats"
+   ]
+  },
+  {
+   "id": "y4-context",
+   "title": "Words in Context",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Comprehension: explaining the meaning of words in context",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y34-e-comprehension"
+   ]
+  },
+  {
+   "id": "y4-wordlist",
+   "title": "Year 3–4 Word List (51–100)",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 statutory word list, words 51–100",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y4-prefix-not",
+   "title": "Prefixes in- il- im- ir-",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: prefixes in-, il-, im-, ir-",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y4-sure-ture",
+   "title": "Endings -sure -ture -sion",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: -sure, -ture, -sion (/ʒən/)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y4-ous",
+   "title": "The Suffix -ous",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: the suffix -ous",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y4-shun",
+   "title": "Endings -tion -sion -ssion -cian",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: /ʃən/ spelt -tion, -sion, -ssion, -cian",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y4-origins",
+   "title": "Word Origins",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: ch (Greek/French), -gue/-que, sc, ei/eigh/ey",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y4-proofread",
+   "title": "Proofreading",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Writing: proofread for spelling",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling",
+    "y34-e-composition"
+   ]
+  },
+  {
+   "id": "y4-homophones",
+   "title": "Homophones 2",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Spelling: homophones and near-homophones (sets 12–22)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y34-e-spelling"
+   ]
+  },
+  {
+   "id": "y4-plural-poss",
+   "title": "Plural and Possessive -s",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y4 Grammar: plural and possessive -s, plural possession",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y4-standard",
+   "title": "Standard English",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y4 Grammar: Standard English verb forms",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y4-nounphrase",
+   "title": "Expanded Noun Phrases",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y4 Grammar: expanded noun phrases",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y4-adverbials",
+   "title": "Fronted Adverbials",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y4 Grammar: fronted adverbials and their comma",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y4-speech",
+   "title": "Direct Speech",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y4 Grammar: punctuating direct speech",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y4-pronouns",
+   "title": "Pronoun or Noun?",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y4 Grammar: pronoun or noun for cohesion and clarity",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y4-determiners",
+   "title": "Determiners and Pronouns",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y4 Grammar: determiner, pronoun, possessive pronoun",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y34-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-pv",
+   "title": "Place Value to a Million",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 NPV: read, write, order, compare to 1,000,000; digit value; count in powers of 10 (5M1–2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y5-m-npv"
+   ]
+  },
+  {
+   "id": "y5-negative",
+   "title": "Negative Numbers",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 NPV: negative numbers in context, count through 0 (5M3)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y5-m-npv"
+   ]
+  },
+  {
+   "id": "y5-round",
+   "title": "Round to 10, 100, 1,000, 10,000 and 100,000",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 NPV: round to 10, 100, 1,000, 10,000, 100,000",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y5-m-npv"
+   ]
+  },
+  {
+   "id": "y5-roman",
+   "title": "Roman Numerals to M",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 NPV: Roman numerals to M; years (5M6)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y5-m-npv"
+   ]
+  },
+  {
+   "id": "y5-column",
+   "title": "Column Adding and Subtracting",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 A&S: more than 4 digits, columnar; round to check (5M7, 5M9)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y5-m-as"
+   ]
+  },
+  {
+   "id": "y5-mental",
+   "title": "Mental Adding and Subtracting",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 A&S: mental, increasingly large numbers (5M8)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y5-m-as"
+   ]
+  },
+  {
+   "id": "y5-story",
+   "title": "Adding and Subtracting Problems",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 A&S: multi-step problems in context (5M10)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y5-m-as"
+   ]
+  },
+  {
+   "id": "y5-factors",
+   "title": "Factors and Multiples",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: multiples, factor pairs, common factors (5M11)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Arrange 12 buttons into equal rows in different ways and see which sizes fit.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-primes",
+   "title": "Prime Numbers",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: primes to 100, prime factors, composite; recall primes to 19 (5M12–13)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Arrange 12 buttons into equal rows in different ways and see which sizes fit.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-longmult",
+   "title": "Long Multiplication",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: up to 4 digits × 1 or 2 digits, formal methods (5M14)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-mentalmd",
+   "title": "Mental Multiplying and Dividing",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: mental × and ÷ from known facts (5M15)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-shortdiv",
+   "title": "Short Division",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: short division up to 4 digits ÷ 1 digit; remainders in context (5M16)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Share a bowl of grapes fairly between family members and ask how many each, and how many are left.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-x10",
+   "title": "Times and Divide by 10, 100, 1,000",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: × and ÷ by 10, 100, 1,000 incl. decimals (5M17)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-squares",
+   "title": "Square and Cube Numbers",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: square and cube numbers, ² and ³ (5M18–19)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-equals",
+   "title": "Balance the Equation",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5: four operations and the meaning of = (5M20)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-story-md",
+   "title": "Scaling and Rates Problems",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 M&D: scaling by simple fractions, simple rates (5M21)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-truefalse",
+   "title": "True or false?",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 aims: reason mathematically; multiples, factors, primes, squares and cubes (5M11–13, 5M18)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Arrange 12 buttons into equal rows in different ways and see which sizes fit.",
+   "strands": [
+    "y5-m-md"
+   ]
+  },
+  {
+   "id": "y5-fraccompare",
+   "title": "Compare Fractions",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: compare and order, related denominators (5M22)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Put two heaps of socks or coins side by side and ask which has more, and by how many.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-fracequiv",
+   "title": "Equivalent Fractions",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: equivalent fractions incl. tenths and hundredths (5M23)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-mixed",
+   "title": "Mixed Numbers",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: mixed numbers and improper fractions (5M24)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-fracadd",
+   "title": "Adding Fractions",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: add and subtract, same and related denominators (5M25)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-fracmult",
+   "title": "Fractions Times Whole Numbers",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: proper fractions and mixed numbers × whole numbers (5M26)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-decfrac",
+   "title": "Decimals and Fractions",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: decimals as fractions, e.g. 0.71 = 71/100 (5M27)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Read prices and measurements aloud: say what the digit after the point means, in tenths or hundredths.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-rounddec",
+   "title": "Rounding Decimals",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: round 2-dp decimals to the nearest whole and to 1 dp (5M29)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": null,
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-decimals",
+   "title": "Thousandths and Decimal Order",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: thousandths; order and compare to 3 dp (5M28, 5M30)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read prices and measurements aloud: say what the digit after the point means, in tenths or hundredths.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-percent",
+   "title": "Per Cent",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Fractions: per cent; FDP equivalents of 1/2, 1/4, 1/5, 2/5, 4/5, tenths, twenty-fifths (5M32–33)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Spot sale labels and work out one tenth of the price, then a half or a quarter of it.",
+   "strands": [
+    "y5-m-frac"
+   ]
+  },
+  {
+   "id": "y5-convert",
+   "title": "Metric Units and Time",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Measurement: convert metric units and units of time (5M34, 5M39)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y5-m-measure"
+   ]
+  },
+  {
+   "id": "y5-imperial",
+   "title": "Imperial Units",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Measurement: approximate metric and imperial equivalences (5M35)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y5-m-measure"
+   ]
+  },
+  {
+   "id": "y5-area",
+   "title": "Area and Perimeter",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Measurement: area of rectangles, composite perimeter, estimating area (5M36–37)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y5-m-measure"
+   ]
+  },
+  {
+   "id": "y5-volume",
+   "title": "Volume and Capacity",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Measurement: estimate volume and capacity (5M38)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y5-m-measure"
+   ]
+  },
+  {
+   "id": "y5-story-measure",
+   "title": "Measure Problems",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Measurement: four operations on measures in decimal notation (5M40)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y5-m-measure"
+   ]
+  },
+  {
+   "id": "y5-3d",
+   "title": "3-D Shapes and Nets",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Geometry: identify 3-D shapes from 2-D representations (5M41)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y5-m-shapes"
+   ]
+  },
+  {
+   "id": "y5-angles",
+   "title": "Angles in Degrees",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Geometry: estimate and compare acute, obtuse and reflex angles (5M42)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y5-m-shapes"
+   ]
+  },
+  {
+   "id": "y5-anglefacts",
+   "title": "Angle Facts",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Geometry: angles at a point, on a line, and rectangle facts (5M44–45)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y5-m-shapes"
+   ]
+  },
+  {
+   "id": "y5-polygons",
+   "title": "Regular Polygons",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Geometry: regular and irregular polygons (5M46)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y5-m-shapes"
+   ]
+  },
+  {
+   "id": "y5-transform",
+   "title": "Reflection and Translation",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Geometry: position after a reflection or translation (5M47)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y5-m-position"
+   ]
+  },
+  {
+   "id": "y5-linegraph",
+   "title": "Line Graphs",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Statistics: comparison, sum and difference from a line graph (5M48)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y5-m-stats"
+   ]
+  },
+  {
+   "id": "y5-timetable",
+   "title": "Timetables",
+   "year": "year5",
+   "subject": "maths",
+   "nc": "Y5 Statistics: read, interpret and complete tables and timetables (5M49)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
+   "strands": [
+    "y5-m-stats"
+   ]
+  },
+  {
+   "id": "y5-factopinion",
+   "title": "Fact or Opinion?",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 Comprehension: distinguish between statements of fact and opinion",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "y56-e-comprehension"
+   ]
+  },
+  {
+   "id": "y5-wordlist",
+   "title": "Year 5–6 Word List (1–50)",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 statutory word list, words 1–50",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y5-cious",
+   "title": "Endings: -cious, -tious, -cial, -tial",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 spelling: endings which sound like /ʃəs/ and /ʃəl/",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y5-ant",
+   "title": "Endings: -ant, -ance, -ent, -ence",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 spelling: words ending in -ant/-ent, -ance/-ence and -ancy/-ency",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y5-able",
+   "title": "Endings: -able, -ible, -ably, -ibly",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 spelling: words ending in -able/-ible and -ably/-ibly",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y5-fer",
+   "title": "Adding endings to -fer words",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 spelling: adding suffixes beginning with vowel letters to words ending in -fer",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y5-silent",
+   "title": "Silent Letters",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 spelling: words with silent letters (doubt, island, solemn)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y5-verbs",
+   "title": "Making verbs: -ate, -ise, -ify",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5 Grammar: converting nouns or adjectives into verbs using suffixes (-ate, -ise, -ify)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-verbprefix",
+   "title": "Verb prefixes: dis-, de-, mis-, over-, re-",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5 Grammar: verb prefixes dis–, de–, mis–, over– and re–",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-relative",
+   "title": "Relative Clauses",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5 Grammar: relative clauses with who, which, where, when, whose, that or an omitted pronoun",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-modal",
+   "title": "Modal Verbs",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5 Grammar: degrees of possibility with modal verbs and adverbs",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-parenthesis",
+   "title": "Parenthesis: brackets, dashes, commas",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 punctuation: brackets, dashes or commas to indicate parenthesis",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-commas",
+   "title": "Commas for clear meaning",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5 Punctuation: commas to clarify meaning or avoid ambiguity",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-cohesion",
+   "title": "Cohesion: linking adverbials",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5 Grammar: linking ideas across paragraphs with adverbials of time, place and number",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y5-perfect",
+   "title": "Perfect tense: had, has, have",
+   "year": "year5",
+   "subject": "writing",
+   "nc": "Y5–6 Grammar: the perfect form of verbs to mark relationships of time and cause",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-pv",
+   "title": "Place value to 10 million",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 NPV: numbers to 10,000,000",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y6-m-npv"
+   ]
+  },
+  {
+   "id": "y6-round",
+   "title": "Round to a required accuracy",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 NPV: round to a required degree of accuracy",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y6-m-npv"
+   ]
+  },
+  {
+   "id": "y6-negative",
+   "title": "Negative numbers",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 NPV: negative numbers, intervals across 0",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Make numbers from pairs of playing cards and ask which digit stands for tens and which for ones.",
+   "strands": [
+    "y6-m-npv"
+   ]
+  },
+  {
+   "id": "y6-longmult",
+   "title": "Long multiplication",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 MD: long multiplication, up to 4 digits × 2 digits (6M5)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Set out egg boxes or muffin trays and count the rows and columns to find the lots of.",
+   "strands": [
+    "y6-m-asmd"
+   ]
+  },
+  {
+   "id": "y6-longdiv",
+   "title": "Long and Short Division",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 M&D: long and short division, interpreting remainders (6M6–7)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Share a bowl of grapes fairly between family members and ask how many each, and how many are left.",
+   "strands": [
+    "y6-m-asmd"
+   ]
+  },
+  {
+   "id": "y6-mental",
+   "title": "Mental calculation",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 ASMD: mental, mixed operations, large numbers",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y6-m-asmd"
+   ]
+  },
+  {
+   "id": "y6-factors",
+   "title": "Factors, multiples and primes",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 MD: common factors, common multiples, primes (6M9)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Arrange 12 buttons into equal rows in different ways and see which sizes fit.",
+   "strands": [
+    "y6-m-asmd"
+   ]
+  },
+  {
+   "id": "y6-order-ops",
+   "title": "Order of Operations",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 M&D: order of operations and brackets (6M10)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Hide a number under a cup and give clues, like \"it is 3 more than 5\", until your child can find it.",
+   "strands": [
+    "y6-m-asmd"
+   ]
+  },
+  {
+   "id": "y6-story",
+   "title": "Multi-step Problems",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 ASMD: multi-step problems, estimating to check (6M11–13)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
+   "strands": [
+    "y6-m-asmd"
+   ]
+  },
+  {
+   "id": "y6-simplify",
+   "title": "Simplify and compare fractions",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: simplify, common denominators, compare >1",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-fracadd",
+   "title": "Adding and subtracting fractions",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: add/subtract, different denominators, mixed numbers",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-fracmult",
+   "title": "Multiplying fractions",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: multiply proper fractions, simplest form",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-fracdiv",
+   "title": "Dividing fractions",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: proper fraction ÷ whole number",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Cut a pizza or an apple into equal parts and ask for one half, one quarter or three quarters.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-fdp",
+   "title": "Fractions, decimals and percentages",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: fraction as division; FDP equivalences",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Read prices and measurements aloud: say what the digit after the point means, in tenths or hundredths.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-decimals",
+   "title": "Decimals to 3 places",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: 3 dp place value; ×÷ 10, 100, 1,000",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Read prices and measurements aloud: say what the digit after the point means, in tenths or hundredths.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-decmult",
+   "title": "Multiplying decimals",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: decimals (≤2 dp) × whole numbers",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Read prices and measurements aloud: say what the digit after the point means, in tenths or hundredths.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-decdiv",
+   "title": "Dividing to decimals",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 F: division with a 2 dp answer",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Read prices and measurements aloud: say what the digit after the point means, in tenths or hundredths.",
+   "strands": [
+    "y6-m-frac"
+   ]
+  },
+  {
+   "id": "y6-ratio",
+   "title": "Ratio and scale",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 R&P: relative sizes, unequal sharing, scale factor",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Double or halve a recipe together and talk about how every amount changes by the same rule.",
+   "strands": [
+    "y6-m-ratio"
+   ]
+  },
+  {
+   "id": "y6-percentof",
+   "title": "Percentages of amounts",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 R&P: percentages of amounts, comparison",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Spot sale labels and work out one tenth of the price, then a half or a quarter of it.",
+   "strands": [
+    "y6-m-ratio"
+   ]
+  },
+  {
+   "id": "y6-formulae",
+   "title": "Using formulae",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Alg: simple formulae",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Hide a number under a cup and give clues, like \"it is 3 more than 5\", until your child can find it.",
+   "strands": [
+    "y6-m-algebra"
+   ]
+  },
+  {
+   "id": "y6-sequences",
+   "title": "Linear sequences",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Alg: linear number sequences",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Count stairs, spoons or steps together, then count backwards, and stop to ask what comes next.",
+   "strands": [
+    "y6-m-algebra"
+   ]
+  },
+  {
+   "id": "y6-algebra",
+   "title": "Missing numbers with letters",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Alg: missing numbers algebraically",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Hide a number under a cup and give clues, like \"it is 3 more than 5\", until your child can find it.",
+   "strands": [
+    "y6-m-algebra"
+   ]
+  },
+  {
+   "id": "y6-twounknowns",
+   "title": "Two unknowns",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Alg: two unknowns; combinations",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Hide a number under a cup and give clues, like \"it is 3 more than 5\", until your child can find it.",
+   "strands": [
+    "y6-m-algebra"
+   ]
+  },
+  {
+   "id": "y6-convert",
+   "title": "Converting Units and Miles",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Measurement: convert units to 3 dp, miles and kilometres (6M34–36)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y6-m-measure"
+   ]
+  },
+  {
+   "id": "y6-areaperim",
+   "title": "Same Area, Different Perimeter",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Measurement: same area, different perimeter; when formulae apply (6M37–38)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y6-m-measure"
+   ]
+  },
+  {
+   "id": "y6-area",
+   "title": "Area of Triangles and Parallelograms",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Measurement: area of parallelograms and triangles (6M39)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y6-m-measure"
+   ]
+  },
+  {
+   "id": "y6-volume",
+   "title": "Volume of Cuboids",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Measurement: volume of cubes and cuboids (6M40)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
+   "strands": [
+    "y6-m-measure"
+   ]
+  },
+  {
+   "id": "y6-nets",
+   "title": "Nets of 3-D Shapes",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Geometry: describe 3-D shapes and their nets (6M42)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y6-m-shapes"
+   ]
+  },
+  {
+   "id": "y6-missingangles",
+   "title": "Missing Angles",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Geometry: missing angles in shapes, on lines, vertically opposite (6M43, 6M45)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y6-m-shapes"
+   ]
+  },
+  {
+   "id": "y6-circles",
+   "title": "Parts of a Circle",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Geometry: radius, diameter and circumference (6M44)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y6-m-shapes"
+   ]
+  },
+  {
+   "id": "y6-coords",
+   "title": "Four-Quadrant Coordinates",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Geometry: describe positions on the full coordinate grid, all four quadrants (6M46)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y6-m-position"
+   ]
+  },
+  {
+   "id": "y6-transform",
+   "title": "Reflect in the Axes",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Geometry: translate and reflect in the axes (6M47)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
+   "strands": [
+    "y6-m-position"
+   ]
+  },
+  {
+   "id": "y6-pie",
+   "title": "Pie Charts",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Statistics: interpret pie charts and use them to solve problems (6M48)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y6-m-stats"
+   ]
+  },
+  {
+   "id": "y6-graphs",
+   "title": "Line and Conversion Graphs",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Statistics: interpret line graphs and conversion graphs (6M48)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y6-m-stats"
+   ]
+  },
+  {
+   "id": "y6-mean",
+   "title": "The Mean",
+   "year": "year6",
+   "subject": "maths",
+   "nc": "Y6 Statistics: calculate and interpret the mean as an average (6M49)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
+   "strands": [
+    "y6-m-stats"
+   ]
+  },
+  {
+   "id": "y6-figurative",
+   "title": "Figurative Language",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y5–6 Comprehension: figurative language",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Read a few lines together every day and ask your child to point to the tricky words.",
+   "strands": [
+    "y56-e-comprehension"
+   ]
+  },
+  {
+   "id": "y6-ough",
+   "title": "ough and ei Spellings",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y5/6 Spelling: ough; ei after c (Appendix 1)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y6-homophones",
+   "title": "Often-Confused Words",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y5/6 Spelling: homophones and often-confused words (Appendix 1)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y6-wordlist",
+   "title": "Year 5–6 Word List (51–100)",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y5/6 statutory word list, words 51–100 (Appendix 1)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y6-spellgap",
+   "title": "Spell the missing word",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "E56-25 (App. 1 Y5–6)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
+   "strands": [
+    "y56-e-spelling"
+   ]
+  },
+  {
+   "id": "y6-formal",
+   "title": "Formal or Informal",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Grammar: formal and informal vocabulary and structures (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose a word of the day and take turns using it in a sentence, or finding a word that means the same.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-synonyms",
+   "title": "Synonyms and Antonyms",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Vocabulary: synonyms and antonyms (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Choose a word of the day and take turns using it in a sentence, or finding a word that means the same.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-passive",
+   "title": "Active and Passive",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Grammar: active and passive (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-subjunctive",
+   "title": "The Subjunctive",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Grammar: subjunctive forms in formal writing (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-cohesion",
+   "title": "Linking Paragraphs",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Cohesion: linking adverbials and ellipsis (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": null,
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-clauses",
+   "title": "Semicolons, Colons, Dashes",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Punctuation: semi-colon, colon and dash between independent clauses (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-lists",
+   "title": "Lists and Bullet Points",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Punctuation: colon before a list, semi-colons in lists, bullet points (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-hyphen",
+   "title": "Hyphens",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Punctuation: hyphens to avoid ambiguity (Appendix 1, Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-subjectobject",
+   "title": "Subject and Object",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y6 Grammar terms: subject and object (Appendix 2)",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-grammar"
+   ]
+  },
+  {
+   "id": "y6-consistency",
+   "title": "Tense and Agreement",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y5/6 Writing: consistent tense and subject–verb agreement",
+   "mode": "mixed",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": true,
+   "tip": "Look at a favourite book together and spot the full stops, question marks and describing words.",
+   "strands": [
+    "y56-e-composition"
+   ]
+  }
+ ],
+ "coverage": [
+  {
+   "id": "r-m-number",
+   "name": "EYFS Mathematics: Number (ELG)",
+   "subject": "maths",
+   "years": [
+    "reception"
+   ],
+   "source": "https://www.gov.uk/government/publications/early-years-foundation-stage-framework--2",
+   "topics": [
+    "r-count",
+    "r-numeral",
+    "r-subitise",
+    "r-onemore",
+    "r-bonds",
+    "r-add",
+    "r-sub",
+    "r-balance"
+   ]
+  },
+  {
+   "id": "r-m-patterns",
+   "name": "EYFS Mathematics: Numerical Patterns (ELG)",
+   "subject": "maths",
+   "years": [
+    "reception"
+   ],
+   "source": "https://www.gov.uk/government/publications/early-years-foundation-stage-framework--2",
+   "topics": [
+    "r-compare",
+    "r-measure",
+    "r-counton",
+    "r-order",
+    "r-patterns",
+    "r-doubles",
+    "r-share",
+    "r-oddeven"
+   ]
+  },
+  {
+   "id": "r-m-spatial",
+   "name": "EYFS Development Matters: Spatial reasoning",
+   "subject": "maths",
+   "years": [
+    "reception"
+   ],
+   "source": "https://www.gov.uk/government/publications/early-years-foundation-stage-framework--2",
+   "topics": [
+    "r-shapes"
+   ]
+  },
+  {
+   "id": "r-e-comprehension",
+   "name": "EYFS Literacy: Comprehension (ELG)",
+   "subject": "writing",
+   "years": [
+    "reception"
+   ],
+   "source": "https://www.gov.uk/government/publications/early-years-foundation-stage-framework--2",
+   "topics": [
+    "r-storytime",
+    "r-storyorder"
+   ]
+  },
+  {
+   "id": "r-e-word-reading",
+   "name": "EYFS Literacy: Word Reading (ELG)",
+   "subject": "writing",
+   "years": [
+    "reception"
+   ],
+   "source": "https://www.gov.uk/government/publications/early-years-foundation-stage-framework--2",
+   "topics": [
+    "r-rhyme",
+    "r-syllables",
+    "r-soundhunt",
+    "r-capitals",
+    "r-tricky",
+    "r-read",
+    "r-initial"
+   ]
+  },
+  {
+   "id": "r-e-writing",
+   "name": "EYFS Literacy: Writing (ELG)",
+   "subject": "writing",
+   "years": [
+    "reception"
+   ],
+   "source": "https://www.gov.uk/government/publications/early-years-foundation-stage-framework--2",
+   "topics": [
+    "r-sounds",
+    "r-build",
+    "r-sentence",
+    "r-trace"
+   ]
+  },
+  {
+   "id": "y1-m-npv",
+   "name": "Year 1 Number: number and place value",
+   "subject": "maths",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y1-skip",
+    "y1-moreless",
+    "y1-words",
+    "y1-order",
+    "y1-compare",
+    "y1-line"
+   ]
+  },
+  {
+   "id": "y1-m-as",
+   "name": "Year 1 Number: addition and subtraction",
+   "subject": "maths",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y1-bonds",
+    "y1-bonds-10",
+    "y1-bonds-20",
+    "y1-add",
+    "y1-story",
+    "y1-sub",
+    "y1-missing",
+    "y1-doubles",
+    "y1-doubles-halves",
+    "y1-balance"
+   ]
+  },
+  {
+   "id": "y1-m-md",
+   "name": "Year 1 Number: multiplication and division",
+   "subject": "maths",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y1-arrays",
+    "y1-share"
+   ]
+  },
+  {
+   "id": "y1-m-frac",
+   "name": "Year 1 Number: fractions",
+   "subject": "maths",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y1-half"
+   ]
+  },
+  {
+   "id": "y1-m-measure",
+   "name": "Year 1 Measurement",
+   "subject": "maths",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y1-coins",
+    "y1-time",
+    "y1-timewords",
+    "y1-length",
+    "y1-mass",
+    "y1-capacity",
+    "y1-months",
+    "y1-when"
+   ]
+  },
+  {
+   "id": "y1-m-shapes",
+   "name": "Year 1 Geometry: properties of shapes",
+   "subject": "maths",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y1-shapes",
+    "y1-shapes3d"
+   ]
+  },
+  {
+   "id": "y1-m-position",
+   "name": "Year 1 Geometry: position and direction",
+   "subject": "maths",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y1-position"
+   ]
+  },
+  {
+   "id": "y2-m-npv",
+   "name": "Year 2 Number: number and place value",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-pv",
+    "y2-compare",
+    "y2-skip",
+    "y2-words",
+    "y2-order",
+    "y2-line",
+    "y2-estimate"
+   ]
+  },
+  {
+   "id": "y2-m-as",
+   "name": "Year 2 Number: addition and subtraction",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-add",
+    "y2-sub",
+    "y2-related",
+    "y2-three",
+    "y2-inverse",
+    "y2-story-add",
+    "y2-anyorder",
+    "y2-balance"
+   ]
+  },
+  {
+   "id": "y2-m-md",
+   "name": "Year 2 Number: multiplication and division",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-anyorder",
+    "y2-tables",
+    "y2-tables-2",
+    "y2-tables-5",
+    "y2-tables-10",
+    "y2-story-times",
+    "y2-oddeven"
+   ]
+  },
+  {
+   "id": "y2-m-frac",
+   "name": "Year 2 Number: fractions",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-fractions",
+    "y2-equiv"
+   ]
+  },
+  {
+   "id": "y2-m-measure",
+   "name": "Year 2 Measurement",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-money",
+    "y2-story-money",
+    "y2-coincombo",
+    "y2-time",
+    "y2-length",
+    "y2-mass",
+    "y2-capacity",
+    "y2-measure-compare",
+    "y2-temp",
+    "y2-scales",
+    "y2-duration"
+   ]
+  },
+  {
+   "id": "y2-m-shapes",
+   "name": "Year 2 Geometry: properties of shapes",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-shapes",
+    "y2-objects3d",
+    "y2-faces",
+    "y2-symmetry"
+   ]
+  },
+  {
+   "id": "y2-m-position",
+   "name": "Year 2 Geometry: position and direction",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-patterns",
+    "y2-position"
+   ]
+  },
+  {
+   "id": "y2-m-stats",
+   "name": "Year 2 Statistics",
+   "subject": "maths",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y2-stats",
+    "y2-stats-order",
+    "y2-stats-table"
+   ]
+  },
+  {
+   "id": "y3-m-npv",
+   "name": "Year 3 Number: number and place value",
+   "subject": "maths",
+   "years": [
+    "year3"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y3-count",
+    "y3-pv",
+    "y3-compare",
+    "y3-line",
+    "y3-words"
+   ]
+  },
+  {
+   "id": "y3-m-as",
+   "name": "Year 3 Number: addition and subtraction",
+   "subject": "maths",
+   "years": [
+    "year3"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y3-mental",
+    "y3-column",
+    "y3-check",
+    "y3-missing",
+    "y3-story-as"
+   ]
+  },
+  {
+   "id": "y3-m-md",
+   "name": "Year 3 Number: multiplication and division",
+   "subject": "maths",
+   "years": [
+    "year3"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y3-tables",
+    "y3-tables-3",
+    "y3-tables-4",
+    "y3-tables-8",
+    "y3-multiply",
+    "y3-story"
+   ]
+  },
+  {
+   "id": "y3-m-frac",
+   "name": "Year 3 Number: fractions",
+   "subject": "maths",
+   "years": [
+    "year3"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y3-tenths",
+    "y3-fracof",
+    "y3-fracline",
+    "y3-fracequiv",
+    "y3-fracadd",
+    "y3-fraccompare"
+   ]
+  },
+  {
+   "id": "y3-m-measure",
+   "name": "Year 3 Measurement",
+   "subject": "maths",
+   "years": [
+    "year3"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y3-measures",
+    "y3-perimeter",
+    "y3-money",
+    "y3-time",
+    "y3-roman",
+    "y3-calendar"
+   ]
+  },
+  {
+   "id": "y3-m-shapes",
+   "name": "Year 3 Geometry: properties of shapes",
+   "subject": "maths",
+   "years": [
+    "year3"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y3-angles"
+   ]
+  },
+  {
+   "id": "y3-m-stats",
+   "name": "Year 3 Statistics",
+   "subject": "maths",
+   "years": [
+    "year3"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y3-charts"
+   ]
+  },
+  {
+   "id": "y4-m-npv",
+   "name": "Year 4 Number: number and place value",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-count",
+    "y4-negative",
+    "y4-pv",
+    "y4-round",
+    "y4-roman"
+   ]
+  },
+  {
+   "id": "y4-m-as",
+   "name": "Year 4 Number: addition and subtraction",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-column",
+    "y4-mistake",
+    "y4-story",
+    "y4-whichop"
+   ]
+  },
+  {
+   "id": "y4-m-md",
+   "name": "Year 4 Number: multiplication and division",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-whichop",
+    "y4-tables",
+    "y4-tables-6",
+    "y4-tables-7",
+    "y4-tables-9",
+    "y4-tables-11",
+    "y4-tables-12",
+    "y4-mental",
+    "y4-factorpairs",
+    "y4-shortmult",
+    "y4-story-md"
+   ]
+  },
+  {
+   "id": "y4-m-frac",
+   "name": "Year 4 Number: fractions (including decimals)",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-fracequiv",
+    "y4-hundredths",
+    "y4-fracof",
+    "y4-fracadd",
+    "y4-decimals",
+    "y4-div10",
+    "y4-comparedec",
+    "y4-money"
+   ]
+  },
+  {
+   "id": "y4-m-measure",
+   "name": "Year 4 Measurement",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-money",
+    "y4-convert",
+    "y4-area",
+    "y4-time"
+   ]
+  },
+  {
+   "id": "y4-m-shapes",
+   "name": "Year 4 Geometry: properties of shapes",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-shapes",
+    "y4-angles",
+    "y4-symmetry"
+   ]
+  },
+  {
+   "id": "y4-m-position",
+   "name": "Year 4 Geometry: position and direction",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-coords"
+   ]
+  },
+  {
+   "id": "y4-m-stats",
+   "name": "Year 4 Statistics",
+   "subject": "maths",
+   "years": [
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y4-graphs"
+   ]
+  },
+  {
+   "id": "y5-m-npv",
+   "name": "Year 5 Number: number and place value",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-pv",
+    "y5-negative",
+    "y5-round",
+    "y5-roman"
+   ]
+  },
+  {
+   "id": "y5-m-as",
+   "name": "Year 5 Number: addition and subtraction",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-column",
+    "y5-mental",
+    "y5-story"
+   ]
+  },
+  {
+   "id": "y5-m-md",
+   "name": "Year 5 Number: multiplication and division",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-factors",
+    "y5-primes",
+    "y5-longmult",
+    "y5-mentalmd",
+    "y5-shortdiv",
+    "y5-x10",
+    "y5-squares",
+    "y5-equals",
+    "y5-story-md",
+    "y5-truefalse"
+   ]
+  },
+  {
+   "id": "y5-m-frac",
+   "name": "Year 5 Number: fractions (including decimals and percentages)",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-fraccompare",
+    "y5-fracequiv",
+    "y5-mixed",
+    "y5-fracadd",
+    "y5-fracmult",
+    "y5-decfrac",
+    "y5-rounddec",
+    "y5-decimals",
+    "y5-percent"
+   ]
+  },
+  {
+   "id": "y5-m-measure",
+   "name": "Year 5 Measurement",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-convert",
+    "y5-imperial",
+    "y5-area",
+    "y5-volume",
+    "y5-story-measure"
+   ]
+  },
+  {
+   "id": "y5-m-shapes",
+   "name": "Year 5 Geometry: properties of shapes",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-3d",
+    "y5-angles",
+    "y5-anglefacts",
+    "y5-polygons"
+   ]
+  },
+  {
+   "id": "y5-m-position",
+   "name": "Year 5 Geometry: position and direction",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-transform"
+   ]
+  },
+  {
+   "id": "y5-m-stats",
+   "name": "Year 5 Statistics",
+   "subject": "maths",
+   "years": [
+    "year5"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y5-linegraph",
+    "y5-timetable"
+   ]
+  },
+  {
+   "id": "y6-m-npv",
+   "name": "Year 6 Number: number and place value",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-pv",
+    "y6-round",
+    "y6-negative"
+   ]
+  },
+  {
+   "id": "y6-m-asmd",
+   "name": "Year 6 Number: addition, subtraction, multiplication and division",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-longmult",
+    "y6-longdiv",
+    "y6-mental",
+    "y6-factors",
+    "y6-order-ops",
+    "y6-story"
+   ]
+  },
+  {
+   "id": "y6-m-frac",
+   "name": "Year 6 Number: fractions (including decimals and percentages)",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-simplify",
+    "y6-fracadd",
+    "y6-fracmult",
+    "y6-fracdiv",
+    "y6-fdp",
+    "y6-decimals",
+    "y6-decmult",
+    "y6-decdiv"
+   ]
+  },
+  {
+   "id": "y6-m-ratio",
+   "name": "Year 6 Ratio and proportion",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-ratio",
+    "y6-percentof"
+   ]
+  },
+  {
+   "id": "y6-m-algebra",
+   "name": "Year 6 Algebra",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-formulae",
+    "y6-sequences",
+    "y6-algebra",
+    "y6-twounknowns"
+   ]
+  },
+  {
+   "id": "y6-m-measure",
+   "name": "Year 6 Measurement",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-convert",
+    "y6-areaperim",
+    "y6-area",
+    "y6-volume"
+   ]
+  },
+  {
+   "id": "y6-m-shapes",
+   "name": "Year 6 Geometry: properties of shapes",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-nets",
+    "y6-missingangles",
+    "y6-circles"
+   ]
+  },
+  {
+   "id": "y6-m-position",
+   "name": "Year 6 Geometry: position and direction",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-coords",
+    "y6-transform"
+   ]
+  },
+  {
+   "id": "y6-m-stats",
+   "name": "Year 6 Statistics",
+   "subject": "maths",
+   "years": [
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+   "topics": [
+    "y6-pie",
+    "y6-graphs",
+    "y6-mean"
+   ]
+  },
+  {
+   "id": "y1-e-word-reading",
+   "name": "Year 1 Reading: word reading",
+   "subject": "writing",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y1-contractions",
+    "y1-alien",
+    "y1-soundhunt"
+   ]
+  },
+  {
+   "id": "y1-e-comprehension",
+   "name": "Year 1 Reading: comprehension",
+   "subject": "writing",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y1-storytime"
+   ]
+  },
+  {
+   "id": "y1-e-spelling",
+   "name": "Year 1 Writing: transcription (spelling)",
+   "subject": "writing",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y1-digraphs",
+    "y1-spelling",
+    "y1-spellrules",
+    "y1-spellrules2",
+    "y1-plurals",
+    "y1-compound",
+    "y1-suffix",
+    "y1-prefix",
+    "y1-alphabet",
+    "y1-days",
+    "y1-syllables"
+   ]
+  },
+  {
+   "id": "y1-e-handwriting",
+   "name": "Year 1 Writing: transcription (handwriting)",
+   "subject": "writing",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y1-trace",
+    "y1-tracenum"
+   ]
+  },
+  {
+   "id": "y1-e-composition",
+   "name": "Year 1 Writing: composition",
+   "subject": "writing",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y1-sentence",
+    "y1-storyorder"
+   ]
+  },
+  {
+   "id": "y1-e-grammar",
+   "name": "Year 1 Writing: vocabulary, grammar and punctuation",
+   "subject": "writing",
+   "years": [
+    "year1"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y1-punct"
+   ]
+  },
+  {
+   "id": "y2-e-word-reading",
+   "name": "Year 2 Reading: word reading",
+   "subject": "writing",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": []
+  },
+  {
+   "id": "y2-e-comprehension",
+   "name": "Year 2 Reading: comprehension",
+   "subject": "writing",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y2-storytime",
+    "y2-infer"
+   ]
+  },
+  {
+   "id": "y2-e-spelling",
+   "name": "Year 2 Writing: transcription (spelling)",
+   "subject": "writing",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y2-spelling",
+    "y2-contractions",
+    "y2-suffix",
+    "y2-suffix-root",
+    "y2-homophones",
+    "y2-spell-kn",
+    "y2-spell-le",
+    "y2-spell-dge",
+    "y2-spell-c",
+    "y2-spell-tion",
+    "y2-spell-more"
+   ]
+  },
+  {
+   "id": "y2-e-handwriting",
+   "name": "Year 2 Writing: transcription (handwriting)",
+   "subject": "writing",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y2-trace"
+   ]
+  },
+  {
+   "id": "y2-e-composition",
+   "name": "Year 2 Writing: composition",
+   "subject": "writing",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y2-sentence"
+   ]
+  },
+  {
+   "id": "y2-e-grammar",
+   "name": "Year 2 Writing: vocabulary, grammar and punctuation",
+   "subject": "writing",
+   "years": [
+    "year2"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y2-nouns",
+    "y2-wordclass",
+    "y2-sentencetype",
+    "y2-tense",
+    "y2-punct",
+    "y2-conjunction"
+   ]
+  },
+  {
+   "id": "y34-e-word-reading",
+   "name": "Years 3-4 Reading: word reading",
+   "subject": "writing",
+   "years": [
+    "year3",
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": []
+  },
+  {
+   "id": "y34-e-comprehension",
+   "name": "Years 3-4 Reading: comprehension",
+   "subject": "writing",
+   "years": [
+    "year3",
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y4-context"
+   ]
+  },
+  {
+   "id": "y34-e-spelling",
+   "name": "Years 3-4 Writing: transcription (spelling)",
+   "subject": "writing",
+   "years": [
+    "year3",
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y3-wordlist",
+    "y3-prefix",
+    "y3-suffix",
+    "y3-double",
+    "y3-sounds",
+    "y3-homophones",
+    "y3-dictionary",
+    "y3-dictation",
+    "y4-wordlist",
+    "y4-prefix-not",
+    "y4-sure-ture",
+    "y4-ous",
+    "y4-shun",
+    "y4-origins",
+    "y4-proofread",
+    "y4-homophones"
+   ]
+  },
+  {
+   "id": "y34-e-handwriting",
+   "name": "Years 3-4 Writing: transcription (handwriting)",
+   "subject": "writing",
+   "years": [
+    "year3",
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": []
+  },
+  {
+   "id": "y34-e-composition",
+   "name": "Years 3-4 Writing: composition",
+   "subject": "writing",
+   "years": [
+    "year3",
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y4-proofread"
+   ]
+  },
+  {
+   "id": "y34-e-grammar",
+   "name": "Years 3-4 Writing: vocabulary, grammar and punctuation",
+   "subject": "writing",
+   "years": [
+    "year3",
+    "year4"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y3-dictation",
+    "y3-an",
+    "y3-wordfamily",
+    "y3-conjunctions",
+    "y3-perfect",
+    "y3-speech",
+    "y4-plural-poss",
+    "y4-standard",
+    "y4-nounphrase",
+    "y4-adverbials",
+    "y4-speech",
+    "y4-pronouns",
+    "y4-determiners"
+   ]
+  },
+  {
+   "id": "y56-e-word-reading",
+   "name": "Years 5-6 Reading: word reading",
+   "subject": "writing",
+   "years": [
+    "year5",
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": []
+  },
+  {
+   "id": "y56-e-comprehension",
+   "name": "Years 5-6 Reading: comprehension",
+   "subject": "writing",
+   "years": [
+    "year5",
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y5-factopinion",
+    "y6-figurative"
+   ]
+  },
+  {
+   "id": "y56-e-spelling",
+   "name": "Years 5-6 Writing: transcription (spelling)",
+   "subject": "writing",
+   "years": [
+    "year5",
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y5-wordlist",
+    "y5-cious",
+    "y5-ant",
+    "y5-able",
+    "y5-fer",
+    "y5-silent",
+    "y6-ough",
+    "y6-homophones",
+    "y6-wordlist",
+    "y6-spellgap"
+   ]
+  },
+  {
+   "id": "y56-e-handwriting",
+   "name": "Years 5-6 Writing: transcription (handwriting)",
+   "subject": "writing",
+   "years": [
+    "year5",
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": []
+  },
+  {
+   "id": "y56-e-composition",
+   "name": "Years 5-6 Writing: composition",
+   "subject": "writing",
+   "years": [
+    "year5",
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y6-consistency"
+   ]
+  },
+  {
+   "id": "y56-e-grammar",
+   "name": "Years 5-6 Writing: vocabulary, grammar and punctuation",
+   "subject": "writing",
+   "years": [
+    "year5",
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": [
+    "y5-verbs",
+    "y5-verbprefix",
+    "y5-relative",
+    "y5-modal",
+    "y5-parenthesis",
+    "y5-commas",
+    "y5-cohesion",
+    "y5-perfect",
+    "y6-formal",
+    "y6-synonyms",
+    "y6-passive",
+    "y6-subjunctive",
+    "y6-cohesion",
+    "y6-clauses",
+    "y6-lists",
+    "y6-hyphen",
+    "y6-subjectobject"
+   ]
+  },
+  {
+   "id": "ks12-e-spoken",
+   "name": "Years 1-6 Spoken language",
+   "subject": "writing",
+   "years": [
+    "year1",
+    "year2",
+    "year3",
+    "year4",
+    "year5",
+    "year6"
+   ],
+   "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+   "topics": []
+  }
+ ]
+}

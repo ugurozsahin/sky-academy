@@ -18,6 +18,7 @@ import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, actionButt
 import { dojoRowsHTML } from './memory';
 import { stickersHTML } from './screen';
 import { deliverCertificate, drawCertificate } from './certificate';
+import { askGrownUp } from './grown-up-gate';
 import type { ResultPayout } from './play-session';
 
 /** The payout a practice ("Fix my mistakes", #930) run commits when nothing is recorded (an incomplete round): no dojo outcome was ever
@@ -83,7 +84,7 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
   async function onCertificate(earned: NonNullable<ResultPayout['cert']>) {
     sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
     try {
-      const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+      const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, () => askGrownUp('share the certificate'));
       if (how === 'shared') toast('Certificate shared!', 'good');
       else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
       else if (how === 'declined') toast('No problem — you can save it next time!', 'good');

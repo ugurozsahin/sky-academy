@@ -104,6 +104,7 @@ export const NO_REPEATED_SET = new Set([
   'y2-conjunction d1', 'y2-conjunction d2', 'y2-conjunction d3', // #1007: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y2-nouns d1', 'y2-nouns d2', 'y2-nouns d3', // #1008: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y2-storytime d2', 'y2-storytime d3', // #1019: each story question carries its own decoys, so an option set never recurs with a different answer; d1 does compare (the names Mum and Dad recur)
+  'r-storytime d2', 'r-storytime d3', // #1020: each story question carries its own pictures or digits, so an option set never recurs with a different answer; d1 compares
   'y1-storytime d2', 'y1-storytime d3', // #1018: each story question carries its own decoys, so an option set never recurs with a different answer; d1 does compare (the names Mum and Dad recur)
   'y1-share d2', 'y1-share d3', // #986: the decoys are the total, k and answer ±1, all derived from the card, so no option set recurs with a different answer at these seeds
   'y2-story-times d1', // #995: the array on d1 cards is the whole question and its decoys derive from the card, so no option set recurs with a different answer
