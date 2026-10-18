@@ -1,6 +1,6 @@
 # Android build (tablet APK)
 
-The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in `dist/` is embedded in the APK, so it runs **offline** on a tablet or phone. App id `uk.skyninja.academy`, name "Sky Ninja Academy".
+The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in `dist/` is embedded in the APK, so it runs **offline** on a tablet or phone. App id `uk.co.sharpwise`, name "Sky Ninja Academy".
 
 ## Get the APK (no tools needed)
 1. GitHub → **Actions** → workflow **Android APK** → **Run workflow** on `main`, and wait ~3 minutes.
@@ -10,6 +10,9 @@ The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in
 3. On the tablet: allow "install unknown apps" for your browser/file manager once, open the APK, install.
    **Updating:** each CI run signs the debug APK with a fresh key, so Android refuses to install a newer build over the old one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) — you must uninstall first, **which deletes the saved progress on that tablet**. To keep one key across builds, create a debug keystore once (`keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -validity 10000 -dname CN=Android` ), then add the repo secret `ANDROID_DEBUG_KEYSTORE` = `base64 -i debug.keystore`; the workflow picks it up automatically. A proper release keystore is a follow-up.
 4. Tagging a commit `vX.Y.Z` also attaches the APK to a GitHub Release.
+
+## The app id changed (old Sky Ninja id → `uk.co.sharpwise`, #1930)
+Android treats a different application id as a different app. A build with the new id installs **beside** any build with the old id and starts with no saved progress; it does not update it. Nothing has been published to a store (the APK is debug-signed), so the only installs affected are test tablets. To carry progress across: in the **old** app open the parents' area → **Move to another device** → copy the save code; in the **new** app paste it into **Restore**. Then uninstall the old app. The id is fixed from the first store upload, so this is the cheap moment to change it. **Unverified:** no device install and no old-to-new save-code round trip has been done yet; that is a step for someone with a tablet, and the Android APK workflow only proves the build.
 
 ## Build locally (optional)
 Android Studio (or the SDK command-line tools) + JDK 21:
