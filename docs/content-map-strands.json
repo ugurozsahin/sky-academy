@@ -1,0 +1,102 @@
+{
+  "_": "Programme-of-study strands the content map (docs/CONTENT-MAP.md) measures coverage against, one row per statutory heading per year group (English: per band). A topic belongs to every row of its own year whose `re` matches its `nc` string and whose `not` does not. Extend by adding a row; scripts/content-map.mjs fails on a topic that matches none. A strand is covered only when a topic names it.",
+  "sources": {
+    "maths": "https://www.gov.uk/government/publications/national-curriculum-in-england-mathematics-programmes-of-study",
+    "english": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
+    "eyfs": "https://www.gov.uk/government/publications/early-years-foundation-stage-framework--2"
+  },
+  "shared": {
+    "pos": "position|direction|rotation|coordinat|translat|reflection|patterns and sequences"
+  },
+  "strands": [
+    { "id": "r-m-number", "subject": "maths", "years": ["reception"], "source": "eyfs", "name": "EYFS Mathematics: Number (ELG)", "re": "ELG Number" },
+    { "id": "r-m-patterns", "subject": "maths", "years": ["reception"], "source": "eyfs", "name": "EYFS Mathematics: Numerical Patterns (ELG)", "re": "ELG Patterns|Development Matters: continue" },
+    { "id": "r-m-spatial", "subject": "maths", "years": ["reception"], "source": "eyfs", "name": "EYFS Development Matters: Spatial reasoning", "re": "Spatial reasoning" },
+    { "id": "r-e-comprehension", "subject": "writing", "years": ["reception"], "source": "eyfs", "name": "EYFS Literacy: Comprehension (ELG)", "re": "ELG Comprehension" },
+    { "id": "r-e-word-reading", "subject": "writing", "years": ["reception"], "source": "eyfs", "name": "EYFS Literacy: Word Reading (ELG)", "re": "ELG Word Reading" },
+    { "id": "r-e-writing", "subject": "writing", "years": ["reception"], "source": "eyfs", "name": "EYFS Literacy: Writing (ELG)", "re": "ELG Writing" },
+
+    { "id": "y1-m-npv", "subject": "maths", "years": ["year1"], "source": "maths", "name": "Year 1 Number: number and place value", "re": "\\bNPV\\b" },
+    { "id": "y1-m-as", "subject": "maths", "years": ["year1"], "source": "maths", "name": "Year 1 Number: addition and subtraction", "re": "\\bA&S\\b" },
+    { "id": "y1-m-md", "subject": "maths", "years": ["year1"], "source": "maths", "name": "Year 1 Number: multiplication and division", "re": "\\bM&D\\b" },
+    { "id": "y1-m-frac", "subject": "maths", "years": ["year1"], "source": "maths", "name": "Year 1 Number: fractions", "re": "Fractions" },
+    { "id": "y1-m-measure", "subject": "maths", "years": ["year1"], "source": "maths", "name": "Year 1 Measurement", "re": "Measurement" },
+    { "id": "y1-m-shapes", "subject": "maths", "years": ["year1"], "source": "maths", "name": "Year 1 Geometry: properties of shapes", "re": "Geometry", "not": "@pos" },
+    { "id": "y1-m-position", "subject": "maths", "years": ["year1"], "source": "maths", "name": "Year 1 Geometry: position and direction", "re": "Geometry: .*(@pos)" },
+
+    { "id": "y2-m-npv", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Number: number and place value", "re": "\\bNPV\\b" },
+    { "id": "y2-m-as", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Number: addition and subtraction", "re": "\\bA&S\\b" },
+    { "id": "y2-m-md", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Number: multiplication and division", "re": "\\bM&D\\b" },
+    { "id": "y2-m-frac", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Number: fractions", "re": "Fractions" },
+    { "id": "y2-m-measure", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Measurement", "re": "Measurement" },
+    { "id": "y2-m-shapes", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Geometry: properties of shapes", "re": "Geometry", "not": "@pos" },
+    { "id": "y2-m-position", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Geometry: position and direction", "re": "Geometry: .*(@pos)" },
+    { "id": "y2-m-stats", "subject": "maths", "years": ["year2"], "source": "maths", "name": "Year 2 Statistics", "re": "Statistics" },
+
+    { "id": "y3-m-npv", "subject": "maths", "years": ["year3"], "source": "maths", "name": "Year 3 Number: number and place value", "re": "\\bNPV\\b" },
+    { "id": "y3-m-as", "subject": "maths", "years": ["year3"], "source": "maths", "name": "Year 3 Number: addition and subtraction", "re": "\\bA&S\\b" },
+    { "id": "y3-m-md", "subject": "maths", "years": ["year3"], "source": "maths", "name": "Year 3 Number: multiplication and division", "re": "\\bM&D\\b" },
+    { "id": "y3-m-frac", "subject": "maths", "years": ["year3"], "source": "maths", "name": "Year 3 Number: fractions", "re": "Fractions" },
+    { "id": "y3-m-measure", "subject": "maths", "years": ["year3"], "source": "maths", "name": "Year 3 Measurement", "re": "Measurement" },
+    { "id": "y3-m-shapes", "subject": "maths", "years": ["year3"], "source": "maths", "name": "Year 3 Geometry: properties of shapes", "re": "Geometry" },
+    { "id": "y3-m-stats", "subject": "maths", "years": ["year3"], "source": "maths", "name": "Year 3 Statistics", "re": "Statistics" },
+
+    { "id": "y4-m-npv", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Number: number and place value", "re": "\\bNPV\\b" },
+    { "id": "y4-m-as", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Number: addition and subtraction", "re": "\\bA&S\\b" },
+    { "id": "y4-m-md", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Number: multiplication and division", "re": "\\bM&D\\b" },
+    { "id": "y4-m-frac", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Number: fractions (including decimals)", "re": "Fractions" },
+    { "id": "y4-m-measure", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Measurement", "re": "Measurement" },
+    { "id": "y4-m-shapes", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Geometry: properties of shapes", "re": "Geometry", "not": "@pos" },
+    { "id": "y4-m-position", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Geometry: position and direction", "re": "Geometry: .*(@pos)" },
+    { "id": "y4-m-stats", "subject": "maths", "years": ["year4"], "source": "maths", "name": "Year 4 Statistics", "re": "Statistics" },
+
+    { "id": "y5-m-npv", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Number: number and place value", "re": "\\bNPV\\b" },
+    { "id": "y5-m-as", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Number: addition and subtraction", "re": "\\bA&S\\b" },
+    { "id": "y5-m-md", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Number: multiplication and division", "re": "\\bM&D\\b|^Y5( aims)?:" },
+    { "id": "y5-m-frac", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Number: fractions (including decimals and percentages)", "re": "Fractions" },
+    { "id": "y5-m-measure", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Measurement", "re": "Measurement" },
+    { "id": "y5-m-shapes", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Geometry: properties of shapes", "re": "Geometry", "not": "@pos" },
+    { "id": "y5-m-position", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Geometry: position and direction", "re": "Geometry: .*(@pos)" },
+    { "id": "y5-m-stats", "subject": "maths", "years": ["year5"], "source": "maths", "name": "Year 5 Statistics", "re": "Statistics" },
+
+    { "id": "y6-m-npv", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Number: number and place value", "re": "\\bNPV\\b" },
+    { "id": "y6-m-asmd", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Number: addition, subtraction, multiplication and division", "re": "\\bASMD\\b|\\bMD\\b|\\bM&D\\b" },
+    { "id": "y6-m-frac", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Number: fractions (including decimals and percentages)", "re": "Y6 F:" },
+    { "id": "y6-m-ratio", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Ratio and proportion", "re": "R&P" },
+    { "id": "y6-m-algebra", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Algebra", "re": "\\bAlg\\b" },
+    { "id": "y6-m-measure", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Measurement", "re": "Measurement" },
+    { "id": "y6-m-shapes", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Geometry: properties of shapes", "re": "Geometry", "not": "@pos" },
+    { "id": "y6-m-position", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Geometry: position and direction", "re": "Geometry: .*(@pos)" },
+    { "id": "y6-m-stats", "subject": "maths", "years": ["year6"], "source": "maths", "name": "Year 6 Statistics", "re": "Statistics" },
+
+    { "id": "y1-e-word-reading", "subject": "writing", "years": ["year1"], "source": "english", "name": "Year 1 Reading: word reading", "re": "Word Reading" },
+    { "id": "y1-e-comprehension", "subject": "writing", "years": ["year1"], "source": "english", "name": "Year 1 Reading: comprehension", "re": "Comprehension" },
+    { "id": "y1-e-spelling", "subject": "writing", "years": ["year1"], "source": "english", "name": "Year 1 Writing: transcription (spelling)", "re": "[Ss]pelling|common exception words" },
+    { "id": "y1-e-handwriting", "subject": "writing", "years": ["year1"], "source": "english", "name": "Year 1 Writing: transcription (handwriting)", "re": "Handwriting" },
+    { "id": "y1-e-composition", "subject": "writing", "years": ["year1"], "source": "english", "name": "Year 1 Writing: composition", "re": "Writing" },
+    { "id": "y1-e-grammar", "subject": "writing", "years": ["year1"], "source": "english", "name": "Year 1 Writing: vocabulary, grammar and punctuation", "re": "[Gg]rammar|[Pp]unctuation" },
+
+    { "id": "y2-e-word-reading", "subject": "writing", "years": ["year2"], "source": "english", "name": "Year 2 Reading: word reading", "re": "Word Reading" },
+    { "id": "y2-e-comprehension", "subject": "writing", "years": ["year2"], "source": "english", "name": "Year 2 Reading: comprehension", "re": "Comprehension|Y2 Reading" },
+    { "id": "y2-e-spelling", "subject": "writing", "years": ["year2"], "source": "english", "name": "Year 2 Writing: transcription (spelling)", "re": "[Ss]pelling|common exception words" },
+    { "id": "y2-e-handwriting", "subject": "writing", "years": ["year2"], "source": "english", "name": "Year 2 Writing: transcription (handwriting)", "re": "Handwriting" },
+    { "id": "y2-e-composition", "subject": "writing", "years": ["year2"], "source": "english", "name": "Year 2 Writing: composition", "re": "Y2 Writing" },
+    { "id": "y2-e-grammar", "subject": "writing", "years": ["year2"], "source": "english", "name": "Year 2 Writing: vocabulary, grammar and punctuation", "re": "[Gg]rammar|[Pp]unctuation" },
+
+    { "id": "y34-e-word-reading", "subject": "writing", "years": ["year3", "year4"], "source": "english", "name": "Years 3-4 Reading: word reading", "re": "Word Reading" },
+    { "id": "y34-e-comprehension", "subject": "writing", "years": ["year3", "year4"], "source": "english", "name": "Years 3-4 Reading: comprehension", "re": "Comprehension" },
+    { "id": "y34-e-spelling", "subject": "writing", "years": ["year3", "year4"], "source": "english", "name": "Years 3-4 Writing: transcription (spelling)", "re": "[Ss]pelling|statutory word list" },
+    { "id": "y34-e-handwriting", "subject": "writing", "years": ["year3", "year4"], "source": "english", "name": "Years 3-4 Writing: transcription (handwriting)", "re": "Handwriting" },
+    { "id": "y34-e-composition", "subject": "writing", "years": ["year3", "year4"], "source": "english", "name": "Years 3-4 Writing: composition", "re": "Writing" },
+    { "id": "y34-e-grammar", "subject": "writing", "years": ["year3", "year4"], "source": "english", "name": "Years 3-4 Writing: vocabulary, grammar and punctuation", "re": "[Gg]rammar|[Pp]unctuation" },
+
+    { "id": "y56-e-word-reading", "subject": "writing", "years": ["year5", "year6"], "source": "english", "name": "Years 5-6 Reading: word reading", "re": "Word Reading" },
+    { "id": "y56-e-comprehension", "subject": "writing", "years": ["year5", "year6"], "source": "english", "name": "Years 5-6 Reading: comprehension", "re": "Comprehension" },
+    { "id": "y56-e-spelling", "subject": "writing", "years": ["year5", "year6"], "source": "english", "name": "Years 5-6 Writing: transcription (spelling)", "re": "[Ss]pelling|statutory word list|E56-25" },
+    { "id": "y56-e-handwriting", "subject": "writing", "years": ["year5", "year6"], "source": "english", "name": "Years 5-6 Writing: transcription (handwriting)", "re": "Handwriting" },
+    { "id": "y56-e-composition", "subject": "writing", "years": ["year5", "year6"], "source": "english", "name": "Years 5-6 Writing: composition", "re": "Writing" },
+    { "id": "y56-e-grammar", "subject": "writing", "years": ["year5", "year6"], "source": "english", "name": "Years 5-6 Writing: vocabulary, grammar and punctuation", "re": "[Gg]rammar|[Pp]unctuation|Cohesion|Vocabulary" },
+
+    { "id": "ks12-e-spoken", "subject": "writing", "years": ["year1", "year2", "year3", "year4", "year5", "year6"], "source": "english", "name": "Years 1-6 Spoken language", "re": "Spoken language" }
+  ]
+}
