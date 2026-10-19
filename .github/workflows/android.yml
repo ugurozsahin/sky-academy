@@ -59,3 +59,65 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with: { files: sky-ninja-academy-*.apk }
+
+  # Signed Play bundle (#1939, epic #1927). Runs on a v* tag or by hand, never on a PR, and only once the owner
+  # has set the repository VARIABLE ANDROID_RELEASE_ENABLED=true (docs/ANDROID.md "Release build"): a job-level
+  # `if` cannot read secrets, so a variable is the switch, as PAGES_ENABLED is for Pages (#2044). Until then the
+  # job is skipped, not failed, and main and tag runs stay green. The upload key comes from secrets only.
+  release:
+    if: ${{ github.event_name != 'pull_request' && vars.ANDROID_RELEASE_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      ANDROID_VERSION_CODE: ${{ github.run_number }}   # always rises, tag or dispatch: Play rejects a repeat
+      BUNDLETOOL_VERSION: '1.18.1'
+      BUNDLETOOL_SHA256: '675786493983787ffa11550bdb7c0715679a44e1643f3ff980a529e9c822595c'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Unit tests + typecheck
+        run: npx tsc --noEmit && npm test
+      - name: Web build
+        run: npm run build
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v4
+        with: { packages: 'platform-tools' }
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Copy the web build into the Android project
+        run: npx cap sync android
+      - name: Version name (the tag without its v, else 1.0)
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then echo "ANDROID_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "ANDROID_VERSION_NAME=1.0" >> "$GITHUB_ENV"; fi
+      - name: Decode the upload keystore to a temp file (never echoed)
+        env: { KS: '${{ secrets.ANDROID_UPLOAD_KEYSTORE }}' }
+        run: |
+          test -n "$KS" || { echo "::error::ANDROID_RELEASE_ENABLED is on but the secret ANDROID_UPLOAD_KEYSTORE is not set (docs/ANDROID.md)"; exit 1; }
+          printf '%s' "$KS" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+      - name: Build the signed bundle
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: cd android && chmod +x gradlew && ./gradlew bundleRelease --no-daemon
+      - name: Remove the keystore
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/upload.jks"
+      - name: Validate the bundle (bundletool) and check it is signed
+        run: |
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          curl -fsSL -o "$RUNNER_TEMP/bundletool.jar" "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar"
+          echo "${BUNDLETOOL_SHA256}  $RUNNER_TEMP/bundletool.jar" | sha256sum -c -
+          java -jar "$RUNNER_TEMP/bundletool.jar" validate --bundle="$AAB"
+          jarsigner -verify "$AAB" | tee /dev/stderr | grep -q "jar verified"
+          cp "$AAB" "sharpwise-${ANDROID_VERSION_NAME}-${ANDROID_VERSION_CODE}.aab"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: sharpwise-aab
+          path: sharpwise-*.aab
+          retention-days: 30
