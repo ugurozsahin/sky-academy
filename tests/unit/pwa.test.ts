@@ -218,12 +218,12 @@ describe('the precache list is read from the build, never written down (#15)', (
  * than DOM's `Request`/`Response`, which the fakes below only partially satisfy.
  */
 interface FakeReq { url: string; method?: string; mode?: string; cache?: string }
-interface FakeRes { ok: boolean; type: string; clone: () => FakeRes }
+interface FakeRes { ok: boolean; type: string; clone: () => FakeRes; text: () => Promise<string> }
 interface FakeEvent { request?: FakeReq; respondWith?: (p: Promise<unknown>) => void; waitUntil: (p: Promise<unknown>) => void }
 
 function fakeResponse(overrides: Partial<Pick<FakeRes, 'ok' | 'type'>> = {}): FakeRes {
   const shape = { ok: true, type: 'basic', ...overrides };
-  return { ...shape, clone: () => fakeResponse(overrides) };
+  return { ...shape, clone: () => fakeResponse(overrides), text: async () => '' };
 }
 
 const DEFAULT_LIST = ['index.html'];
@@ -427,7 +427,7 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
 
   it('a rebuild that fails offline stores nothing and does not reject, and the next miss tries again', async () => {
     let online = false;
-    const { listeners, named } = runWorker(async () => { if (!online) throw new Error('offline'); return fakeResponse(); }, LIST, PRINTS);
+    const { listeners, named } = runWorker(async () => { if (!online) throw new TypeError('Failed to fetch'); return fakeResponse(); }, LIST, PRINTS);
     const first = dispatch(listeners, NAV);
     expect(((await first.respondWith) as Response).type, 'no shell anywhere: Response.error(), as before').toBe('error');
     // An unhandled rejection inside waitUntil is a console error on every offline launch after an eviction.
@@ -443,7 +443,7 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
   it('a rebuild where only one of two files fails stores neither — the cache is whole or empty (#634)', async () => {
     const urlOf = (r: FakeReq | string) => (typeof r === 'string' ? r : r.url);
     const { listeners, named } = runWorker(async (r) => {
-      if (urlOf(r).endsWith('index-ABC.js')) throw new Error('offline mid-way');
+      if (urlOf(r).endsWith('index-ABC.js')) throw new TypeError('Failed to fetch');
       return fakeResponse();
     }, LIST, PRINTS);
     const { waitUntil } = dispatch(listeners, NAV);
@@ -485,7 +485,8 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
     const a = dispatch(listeners, NAV);
     const b = dispatch(listeners, NAV);
     release();
-    await Promise.all([a.respondWith, b.respondWith, a.waitUntil(), b.waitUntil()]);
+    await Promise.all([a.respondWith, b.respondWith]);
+    await Promise.all([a.waitUntil(), b.waitUntil()]);   // read after the responses: `shell()` registers it once it has looked
     // Two navigations (the shell itself, once each) plus ONE precache of the two files — not two.
     expect(fetchImpl).toHaveBeenCalledTimes(2 + LIST.length);
     expect(precached(named)).toHaveLength(LIST.length);
