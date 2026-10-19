@@ -803,7 +803,7 @@ test.describe('Ninja Duel', () => {
    * The budget must BOUND the bar without cutting the answer off, on either axis — asserted in both orientations,
    * because the first version of this only ran in landscape and only at viewports where nothing clipped.
    */
-  function expectNothingClipped(m: { clipY: number; overflowX: string; markPainted: boolean }, where: string) {
+  function expectNothingClipped(m: { clipY: number; overflowX: string; markState: 'absent' | 'painted' | 'clipped' }, where: string) {
     // Vertical: a cropped row of objects is a WRONG COUNT, not merely a small one — `y2-fractions` draws twelve
     // stars, and half a bottom row turns "1/4 of 12" into a card that reads as ten.
     expect(m.clipY, `${where}: the budget bounds the visual without cutting it off`).toBeLessThanOrEqual(0.5);
@@ -811,12 +811,14 @@ test.describe('Ninja Duel', () => {
     // where the prompt is "Which number is hidden?". `overflow-y: clip` bounds y and leaves x alone; beside
     // `hidden`, `overflow-x: visible` would compute to `auto` and make a scroll container instead.
     expect(m.overflowX, `${where}: the budget does not clip the horizontal axis`).toBe('visible');
-    expect(m.markPainted, `${where}: the '?' the question asks about is painted, not clipped away`).toBe(true);
+    // Three states, not a boolean that is `true` whenever the card has no `?` at all: 'absent' is most cards and
+    // asserts nothing, so a pass only means the mark survived when the card carries one (#404).
+    expect(m.markState, `${where}: the '?' the question asks about is painted, not clipped away`).not.toBe('clipped');
   }
 
   const dressAndMeasure = (page: Page, card: { html: string; prompt: string; hint: string }) => page.evaluate(h => {
     // The round's toast is not this measurement's business, and a live match raises one whenever a round is
-    // missed or drawn. Left up, it sits on the bar and `markPainted` reads IT at the `?`'s centre — which made
+    // missed or drawn. Left up, it sits on the bar and `markState` reads IT at the `?`'s centre — which made
     // this sweep fail about one full-suite run in two, at whichever viewport the draw happened to collide with.
     // The toast's own placement is asserted by the sight loop, deliberately and with the toast lit.
     document.querySelector('.toast')!.classList.remove('show');
@@ -851,9 +853,9 @@ test.describe('Ninja Duel', () => {
     // Its CENTRE, not two pixels inside its right edge: the edge sample reads whatever overlaps the card there,
     // which is the same on `main` as here and so is not this diff's business. The centre discriminates exactly
     // the regression — `overflow: hidden` left it unpainted at 320px, `overflow-y: clip` paints it.
-    const markPainted = !mr || (() => {
+    const markState = !mr ? 'absent' as const : (() => {
       const hit = document.elementFromPoint(mr.x + mr.width / 2, mr.y + mr.height / 2);
-      return !!hit && (hit === mark || hit.closest('.mark') === mark);
+      return !!hit && (hit === mark || hit.closest('.mark') === mark) ? 'painted' as const : 'clipped' as const;
     })();
     return {
       a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
@@ -861,7 +863,7 @@ test.describe('Ninja Duel', () => {
       // All measured here, in the same tick, for the same reason the boxes are.
       clipY: kidsOverflow,
       overflowX: cs.overflowX,
-      markPainted,
+      markState,
     };
   }, card);
 
@@ -1297,6 +1299,7 @@ test.describe('Ninja Duel', () => {
     // construction and the rail could not have failed however wrong the CSS was.
     for (const vp of [{ width: 390, height: 844 }, { width: 800, height: 1280 }, { width: 320, height: 568 }]) {
       await resizeTo(page, vp);
+      let paintedMarks = 0;
       for (const card of [...POOL_CARDS, ABSURD]) {
         const P = await dressAndMeasure(page, card);
         const where = `${vp.width}x${vp.height}, ${card.what}`;
@@ -1310,7 +1313,10 @@ test.describe('Ninja Duel', () => {
         // Asserted here, not merely measured. The previous version computed a crop count in portrait and then
         // never looked at it, which is how a budget that cut every tablet's counting card shipped green.
         if (card !== ABSURD) expectNothingClipped(P, where);
+        if (P.markState === 'painted') paintedMarks++;
       }
+      // The '?' check ran on a card that really carries one here, or 'absent' on every card made it vacuous.
+      expect(paintedMarks, `${vp.width}x${vp.height}: at least one card in the sweep carries a '?' and paints it`).toBeGreaterThan(0);
       // The fallback's floor, once per viewport on the tallest card the pool can draw.
       //
       // 24%, measured rather than chosen, and it is a LOW bar on purpose. On the twelve-star card each arena is
