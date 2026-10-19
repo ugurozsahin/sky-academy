@@ -85,6 +85,16 @@ describe('the card follows the voice verdict (#649)', () => {
     duel.start(); beats.stop();
     expect(voice.listeners.size).toBe(0);
   });
+
+  it('a verdict after the last round repaints nothing: the card behind the results stays as it was (#2063)', () => {
+    const { duel } = mount([SOUND]); duel.start();
+    for (let r = 0; r < 3 && !duel.ended; r++) { duel.hit('a', duel.current!.answer); duel.waveEnd(); }
+    expect(duel.ended).toBe(true);
+    els['#prompt']!.innerHTML = 'untouched'; els['#hint']!.textContent = 'untouched';
+    voice.audible = false; for (const fn of [...voice.listeners]) fn();
+    expect(els['#prompt']!.innerHTML).toBe('untouched');
+    expect(els['#hint']!.textContent).toBe('untouched');
+  });
 });
 
 describe('🔊 repeats the question as it was first spoken (#650)', () => {
