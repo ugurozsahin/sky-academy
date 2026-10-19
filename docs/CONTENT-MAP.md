@@ -7,7 +7,7 @@ Generated from the registry: 342 topics. A strand counts as covered only when a 
 |---|---|---|
 | Reception | 17 | 13 |
 | Year 1 | 30 | 20 |
-| Year 2 | 43 | 20 |
+| Year 2 | 43 | 21 |
 | Year 3 | 30 | 13 |
 | Year 4 | 35 | 17 |
 | Year 5 | 38 | 15 |
@@ -165,6 +165,7 @@ Generated from the registry: 342 topics. A strand counts as covered only when a 
 
 | Topic | Objective | Mode | What a child does | Bank | Picture |
 |---|---|---|---|---|---|
+| Story Time (`y2-storytime`) | Y2 Comprehension: listening; inference; answering questions | solo | Slices the answer | 49 | no |
 | Tricky Words (`y2-spelling`) | Y2 common exception words | mixed | Slices the answer | generated | yes |
 | Contractions don't (`y2-contractions`) | Y2 Spelling: contractions | mixed | Slices the answer | generated | yes |
 | Endings -ful -ly (`y2-suffix`) | Y2 Spelling: suffixes | mixed | Slices the answer | generated | yes |
@@ -501,7 +502,7 @@ Generated from the registry: 342 topics. A strand counts as covered only when a 
 | Year 1 Writing: transcription (handwriting) | 2 |
 | Year 1 Writing: composition | 2 |
 | Year 1 Writing: vocabulary, grammar and punctuation | 1 |
-| Year 2 Reading: comprehension | 1 |
+| Year 2 Reading: comprehension | 2 |
 | Year 2 Writing: transcription (spelling) | 11 |
 | Year 2 Writing: transcription (handwriting) | 1 |
 | Year 2 Writing: composition | 1 |

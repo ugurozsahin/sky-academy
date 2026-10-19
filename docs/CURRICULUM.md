@@ -138,6 +138,7 @@ Maths:
 - y2-stats-table — statistics: read a simple table (category and count) — how many chose one, how many altogether, how many more, which most; no ties
 
 Writing:
+- y2-storytime — Story Time (#1019): ten short stories read aloud on the story card (solo, mission only); d1 who / what, d2 where / when / why, d3 a simple inference with one defensible answer; no prediction questions
 - y2-spelling — 64 CEW
 - y2-contractions
 - y2-suffix — -ful -less -ness -ly -ment, root unchanged

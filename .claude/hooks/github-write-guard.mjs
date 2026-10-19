@@ -15,9 +15,15 @@ const HEARTBEAT_TITLE = 'routine: heartbeat';
 
 // A body that OPENS with an owner marker, the same shape `scripts/review-gate.mjs` reads as a verdict:
 // APPROVED strictly, REJECTED with emphasis and case forgiven. Characters GitHub renders as nothing are
-// deleted first, so none of them can hide inside the marker. The set is a UNION on purpose (#221): swapping
-// Cf/Cc for Default_Ignorable_Code_Point once dropped real format characters. Add to it, never replace.
-const INVISIBLE = /[\p{Cf}\p{Cc}\p{Default_Ignorable_Code_Point}\u3164\ufe0f]+/gu;
+// deleted first, so none of them can hide inside the marker. The set is imported from the gate itself (#229):
+// one list, so what the gate reads as a verdict and what this hook refuses cannot drift apart. It is a UNION
+// on purpose (#221) \u2014 add to it in `scripts/review-gate.mjs`, never replace.
+//
+// FAIL CLOSED (PR #2064 review): a static import that fails is a non-blocking hook error and the write
+// proceeds, so a missing or broken gate file would switch every rule here off. Hence a dynamic import whose
+// failure leaves INVISIBLE null, and `check` refuses every call while it is.
+let INVISIBLE = null;
+try { ({ INVISIBLE } = await import('../../scripts/review-gate.mjs')); } catch { /* check() refuses */ }
 const norm = (s) => s.replace(INVISIBLE, '').replace(/\s+/g, ' ').trim();
 
 export const ownerMarker = ({ body }) => {
@@ -65,9 +71,12 @@ const REVIEWER_HEARTBEAT_TITLE = 'reviewer: heartbeat';
  */
 const pulseWrite = ({ method, issue_number, title }) => {
   if (method !== 'create' && method !== 'update') return null;
+  // The number first (#679): it is the belt, and a title must not talk a write to #62 out of the developer
+  // pulse's rules — `reviewer: heartbeat` sent with issue_number 62 was DENY before #417 and ALLOW after it.
+  if (Number(issue_number) === ROUTINE_HEARTBEAT) return HEARTBEAT_TITLE;
   const named = typeof title === 'string' ? norm(title).toLowerCase() : '';
   for (const pulse of [HEARTBEAT_TITLE, REVIEWER_HEARTBEAT_TITLE]) if (named.startsWith(pulse)) return pulse;
-  return Number(issue_number) === ROUTINE_HEARTBEAT ? HEARTBEAT_TITLE : null;
+  return null;
 };
 
 const heartbeatWrite = (input) => pulseWrite(input) === HEARTBEAT_TITLE;
@@ -185,6 +194,10 @@ export const prHead = (input) => {
 // proceeds. `heartbeatBody` fixed one expression; this fixes the class (PR #393 review, note 7).
 export const check = (input, root) => {
   try {
+    if (!(INVISIBLE instanceof RegExp)) {
+      return 'github-write-guard could not load scripts/review-gate.mjs, whose INVISIBLE class it shares (#229), so '
+        + 'it refused every GitHub write rather than judge one blind. Restore that file; do not retry.';
+    }
     return ownerMarker(input ?? {}) ?? requiredLines(input ?? {}) ?? filePath(input, root)
       ?? frozenLabel(input ?? {}) ?? heartbeatAppend(input ?? {}) ?? prHead(input);
   } catch {

@@ -4,16 +4,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
 import { check as bashCheck, claudeWrite, forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
-// @ts-expect-error — plain ESM hook helper
 import { commands, parse } from '../../.claude/hooks/shell.mjs';
-// @ts-expect-error — plain ESM hook helper: the one decision both file and shell guards ask (#346)
-import { OWNER_MARKER, protectedKind } from '../../.claude/hooks/paths.mjs';
-// @ts-expect-error — plain ESM hook script
-import { check as writeCheck, claudeDir } from '../../.claude/hooks/write-guard.mjs';
-// @ts-expect-error — plain ESM hook script
+import { OWNER_MARKER } from '../../.claude/hooks/paths.mjs';
+import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
 import { check as githubCheck, filePath, frozenLabel, heartbeatAppend, ownerMarker, REQUIRED_LINES, requiredLines } from '../../.claude/hooks/github-write-guard.mjs';
+
+// The hook imports the gate's INVISIBLE class (#229), so a stand-in clone needs that one file too.
+const stageGate = (clone: string) => cpSync(join(root, 'scripts'), join(clone, 'scripts'), { recursive: true });
 
 /**
  * The layer-0 hooks (#101): `.claude/settings.json` runs one script per tool family before the tool call,
@@ -1146,6 +1144,7 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
   it('Bash: denies a shell write under .claude/ and the marker, in a checkout with no owner marker', () => {
     const clone = mkdtempSync(join(tmpdir(), 'sna-sh-wired-'));
     cpSync(join(root, '.claude/hooks'), join(clone, '.claude/hooks'), { recursive: true });
+    stageGate(clone);
     expect(existsSync(join(clone, OWNER_MARKER)), 'a clone never carries the marker').toBe(false);
     expect(isDeny(runWired('Bash', { command: "sed -i '' s/x/y/ .claude/rules/governance.md" }, clone))).toBe(true);
     expect(isDeny(runWired('Bash', { command: 'touch .owner-machine' }, clone))).toBe(true);
@@ -1165,6 +1164,7 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
     // because it never is. `CLAUDE_PROJECT_DIR` locates the scripts as well as the root, so both must move.
     const clone = mkdtempSync(join(tmpdir(), 'sna-wired-'));
     cpSync(join(root, '.claude/hooks'), join(clone, '.claude/hooks'), { recursive: true });
+    stageGate(clone);
     expect(existsSync(join(clone, OWNER_MARKER)), 'a clone never carries the marker').toBe(false);
     expect(isDeny(runWired('Write', { file_path: join(clone, '.claude/rules/governance.md') }, clone))).toBe(true);
     expect(isDeny(runWired('Write', { file_path: join(clone, OWNER_MARKER) }, clone))).toBe(true);
