@@ -1,6 +1,6 @@
 ---
 name: qa-screenshot
-description: Bounded visual QA for a Sky Ninja Academy pull request. Use when reviewing or verifying a player-visible change and a screenshot would settle it faster than reading the diff.
+description: Bounded visual QA for a Sharpwise pull request. Use when reviewing or verifying a player-visible change and a screenshot would settle it faster than reading the diff.
 ---
 # QA screenshot
 

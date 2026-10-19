@@ -196,7 +196,7 @@ describe('curriculum ranges', () => {
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
         const q = t.gen(d, r);
         const m = q.prompt.match(SUM);
-        if (!m) continue;
+        if (!m) { expect(q.prompt, 'an add/subtract card that SUM no longer reads (#329)').not.toMatch(/ = \?$/); continue; }
         sums++;
         const [, aStr, unit, op, bStr] = m;
         const a = Number(aStr), b = Number(bStr);
@@ -529,7 +529,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       ['prove', 1, 'o'], ['here', 1, 'o'],
       // #416: found driving the real generator 300,000 times — `poove` above (from `prove@1`) had already
       // closed the family, but `poor@3` still offered `v`, spelling `poov`, the clipped form of the same slur.
-      ['poor', 3, 'v']] as [string, number, string][]) {
+      ['poor', 3, 'v']] satisfies [string, number, string][]) {
       expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} belongs in AVOID, not the word lists`).toBe(false);
       expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
     }
@@ -555,7 +555,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       ['pig', 0, 'n'], ['hen', 1, 'u'],
       // #443: the fifth sweep, and this stem was reachable through the whole fourth (#418/#419) — `le_`
       // offered `z`, a slur, to a Reception card.
-      ['leg', 2, 'z']] as [string, number, string][]) {
+      ['leg', 2, 'z']] satisfies [string, number, string][]) {
       const filled = w.slice(0, i) + l + w.slice(i + 1);
       const gap = `${w.slice(0, i)}_${w.slice(i + 1)}`;
       expect(AVOID.has(filled), `${gap}: ${l} spells ${filled}, which belongs in AVOID`).toBe(true);
@@ -834,7 +834,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
         expect(q.prompt, id).toMatch(/^Which holds (more|less|the most|the least)\?$/);
         // `litres` joins `millilitres` with #298 slice 1: Year 2 compares in `l` where `ml` would need
         // hundreds. The verb is what this rail is about and is still asserted — only the unit is widened.
-        expect(q.say, 'the spoken line says what each one holds').toMatch(/ holds \d+ (millilitres|litres)/);
+        expect(q.say, 'the spoken line says what each one holds, in the unit the hint prints (#329)').toMatch(new RegExp(` holds \\d+ ${{ ml: 'millilitres', l: 'litres' }[q.hint!.match(/\d+ (ml|l)(?: ·|$)/)![1] as 'ml' | 'l']}\\b`));
         expect(q.say, id).not.toMatch(/full|empt/);
       }
     }

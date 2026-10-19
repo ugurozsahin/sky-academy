@@ -15,7 +15,7 @@ Create a scheduled task with the repo attached, exactly like the dev routine, na
 **"Sky Ninja Academy — watchdog"**, run it **every 6 hours**, and give it this prompt:
 
 ```
-You are the watchdog for "Sky Ninja Academy" (repo ugurozsahin/sky-academy). The repo is cloned for you.
+You are the watchdog for "Sharpwise" (repo ugurozsahin/sky-academy). The repo is cloned for you.
 
 1. `git pull --ff-only` on main; if it cannot fast-forward, `git fetch origin && git reset --hard origin/main`
    and say so in your report — safe because a run's clone holds no local work at its start (#132).
@@ -138,20 +138,18 @@ your first finding and the only one you can report.
    through an owner approval until a session broke it by hand. Reviews now come from the hourly reviewer
    routine (`docs/REVIEWER-PROMPT.md`), not from the development routine, so a pile of ready, unreviewed
    pull requests means that routine is not running — say that in the finding.
-5. **Is the priority order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
-   is a one-time event, not a condition that can re-arm: a `review` or `debt` issue filed after that date does
-   not re-freeze anything, the `frozen` label is retired, and code health now queues with features by priority
-   instead of blocking them. So there is no freeze left to check. Two successors, and both are questions rather
+5. **Is the priority order being followed?** The code-health freeze **ended on 2026-09-10**, a one-time event
+   that cannot re-arm (`docs/decisions/012-the-code-health-freeze-and-its-lift.md`); the `frozen` label is retired
+   and code health queues with features by priority. So there is no freeze left to check. Two successors, and both are questions rather
    than accusations. **(a) Has a run re-imposed one?** A doc edit, an issue comment or a PR that bars a class of
    work again — or a run declining eligible work because it believes a freeze still holds. Only the owner
    declares a freeze, and it would appear in CLAUDE.md and `docs/ROUTINE-PROMPT.md` together, so a
    bar in one place alone is a finding. **(b) Has the order been skipped?** Since 2026-09-11 the order is
    **the labels, not a list** (#94), which is the version of this check you can actually evaluate: run STEP 3's
-   query as `docs/ROUTINE-PROMPT.md` writes it, and apply its drops in its order — never a copy of either
-   here: a copy drifted the day the query gained `creator=` (#284), and a run would then have been accused of
-   skipping an issue it was right to skip — then highest `priority:*`, oldest issue number first — and
-   compare the issue it names with the issue each PR opened
-   since your last check actually develops. A PR developing a lower-priority issue while that one sat
+   query as `docs/ROUTINE-PROMPT.md` writes it, apply its drops and then its sort, in its order, and compare
+   the issue it names with the issue each PR opened since your last check actually develops. Never a copy of
+   any of that here: a copy drifted the day the query gained `creator=` (#284), and a run would then have been
+   accused of skipping an issue it was right to skip. A PR developing a lower-priority issue while that one sat
    unstarted is the finding, and the query is reproducible, so it is evidence rather than an impression.
    Run it too when a pulse says `none eligible` (#1369): with no PR there is nothing to compare, so an eligible
    issue the query returns is the finding, and so is a `blockers read live` count the query does not bear out.

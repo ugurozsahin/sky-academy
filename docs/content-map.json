@@ -1,6 +1,6 @@
 {
  "generated": "scripts/content-map.mjs",
- "topicCount": 340,
+ "topicCount": 343,
  "byYear": [
   {
    "year": "reception",
@@ -18,7 +18,7 @@
    "year": "year2",
    "title": "Year 2",
    "maths": 43,
-   "writing": 20
+   "writing": 21
   },
   {
    "year": "year3",
@@ -30,7 +30,7 @@
    "year": "year4",
    "title": "Year 4",
    "maths": 35,
-   "writing": 16
+   "writing": 17
   },
   {
    "year": "year5",
@@ -42,7 +42,7 @@
    "year": "year6",
    "title": "Year 6",
    "maths": 35,
-   "writing": 15
+   "writing": 16
   }
  ],
  "topics": [
@@ -2631,6 +2631,27 @@
    ]
   },
   {
+   "id": "y2-storytime",
+   "title": "Story Time",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Comprehension: listening; inference; answering questions",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": 49,
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y2-e-comprehension"
+   ]
+  },
+  {
    "id": "y2-spelling",
    "title": "Tricky Words",
    "year": "year2",
@@ -4689,6 +4710,27 @@
    "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
    "strands": [
     "y4-m-stats"
+   ]
+  },
+  {
+   "id": "y4-retrieve",
+   "title": "Retrieving Information",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Comprehension: retrieve and record information from non-fiction",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y34-e-comprehension"
    ]
   },
   {
@@ -6877,6 +6919,27 @@
    ]
   },
   {
+   "id": "y6-inference",
+   "title": "Inference",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y5–6 Comprehension: inferring feelings, thoughts and motives, justified with evidence",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y56-e-comprehension"
+   ]
+  },
+  {
    "id": "y6-figurative",
    "title": "Figurative Language",
    "year": "year6",
@@ -8125,6 +8188,7 @@
    ],
    "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
    "topics": [
+    "y2-storytime",
     "y2-infer"
    ]
   },
@@ -8212,6 +8276,7 @@
    ],
    "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
    "topics": [
+    "y4-retrieve",
     "y4-context"
    ]
   },
@@ -8314,6 +8379,7 @@
    "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
    "topics": [
     "y5-factopinion",
+    "y6-inference",
     "y6-figurative"
    ]
   },

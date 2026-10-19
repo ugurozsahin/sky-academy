@@ -4,16 +4,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
 import { check as bashCheck, claudeWrite, forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
-// @ts-expect-error — plain ESM hook helper
 import { commands, parse } from '../../.claude/hooks/shell.mjs';
-// @ts-expect-error — plain ESM hook helper: the one decision both file and shell guards ask (#346)
-import { OWNER_MARKER, protectedKind } from '../../.claude/hooks/paths.mjs';
-// @ts-expect-error — plain ESM hook script
-import { check as writeCheck, claudeDir } from '../../.claude/hooks/write-guard.mjs';
-// @ts-expect-error — plain ESM hook script
+import { OWNER_MARKER } from '../../.claude/hooks/paths.mjs';
+import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
 import { check as githubCheck, filePath, frozenLabel, heartbeatAppend, ownerMarker, REQUIRED_LINES, requiredLines } from '../../.claude/hooks/github-write-guard.mjs';
+
+// The hook imports the gate's INVISIBLE class (#229), so a stand-in clone needs that one file too.
+const stageGate = (clone: string) => cpSync(join(root, 'scripts'), join(clone, 'scripts'), { recursive: true });
 
 /**
  * The layer-0 hooks (#101): `.claude/settings.json` runs one script per tool family before the tool call,
@@ -557,7 +555,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
 
   it('#338 query-top-pick hook: prose about the query, not the line itself, still denies', () => {
     expect(isDeny(runHeartbeatHook({ method: 'update', issue_number: 62,
-      body: 'the query top pick was #298 but I never wrote it as a line\n- second item: no' }))).toBe(true);
+      body: 'the query top pick: #298 was what I meant, but I never wrote it as a line\n- second item: no' }))).toBe(true);
   });
 
   // Round-1 review of PR #341: the deny message is the whole interface a blocked run sees, and this rule was
@@ -590,7 +588,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
   it('#359: every required line declares the key a run writes and why it is there', () => {
     expect((REQUIRED_LINES as unknown[]).length, 'two lines today; governance.md anticipates a third').toBeGreaterThanOrEqual(2);
     for (const { key, why } of REQUIRED_LINES as { key: string; why: string }[]) {
-      expect(key, 'the key is the literal line prefix a run writes').toMatch(/^- [a-z][a-z ]*:$/);
+      expect(key, 'the key is the literal line prefix a run writes').toMatch(/^- [a-z][a-z0-9 -]*:$/);
       expect(why.length, `${key} has no reason text, so its deny says nothing`).toBeGreaterThan(20);
     }
   });
@@ -645,7 +643,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     const sentence = prompt.split('\n').find((l) => l.includes('stamp the pulse')) ?? '';
     expect(sentence, 'STEP 1 must still prescribe a stamp, or this rail reads nothing').toContain('IN PROGRESS');
     // Every `- key: value` the stamp sentence names, reassembled into the body a run would actually send.
-    const lines = [...sentence.matchAll(/`(- [a-z][a-z ]*: [^`]+)`/g)].map((m) => m[1]);
+    const lines = [...sentence.matchAll(/`(- [a-z][a-z0-9 -]*: [^`]+)`/g)].map((m) => m[1]);
     // Counted against the hook's own list rather than `> 1` (#359): a third required line added to
     // `REQUIRED_LINES` and not to the stamp is the identical defect, and `> 1` would not have seen it.
     for (const { key } of REQUIRED_LINES as { key: string }[])
@@ -1146,6 +1144,7 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
   it('Bash: denies a shell write under .claude/ and the marker, in a checkout with no owner marker', () => {
     const clone = mkdtempSync(join(tmpdir(), 'sna-sh-wired-'));
     cpSync(join(root, '.claude/hooks'), join(clone, '.claude/hooks'), { recursive: true });
+    stageGate(clone);
     expect(existsSync(join(clone, OWNER_MARKER)), 'a clone never carries the marker').toBe(false);
     expect(isDeny(runWired('Bash', { command: "sed -i '' s/x/y/ .claude/rules/governance.md" }, clone))).toBe(true);
     expect(isDeny(runWired('Bash', { command: 'touch .owner-machine' }, clone))).toBe(true);
@@ -1165,6 +1164,7 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
     // because it never is. `CLAUDE_PROJECT_DIR` locates the scripts as well as the root, so both must move.
     const clone = mkdtempSync(join(tmpdir(), 'sna-wired-'));
     cpSync(join(root, '.claude/hooks'), join(clone, '.claude/hooks'), { recursive: true });
+    stageGate(clone);
     expect(existsSync(join(clone, OWNER_MARKER)), 'a clone never carries the marker').toBe(false);
     expect(isDeny(runWired('Write', { file_path: join(clone, '.claude/rules/governance.md') }, clone))).toBe(true);
     expect(isDeny(runWired('Write', { file_path: join(clone, OWNER_MARKER) }, clone))).toBe(true);

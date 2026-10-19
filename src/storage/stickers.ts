@@ -9,7 +9,8 @@ import type { SaveData, TopicProgress } from './shape';
 // Derived from the roster (#113), not a hand-maintained parallel list: a roster rename or reorder used to
 // need editing this array too, and nothing caught it if you forgot — the villain always resolves as the
 // fallback for any id that has drifted out of step, so a forgotten edit here rendered a child's earned
-// sticker as Hammer Man under "New sticker!" instead of failing loudly.
+// sticker as Hammer Man under "New sticker!" instead of failing loudly. `ACHIEVEMENTS` below is still keyed by
+// the same ids: the achievements-parity test in tests/unit/storage.test.ts is what catches a roster edit there.
 export const STICKER_IDS = [...AVATARS.map(a => a.id), VILLAIN.id];
 export const STICKER_COST = [30, 70, 120];
 export function stickersFor(coins: number): string[] {

@@ -12,11 +12,10 @@ paths:
 
 - **Each rule has one home; every other file points at it** (`docs/decisions/001-one-home-per-rule.md`, which
   replaces the three-file rule and #216 §1's enforcement bar). Removing a duplicate is ordinary work as long
-  as the home still carries the rule. Two paragraphs are still copied into `CLAUDE.md` and
-  `docs/ROUTINE-PROMPT.md` — the freeze history and records-have-readers (the #97 second-item conditions went to their home, the developer prompt, with #145). That is debt: until a paragraph is reduced to its home, change its copies together,
-  which `tests/unit/guardrails.test.ts` still checks. **While this reduction is under way it is done in
-  sessions with the owner** (issues labelled `owner-session`), not by the routine; removing a rule rather than
-  a copy, or removing any other rail, is still a loosening under the `open-pr` skill §6.
+  as the home still carries the rule. No paragraph is copied verbatim any more; one sentence still is, the freeze lift in `CLAUDE.md` and `docs/ROUTINE-PROMPT.md` (pinned; change both). The freeze history and
+  records-have-readers went to `docs/decisions/012-the-code-health-freeze-and-its-lift.md` and
+  `docs/decisions/014-records-have-readers.md` (#636, #638), the #97 conditions to the developer prompt (#145).
+  Removing a rule rather than a copy, or removing any other rail, is a loosening under the `open-pr` skill §6.
 - **An unattended run never writes under `.claude/` (#342).** Not a preference — a platform constraint.
   `.claude/` is a Claude Code **protected path**, like `.git/`: a write there is never auto-approved, and no
   routine setting changes it. `permissions.allow` does not reach protected paths, a cloud session cannot use
@@ -63,12 +62,10 @@ paths:
 - **The run's heartbeat snapshot (issue #62) must say whether it took a second item and, if not, which of the
   four #97 eligibility conditions failed (#239).** Enforced in code: a `PreToolUse` hook in
   `.claude/settings.json` denies an `issue_write` create or update to the heartbeat whose body has no
-  `- second item: ` line. It finds the heartbeat by **title** — `routine: heartbeat` — falling back to the
-  number for an update that carries none, because STEP 5 tells a run to recreate the issue if it is gone and a
-  recreated one carries a new number (#353); issue #62 is the one it has today. The four eligibility conditions
-  themselves (are more than three reviews waiting, is
-  there time left in the run, are the second item's files disjoint from the first's, did the first item
-  actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,
+  `- second item: ` line. It finds the heartbeat by **number first** (#62 is the one it has today, and no title
+  talks a write to it out of the rules, #679), then by **title** — `routine: heartbeat` — because STEP 5 tells a
+  run to recreate the issue if it is gone and a recreated one carries a new number (#353). The four eligibility conditions
+  themselves have no such enforcement yet — nothing stops a run from taking an ineligible second item,
   only from failing to say so. Their home is `docs/ROUTINE-PROMPT.md` STEP 3; `CLAUDE.md` points there. `docs/ROUTINE-PROMPT.md` carries a pointer here for the
   recording obligation instead of restating it.
 - **A run that develops anything other than the issue its query named says so, and says which documented way
@@ -113,20 +110,12 @@ paths:
   bullet is new. What the hook cannot catch: an append that drops or reformats the previous summary's leading
   timestamp before concatenating, or one that appends a second paragraph with no bare timestamp of its own —
   both need a diff-aware check against the previous body, which this PR does not attempt.
-- **The code-health freeze (2026-09-06 → 2026-09-10).** The owner held it while any issue labelled `review` or
-  `debt` was open, so the 6 September code review's refactors could land *before* feature work resumed —
-  refactors move code around, and features written first would have conflicted with them. He lifted it once
-  every such issue was closed (the last four on 2026-09-10); the decision is recorded on issue #36. What made
-  it work — review/QA by a different agent, the guard rails, budgets that only go down — stays; only the
-  blanket bar on feature work is gone, permanently: the lift does not re-arm on a future `review`/`debt` issue.
+- **The code-health freeze (2026-09-07 → 2026-09-10) is over for good.** Dates, reason and the lift:
+  `docs/decisions/012-the-code-health-freeze-and-its-lift.md`; the lift does not re-arm on a `review`/`debt` issue.
 - **No issue ever carries the retired `frozen` label again (#101).** Enforced in code: a `PreToolUse` hook in
   `.claude/settings.json` denies an `issue_write` create or update whose `labels` include `frozen` — the one
-  actionable rule the freeze's history leaves behind, since "no run reinstates a freeze on its own" has no
-  other concrete action to catch. The
-  freeze's broader one-time-lift narrative above (the dates, the reasoning, "does not re-arm") has no such
-  enforcement point — nothing stops a run from *arguing* a class of work should be barred again, only from
-  applying this one label — and that narrative is still copied in `CLAUDE.md` and
-  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `docs/ROUTINE-PROMPT.md` carries a pointer here instead of
+  actionable rule the freeze's history leaves behind. Nothing stops a run from *arguing* a class of work should
+  be barred again, only from applying this label. `docs/ROUTINE-PROMPT.md` carries a pointer here instead of
   restating it. **`frozen` is not a way to park work — `later` is.**
 - **When a decision needs a `docs/decisions/` record and not just an issue.** The record-routing rule offers
   "the issue, or `docs/decisions/NNN-title.md`" and gives no test for choosing, so everything drifted to the
@@ -138,20 +127,20 @@ paths:
   one of them will otherwise argue it from scratch. The pull request body says what changed and the rail says
   what is pinned; neither survives as the answer to "why this and not that". Written after 2026-09-19, when
   two decisions of exactly that kind were recorded only in pull request bodies: the review-block bar and round
-  cap (#305/PR #306), now `docs/decisions/004-what-a-review-block-is-for.md`, and the run pulse (#314/PR #315),
-  now `docs/decisions/005-the-run-pulse-says-when-a-run-started.md`. **The number is claimed by the pull
+  cap (#305/PR #306), now ADR 004, and the run pulse (#314/PR #315), now ADR 005. **The number is claimed by the pull
   request, and nothing reserves it**: those two were written concurrently and each picked its own number
   without seeing the other. Take the next free number at the moment you write the file, and if an open pull
   request has already claimed it, renumber yours rather than the other way round — a merged record's number is
-  the one pointers are written against. Every record is pointed at by a live instruction file, which
-  `tests/unit/instructions.test.ts` checks (#98).
+  the one pointers are written against. Every record is pointed at, in a code span with its full path, by a live instruction file, which
+  `tests/unit/instructions.test.ts` checks (#98); that the pointer is one a run would follow stays the reviewer's call.
 - A PR touching a governance file states in one line whether it **tightens** the constraints on a run (a check,
   a rail, a rule, or describing behaviour that already exists — ordinary work) or **loosens** them (a
   constraint removed, a budget raised, a gate that no longer gates — owner-gated, never routine-merged). See
-  the `open-pr` skill §6 for the full rule and worked examples.
+  the `open-pr` skill §6 for the rule and `docs/decisions/015-tightening-and-loosening-a-governance-change.md` for why.
 - The review-block mechanism, in one line: a reviewer blocks a PR by marking it draft and posting a comment
   starting `REVIEW: CHANGES REQUESTED`; only its setter clears it with `REVIEW: CLEARED`, or a later run's
-  fresh review supersedes it (#161) — see the `review-pr` skill for the full protocol.
+  fresh review supersedes it (#161) — see the `review-pr` skill for the protocol and
+  `docs/decisions/013-a-review-blocks-by-draft-and-comment.md` for why a formal review is not used.
 - No agent ever writes an `OWNER: APPROVED` or `OWNER: REJECTED` marker, whatever the context.
 - **The three ordering tools (agreed with the owner, 2026-09-11).** The project board is a read-only view, not
   a second list — `docs/ROUTINE-PROMPT.md` STEP 1 has why a cloud session cannot write to it. The owner

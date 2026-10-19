@@ -20,15 +20,16 @@ const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven
                          'verification-before-completion'];   // pinned upstream; they point at their own siblings
 
 const mdIn = (dir: string) => readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).map((f) => `${dir}/${f}`);
+const ADR_FILES = mdIn('docs/decisions');   // the record set, named once: both halves below derive from it (#654)
 const INSTRUCTION_FILES = [
   'CLAUDE.md', 'AGENTS.md', 'README.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-  'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md', ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
+  'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md', ...mdIn('.claude/rules'), ...ADR_FILES, ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
 ];
 // The instruction files a session reads to be told what to do. The decision records are excluded because they
 // are the thing pointed *at*: counting them would let ADRs satisfy the rails below by citing one another, and
 // would let a retired file stay "named" by the history that records its retirement.
-const LIVE_FILES = INSTRUCTION_FILES.filter((f) => !f.startsWith('docs/decisions/'));
-const liveText = () => LIVE_FILES.map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
+const LIVE_FILES = INSTRUCTION_FILES.filter((f) => !ADR_FILES.includes(f));
+const read = (f: string) => readFileSync(join(root, f), 'utf8');
 
 // A repo path anywhere inside a code span — alone, or as an argument of a command: a path under a tracked
 // top-level directory, or one of the root files these documents point at by bare name.
@@ -112,28 +113,64 @@ describe('agent instruction files', () => {
    * owner already made. `.claude/rules/governance.md` carries the test for when a decision needs one at all;
    * this holds the other half, that it is reachable from something a session actually reads.
    *
-   * The pointer may sit in any live instruction file — usually the rule's own home: `docs/ROUTINE-PROMPT.md`
-   * points at 002 and 003, the `review-pr` skill at 002 and 004, `docs/WATCHDOG-PROMPT.md` at 005.
+   * The pointer may sit in any live instruction file, but it must be a **code span** holding the full
+   * repo-relative path (#654): that is what `pointersIn` reads, so it is the same extraction the
+   * `%s points only at paths that exist` rail runs, and a record that is deleted while its pointer stands goes
+   * red there. A prose mention, a bare basename or a glued prefix (`mydocs/decisions/…`) does not count.
+   * Beyond "somebody points at it", ADR_POINTERS below names the file a run follows for each record
+   * 001-011 (#656), so deleting the functional pointer goes red even while a history sentence in
+   * `.claude/rules/governance.md` still names the record. 006 has only that one pointer, so it is one edit from red.
    *
-   * What it does not check, so a reviewer does not read more into a green than is there. It matches the
-   * repo-relative path anywhere in the text, so an incidental or dead mention satisfies it: this proves the
-   * record is *reachable*, never that the pointer is one a run would follow or that it still says what the
-   * pointer promises — both are the reviewer's, exactly as for the sibling rail above. The full path is
-   * required on purpose (a bare basename, or one under the wrong directory, no longer passes), which is also
-   * what makes this compose with `%s points only at paths that exist`: that rail then proves the same path
-   * resolves. `readdirSync` is not recursive, so a record filed in a subdirectory of `docs/decisions/` is
-   * exempt and green.
+   * What it does not check, so a reviewer does not read more into a green than is there: that the pointer is
+   * one a run would follow, or that it still says what the pointer promises — both are the reviewer's, exactly
+   * as for the sibling rail above. The shape and numbering of the record set is held by `adr-records.test.ts`.
    *
-   * Prove it red: add a file to `docs/decisions/` and point nothing at it.
+   * Prove it red: add a file to `docs/decisions/` and point nothing at it; turn a pointer into prose.
    */
+  const pointedAt = (files: string[], adr: string) => files.filter((f) => pointersIn(read(f)).includes(adr));
+
+  it('a pointer counts only as a code span holding the full path, not prose, a basename or a glued prefix (#654, #657)', () => {
+    const adr = 'docs/decisions/004-what-a-review-block-is-for.md';
+    expect(pointersIn(`see \`${adr}\` for why`)).toContain(adr);
+    expect(pointersIn(`prose only: ${adr}`)).not.toContain(adr);
+    expect(pointersIn('`004-what-a-review-block-is-for.md`')).not.toContain(adr);
+    expect(pointersIn(`\`mydocs/${adr}\``)).not.toContain(adr);
+  });
+
+  it('the record set partitions the instruction files, and nothing in docs/decisions escapes it (#654)', () => {
+    expect(LIVE_FILES.length + ADR_FILES.length, 'a file is both a record and live, or neither').toBe(INSTRUCTION_FILES.length);
+    // A nested directory or a non-.md file would be a record by location and absent from ADR_FILES, so nothing
+    // would have to point at it: the two counts must agree.
+    expect(readdirSync(join(root, 'docs/decisions')).length, 'a record in the wrong shape under docs/decisions/')
+      .toBe(ADR_FILES.length);
+  });
+
   it('every decision record is pointed at by a live instruction file (#98)', () => {
-    const adrs = mdIn('docs/decisions');
     // Vacuity only: an empty directory would pass the assertion below saying nothing. Deliberately not a
     // floor at today's count — retiring a record is a decision a run may legitimately make.
-    expect(adrs.length, 'the decision records have gone missing').toBeGreaterThan(0);
-    const text = liveText();
-    // By repo-relative path, wherever it is written — a code span, a sentence, a link.
-    expect(adrs.filter((f) => !text.includes(f)), 'a decision record nothing points at').toEqual([]);
+    expect(ADR_FILES.length, 'the decision records have gone missing').toBeGreaterThan(0);
+    expect(ADR_FILES.filter((f) => pointedAt(LIVE_FILES, f).length === 0), 'a decision record nothing points at').toEqual([]);
+  });
+
+  // The file a run follows to reach each record (#656). Not exhaustive: a record may be added without a row,
+  // and the rail above still holds it. Retiring a record means dropping its row here, a visible edit.
+  const ADR_POINTERS: Record<string, string> = {
+    '001-one-home-per-rule.md': '.claude/skills/open-pr/SKILL.md',
+    '002-routine-prompt-is-flow-only.md': 'docs/ROUTINE-PROMPT.md',
+    '003-two-routines.md': 'docs/ROUTINE-PROMPT.md',
+    '004-what-a-review-block-is-for.md': '.claude/skills/review-pr/SKILL.md',
+    '005-the-run-pulse-says-when-a-run-started.md': 'docs/WATCHDOG-PROMPT.md',
+    '006-a-routine-never-writes-under-claude.md': '.claude/rules/governance.md',
+    '007-a-pulse-stamp-is-read-from-the-clock.md': 'docs/WATCHDOG-PROMPT.md',
+    '008-the-backlog-is-refined-by-a-routine.md': 'docs/REFINER-PROMPT.md',
+    '009-the-reviewer-pulse-says-who-holds-it.md': 'docs/REVIEWER-PROMPT.md',
+    '010-3d-art-is-the-avatars-style.md': 'CLAUDE.md',
+    '011-instruction-files-are-measured-by-structure.md': 'CLAUDE.md',
+  };
+
+  it.each(Object.entries(ADR_POINTERS))('%s is pointed at from %s, the file a run follows (#656)', (adr, file) => {
+    expect(ADR_FILES, `${adr} is gone: drop its row from ADR_POINTERS`).toContain(`docs/decisions/${adr}`);
+    expect(pointedAt([file], `docs/decisions/${adr}`), `${file} must point at ${adr} in a code span`).toHaveLength(1);
   });
 
   it('every skill directory is classed as ours or vendored, so a new one cannot go unread', () => {

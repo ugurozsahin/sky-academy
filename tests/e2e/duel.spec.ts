@@ -72,7 +72,7 @@ async function forceTopicAndClick(page: Page, index: number, poolSize: number, e
   await page.evaluate(() => { const w = window as any; if (w.__realRandom) { Math.random = w.__realRandom; delete w.__realRandom; } });
 }
 
-async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0, opts?: { pickTopic?: string; refuseWrites?: boolean; forceTopic?: { index: number; poolSize: number; topicId: string } }) {
+async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0, opts?: { pickTopic?: string; noSpeech?: boolean; refuseWrites?: boolean; forceTopic?: { index: number; poolSize: number; topicId: string } }) {
   // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
   // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
   // gone, the case green for the wrong reason. The two clocks straddle midnight UTC in the general case,
@@ -87,7 +87,7 @@ async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins
       if (seed) d.dojo = seed; else window.__seedMiss = true;
     }
     localStorage.setItem('sna:v1', JSON.stringify(d));
-  }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate, coins });
+  }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', ...(opts?.noSpeech ? { speech: false } : {}) }), dojoByDate, coins });   // `noSpeech`: read-aloud off, so `canHear()` is false and a `listen` card is revealed (#648)
   if (opts?.refuseWrites) await refuseWrites(page);   // after the seed above, so only the match's own writes are refused
   await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
   await recordingEngine(page);
@@ -96,7 +96,9 @@ async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins
   await page.click('.island[data-year="year1"]');
   const ft = opts?.forceTopic;
   if (ft) await forceTopicAndClick(page, ft.index, ft.poolSize, ft.topicId, async () => { await page.click('#duel'); await page.click('.topic[data-mixed]'); });   // #957: Random, as before
-  else { await page.click('#duel'); await page.click(opts?.pickTopic ? `#island-overlay .topic[data-id="${opts.pickTopic}"]` : '.topic[data-mixed]'); }
+  else {
+    if (opts?.pickTopic && topicById(opts.pickTopic)?.subject === 'writing') await page.click('.tab[data-s="writing"]');   // the chooser lists the open subject only (#648)
+    await page.click('#duel'); await page.click(opts?.pickTopic ? `#island-overlay .topic[data-id="${opts.pickTopic}"]` : '.topic[data-mixed]'); }
   await expect(page.locator('.duel-screen')).toBeVisible();
   await page.waitForFunction(() => window.__sna?.state().prompt);
 }
@@ -657,8 +659,43 @@ test.describe('Ninja Duel', () => {
     await page.waitForFunction(r => window.__sna.state().round === r + 1, before.round, { timeout: 5000 });
   });
 
+  // The pool's comparison topics, FORCED through the chooser (#648): an unseeded duel draws one topic of the pool
+  // and most of it emits no `hint`, so the review's own class of question was on the card 3 runs in 24.
+  for (const topic of ['y1-mass', 'y1-capacity']) {
+    test(`the card carries ${topic}'s own hint line, every round (#648)`, async ({ page }) => {
+      await startDuel(page, undefined, 0, { pickTopic: topic });
+      for (let r = 1; r <= 2; r++) {
+        await page.waitForFunction(r => window.__sna.state().round === r && !!window.__sna.state().prompt, r);
+        const seen = await page.evaluate(() => ({ topic: window.__sna.state().topic, own: window.__sna.duel.current?.hint ?? null, dom: document.querySelector('#hint')!.textContent }));
+        expect(seen.topic, 'the chosen topic is the one on the card').toBe(topic);
+        expect(seen.own, `round ${r}: this topic puts the compared values in q.hint, so there is one to check`).toBeTruthy();
+        expect(seen.dom, `round ${r}: the question's own hint, not a generic instruction`).toBe(seen.own);
+        if (r < 2) await winRound(page, 'a');
+      }
+    });
+  }
+
+  test('a listen card is revealed, not hidden, when the device cannot be heard (#648)', async ({ page }) => {
+    await startDuel(page, undefined, 0, { pickTopic: 'y1-soundhunt', noSpeech: true });
+    // `reveal` is true here (`canHear()` is false): the words the voice would say are printed, the speaker button
+    // is hidden, and the hint is the question's own. One evaluate: a round can end between two.
+    for (let r = 1; r <= 2; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r && !!window.__sna.state().prompt, r);
+      const seen = await page.evaluate(() => {
+        const q = window.__sna.duel.current;
+        return { topic: window.__sna.state().topic, listen: q?.listen ?? null, hint: q?.hint ?? null, prompt: document.querySelector('#prompt')!.textContent ?? '', hintDom: document.querySelector('#hint')!.textContent, speakHidden: (document.querySelector('#speak') as HTMLElement).hidden };
+      });
+      expect(seen.topic).toBe('y1-soundhunt');
+      expect(seen.listen, `round ${r}: Sound Hunt is a listen question`).toBeTruthy();
+      expect(seen.prompt, `round ${r}: the words are printed on a device that cannot be heard`).toContain(seen.listen!);
+      expect(seen.speakHidden, `round ${r}: nothing offers to read aloud`).toBe(true);
+      expect(seen.hintDom, `round ${r}: the question's own hint`).toBe(seen.hint);
+      if (r < 2) await winRound(page, 'a');
+    }
+  });
+
   test('the card carries the line the round is decided by, every round (#65, PR #295 review)', async ({ page }) => {
-    await startDuel(page);
+    await startDuel(page, undefined, 0, { pickTopic: 'y1-length' });
     // The pool's comparison topics (length, mass, capacity, temperature) put the values being compared in
     // `q.hint` and nowhere else on the card, so a card without this line is ten rounds of "Which is fuller?"
     // over two coloured bubbles. Read the DOM and the state in ONE evaluate: a round can end between two.
@@ -671,7 +708,9 @@ test.describe('Ninja Duel', () => {
       expect(seen.dom, `round ${r}: the card shows the line the screen says it is showing`).toBe(seen.hint);
       expect(seen.hint, `round ${r}: no round leaves the strip's hint line empty`).not.toBe('');
       expect(seen.shown, `round ${r}: the line is laid out, not collapsed to nothing`).toBeGreaterThan(0);
-      if (seen.own) expect(seen.dom, `round ${r}: the question's own hint, not a generic instruction`).toBe(seen.own);
+      // Unconditional (#648): `y1-length` is forced above and always carries a hint, so this runs every time.
+      expect(seen.own, `round ${r}: y1-length puts the compared values in q.hint`).toBeTruthy();
+      expect(seen.dom, `round ${r}: the question's own hint, not a generic instruction`).toBe(seen.own);
       if (r < 3) await winRound(page, 'a');
     }
     // A phone turned sideways lands in the `max-height: 640px` band, where the shared `.hint` rule is
@@ -703,6 +742,21 @@ test.describe('Ninja Duel', () => {
       const box = document.querySelector('.duel-screen')!.getBoundingClientRect();
       return window.innerWidth === want.width && Math.abs(vh * 100 - want.height) < 2 && Math.abs(box.height - want.height) < 2;
     }, vp);
+  }
+
+  type Rect = { x: number; y: number; w: number; h: number; right: number; bottom: number; cx: number };
+  /**
+   * Each canvas fills ITS OWN half (#675, #404 finding 1). The equality rails compare the two canvases with each
+   * other, so a change that shrinks both identically is invisible to them: delete `.duel-arena`'s
+   * `position: absolute; inset: 0; width: 100%; height: 100%` and both children fall back to the 300x150 default
+   * canvas box, still equal, still green. Measured against the half, not the peer.
+   */
+  function expectFillsHalf(L: { a: Rect; b: Rect; canvasA: Rect; canvasB: Rect }, where: string) {
+    for (const [p, half, canvas] of [['Player 1', L.a, L.canvasA], ['Player 2', L.b, L.canvasB]] as const) {
+      expect(half.w, `${where}: ${p}'s half is laid out, so filling it means something`).toBeGreaterThan(0);
+      expect(Math.abs(canvas.w - half.w), `${where}: ${p}'s canvas is as wide as its half`).toBeLessThan(1);
+      expect(Math.abs(canvas.h - half.h), `${where}: ${p}'s canvas is as tall as its half`).toBeLessThan(1);
+    }
   }
 
   /** Where each piece of the duel screen actually sits, in viewport pixels. */
@@ -749,7 +803,7 @@ test.describe('Ninja Duel', () => {
    * The budget must BOUND the bar without cutting the answer off, on either axis — asserted in both orientations,
    * because the first version of this only ran in landscape and only at viewports where nothing clipped.
    */
-  function expectNothingClipped(m: { clipY: number; overflowX: string; markPainted: boolean }, where: string) {
+  function expectNothingClipped(m: { clipY: number; overflowX: string; markState: 'absent' | 'painted' | 'clipped' }, where: string) {
     // Vertical: a cropped row of objects is a WRONG COUNT, not merely a small one — `y2-fractions` draws twelve
     // stars, and half a bottom row turns "1/4 of 12" into a card that reads as ten.
     expect(m.clipY, `${where}: the budget bounds the visual without cutting it off`).toBeLessThanOrEqual(0.5);
@@ -757,12 +811,14 @@ test.describe('Ninja Duel', () => {
     // where the prompt is "Which number is hidden?". `overflow-y: clip` bounds y and leaves x alone; beside
     // `hidden`, `overflow-x: visible` would compute to `auto` and make a scroll container instead.
     expect(m.overflowX, `${where}: the budget does not clip the horizontal axis`).toBe('visible');
-    expect(m.markPainted, `${where}: the '?' the question asks about is painted, not clipped away`).toBe(true);
+    // Three states, not a boolean that is `true` whenever the card has no `?` at all: 'absent' is most cards and
+    // asserts nothing, so a pass only means the mark survived when the card carries one (#404).
+    expect(m.markState, `${where}: the '?' the question asks about is painted, not clipped away`).not.toBe('clipped');
   }
 
   const dressAndMeasure = (page: Page, card: { html: string; prompt: string; hint: string }) => page.evaluate(h => {
     // The round's toast is not this measurement's business, and a live match raises one whenever a round is
-    // missed or drawn. Left up, it sits on the bar and `markPainted` reads IT at the `?`'s centre — which made
+    // missed or drawn. Left up, it sits on the bar and `markState` reads IT at the `?`'s centre — which made
     // this sweep fail about one full-suite run in two, at whichever viewport the draw happened to collide with.
     // The toast's own placement is asserted by the sight loop, deliberately and with the toast lit.
     document.querySelector('.toast')!.classList.remove('show');
@@ -797,9 +853,9 @@ test.describe('Ninja Duel', () => {
     // Its CENTRE, not two pixels inside its right edge: the edge sample reads whatever overlaps the card there,
     // which is the same on `main` as here and so is not this diff's business. The centre discriminates exactly
     // the regression — `overflow: hidden` left it unpainted at 320px, `overflow-y: clip` paints it.
-    const markPainted = !mr || (() => {
+    const markState = !mr ? 'absent' as const : (() => {
       const hit = document.elementFromPoint(mr.x + mr.width / 2, mr.y + mr.height / 2);
-      return !!hit && (hit === mark || hit.closest('.mark') === mark);
+      return !!hit && (hit === mark || hit.closest('.mark') === mark) ? 'painted' as const : 'clipped' as const;
     })();
     return {
       a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
@@ -807,7 +863,7 @@ test.describe('Ninja Duel', () => {
       // All measured here, in the same tick, for the same reason the boxes are.
       clipY: kidsOverflow,
       overflowX: cs.overflowX,
-      markPainted,
+      markState,
     };
   }, card);
 
@@ -816,9 +872,10 @@ test.describe('Ninja Duel', () => {
     // The layout the owner and child could not play was two stacked halves: each arena had half the height, and
     // `layoutWave` spends a bubble radius twice over out of it, so the flight was ~270px on a phone. Pinned in
     // both projects at a phone on its side, a tablet, and a screen wider than two capped arenas.
-    for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
+    for (const vp of [{ width: 640, height: 360 }, { width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {   // 640x360: any 720p Android held sideways (#404 item 5)
       await resizeTo(page, vp);
       const L = await boxes(page);
+      expectFillsHalf(L, `${vp.width}px`);
       expect(L.a.right, `${vp.width}px: Player 1 ends where Player 2 begins`).toBeLessThanOrEqual(L.b.x + 1);
       expect(Math.abs(L.a.y - L.b.y), `${vp.width}px: neither player is above the other`).toBeLessThan(2);
       expect(Math.abs(L.a.w - L.b.w), `${vp.width}px: the two halves are the same width`).toBeLessThan(2);
@@ -830,6 +887,30 @@ test.describe('Ninja Duel', () => {
       // the cap exists and its message would be a lie. Half the screen, or `--arena-w`, whichever is smaller.
       expect(Math.round(L.a.w), `${vp.width}px: a half is half the screen, capped at --arena-w`).toBe(Math.min(vp.width / 2, 600));
       expect(L.rotate.h, `${vp.width}px: nothing asks a player to turn a screen that is already sideways`).toBe(0);
+    }
+  });
+
+  test('guard rail: a question bar that changes height between rounds re-measures both arenas, with no window resize (#678)', async ({ page }) => {
+    await startDuel(page);
+    await resizeTo(page, { width: 844, height: 390 });
+    // Frozen so no round rewrites the card under the measurement; the arenas' own rAF-driven observer still runs.
+    await page.evaluate(() => { for (const p of ['a', 'b'] as const) window.__sna.arenas[p].paused = true; });
+    const backing = () => page.evaluate(() => (['arena-a', 'arena-b'] as const).map(id => {
+      const c = document.getElementById(id) as HTMLCanvasElement;
+      return { h: c.height, css: c.getBoundingClientRect().height, dpr: Math.min(window.devicePixelRatio || 1, 2) };
+    }));
+    const before = await backing();
+    const height = (m: { h: number; dpr: number }) => m.h / m.dpr;
+    // The ABSURD card is taller than any real one: the bar grows, the half below it shrinks, and no `resize` fires.
+    await dressAndMeasure(page, ABSURD);
+    await page.waitForFunction(() => (['arena-a', 'arena-b'] as const).every(id => {
+      const c = document.getElementById(id) as HTMLCanvasElement;
+      return Math.abs(c.height - Math.round(c.getBoundingClientRect().height * Math.min(window.devicePixelRatio || 1, 2))) <= 1;
+    }));
+    const after = await backing();
+    for (const i of [0, 1]) {
+      expect(height(after[i]), `arena ${i}: the bar grew, so the half below it is shorter than it was`).toBeLessThan(height(before[i]) - 1);
+      expect(Math.abs(height(after[i]) - after[i].css), `arena ${i}: the backing store follows the new box`).toBeLessThan(1);
     }
   });
 
@@ -1218,6 +1299,7 @@ test.describe('Ninja Duel', () => {
     // construction and the rail could not have failed however wrong the CSS was.
     for (const vp of [{ width: 390, height: 844 }, { width: 800, height: 1280 }, { width: 320, height: 568 }]) {
       await resizeTo(page, vp);
+      let paintedMarks = 0;
       for (const card of [...POOL_CARDS, ABSURD]) {
         const P = await dressAndMeasure(page, card);
         const where = `${vp.width}x${vp.height}, ${card.what}`;
@@ -1225,12 +1307,16 @@ test.describe('Ninja Duel', () => {
         expect(P.strip.bottom, `${where}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
         expect(Math.abs(P.a.x - P.b.x), `${where}: the halves are stacked, not side by side`).toBeLessThan(2);
         expect(P.rotate.h, `${where}: portrait tells the players there is a better way round`).toBeGreaterThan(0);
+        expectFillsHalf(P, where);
         expect(Math.abs(P.canvasA.h - P.canvasB.h), `${where}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
         expect(Math.abs(P.canvasA.w - P.canvasB.w), `${where}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
         // Asserted here, not merely measured. The previous version computed a crop count in portrait and then
         // never looked at it, which is how a budget that cut every tablet's counting card shipped green.
         if (card !== ABSURD) expectNothingClipped(P, where);
+        if (P.markState === 'painted') paintedMarks++;
       }
+      // The '?' check ran on a card that really carries one here, or 'absent' on every card made it vacuous.
+      expect(paintedMarks, `${vp.width}x${vp.height}: at least one card in the sweep carries a '?' and paints it`).toBeGreaterThan(0);
       // The fallback's floor, once per viewport on the tallest card the pool can draw.
       //
       // 24%, measured rather than chosen, and it is a LOW bar on purpose. On the twelve-star card each arena is

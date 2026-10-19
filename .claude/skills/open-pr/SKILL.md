@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: Open a pull request in Sky Ninja Academy. Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR.
+description: Open a pull request in Sharpwise. Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR.
 ---
 # Open a pull request
 
@@ -133,6 +133,12 @@ against what you meant: on a `Closes #<n>` pull request it is a failure. Nothing
 you actually post either, so check the file you are about to paste from, and re-check if you edit the body
 afterwards.
 
+An empty or whitespace-only file does not print `closes: nothing`: it exits non-zero with `EMPTY BODY` (#138).
+
+**After opening, check what was actually posted** (#138), however the pull request was opened:
+`gh pr view <n> --json body -q .body > posted.md && node scripts/review-gate.mjs posted.md`, and say in the pull request
+which check you ran. An empty `posted.md` fails the same way.
+
 **Paste that output into the pull request.** If the list is not exactly the issues you intend to close, fix
 the body — not the list.
 
@@ -149,7 +155,7 @@ npx playwright test --project=desktop        # when the change could behave diff
 
 A pull request's CI runs e2e as the **mobile `@smoke` subset only** (#751, #854: eight tests, about half a minute) and
 **only when the diff can reach the game** (#176) — `src/`, `index.html`, `public/`, `tests/e2e/`,
-`playwright.config.*`, `package*.json`, `ci.yml`. Unit tests and the build always run. The full mobile project
+`playwright.config.*`, `package*.json`, `tsconfig*.json`, `vite.config.*`, `ci.yml`. Unit tests and the build always run. The full mobile project
 runs on `main` every night, and the reviewer runs it once more before a merge (`review-pr` §2).
 
 **Run the full mobile project yourself when any of these holds**, because the condition is the point, not the
@@ -261,8 +267,7 @@ undraft starts.
 
 Then stop. **Do not review or merge your own pull request.** The API cannot tell you whose it is — one token
 serves every agent and the owner, so every pull request here looks self-authored; you know it is yours because
-you opened it this run, and that is the only evidence there is. Tick "Develop" on the issue and leave the rest
-to a different agent.
+you opened it this run, and that is the only evidence there is. Leave the rest to a different agent.
 
 If a reviewer later asks for changes, push the fix and say what changed — in a comment shaped like the
 review it answers (#200): open `Pushed <sha>, addressing <what>`, resolve each blocking finding by the
@@ -278,19 +283,14 @@ The reviewer who set it lifts it, or a later reviewer run's fresh review does (`
 ## 6. Governance pull requests say which way they move the constraint
 
 A pull request that changes how the routines themselves work — `CLAUDE.md`,
-`docs/ROUTINE-PROMPT.md`, `docs/REVIEWER-PROMPT.md`, the workflows, the guard rails — used to be left for the
-owner as a class, on the reasoning that a run should not merge changes to its own rules. Sound instinct,
-wrong cut: it conflates *an author must not land their own work* — true, and already enforced by §5 above — with *a run must not land a
-rule change*, which is so broad that PR #96 sat open all day while the thing it fixed was live and unfixed.
-
-So every governance pull request states, in one line near the top, which way it moves the constraint:
+`docs/ROUTINE-PROMPT.md`, `docs/REVIEWER-PROMPT.md`, the workflows, the guard rails — states, in one line near the
+top, which way it moves the constraint (why this cut: `docs/decisions/015-tightening-and-loosening-a-governance-change.md`):
 
 - **Tightening** — it adds a check, a rail or a rule, or it only describes behaviour that already exists.
   Reviewed and merged like any other pull request, by a run that did not open it.
 - **Loosening** — after this change something a run was not permitted to do, it may now do. **Owner-gated.
   Never routine-merged, however obviously right it looks.** Put the `loosening` label on the pull request:
-  `review-gate` reads it and stays red until the owner approves (#112), so the gate is a status a merge rule
-  reads and not only this sentence.
+  `review-gate` reads it and stays red until the owner approves (#112).
 - **Mixed** — both. Owner-gated — same label — and worth splitting instead.
 
 Three things to get right:
@@ -305,9 +305,6 @@ Three things to get right:
    code, not against the pull request body.
 3. **The reviewer's job includes disagreeing with the label.** A mislabelled loosening is then a visible,
    arguable act instead of a silent non-decision.
-
-The point is asymmetry: an agent must not be able to vote itself more freedom, but an agent that wants the
-routine held to a higher standard should not have to wait a day for it.
 
 ## 7. One home per rule
 

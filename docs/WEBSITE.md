@@ -26,6 +26,24 @@ The manifest (`start_url`, `scope`, `id` are `./`), the worker registration and 
 7. **Check**: `https://sharpwise.co.uk/play/` loads, works offline after one visit, and installs as an app;
    `curl -sI http://sharpwise.uk` shows `301`.
 
+8. **Android App Links (#2028, optional until the app is published).** Repo Settings, Secrets and variables, Actions, Variables: add `ANDROID_APP_LINKS_SHA256` = the SHA-256 certificate fingerprint of the key that signs the installed app. With Play App Signing that is **Google's app signing key**: Play Console, Setup, App signing, "App signing key certificate", SHA-256 (the upload key's is not enough). Several fingerprints may be separated by commas. The next deploy then publishes `/.well-known/assetlinks.json`; until then no file is published and links open in the browser, so the web game still works. Testing: `docs/ANDROID.md`.
+
+## Checking the `.well-known` files (#2029)
+
+Android and iOS silently ignore an association file that is redirected, missing or served with the wrong type; the only symptom is "the link opens the browser".
+The `check` job in `pages.yml` runs after every deploy; by hand, once DNS and HTTPS are up:
+
+```
+ANDROID_APP_LINKS_SHA256='AA:BB:...' node scripts/check-well-known.mjs https://sharpwise.co.uk [--ios]
+```
+
+It needs only Node and takes any base URL (a local server works). Exit 0 = as intended, 1 = a check failed (the message names the URL and the fault), 2 = bad usage.
+For each file it wants status 200, no redirect, `content-type: application/json` and a JSON body.
+Which files it wants follows the generator: `assetlinks.json` is expected exactly when `ANDROID_APP_LINKS_SHA256` holds a fingerprint (the same test `scripts/app-links.mjs` applies), so pass the same value; `apple-app-site-association` is expected only with `--ios` until #2030 gives it a generator (and replaces the flag).
+A file that is intentionally absent must answer 404; a 200 for it fails, as does a 404 for an expected one.
+The job reads the repository variable itself and retries for two minutes (CDN and certificate lag). It is a separate job nothing waits on: a failure turns that run red and blocks no pull request.
+Never measured yet: whether Pages serves the extensionless `apple-app-site-association` as JSON (it picks the type from the extension, so `application/octet-stream` is likely). If the first real run says so, the smallest fix is to host `/.well-known` on another host with a headers file (see the Cloudflare note below), not a workaround in the repo.
+
 ## Notes
 
 - The service worker's cache name is derived from the build's contents, so each deployment replaces the previous cache.
