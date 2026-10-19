@@ -4,7 +4,7 @@
 // import path, the same shape #558 used for `src/style.css`'s own split. `Arena` stays the one public seam:
 // every event handler, the physics update and the render loop live here, unmoved.
 import { gentleRelaunchSet } from './gentleRelaunch';   // #742: which bubbles a gentle relaunch brings back together
-import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
+import { watchBox } from './box-watch'; import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
 import type { Rng } from '../curriculum/types';
 import {
   hittable, GOOD, RELAUNCH_DELAY, MAX_RELAUNCHES, COLLIDE,
@@ -56,7 +56,7 @@ export class Arena {
   private trail: { x: number; y: number; t: number }[] = [];
   private strokes: Map<number, Stroke> = new Map();   // #561: one Stroke per pointer (#16: two arenas share one window)
   private mostRecentId: number | null = null;          // which stroke the shared visual trail/swish/fx follows — every stroke still hit-tests
-  private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
+  private raf = 0; private unwatch: () => void; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private orderedLabels: Set<string> = new Set();   // #591: this wave's required sequence labels — a re-launch candidate on fall, unlike a decoy
   // #700: this wave's gentle-year single-relaunch target; #742 extends it — who it comes back WITH (gentleRelaunch.ts).
   private gentleTarget: string | undefined; private gentleUsed = false; private gentleTargetFallen: Bubble | null = null; private gentleDecoys: Bubble[] = [];
@@ -92,7 +92,7 @@ export class Arena {
     this.throwFor = opts.throwFor; this.labelArt = opts.labelArt; this.isHazard = opts.isHazard;
     this.reducedMotion = opts.reducedMotion ?? prefersReducedMotion(window);
     this.resize();
-    window.addEventListener('resize', this.resize);
+    this.unwatch = watchBox(canvas, this.resize);
     canvas.addEventListener('pointerdown', this.onDown);
     canvas.addEventListener('pointermove', this.onMove);
     window.addEventListener('pointerup', this.onUp);
@@ -104,14 +104,14 @@ export class Arena {
     cancelAnimationFrame(this.raf);
     this.canvas.removeEventListener('pointerdown', this.onDown);
     this.canvas.removeEventListener('pointermove', this.onMove);
-    window.removeEventListener('resize', this.resize);
+    this.unwatch();
     window.removeEventListener('pointerup', this.onUp);
     window.removeEventListener('pointercancel', this.onUp);
   }
   resize = () => {
     const rect = this.canvas.getBoundingClientRect();
     const from: ArenaBox = { W: this.W, H: this.H };
-    this.W = Math.max(1, rect.width); this.H = Math.max(1, rect.height);
+    this.W = Math.max(1, Math.round(rect.width)); this.H = Math.max(1, Math.round(rect.height));   // whole CSS px: the duel halves settle a sub-pixel apart and must derive the same `g` (#389/#400, #678)
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.W * this.dpr); this.canvas.height = Math.round(this.H * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);

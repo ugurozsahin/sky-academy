@@ -131,6 +131,40 @@ describe('review gate', () => {
     it.each(['OWNER: REJECTED — too bright', '**OWNER: REJECTED**', 'owner: rejected'])(
       'reads %j as a rejection', (body) => expect(isOwnerRejected(body)).toBe(true));
   });
+
+  // #229 — a marker pasted with an invisible character in front, or inside it, must still read as the marker.
+  // The first six are the ones PR #221 named bar NBSP (JS `\s` misses five of them); the rest are what the
+  // hook's shared INVISIBLE class adds. Every matcher, both positions, so one cannot be left on plain `\s`.
+  describe('invisible characters (#229)', () => {
+    const invisible = ['​', '‌', '‍', '⁠', '﻿', '­', 'ㅤ', '️', '‮'];
+    const matchers: [string, (b: string) => boolean, string, boolean][] = [
+      ['isChangesRequested', isChangesRequested, 'REVIEW: CHANGES REQUESTED', false],
+      ['isCleared', isCleared, 'REVIEW: CLEARED', true],
+      ['isOwnerRejected', isOwnerRejected, 'OWNER: REJECTED', false],
+      ['isOwnerApproved', isOwnerApproved, 'OWNER: APPROVED', true],
+    ];
+    for (const [name, fn, marker, isStrict] of matchers) {
+      it.each(invisible.map((c) => [c.codePointAt(0)!.toString(16), c]))(
+        `${name} reads ${marker} with U+%s in front and inside`, (_hex, c) => {
+          expect(fn(`${c}${marker} — ok`), 'in front').toBe(true);
+          expect(fn(`${marker.slice(0, 4)}${c}${marker.slice(4)}`), 'inside').toBe(true);
+        });
+      it(`${name} still refuses a marker that is only quoted or mentioned`, () => {
+        if (isStrict) expect(fn(`​> ${marker}`), 'strict').toBe(false);
+        expect(fn(`Reply ${marker} later`)).toBe(false);
+      });
+    }
+    it('a no-break space in front is whitespace, and counts for every matcher', () => {
+      for (const [, fn, marker] of matchers) expect(fn(` ${marker}`)).toBe(true);
+    });
+    it('a marker split across a line break still counts for the loose matchers (the controls are not deleted)', () => {
+      expect(isChangesRequested('REVIEW:\nCHANGES\tREQUESTED')).toBe(true);
+      expect(isOwnerRejected('OWNER:​\nREJECTED')).toBe(true);
+    });
+    it('the gate counts an owner approval pasted with a zero-width space in front', () => {
+      expect(gated('​OWNER: APPROVED').blocked).toBe(false);
+    });
+  });
 });
 
 /**
