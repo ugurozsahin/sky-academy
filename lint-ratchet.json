@@ -16,13 +16,13 @@
     "tests/unit/audio.test.ts": 617,
     "tests/unit/curriculum.test.ts": 2565,
     "tests/unit/duel.test.ts": 970,
-    "tests/unit/governance.test.ts": 5691,
+    "tests/unit/governance.test.ts": 5690,
     "tests/unit/guardrails.test.ts": 3504,
     "tests/unit/hooks.test.ts": 1200,
     "tests/unit/play-session.test.ts": 629,
     "tests/unit/session.test.ts": 1282,
     "tests/unit/sim.test.ts": 1641,
-    "tests/unit/storage.test.ts": 3024,
+    "tests/unit/storage.test.ts": 3022,
     "tests/unit/workflows.test.ts": 620
   }
 }

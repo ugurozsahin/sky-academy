@@ -83,15 +83,14 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
   /** The certificate button's click: draw it, hand it over, and say how it went (toast only — 'shown' has its own hint). */
   async function onCertificate(earned: NonNullable<ResultPayout['cert']>) {
     sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
-    try {
-      const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, () => askGrownUp('share the certificate'));
-      if (how === 'shared') toast('Certificate shared!', 'good');
-      else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
-      else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
-      // 'shown' opens the full-screen view with its own save hint, so no toast
-    }
-    catch (e) { console.error('certificate delivery failed', e); toast('Could not make the certificate', 'bad'); }
-    b.disabled = false;
+    let how: Awaited<ReturnType<typeof deliverCertificate>>;   // #674: the try holds the delivery only, so reporting a failure cannot throw into its own catch
+    try { how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, () => askGrownUp('share the certificate')); }
+    catch (e) { console.error('certificate delivery failed', e); toast('Could not make the certificate', 'bad'); return; }
+    finally { b.disabled = false; }
+    if (how === 'shared') toast('Certificate shared!', 'good');
+    else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
+    else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
+    // 'shown' opens the full-screen view with its own save hint, so no toast
   }
 
   /** Wires the overlay's buttons; each one taps, tears the play screen down, then does its own thing. */

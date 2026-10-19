@@ -557,7 +557,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
 
   it('#338 query-top-pick hook: prose about the query, not the line itself, still denies', () => {
     expect(isDeny(runHeartbeatHook({ method: 'update', issue_number: 62,
-      body: 'the query top pick was #298 but I never wrote it as a line\n- second item: no' }))).toBe(true);
+      body: 'the query top pick: #298 was what I meant, but I never wrote it as a line\n- second item: no' }))).toBe(true);
   });
 
   // Round-1 review of PR #341: the deny message is the whole interface a blocked run sees, and this rule was
@@ -590,7 +590,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
   it('#359: every required line declares the key a run writes and why it is there', () => {
     expect((REQUIRED_LINES as unknown[]).length, 'two lines today; governance.md anticipates a third').toBeGreaterThanOrEqual(2);
     for (const { key, why } of REQUIRED_LINES as { key: string; why: string }[]) {
-      expect(key, 'the key is the literal line prefix a run writes').toMatch(/^- [a-z][a-z ]*:$/);
+      expect(key, 'the key is the literal line prefix a run writes').toMatch(/^- [a-z][a-z0-9 -]*:$/);
       expect(why.length, `${key} has no reason text, so its deny says nothing`).toBeGreaterThan(20);
     }
   });
@@ -645,7 +645,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     const sentence = prompt.split('\n').find((l) => l.includes('stamp the pulse')) ?? '';
     expect(sentence, 'STEP 1 must still prescribe a stamp, or this rail reads nothing').toContain('IN PROGRESS');
     // Every `- key: value` the stamp sentence names, reassembled into the body a run would actually send.
-    const lines = [...sentence.matchAll(/`(- [a-z][a-z ]*: [^`]+)`/g)].map((m) => m[1]);
+    const lines = [...sentence.matchAll(/`(- [a-z][a-z0-9 -]*: [^`]+)`/g)].map((m) => m[1]);
     // Counted against the hook's own list rather than `> 1` (#359): a third required line added to
     // `REQUIRED_LINES` and not to the stamp is the identical defect, and `> 1` would not have seen it.
     for (const { key } of REQUIRED_LINES as { key: string }[])

@@ -1,8 +1,8 @@
 // Builds dist/ then inlines JS, CSS and avatar images into one self-contained HTML (for hosting as a single page / Artifact).
 // Usage: node scripts/bundle-single.mjs [out.html] [--artifact]  (--artifact = body-only fragment, no doctype/html/head/body)
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -33,7 +33,9 @@ export function stripHead(head) {
 // false the moment the path needs escaping (a space, `#`, anything non-ASCII), and this block then silently
 // no-ops — `node scripts/bundle-single.mjs` exits 0 from a path like `~/Documents/Sky Academy/…` with no
 // `dist/sky-ninja-academy.html` written and no error.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths, not resolve(): a symlinked checkout (macOS /var -> /private/var) never matched, so the CLI silently did nothing (#309).
+const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) {
   const out = process.argv[2] ?? 'dist/sky-ninja-academy.html';
   const fragment = process.argv.includes('--artifact');
   execSync('npx vite build', { stdio: 'inherit' });
