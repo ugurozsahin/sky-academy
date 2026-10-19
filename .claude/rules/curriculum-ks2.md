@@ -21,6 +21,9 @@ Beside `curriculum.md`, which holds the shared rules. Each line names the test t
 - A label must read at 13px on a 390px phone, and a prompt must fit the card in three lines
   (`ks2-label-size.test.ts` #1046, `ks2-card-budget.test.ts` #1051).
 - A built answer has at most 6 slots (`MAX_SLOTS` in `build.ts`, `build.test.ts`).
+- A word too long for a bubble goes on the card and the bubbles carry a letter or yes/no
+  (`topic-y6-nets.test.ts`). Statutory words of 10+ letters are built from chunks of at most 4 characters
+  (`topic-y6-wordlist.test.ts`).
 - Misconception decoys come first (`mistakes.ts`, `mistakes.test.ts`). At most 30% of cards may have a units or
   leading digit no other option shares, for whole-number answers of 20 or more and every money or decimal answer
   (`helpers/decoy-leak.ts`, #1058, called from each number topic's own test).
