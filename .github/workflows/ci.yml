@@ -134,7 +134,7 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
           EVENT: ${{ github.event_name }}
         run: |
-          GAME_PATHS='^(src/|index\.html$|public/|tests/e2e/|playwright\.config\.|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'
+          GAME_PATHS='^(src/|index\.html$|public/|tests/e2e/|playwright\.config\.|package(-lock)?\.json$|tsconfig[^/]*\.json$|vite\.config\.|\.github/workflows/ci\.yml$)'
           if [ "$EVENT" != 'pull_request' ]; then
             echo "e2e=true" >> "$GITHUB_OUTPUT"
             echo "sketch=false" >> "$GITHUB_OUTPUT"   # the full matrix below already carries the sketchbook project
