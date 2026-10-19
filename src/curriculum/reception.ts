@@ -244,7 +244,7 @@ export const R_LETTERS_ALL = [...new Set([...R_LETTERS_P2, ...singles(PHASE2B)])
  */
 const rLetters = (d: 1 | 2 | 3) => (d === 1 ? R_LETTERS_P2 : R_LETTERS_ALL);
 /** The CVC words spellable with the letters that difficulty has met. Answer and decoys both obey it. */
-const rWords = (d: 1 | 2 | 3) => { const pool = rLetters(d); return CVC.filter(([w]) => [...w].every(c => pool.includes(c))); };
+const spellable = (d: 1 | 2 | 3) => { const pool = rLetters(d); return CVC.filter(([w]) => [...w].every(c => pool.includes(c))); };
 /**
  * #135: a word's middle letter is a genuine medial sound only when it is a vowel — `egg`'s middle is `g`, and
  * the question would show `e_g` against vowel decoys with `g` marked correct.
@@ -263,6 +263,34 @@ export const finalIsGenuine = (w: string) => {
   return !entry || entry[2] !== 'end' || entry[1] === entry[0];
 };
 
+/**
+ * #134: every word pool a Reception generator draws from, built once at module load and named, so a narrower
+ * `PHASE2` is a failing unit test that says which pool shrank (`R_POOL_FLOOR`, `tests/unit/r-word-pools.test.ts`)
+ * rather than a `TypeError` at an unlucky question. 12 is the floor `r-build` d1 already had to clear.
+ */
+export const R_POOL_FLOOR = 12;
+const WORDS: Record<1 | 2 | 3, [string, string][]> = { 1: spellable(1), 2: spellable(2), 3: spellable(3) };
+export const R_WORD_POOLS: Record<string, [string, string][]> = {
+  'rWords(1): r-sounds start sound, r-build, r-read d1': WORDS[1],
+  'rWords(2): r-build, r-read d2': WORDS[2],
+  'rWords(3): r-build, r-read d3': WORDS[3],
+  'rWords(2) with a genuine final sound: r-sounds d2': WORDS[2].filter(([w]) => finalIsGenuine(w)),
+  'rWords(3) with a genuine medial sound: r-sounds d3': WORDS[3].filter(([w]) => medialIsGenuine(w)),
+};
+/** The pools (by name) holding fewer than `floor` words — empty when the data is healthy. */
+export const rPoolShortfalls = (pools: Record<string, readonly unknown[]> = R_WORD_POOLS, floor = R_POOL_FLOOR) =>
+  Object.entries(pools).filter(([, p]) => p.length < floor).map(([name, p]) => `${name} has ${p.length} words, needs ${floor}`);
+const rWords = (d: 1 | 2 | 3) => WORDS[d];
+/**
+ * A word from `pool`, or — if a later edit has emptied it — from the whole difficulty's pool, then from every
+ * CVC word, so the arena never draws `undefined` and freezes. The floor test above is what fails first; this
+ * only keeps a child playing if that test was ignored.
+ */
+const pickWord = (rng: Rng, d: 1 | 2 | 3, pool: [string, string][]): [string, string] =>
+  pick(rng, pool.length ? pool : WORDS[d].length ? WORDS[d] : CVC);
+/** Decoy letters for a word: the phase pool unless it is too thin to leave eight beside the word's own letters. */
+const decoyLetters = (d: 1 | 2 | 3, w: string) => (rLetters(d).filter(l => !w.includes(l)).length >= 8 ? rLetters(d) : LETTERS);
+
 const rSoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE2, PHASE2, 2) : d === 2 ? soundQ(rng, [...PHASE2, ...PHASE2B], [...PHASE2, ...PHASE2B], 3) : soundQ(rng, PHASE3, PHASE3, 3);
 
 // ---------- Reception (writing): letter sounds, capitals, spelling, tracing ----------
@@ -271,9 +299,9 @@ const rSoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE2, PHASE2, 
 const rLetterSound: Generator = (d, rng) => {
   // #135: filtering by role, not deleting from CVC — `egg` keeps its (correct) place at d1, it is only kept
   // out of the d3 draw whose gap it would answer wrong.
-  if (d === 1) { const [w, e] = pick(rng, rWords(d)); return gapQ(rng, w, 0, rLetters(d), e, `${w}. Which sound does ${w} start with?`); }
-  if (d === 2) { const [w, e] = pick(rng, rWords(d).filter(([w]) => finalIsGenuine(w))); return gapQ(rng, w, 2, rLetters(d), e, `${w}. Which sound does ${w} end with?`); }
-  const [w, e] = pick(rng, rWords(d).filter(([w]) => medialIsGenuine(w)));
+  if (d === 1) { const [w, e] = pickWord(rng, d, rWords(d)); return gapQ(rng, w, 0, decoyLetters(d, w), e, `${w}. Which sound does ${w} start with?`); }
+  if (d === 2) { const [w, e] = pickWord(rng, d, rWords(d).filter(([w]) => finalIsGenuine(w))); return gapQ(rng, w, 2, decoyLetters(d, w), e, `${w}. Which sound does ${w} end with?`); }
+  const [w, e] = pickWord(rng, d, rWords(d).filter(([w]) => medialIsGenuine(w)));
   return gapQ(rng, w, 1, VOWELS, e, `${w}. Which sound is in the middle of ${w}?`);
 };
 const rCapitals: Generator = (d, rng) => {
@@ -317,8 +345,8 @@ const rTricky: Generator = (d, rng) => {
   return wordQ(rng, 'Find the word you hear', w, ds, { say: `Find the word: ${w}`, listen: w, peek: true });
 };
 const rBuild: Generator = (d, rng) => {
-  const [w, e] = pick(rng, rWords(d));
-  return spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4, rLetters(d));
+  const [w, e] = pickWord(rng, d, rWords(d));
+  return spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4, decoyLetters(d, w));
 };
 /**
  * #967: the ELG Word Reading goal itself — sound-blend a *written* word — so unlike every other Reception
@@ -329,7 +357,7 @@ const rBuild: Generator = (d, rng) => {
  * same-first-letter sibling to draw that decoy from (`rat`/`sun`/`map`… each the only word for their letter).
  */
 const rRead: Generator = (d, rng) => {
-  const pool = rWords(d);
+  const pool = rWords(d).length >= R_POOL_FLOOR ? rWords(d) : CVC;   // #134: too thin to deal three distinct decoys
   const [w, e] = pick(rng, pool);
   const rest = pool.filter(([ow]) => ow !== w);
   let decoyWords: [string, string][];
