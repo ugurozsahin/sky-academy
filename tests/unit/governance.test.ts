@@ -1898,12 +1898,12 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'add-guard-rail': /^Add a guard rail .*Use when .*needs a check that fails the build/,
     'add-topic': /^Add or change a curriculum topic .*Use when asked to add a maths\/writing topic/,
     'pick-issue': /^Run STEP 3's issue query for the developer routine .*Use when a run starts STEP 3, instead of fetching/,
-    'design-language': /^Sky Ninja Academy's visual tokens and UI constraints\. Use before touching CSS or building a new screen/,
+    'design-language': /^Sharpwise's visual tokens and UI constraints\. Use before touching CSS or building a new screen/,
     'frontend-design': /^Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one/,
     'open-pr': /^Open a pull request .*Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR/,
-    'qa-screenshot': /^Bounded visual QA for a Sky Ninja Academy pull request\. Use when reviewing or verifying a player-visible change/,
+    'qa-screenshot': /^Bounded visual QA for a Sharpwise pull request\. Use when reviewing or verifying a player-visible change/,
     'review-pr': /^Review and QA another agent's pull request .*Use when acting as the reviewer for an open PR .*block it with REVIEW: CHANGES REQUESTED/,
-    'three-art': /^Build a 3-D object for Sky Ninja Academy in the avatars' toon style .*Use when an issue labelled 3d asks for a 3-D object/,
+    'three-art': /^Build a 3-D object for Sharpwise in the avatars' toon style .*Use when an issue labelled 3d asks for a 3-D object/,
     'verification-before-completion': /^Use when about to claim work is complete, fixed, or passing, before committing or creating PRs/,
     'using-git-worktrees': /^Use when starting feature work that needs isolation/,
     'systematic-debugging': /^Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes/,
@@ -2021,7 +2021,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
       expect(NEGATED.test(without), `must fire only because of "${word}": ${without}`).toBe(false);
     }
     for (const inverted of [
-      'Open a pull request in Sky Ninja Academy. Use when you are NOT opening a pull request.',
+      'Open a pull request in Sharpwise. Use when you are NOT opening a pull request.',
       'Use this skill unless a pull request is open.',
       "Use when a review doesn't need a block.",
       'Use when you have finished a piece of work on an issue. — never when the work is finished.',

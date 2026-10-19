@@ -386,7 +386,7 @@ Create a scheduled task with the repo attached, name it **"Sky Ninja Academy —
 day**, and give it this prompt:
 
 ```
-You are the refiner for "Sky Ninja Academy" (repo ugurozsahin/sky-academy). The repo is cloned for you.
+You are the refiner for "Sharpwise" (repo ugurozsahin/sky-academy). The repo is cloned for you.
 
 1. `git pull --ff-only` on main; if it cannot fast-forward, `git fetch origin && git reset --hard origin/main`
    and say so in your report — safe because a run's clone holds no local work at its start (#132).
