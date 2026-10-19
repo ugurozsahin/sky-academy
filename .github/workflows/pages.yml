@@ -43,3 +43,20 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+  check:
+    needs: deploy   # skipped with it while PAGES_ENABLED is unset; nothing needs this job, so a failure turns this run red and blocks no PR (#2029)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - name: The .well-known files answer as the platforms need (#2029)
+        run: |
+          for i in 1 2 3 4; do
+            node scripts/check-well-known.mjs https://sharpwise.co.uk && exit 0
+            sleep 30   # the CDN and a fresh certificate can lag the deploy by a minute
+          done
+          exit 1
+        env:
+          ANDROID_APP_LINKS_SHA256: ${{ vars.ANDROID_APP_LINKS_SHA256 }}
