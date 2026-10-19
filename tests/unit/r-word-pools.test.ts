@@ -33,11 +33,12 @@ describe('Reception word pools (#134)', () => {
     expect(spellQ(rng(1), 'cat', undefined, 2, ['c', 'a', 't', 'x', 'y']).options.length).toBe(5);
   });
 
-  it('cutting PHASE2 to five letters fails the floor by pool name, and no Reception generator draws undefined', async () => {
+  // Five letters is the narrowing the issue names; two empties `rWords(1)` outright, the case the fallback is for.
+  for (const keep of [5, 2]) it(`cutting PHASE2 to ${keep} letters fails the floor by pool name, and no Reception generator draws undefined`, async () => {
     vi.resetModules();
     vi.doMock('../../src/curriculum/util', async orig => {
       const real = await orig<typeof import('../../src/curriculum/util')>();
-      return { ...real, PHASE2: PHASE2.slice(0, 5) };
+      return { ...real, PHASE2: PHASE2.slice(0, keep) };
     });
     const narrow = await import('../../src/curriculum/reception');
     const short = narrow.rPoolShortfalls();
