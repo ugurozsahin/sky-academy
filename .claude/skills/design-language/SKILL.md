@@ -1,6 +1,6 @@
 ---
 name: design-language
-description: Sky Ninja Academy's visual tokens and UI constraints. Use before touching CSS or building a new screen/component, to keep the look consistent without opening every existing file.
+description: Sharpwise's visual tokens and UI constraints. Use before touching CSS or building a new screen/component, to keep the look consistent without opening every existing file.
 ---
 # Design language
 

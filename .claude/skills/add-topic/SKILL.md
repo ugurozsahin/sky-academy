@@ -1,6 +1,6 @@
 ---
 name: add-topic
-description: Add or change a curriculum topic (question generator) in Sky Ninja Academy. Use when asked to add a maths/writing topic, adjust difficulty, ranges, or wording of questions.
+description: Add or change a curriculum topic (question generator) in Sharpwise. Use when asked to add a maths/writing topic, adjust difficulty, ranges, or wording of questions.
 ---
 # Add a topic
 

@@ -1,6 +1,6 @@
 ---
 name: three-art
-description: Build a 3-D object for Sky Ninja Academy in the avatars' toon style — object module, stage contract, look pass, mobile budget, sketchbook variants, screenshots and the gallery the owner approves from. Use when an issue labelled 3d asks for a 3-D object, and only then.
+description: Build a 3-D object for Sharpwise in the avatars' toon style — object module, stage contract, look pass, mobile budget, sketchbook variants, screenshots and the gallery the owner approves from. Use when an issue labelled 3d asks for a 3-D object, and only then.
 ---
 # three-art
 

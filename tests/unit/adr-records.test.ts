@@ -58,6 +58,9 @@ describe('governance.md still carries the criterion for when a decision needs a 
     'write the ADR when the decision binds work beyond the issue that prompted it, or when a real alternative was rejected.**',
     'with the alternatives that were dropped and why',
     'Take the next free number at the moment you write the file, and if an open pull request has already claimed it, renumber yours',
+    'pointed at, in a code span with its full path, by a live instruction file',
+    'that the pointer is one a run would follow stays the reviewer\'s call',
+    'now ADR 004, and the run pulse (#314/PR #315), now ADR 005',
   ])('keeps the clause %#', (clause) => {
     expect(g).toContain(clause);
   });
