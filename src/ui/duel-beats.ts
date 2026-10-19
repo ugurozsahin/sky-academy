@@ -11,13 +11,12 @@ import type { Arena } from '../game/arena';
 import { DUEL_PLAYERS, seededRng, spokenQuestion, type Duel, type DuelEvents, type DuelPlayer, type DuelResult } from '../game/duel';
 import { scaled } from '../game/speed';
 import type { GameEndOutcome } from '../storage';
-import { canHear, haptic, say, sfx } from '../audio';
+import { haptic, say, sfx } from '../audio';
 import { $ } from './dom';
+import { createDuelCard } from './duel-card';
 import { fontReady } from './font';
-import { hintText, promptHTML, promptMode } from './hud';
 import { waveOptsFor } from './play-session';
 import type { ScreenScope } from './screen';
-import { renderVisual } from './visuals';
 
 const PLAYERS = DUEL_PLAYERS;
 /** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
@@ -55,19 +54,13 @@ export interface DuelBeatDeps {
 export function createDuelBeats(d: DuelBeatDeps) {
   const { o, av, NAME, scope, arenas, commitOnce, showResults } = d;
   const { later, toast } = scope;
-  const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
   let waveId = 0; let holdOpen = false;   // holdOpen mirrors the Pause overlay (and the results hold)
-  /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
-  let hintLine = '';
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   let duel!: Duel; let bound = false;   // the `Duel` constructor fires no event; `start()` does, after `bind()`
+  const card = createDuelCard({ speak: $('#speak'), prompt: $('#prompt'), vis: $('#vis'), hintEl: $('#hint') }, () => bound && !duel.ended ? duel.current : null);   // #647/#649: the card, repainted on a voice verdict
   const callbacks: DuelEvents = {
     onQuestion(q, info) {
       $('#round').textContent = `Round ${info.round} of ${info.total}`;
-      // #65 through the play screen's own writers (#16 review): a `listen` question (Sound Hunt is in the pool)
-      // shows its words on a device that cannot be heard, and the hint line carries the data five of the pool's
-      // comparison topics keep nowhere else — without it "Which is fuller?" is two coloured bubbles and a guess.
-      // A duel has no peek timing, so a peek question reads through here rather than hiding its text.
       // A BACKSTOP, not the mechanism: no verdict should still be up by the time its question is replaced. What
       // keeps the drawn round's verdict off the next question is `settleDraw()` in `waveEnd` below, which
       // announces it and advances a hold later. Clearing here was tried as the whole fix and was worse than the
@@ -79,10 +72,7 @@ export function createDuelBeats(d: DuelBeatDeps) {
       // verdict was showing by the time it did — the same silent retraction this backstop exists to prevent,
       // one question later.
       scope.clearToast();
-      const reveal = promptMode(q, canHear()) !== 'hear';
-      speak.hidden = reveal;
-      prompt.innerHTML = promptHTML(q, 0, reveal); $('#vis').innerHTML = renderVisual(q.visual);
-      hintLine = hintText(q, { reveal }); hintEl.textContent = hintLine;
+      card.paint(q);
       const myWave = ++waveId; waveDone.a = waveDone.b = false;
       const speed = o.year.speeds[0] ?? 2;
       const opts = waveOptsFor(q, { labels: q.options, speed });
@@ -179,7 +169,9 @@ export function createDuelBeats(d: DuelBeatDeps) {
     callbacks,
     /** Hand over the `Duel` built from `callbacks`. */
     bind(built: Duel) { if (bound) throw new Error('createDuelBeats: bind() called twice'); bound = true; duel = built; },
-    waveEnd, hold,
-    get hintLine() { return hintLine; },
+    waveEnd, hold, stop: card.stop,
+    /** 🔊 and the card tap: the question again, with round 1's hand-over line (#650), as `onQuestion` spoke it. */
+    repeat() { const q = duel.current; if (q) say(spokenQuestion(q, duel.round), true); },
+    get hintLine() { return card.hintLine; },
   };
 }
