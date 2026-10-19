@@ -289,6 +289,7 @@ Writing:
 - y4-determiners — determiner, pronoun and possessive pronoun (English Appendix 2, Year 4 terminology): d1 slices the determiner among a noun, a verb and an adjective, d2 the possessive pronoun (a determiner is always a decoy), d3 names the class of their, my, your or our (determiner) against theirs, mine, yours or ours (pronoun) from twin sentences; "possessive pronoun" appears only on the card; his and her stay out
 - y4-plural-poss — plural or possessive -s (English Appendix 2, Year 4): a card says whose things they are ("the bikes of one boy") and the child slices girl's, girls' or children's; every ASCII apostrophe, no plural equal to its singular; d1 regular owners, d2 adds irregular plurals (children's, men's, mice's), d3 adds the plain-plural sentence form where a verb follows the gap
 - y4-context — what a word with two or three meanings means in one sentence (NC Y3–4 comprehension, words in context); d1–d2 two-sense words, d3 three-sense words
+- y4-retrieve — Retrieving Information (#1130): ten short non-fiction passages on the story card (solo, mission only); every question literal, its answer stated word for word; d1 what / who, d2 where / which / how many, d3 the question in other words; no prediction or opinion questions
 
 ## Year 5 — 7 q/stage, 3 lives
 The third KS2 shell (#1177): hidden behind `meetsShowGate` like Years 3 and 4, no island art yet. Built the same way — one module per strand (`src/curriculum/year5-*.ts`), a `// slot: <id>` comment per planned topic. Answers run 0–1,000,000 and may go down to −100.

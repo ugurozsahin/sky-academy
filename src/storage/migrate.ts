@@ -1,5 +1,5 @@
 // Bringing a stored blob up to the current shape: the migration ladder, the version rules and the front-door sanitiser.
-import type { DojoState } from '../game/dojo';
+import { freshDojo, type DojoState } from '../game/dojo';
 import { sanitizeV5Fields, toV5, toV6 } from '../save-records';
 import { isCert, isDuel } from './album-checks';
 import { cleanName } from './name';
@@ -101,12 +101,35 @@ export const isFutureSave = (s: RawSave): boolean => {
   const v = saveVersionOf(s);
   return v !== UNREADABLE_VERSION && v > SAVE_VERSION;
 };
-const isRecord = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x);
+const isRecord = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+/**
+ * How `sanitizeTypes()` treats each top-level key (#177). One entry per `SaveData` field, and `satisfies
+ * Record<keyof SaveData, Kind>` makes the table total in both directions: a field added to `SaveData` with no
+ * entry here, or an entry for a field that is gone, fails `npx tsc --noEmit`. The check functions below walk
+ * this table, so they cannot disagree with it. `v` is read by `saveVersionOf()`, not sanitised here.
+ */
+type Kind = 'version' | 'string' | 'boolean' | 'record' | 'array' | 'certs' | 'coins' | 'spent' | 'avatar' | 'voice' | 'dojo' | 'v5';
+export const FIELD_KINDS = {
+  v: 'version', name: 'string', avatar: 'avatar', year: 'string', sound: 'boolean', speech: 'boolean', voice: 'voice',
+  progress: 'record', endless: 'record', sprint: 'record', boss: 'record', memory: 'record', training: 'record',
+  coins: 'coins', stickers: 'array', streak: 'record', tutorialSeen: 'boolean', dojo: 'dojo', spent: 'spent',
+  owned: 'array', equipped: 'record', certs: 'certs', onboarded: 'boolean', duels: 'array',
+  slips: 'v5', log: 'v5', settings: 'v5', ks2: 'v5',
+} as const satisfies Record<keyof SaveData, Kind>;
+const keysOf = (kind: Kind) => (Object.keys(FIELD_KINDS) as (keyof SaveData)[]).filter(k => FIELD_KINDS[k] === kind);
 function dropNonRecords(clean: RawSave): void {
-  for (const k of ['progress', 'endless', 'sprint', 'boss', 'memory', 'training', 'equipped', 'streak', 'dojo'] as const) {
-    if (k in clean && !isRecord(clean[k])) delete clean[k];
-  }
+  for (const k of keysOf('record')) if (k in clean && !isRecord(clean[k])) delete clean[k];
 }
+/** Every `DojoState` field: what a valid value is. Keyed so a field added to `DojoState` must be added here (#413). */
+const finiteCount = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const DOJO_FIELDS = {
+  date: (v: unknown) => typeof v === 'string',
+  progress: isRecord,
+  done: Array.isArray,
+  setDone: (v: unknown) => typeof v === 'boolean',
+  streak: (v: unknown) => isRecord(v) && typeof v.last === 'string' && finiteCount(v.days),
+  total: finiteCount,
+} satisfies Record<keyof DojoState, (v: unknown) => boolean>;
 function dropBadDojo(clean: RawSave): void {
   // #363: `dojo` is the one key whose *interior* is read without a guard, and the guard above stops at the
   // record boundary. `dojoFor()` only rebuilds a state whose `date` is stale, so a record carrying TODAY's
@@ -120,14 +143,20 @@ function dropBadDojo(clean: RawSave): void {
   // written. Reachable without devtools: `importSave()` accepts any version-valid JSON, so a `dojo` of
   // `{ date: <today> }` pasted into the Restore box is enough.
   //
-  // Deleting the key here puts it back through `DEFAULT`, the same route a missing key already takes, and
-  // covers `dojoCard()`, every `applyEvent()` reader — `recordGameEnd()` on all three results screens since
+  // Repairing the record here (field by field, #413) covers `dojoCard()`, every `applyEvent()` reader — `recordGameEnd()` on all three results screens since
   // #365, `recordDojo()` wherever it is next used — and every future one, which is what this
   // function's docstring above promises and what a `try/catch` per reader would not.
+  //
+  // #413: the first cut deleted the whole record, which also threw away `streak` and `total` — the only two
+  // fields that outlive a day. Now only the field that is wrong is replaced by its fresh value, so a save whose
+  // `date` alone is malformed rolls over through `dojoFor()` with its streak and total intact. A `dojo` that is
+  // not a record at all is still dropped just above and comes back whole from `DEFAULT`.
+  if ('dojo' in clean && !isRecord(clean.dojo)) delete clean.dojo;
   if (isRecord(clean.dojo)) {
-    const dj = clean.dojo as Partial<DojoState>;
-    const streakOk = isRecord(dj.streak) && typeof dj.streak!.last === 'string' && typeof dj.streak!.days === 'number';
-    if (typeof dj.date !== 'string' || !isRecord(dj.progress) || !Array.isArray(dj.done) || !streakOk || typeof dj.total !== 'number') delete clean.dojo;
+    const fresh = freshDojo('');
+    const dj: Record<string, unknown> = { ...clean.dojo };    // unknown extra keys ride along untouched
+    for (const k of Object.keys(DOJO_FIELDS) as (keyof DojoState)[]) if (!DOJO_FIELDS[k](dj[k])) dj[k] = fresh[k];
+    clean.dojo = dj;
   }
 }
 function dropNonArrays(clean: RawSave): void {
@@ -135,11 +164,11 @@ function dropNonArrays(clean: RawSave): void {
   // own `Array.isArray` guard at its reader (`certificates()`, `duelHistory()`), which is why a wrong-typed
   // value here was never reachable — but every *other* array field is sanitized at this one front door
   // instead of trusting its own reader, and a non-array here reached `{...DEFAULT, ...s}` unfiltered until now.
-  for (const k of ['stickers', 'owned', 'certs', 'duels'] as const) {
-    if (k in clean && !Array.isArray(clean[k])) delete clean[k];
-  }
+  for (const k of [...keysOf('array'), ...keysOf('certs')]) if (k in clean && !Array.isArray(clean[k])) delete clean[k];
+  // #177: a current-version save skips the v1 step that filters `certs`, so entries that are not album rows
+  // would otherwise be kept (and written back). Valid rows are kept exactly as they are.
+  if (Array.isArray(clean.certs)) clean.certs = clean.certs.filter(isCert);
 }
-  // #795: dropping a corrupted `spent` to 0 the way every other field falls back to DEFAULT would silently inflate the shop balance (`coins − spent`) — clamp it to (already-sanitized) `coins` instead, the worst-case assumption, and warn on both rejections so a corruption event leaves a trace.
 function sanitizeCoins(clean: RawSave): void {
   if ('coins' in clean && (typeof clean.coins !== 'number' || !Number.isFinite(clean.coins) || clean.coins < 0)) { console.warn(`sanitizeTypes: invalid coins (${JSON.stringify(clean.coins)}) — reset`); delete clean.coins; }
 }
@@ -152,7 +181,7 @@ function sanitizePrimitives(clean: RawSave): void {
   // (`dom.ts`) and `hasName(d.name)` (`.trim()`) both throw on a non-string, and `migrate({ v: 1, name: 123
   // })` used to hand that straight through: no branch here checked it, so a wrong-typed `name` is exactly as
   // reachable as the `progress`/`streak`/`dojo` cases above, on a screen every first-run wizard can reach.
-  for (const k of ['name', 'year'] as const) {
+  for (const k of keysOf('string')) {
     if (k in clean && typeof clean[k] !== 'string') delete clean[k];
   }
   // #424: a Restore code is a name a person freely typed, exactly like the wizard's field below, and the
@@ -162,7 +191,7 @@ function sanitizePrimitives(clean: RawSave): void {
   if (typeof clean.name === 'string') clean.name = cleanName(clean.name);
   if ('avatar' in clean && clean.avatar !== null && typeof clean.avatar !== 'string') delete clean.avatar;
   if ('voice' in clean && clean.voice !== 'unknown' && clean.voice !== 'yes' && clean.voice !== 'no') delete clean.voice;
-  for (const k of ['sound', 'speech', 'tutorialSeen', 'onboarded'] as const) {
+  for (const k of keysOf('boolean')) {
     if (k in clean && typeof clean[k] !== 'boolean') delete clean[k];
   }
 }
