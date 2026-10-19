@@ -1,6 +1,6 @@
 ---
 name: add-guard-rail
-description: Add a guard rail to Sky Ninja Academy. Use when a bug fix, a review finding or a refactor needs a check that fails the build if the mistake comes back.
+description: Add a guard rail to Sharpwise. Use when a bug fix, a review finding or a refactor needs a check that fails the build if the mistake comes back.
 ---
 # Add a guard rail
 
