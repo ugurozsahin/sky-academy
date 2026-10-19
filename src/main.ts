@@ -23,7 +23,8 @@ import { backGuard } from './ui/screen';
 import { topicById, topicsFor, YEARS, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
 import { needsSchoolYear, placementYear } from './school-year';
-import { queueLink, stripLinkParams, takeLink, wireDeepLinks } from './deeplink-open';
+import { handleDeepLink, queueLink, stripLinkParams, takeLink, wireDeepLinks } from './deeplink-open';
+import { wireNativeLinks } from './deeplink-native';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
 // Each screen below the map pushes a history entry, so the browser's back button steps back one screen —
@@ -237,6 +238,7 @@ const params = new URLSearchParams(location.search);
 if (params.get('reset')) { try { localStorage.clear(); } catch { /* ignore */ } }
 queueLink(location.href); stripLinkParams();   // #2027: the link waits for a profile; the address bar drops it so reload and back never replay it
 wireDeepLinks(relaunch, () => !load().onboarded ? 'keep' : backGuard() || !LINK_REACHABLE.has(history.state?.screen) ? 'drop' : 'go');   // #2041: never tear a live mission down, never strand a link behind two Backs
+wireNativeLinks({ open: handleDeepLink });   // #2028: Android App Links, native shell only
 
 document.addEventListener('visibilitychange', () => restClock.show(document.visibilityState === 'visible'));   // #940: hidden time never counts toward the rest prompt
 applyCalm();   // #906: the grown-ups' Calm motion switch, as a class on <html> before the first screen

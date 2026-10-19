@@ -26,6 +26,8 @@ The manifest (`start_url`, `scope`, `id` are `./`), the worker registration and 
 7. **Check**: `https://sharpwise.co.uk/play/` loads, works offline after one visit, and installs as an app;
    `curl -sI http://sharpwise.uk` shows `301`.
 
+8. **Android App Links (#2028, optional until the app is published).** Repo Settings, Secrets and variables, Actions, Variables: add `ANDROID_APP_LINKS_SHA256` = the SHA-256 certificate fingerprint of the key that signs the installed app. With Play App Signing that is **Google's app signing key**: Play Console, Setup, App signing, "App signing key certificate", SHA-256 (the upload key's is not enough). Several fingerprints may be separated by commas. The next deploy then publishes `/.well-known/assetlinks.json`; until then no file is published and links open in the browser, so the web game still works. Testing: `docs/ANDROID.md`.
+
 ## Notes
 
 - The service worker's cache name is derived from the build's contents, so each deployment replaces the previous cache.
