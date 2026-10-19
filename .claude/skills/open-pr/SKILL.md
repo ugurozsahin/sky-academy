@@ -133,6 +133,12 @@ against what you meant: on a `Closes #<n>` pull request it is a failure. Nothing
 you actually post either, so check the file you are about to paste from, and re-check if you edit the body
 afterwards.
 
+An empty or whitespace-only file does not print `closes: nothing`: it exits non-zero with `EMPTY BODY` (#138).
+
+**After opening, check what was actually posted** (#138), however the pull request was opened:
+`gh pr view <n> --json body -q .body > posted.md && node scripts/review-gate.mjs posted.md`, and say in the pull request
+which check you ran. An empty `posted.md` fails the same way.
+
 **Paste that output into the pull request.** If the list is not exactly the issues you intend to close, fix
 the body — not the list.
 

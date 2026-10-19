@@ -175,6 +175,10 @@ export function closingRefs(body) {
 // Real paths, not resolve(): a symlinked checkout (macOS /var -> /private/var) never matched, so the CLI silently did nothing (#309).
 const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
 if (isMain()) {
-  const refs = closingRefs(readFileSync(process.argv[2], 'utf8'));
+  const text = readFileSync(process.argv[2], 'utf8');
+  // #138: an empty body is not a body that closes nothing on purpose. It is what a stale, mistyped or never-posted
+  // file looks like, so it fails with its own message instead of the `closes: nothing` a correct body can print.
+  if (!text.trim()) { console.error(`EMPTY BODY: ${process.argv[2]} has no text, so there is nothing to check. This is not "closes: nothing".`); process.exit(2); }
+  const refs = closingRefs(text);
   console.log(refs.length ? `closes: ${refs.map((n) => '#' + n).join(', ')}` : 'closes: nothing');
 }
