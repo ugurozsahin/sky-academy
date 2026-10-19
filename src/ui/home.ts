@@ -172,7 +172,7 @@ export function mapScreen(nav: Nav) {
       ${islandsHTML(shown, y => ({ s: totalStars(y), m: maxStars(y) }), nudge?.id ?? d.year, layout.compact, d.ks2.schoolYear)}
     </div>
     ${dojoCard(dojoState, dojoChallenges)}
-    <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS${shown.some(y => isKs2(y.id)) ? ', KS1 & KS2' : ' & KS1'} National Curriculum</span>
+    <footer class="foot"><span>Sharpwise · aligned to EYFS${shown.some(y => isKs2(y.id)) ? ', KS1 & KS2' : ' & KS1'} National Curriculum</span>
       <div class="foot-links">
         <button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button>
         <button class="foot-link" id="who" aria-label="Who is playing?">👥 Who is playing?</button>

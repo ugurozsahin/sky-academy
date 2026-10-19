@@ -1,4 +1,4 @@
-# Sky Ninja Academy
+# Sharpwise
 
 A slice-the-answer maths and writing game for **Reception, Year 1 and Year 2** — England's EYFS and Key
 Stage 1 National Curriculum. Questions rise as bubbles; the player swipes through the right one. Mobile-first
@@ -65,7 +65,7 @@ the setup and the signing story.
 
 **The artwork and the game's written content are not.** The twelve character illustrations under
 `public/avatars/` and the icons under `public/icons/` are **not licensed**: all rights in them are reserved,
-along with the name "Sky Ninja Academy", the game's visual identity and its written text. The split is
+along with the name "Sharpwise", the game's visual identity and its written text. The split is
 deliberate and it is the usual one for a game: the engine is worth sharing, the characters are not mine to
 give away twice. `LICENSE` states exactly what falls each side of the line.
 

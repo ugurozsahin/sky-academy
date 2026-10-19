@@ -259,6 +259,7 @@ function coinShape(p: number, r: number): string {
   const pts = Array.from({ length: 7 }, (_, i) => { const a = i / 7 * Math.PI * 2 - Math.PI / 2; return `${(32 + r * Math.cos(a)).toFixed(1)},${(32 + r * Math.sin(a)).toFixed(1)}`; });
   return `<polygon points="${pts.join(' ')}"/>`;
 }
+/** One coin or note by its denomination, never an amount: a mixed `coinLabel` (`£1 and 50p`) is too long for this face (#653). */
 export function coinSVG(p: number): string {
   if (isNote(p)) return noteSVG(p);
   const gold = coinColours(p), label = coinLabel(p), r = COIN_RADIUS[p] ?? 28;

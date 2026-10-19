@@ -239,6 +239,14 @@ const moneyRule: Rule = rest => {
   const m = rest.match(/^£(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?(?![\d]|\.\d)/);
   return m && hit('money', m, moneyWords(Number(m[1].replace(/,/g, '')), m[2]));
 };
+// Readings no rule can make right, so they stay raw and `sayIsSafe` fails them (#1992): a pound sign with a
+// unit letter ("£1m"), a class name ("Class 4M": the M is no metre) and a ranged quantity ("15-20 kg", which
+// the hyphen rule would speak as a subtraction).
+const ambiguousRule: Rule = (rest, before) => {
+  const m = rest.match(/^£\d+(?:\.\d+)?[a-zA-Z]+\b/) ?? (/\bClass $/i.test(before) ? rest.match(/^\d+[A-Z]\b/) : null)
+    ?? rest.match(/^\d+(?:\.\d+)?\s?[-–]\s?\d+(?:\.\d+)?(?: ?(?:kg|g|km|m|cm|mm|l|ml|ft|in|lb|oz|mph)\b)/);
+  return m && hit('malformed', m, m[0]);
+};
 // Shapes that look like notation but are not any: "1.5.2", "3/4.5", "£3.505" (more than two decimal places is
 // no price). Left raw, so `sayIsSafe` fails them.
 const malformedRule: Rule = rest => {
@@ -282,7 +290,7 @@ const powerRule: Rule = rest => { const m = rest.match(/^(\d+)([²³])/); return
 // Order matters: the first rule that matches claims the span. `malformedRule` goes before `decimalRule`, which would
 // otherwise take the "1.5" of "1.5.2" and leave ".2" behind; the dimension and compound idioms go first because a
 // digit and a hyphen are all they need. The tokenize tests pin the pairs that depend on it.
-const RULES: readonly Rule[] = [dimensionRule, compoundRule, moneyRule, malformedRule, mixedRule, fractionRule, timeRule,
+const RULES: readonly Rule[] = [dimensionRule, compoundRule, ambiguousRule, moneyRule, malformedRule, mixedRule, fractionRule, timeRule,
   decimalRule, speedRule, asciiPowerRule, powerRule];
 
 /** One left-to-right scan claiming the longest notation match at each position; everything else is a
