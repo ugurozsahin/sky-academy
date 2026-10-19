@@ -49,6 +49,22 @@ describe('watchBox — re-measure when the element\'s own box changes (#678)', (
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('two duel halves a sub-pixel apart (194.390625 vs 194.375) are not re-measured, so they keep identical waves (#389/#400)', () => {
+    const calls: string[] = [];
+    for (const h of [194.375, 194.390625]) {
+      const half = { getBoundingClientRect: () => ({ width: 390, height: 194.375 }) } as unknown as HTMLElement;
+      watchBox(half, () => calls.push('measured'));
+      FakeRO.all[FakeRO.all.length - 1].fire();
+      (half as unknown as { getBoundingClientRect: () => object }).getBoundingClientRect = () => ({ width: 390, height: h });
+      FakeRO.all[FakeRO.all.length - 1].fire();
+    }
+    flush();
+    expect(calls).toEqual([]);                                          // neither half re-derived g from its own sub-pixel H
+    box.h = 50.015; const onChange = vi.fn(); watchBox(el, onChange); box.h = 51.5;
+    FakeRO.all[FakeRO.all.length - 1].fire(); flush();
+    expect(onChange).toHaveBeenCalledTimes(1);                          // a real change (>= 1px) still does
+  });
+
   it('settles after the callback itself moves the box: one extra pass at most, then silence', () => {
     let calls = 0;
     watchBox(el, () => { calls++; });
@@ -94,5 +110,12 @@ describe('Arena and Tracer take the same trigger and release it on teardown (#67
     expect(t).toMatch(/this\.unwatch = watchBox\(canvas, this\.resize\)/);
     expect(t).toMatch(/destroy\(\) \{[\s\S]*?this\.unwatch\(\)/);
     expect(t).not.toMatch(/addEventListener\('resize'/);                // the one trigger is watchBox, not a second window listener
+  });
+});
+
+describe('Arena measures whole CSS pixels, so two duel halves a sub-pixel apart derive the same wave (#389/#400)', () => {
+  it('rounds the measured width and height before g and vy are derived from them', () => {
+    const t = readFileSync(new URL('../../src/game/arena.ts', import.meta.url), 'utf8');
+    expect(t).toMatch(/this\.W = Math\.max\(1, Math\.round\(rect\.width\)\); this\.H = Math\.max\(1, Math\.round\(rect\.height\)\)/);
   });
 });
