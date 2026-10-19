@@ -149,7 +149,7 @@ npx playwright test --project=desktop        # when the change could behave diff
 
 A pull request's CI runs e2e as the **mobile `@smoke` subset only** (#751, #854: eight tests, about half a minute) and
 **only when the diff can reach the game** (#176) — `src/`, `index.html`, `public/`, `tests/e2e/`,
-`playwright.config.*`, `package*.json`, `ci.yml`. Unit tests and the build always run. The full mobile project
+`playwright.config.*`, `package*.json`, `tsconfig*.json`, `vite.config.*`, `ci.yml`. Unit tests and the build always run. The full mobile project
 runs on `main` every night, and the reviewer runs it once more before a merge (`review-pr` §2).
 
 **Run the full mobile project yourself when any of these holds**, because the condition is the point, not the
@@ -261,8 +261,7 @@ undraft starts.
 
 Then stop. **Do not review or merge your own pull request.** The API cannot tell you whose it is — one token
 serves every agent and the owner, so every pull request here looks self-authored; you know it is yours because
-you opened it this run, and that is the only evidence there is. Tick "Develop" on the issue and leave the rest
-to a different agent.
+you opened it this run, and that is the only evidence there is. Leave the rest to a different agent.
 
 If a reviewer later asks for changes, push the fix and say what changed — in a comment shaped like the
 review it answers (#200): open `Pushed <sha>, addressing <what>`, resolve each blocking finding by the
