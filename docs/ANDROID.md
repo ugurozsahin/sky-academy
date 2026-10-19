@@ -8,11 +8,27 @@ The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in
    for an artifact nobody downloaded. A `v*` tag builds one too, and attaches it to the release.)
 2. Download the **sky-ninja-academy-apk** artifact (a zip), unzip → `sky-ninja-academy-<commit>.apk`.
 3. On the tablet: allow "install unknown apps" for your browser/file manager once, open the APK, install.
-   **Updating:** each CI run signs the debug APK with a fresh key, so Android refuses to install a newer build over the old one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) — you must uninstall first, **which deletes the saved progress on that tablet**. To keep one key across builds, create a debug keystore once (`keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -validity 10000 -dname CN=Android` ), then add the repo secret `ANDROID_DEBUG_KEYSTORE` = `base64 -i debug.keystore`; the workflow picks it up automatically. A proper release keystore is a follow-up.
+   **Updating:** each CI run signs the debug APK with a fresh key, so Android refuses to install a newer build over the old one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) — you must uninstall first, **which deletes the saved progress on that tablet**. To keep one key across builds, create a debug keystore once (`keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -validity 10000 -dname CN=Android` ), then add the repo secret `ANDROID_DEBUG_KEYSTORE` = `base64 -i debug.keystore`; the workflow picks it up automatically. The Play release key is separate: see "Release build" below.
 4. Tagging a commit `vX.Y.Z` also attaches the APK to a GitHub Release.
 
 ## The app id changed (old Sky Ninja id → `uk.co.sharpwise`, #1930)
 Android treats a different application id as a different app. A build with the new id installs **beside** any build with the old id and starts with no saved progress; it does not update it. Nothing has been published to a store (the APK is debug-signed), so the only installs affected are test tablets. To carry progress across: in the **old** app open the parents' area → **Move to another device** → copy the save code; in the **new** app paste it into **Restore**. Then uninstall the old app. The id is fixed from the first store upload, so this is the cheap moment to change it. **Unverified:** no device install and no old-to-new save-code round trip has been done yet; that is a step for someone with a tablet, and the Android APK workflow only proves the build.
+
+## Release build (signed bundle for Google Play, #1939)
+Play takes an Android App Bundle (`.aab`), not an APK ([docs](https://developer.android.com/guide/app-bundle)). The `release` job in **Android APK** builds one with `./gradlew bundleRelease`, signed with an **upload key** that lives only in repository secrets. It runs on a `v*` tag or **Run workflow**, never on a PR, and it is **skipped (not failed)** until you opt in, so `main` stays green. It validates the bundle with `bundletool validate` and uploads it as the artifact **sharpwise-aab**. `versionCode` is the workflow run number (it only rises); `versionName` is the tag without its `v`. Uploading to Play stays manual.
+
+**One-time steps (the owner):**
+1. Create the upload key on your own machine (keep the passwords somewhere safe; you will paste them in step 4):
+   `keytool -genkeypair -v -keystore sharpwise-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`
+2. **Back it up now**: the `.jks` file and its passwords, in a password manager and one offline copy. **Never commit it, paste it into an issue, or put it in the repo.** If you lose it, Play can reset the upload key (that is the point of step 3), but only through a support request.
+3. In Play Console enrol the app in **Play App Signing** (the default for new apps): Google then holds the app-signing key, and you hold only the upload key ([docs](https://support.google.com/googleplay/android-developer/answer/9842756)).
+4. Repository **Secrets** (Settings, Secrets and variables, Actions): `ANDROID_UPLOAD_KEYSTORE` = `base64 -i sharpwise-upload.jks`, `ANDROID_UPLOAD_KEYSTORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS` (`upload` above) and `ANDROID_UPLOAD_KEY_PASSWORD`.
+5. Repository **Variable**: `ANDROID_RELEASE_ENABLED` = `true` (a job-level condition cannot read secrets, so a variable is the switch). With it set and a secret missing, the job fails with a message naming it.
+6. Tag `vX.Y.Z` (or Run workflow), download **sharpwise-aab**, and upload it to the internal test track.
+
+**App Links:** the SHA-256 that matters for `assetlinks.json` is **Google's app-signing key** (Play Console, Test and release, App signing), not the upload key and not the debug key (issue #2028).
+
+The workflow decodes the keystore to a temp file, passes its path and the passwords to Gradle through environment variables (`android/app/build.gradle`, `signingConfigs.release`), and deletes the file afterwards. With none of those set, `./gradlew assembleDebug` below works as before and `bundleRelease` gives an unsigned bundle.
 
 ## Build locally (optional)
 Android Studio (or the SDK command-line tools) + JDK 21:
