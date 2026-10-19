@@ -209,7 +209,7 @@ describe('guard rails', () => {
   // `throwFor(b)` before throwing; play.ts answers false for the TNT so it pops under the finger. The e2e
   // proves the behaviour; this rail catches the wiring being dropped in a refactor, where e2e cannot run.
   it('a tapped TNT is never thrown at (#48)', () => {
-    const play = code(SOURCES['/src/ui/play.ts']);
+    const play = code(SOURCES['/src/ui/play-arena.ts']);   // #2081: the Arena mount lives in play-arena.ts
     expect(play).toMatch(/throwFor:\s*b\s*=>\s*b\.label\s*!==\s*BOMB/);
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
@@ -223,7 +223,7 @@ describe('guard rails', () => {
   // own wiring so a future edit that drops or mistypes it (leaving `throwFor` correct but `isHazard` stale)
   // fails a rail here, not just silently un-tests a live bug's fix.
   it('a TNT is wired as a hazard everywhere it is wired as unthrowable (#742)', () => {
-    const play = code(SOURCES['/src/ui/play.ts']);
+    const play = code(SOURCES['/src/ui/play-arena.ts']);   // #2081
     expect(play).toMatch(/isHazard:\s*label\s*=>\s*label\s*===\s*BOMB/);
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('!this.isHazard?.(b.label)) this.gentleDecoys.push(b)');
