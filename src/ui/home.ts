@@ -411,7 +411,7 @@ export function rewardsScreen(nav: Nav) {
     <div class="album">${cards}</div>
     <div class="rewards-cols">
       <div class="rewards-col">
-        <div class="isl-head"><span class="icon-btn" aria-hidden="true">🎓</span><div><b>My certificates</b><small>${certs.length ? `${certs.length} earned` : 'Win a mission to earn one'}</small></div></div>
+        <div class="isl-head"><span class="icon-btn" aria-hidden="true">🎓</span><div><b>My certificates</b><small>${certs.length ? `${certs.length} earned` : 'Win a mission or a duel to earn one'}</small></div></div>
         ${certAlbumHTML(certs)}
       </div>
       <div class="rewards-col">
