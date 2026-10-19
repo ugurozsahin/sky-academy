@@ -139,10 +139,16 @@ async function attempt(cache) {
 }
 
 async function mayRebuild(cache) {
-  if (Date.now() - gaveUpAt < RETRY_AFTER) return false;
+  if (backingOff(gaveUpAt)) return false;
   const mark = await cache.match(GAVE_UP).catch(() => undefined);
   const at = mark ? Number(await mark.clone().text().catch(() => 0)) : 0;
-  return !(at && Date.now() - at < RETRY_AFTER);
+  return !backingOff(at);
+}
+
+/** A timestamp from the future (a clock that was ahead and has been corrected) is expired, not a ban for years. */
+function backingOff(at) {
+  const age = Date.now() - at;
+  return at > 0 && age >= 0 && age < RETRY_AFTER;
 }
 
 async function giveUp(cache) {

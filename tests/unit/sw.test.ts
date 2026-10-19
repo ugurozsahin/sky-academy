@@ -335,6 +335,18 @@ describe('a rebuild that keeps failing stops re-downloading the game (#635)', ()
     expect((await cost(w)).hits, 'and the next launch does not download the game again').toBe(1);
   });
 
+  it('a clock that was ahead and is corrected does not switch the rebuild off', async () => {
+    const caches = new Map<string, FakeCache>();
+    const clock = { t: 1.7e12 };
+    const w = drive(BUILD2(), { caches, clock });
+    w.server.full = true;
+    await NAV(w);
+    clock.t -= 24 * 3600e3;   // the marker is now a day in the future
+    const later = drive(BUILD2(), { caches, clock });
+    expect((await cost(later)).hits, 'shell + whole precache').toBe(1 + 4);
+    expect(cached(later)).toEqual(WHOLE);
+  });
+
   it('a new deployment is not held back by the old one’s give-up', async () => {
     const caches = new Map<string, FakeCache>();
     const old = drive(BUILD2(), { caches });
