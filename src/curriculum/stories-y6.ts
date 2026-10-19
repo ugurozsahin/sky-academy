@@ -41,27 +41,27 @@ const it = (d: 1 | 2 | 3, story: string, question: string, answer: string, decoy
 
 export const Y6_INFERENCE: StoryItem[] = [
   it(1, STAGE, 'How did she feel before she sang?', 'nervous', ['proud', 'tired'], 'hands shook'),
-  it(3, STAGE, 'Which word shows she was nervous?', 'shook', ['stage', 'crowd'], 'hands shook'),
+  it(3, STAGE, 'Which word shows she was nervous?', 'shook', ['stage', 'sing'], 'hands shook'),
   it(1, SOFA, 'How did Leo feel?', 'tired', ['excited', 'angry'], 'yawned again and his head drooped'),
   it(3, SOFA, 'Which word shows Leo was tired?', 'yawned', ['film', 'started'], 'Leo yawned again'),
   it(1, RACE, 'How did Ana feel?', 'proud', ['sad', 'scared'], 'beamed at her mum'),
   it(3, RACE, 'Which word shows Ana was proud?', 'beamed', ['line', 'mum'], 'beamed at her mum'),
   it(2, COLD, 'Why did Ben hurry indoors?', 'the cold', ['hunger', 'a surprise'], 'Ben shivered and pulled his scarf up to his nose'),
-  it(3, COLD, 'Which word shows Ben was cold?', 'shivered', ['grass', 'indoors'], 'Ben shivered'),
+  it(3, COLD, 'Which word shows Ben was cold?', 'shivered', ['hurried', 'indoors'], 'Ben shivered'),
   it(2, GIFT, 'Why did Priya keep the box behind her back?', 'a surprise', ['the cold', 'hunger'], 'wrapped the box in paper and tied a ribbon'),
   it(1, DOG, 'How did Sam feel?', 'sad', ['excited', 'proud'], 'Sam sobbed into his sleeve'),
   it(2, DOG, 'Why was Sam upset?', 'a lost pet', ['the cold', 'hunger'], 'His dog had not come home'),
-  it(3, DOG, 'Which word shows Sam was sad?', 'sobbed', ['sleeve', 'floor'], 'Sam sobbed'),
+  it(3, DOG, 'Which word shows Sam was sad?', 'sobbed', ['sleeve', 'home'], 'Sam sobbed'),
   it(1, DOOR, 'How did Jo feel?', 'angry', ['relieved', 'lonely'], 'stormed into her room and slammed the door'),
   it(2, DOOR, 'Why was Jo upset?', 'broken model', ['hunger', 'the cold'], 'had broken her model'),
-  it(3, DOOR, 'Which word shows Jo was angry?', 'slammed', ['room', 'fists'], 'slammed the door'),
+  it(3, DOOR, 'Which word shows Jo was angry?', 'slammed', ['room', 'brother'], 'slammed the door'),
   it(1, BAGS, 'How did Mr Ray feel once the bags were carried?', 'relieved', ['angry', 'scared'], 'He sighed and thanked her'),
   it(2, BAGS, 'Why did Kim carry the bags?', 'to help', ['to hide', 'hunger'], 'Kim offered to help and carried them'),
   it(1, NIGHT, 'How did Tom feel?', 'scared', ['proud', 'jealous'], 'Tom froze at the window'),
   it(2, NIGHT, 'Why did Tom hide under the blanket?', 'fear', ['a surprise', 'hunger'], 'froze at the window as thunder cracked'),
-  it(3, NIGHT, 'Which word shows Tom was scared?', 'froze', ['window', 'teddy'], 'Tom froze'),
+  it(3, NIGHT, 'Which word shows Tom was scared?', 'froze', ['window', 'Tom'], 'Tom froze'),
   it(1, DRESS, 'How did Eva feel about the dress?', 'jealous', ['nervous', 'tired'], 'She envied her and wished she had one too'),
-  it(3, DRESS, 'Which word shows Eva was jealous?', 'envied', ['twirl', 'shoes'], 'She envied her'),
+  it(3, DRESS, 'Which word shows Eva was jealous?', 'envied', ['twirl', 'party'], 'She envied her'),
 ];
 
 /** Labels that fit an item by common sense with no clue word in the text: never a decoy of that item. Keyed by question. */

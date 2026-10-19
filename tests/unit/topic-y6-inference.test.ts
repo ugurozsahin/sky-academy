@@ -3,11 +3,12 @@ import { TOPICS } from '../../src/curriculum';
 import { AVOID } from '../../src/curriculum/util';
 import { storyBankProblems } from '../../src/curriculum/story-bank';
 import { INFER_CLUES, NOT_DECOYS, Y6_INFERENCE } from '../../src/curriculum/stories-y6';
+import { TIPS, tipFor } from '../../src/game/tips';
 import { mixable } from '../../src/game/pools';
 
 const topic = TOPICS.find(t => t.id === 'y6-inference')!;
 const EXCLUDE = ['gay', 'queer', 'bitch', 'butt'];
-const words = (s: string) => s.toLowerCase().match(/[a-z']+/g) ?? [];
+const words = (s: string): string[] => s.toLowerCase().match(/[a-z']+/g) ?? [];
 const clueWords = (label: string) => INFER_CLUES[label] ?? [];
 const hasClue = (text: string, label: string) => words(text).some(w => clueWords(label).includes(w));
 const allClues = Object.values(INFER_CLUES).flat();
@@ -46,8 +47,12 @@ describe('y6-inference (#1240)', () => {
       expect(words(i.evidence), i.question).toContain(i.answer);
       expect(clueWords(named in INFER_CLUES ? named : `the ${named}`), i.question).toContain(i.answer);
       for (const dec of i.decoys) {
-        expect(words(i.story), `${i.question}: decoy ${dec}`).toContain(dec);
-        expect(allClues, `${i.question}: decoy ${dec} is a clue`).not.toContain(dec);
+        expect(words(i.story), `${i.question}: decoy ${dec}`).toContain(dec.toLowerCase());
+        expect(allClues, `${i.question}: decoy ${dec} is a clue`).not.toContain(dec.toLowerCase());
+        // The class (round 1 review): a decoy never comes from another sentence that itself holds a clue of the named label.
+        const label = named in INFER_CLUES ? named : `the ${named}`;
+        const home = i.story.split(/(?<=[.!?])\s+/).find(sen => words(sen).includes(dec.toLowerCase()))!;
+        expect(words(home).includes(i.answer) || !hasClue(home, label), `${i.question}: decoy ${dec} sits in a cue sentence`).toBe(true);
       }
     }
   });
@@ -69,6 +74,8 @@ describe('y6-inference (#1240)', () => {
       }
     }
   });
+
+  it('has a help-at-home tip', () => { expect(tipFor('y6-inference')).toBe(TIPS.comprehension); });
 
   it('every drawn card carries its story and the answer among the options', () => {
     for (const d of [1, 2, 3] as const) for (let n = 0; n < 40; n++) {
