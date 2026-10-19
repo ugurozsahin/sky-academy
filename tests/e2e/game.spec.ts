@@ -3893,7 +3893,7 @@ test.describe('Sharpwise', () => {
     for (let i = 0; i < 3; i++) { asked.push((await state(page)).prompt); await solveCurrent(page); }
     await page.evaluate(() => window.__sna.session.tick(60_000));
     await expect(page.locator('.results')).toBeVisible();
-    await expect(page.locator('.results')).not.toContainText(/challenge|code/i);   // nothing child-facing
+    await expect(page.locator('.results')).not.toContainText(/challenge a friend|\bcode\b/i);   // nothing child-facing (the Dojo's own "challenge done" line is not this feature)
     await page.click('#home');
     await page.click('#back');
     await openGrownUps(page);
