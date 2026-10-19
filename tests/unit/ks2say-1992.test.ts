@@ -13,12 +13,12 @@ describe('ks2say.ts: misreadings found after #1989 (#1992)', () => {
     expect(ks2Say(text)).toBe(spoken);
     expect(sayIsSafe(ks2Say(text))).toBe(true);
   });
-  it.each(['3.45pm', '12/05/2024', '2 5/4', '5 m/s²'])('%j is left raw, so it is refused', text => {
+  it.each(['3.45pm', '12/05/2024', '2 5/4', '5 m/s²', 'Class 4M', '£1m', '15-20 kg'])('%j is left raw, so it is refused', text => {
     expect(sayIsSafe(ks2Say(text))).toBe(false);
   });
   it.each([
     ['5-kgs', '5 kilograms'], ['5-kg', '5 kilograms'], ['1-kg', '1 kilogram'], ['5-cm', '5 centimetres'],
-    ['5-ft', '5 ft'], ['5-ms', '5 ms'], ['3-kgx', '3 kgx'], ['5-km/h', '5 minus kilometres per hour'],
+    ['5-ft', '5 ft'], ['10-abc', '10 abc'], ['5-ms', '5 ms'], ['3-kgx', '3 kgx'], ['5-km/h', '5 minus kilometres per hour'],
   ])('ks2Say(%j) is %j and safe to speak', (text, spoken) => {
     expect(ks2Say(text)).toBe(spoken);
     expect(sayIsSafe(ks2Say(text))).toBe(true);
