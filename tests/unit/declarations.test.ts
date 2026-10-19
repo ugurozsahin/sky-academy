@@ -55,8 +55,9 @@ describe('declaration twins (#271)', () => {
   // gate came to miss five characters the hook already stripped.
   it('the github hook imports the gate\'s INVISIBLE class rather than defining its own', () => {
     const hook = read('.claude/hooks/github-write-guard.mjs');
-    expect(hook).toMatch(/import \{ INVISIBLE \} from '\.\.\/\.\.\/scripts\/review-gate\.mjs';/);
-    expect(hook, 'a local definition would shadow the shared one').not.toMatch(/(const|let|var) INVISIBLE\b/);
+    expect(hook, 'a dynamic import, so a failure can be caught and refused').toMatch(
+      /\{ INVISIBLE \} = await import\('\.\.\/\.\.\/scripts\/review-gate\.mjs'\)/);
+    expect(hook, 'a local definition would shadow the shared one').not.toMatch(/INVISIBLE = \//);
     expect(read('scripts/review-gate.mjs')).toMatch(/^export const INVISIBLE = /m);
   });
 });
