@@ -98,11 +98,13 @@ export function avatarById(id: string | null | undefined): Avatar {
  * word by word, with prefix matching (so `Sol` still catches `Solar Ninja`) in *either* direction (so
  * `Bolt the Robot` next to `Robot` also collides). Word-by-word rather than a whole-string substring check,
  * so a short given name embedded mid-word — `Rin` inside `Spring Ninja`, `Ai` inside `Rain Ninja` — does not
- * falsely collide: neither is a whole word of the other side.
+ * falsely collide: neither is a whole word of the other side. A blank or space-only side has no words and
+ * collides with nothing (#277); stop words and two-letter prefixes are left as they are — no such name exists.
  */
 export function nameElementCollide(name: string, element: string): boolean {
-  const nameWords = name.toLowerCase().split(/\s+/);
-  const elementWords = element.toLowerCase().split(/\s+/);
+  const words = (s: string) => s.toLowerCase().split(/\s+/).filter(Boolean);
+  const nameWords = words(name);
+  const elementWords = words(element);
   return nameWords.some(nw => elementWords.some(ew => ew.startsWith(nw) || nw.startsWith(ew)));
 }
 export function senseiLine(won: boolean, childName: string, rnd = Math.random): string {

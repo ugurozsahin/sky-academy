@@ -138,10 +138,9 @@ your first finding and the only one you can report.
    through an owner approval until a session broke it by hand. Reviews now come from the hourly reviewer
    routine (`docs/REVIEWER-PROMPT.md`), not from the development routine, so a pile of ready, unreviewed
    pull requests means that routine is not running — say that in the finding.
-5. **Is the priority order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
-   is a one-time event, not a condition that can re-arm: a `review` or `debt` issue filed after that date does
-   not re-freeze anything, the `frozen` label is retired, and code health now queues with features by priority
-   instead of blocking them. So there is no freeze left to check. Two successors, and both are questions rather
+5. **Is the priority order being followed?** The code-health freeze **ended on 2026-09-10**, a one-time event
+   that cannot re-arm (`docs/decisions/012-the-code-health-freeze-and-its-lift.md`); the `frozen` label is retired
+   and code health queues with features by priority. So there is no freeze left to check. Two successors, and both are questions rather
    than accusations. **(a) Has a run re-imposed one?** A doc edit, an issue comment or a PR that bars a class of
    work again — or a run declining eligible work because it believes a freeze still holds. Only the owner
    declares a freeze, and it would appear in CLAUDE.md and `docs/ROUTINE-PROMPT.md` together, so a
