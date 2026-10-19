@@ -2,7 +2,7 @@
 import type { Rng, YearId } from '../curriculum';
 import { clockPhrase, CONTRACTIONS } from '../curriculum/year2';
 import { fdpPairs } from './memory-fdp';
-import { coinLabel, CVC, DIGRAPHS, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
+import { coinLabel, coinSay, CVC, DIGRAPHS, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean; quiet?: true }  // coin = pence, drawn as a coin; quiet = not spoken when turned over (#964)
 export interface Pair { a: Face; b: Face }
@@ -22,7 +22,7 @@ export interface Card { pair: number; face: Face; up: boolean; matched: boolean 
 export type FlipResult = 'ignored' | 'open' | 'match' | 'miss';
 
 const txt = (text: string, say = text, small = false): Face => ({ text, say, small });
-const coin = (p: number): Face => ({ text: coinLabel(p), say: p >= 100 ? `${p / 100} pound${p > 100 ? 's' : ''}` : `${p} pence`, coin: p });
+const coin = (p: number): Face => ({ text: coinLabel(p), say: coinSay(p), coin: p });
 const objs = (n: number, emoji: string): Face => ({ text: emoji.repeat(n), say: String(n) });
 const words = (rng: Rng, from: number, to: number, n: number): Pair[] => shuffle(rng, Array.from({ length: to - from + 1 }, (_, i) => from + i)).slice(0, n).map(v => ({ a: txt(String(v), numberWord(v)), b: txt(numberWord(v), numberWord(v), v > 20) }));
 // Shape tables come from curriculum/util.ts (SHAPES_2D/SHAPES_3D); Memory only needs the glyph + name, so
@@ -69,7 +69,7 @@ const letterPairs = (rng: Rng): Pair[] => shuffle(rng, LETTER_POOL).slice(0, 4).
 /** Make 10: six `n + ?` cards beside their partner `10 − n`. 5 is never dealt — its partner is another plain 5, which reads as "match the same number" (#960). */
 export const BOND_POOL = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10];
 const bondPairs = (rng: Rng): Pair[] => shuffle(rng, BOND_POOL).slice(0, 6).map(n => ({ a: txt(`${n} + ?`, `${numberWord(n)} and what make ten?`, true), b: txt(String(10 - n), numberWord(10 - n)) }));
-const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
+const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(coinLabel(p), coinSay(p)) }));
 
 /** Fraction names (#963): the Year 2 NC list. `1/2` and `2/4` are equal in value, so one board carries only one of "a half" / "two quarters". */
 export const FRACTION_POOL: readonly (readonly [string, string])[] = [['a third', '1/3'], ['a quarter', '1/4'], ['three quarters', '3/4']];

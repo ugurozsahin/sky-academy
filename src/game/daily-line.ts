@@ -4,9 +4,9 @@ import type { ProfileId } from '../storage';
 
 const STAR = '⭐';
 
-/** `Sky Ninja Academy · Daily Sprint · Year 1 · 2026-09-28 · 14 correct · ⭐⭐` (the stars only when 1–3 were earned). */
+/** `Sharpwise · Daily Sprint · Year 1 · 2026-09-28 · 14 correct · ⭐⭐` (the stars only when 1–3 were earned). */
 export const dailyLine = (r: { correct: number; stars: number }, yearTitle: string, date: string): string =>
-  `Sky Ninja Academy · Daily Sprint · ${yearTitle} · ${date} · ${r.correct} correct${r.stars > 0 ? ` · ${STAR.repeat(Math.min(3, r.stars))}` : ''}`;
+  `Sharpwise · Daily Sprint · ${yearTitle} · ${date} · ${r.correct} correct${r.stars > 0 ? ` · ${STAR.repeat(Math.min(3, r.stars))}` : ''}`;
 
 let kept: { profile: ProfileId; date: string; line: string } | null = null;
 

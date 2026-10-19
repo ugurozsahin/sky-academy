@@ -318,7 +318,7 @@ const refuseWrites = (page: Page) => page.addInitScript(() => {
   proto.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); };
 });
 
-test.describe('Sky Ninja Academy', () => {
+test.describe('Sharpwise', () => {
   // #32: run the whole suite at 8× game speed (#748 raised it from 4× once a paired CI trial, run four
   // times, showed a consistent 7-10% wall-clock win with no regressions). The app reads `window.__SNA_FAST`
   // at boot (src/game/speed.ts) and divides only the scheduled waits — outcome holds, the inter-question
@@ -3828,7 +3828,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#back');
     await openGrownUps(page);
     const line = await page.locator('#daily-text').inputValue();
-    expect(line).toMatch(/^Sky Ninja Academy · Daily Sprint · Year 1 · \d{4}-\d{2}-\d{2} · 0 correct$/);
+    expect(line).toMatch(/^Sharpwise · Daily Sprint · Year 1 · \d{4}-\d{2}-\d{2} · 0 correct$/);
     expect(line).not.toContain('Ada');
     await page.click('#daily-copy');
     await expect(page.locator('#daily-msg')).toContainText('Copied');
@@ -4991,7 +4991,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#restore-go');                                  // first tap only warns
     await expect(page.locator('#move-msg')).toHaveClass(/bad/);
     await page.click('#restore-go');
-    await expect(page.locator('#move-msg')).toContainText('not a Sky Ninja Academy save');
+    await expect(page.locator('#move-msg')).toContainText('not a Sharpwise save');
     await expect(page.locator('.isl-head b')).toContainText('Grown-ups dashboard');
     expect(await page.inputValue('#save-code')).toBe(code);           // the save is untouched
 

@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { MANIFEST_SELECTOR, registerServiceWorker, type RegisterEnv } from '../../src/pwa';
+import { imageSize } from '../../scripts/pwa-icons.mjs';
+import { appleIconHref } from './helpers/icons';
 import { cacheName, fingerprints, listFiles, precacheList, renderSw } from '../../scripts/build-sw.mjs';
 
 /**
@@ -232,9 +234,10 @@ function runWorker(fetchImpl: (req: FakeReq | string) => Promise<FakeRes>, list:
   const listeners: Record<string, (e: FakeEvent) => void> = {};
   const named = new Map<string, Map<string, FakeRes>>();
   const matchCalls: { cache: string; url: string; opts: unknown }[] = [];
+  const skipWaiting = vi.fn();
   const fakeSelf = {
     addEventListener: (type: string, fn: (e: FakeEvent) => void) => { listeners[type] = fn; },
-    skipWaiting: () => {},
+    skipWaiting,
     clients: { claim: () => {} },
     location: { origin: 'https://example.com' },
   };
@@ -276,7 +279,7 @@ function runWorker(fetchImpl: (req: FakeReq | string) => Promise<FakeRes>, list:
   const context = vm.createContext({ self: fakeSelf, caches, fetch: fetchImpl, Response, Request: FakeRequest, URL });
   const template = readFileSync(new URL('../../scripts/sw-template.js', import.meta.url), 'utf8');
   vm.runInContext(renderSw(template, list, prints), context);
-  return { listeners, named, matchCalls, caches };
+  return { listeners, named, matchCalls, caches, skipWaiting };
 }
 
 /** Fires the `fetch` listener and returns the promises it hands to `respondWith`/`waitUntil`. */
@@ -289,14 +292,14 @@ function dispatch(listeners: Record<string, (e: FakeEvent) => void>, req: FakeRe
 
 describe("the worker's runtime handlers (#116 item 4)", () => {
   it('precaches with {cache:"reload"}, so a stale HTTP-cache entry cannot be stored under a fresh deployment\'s name', async () => {
-    const seen: FakeReq[] = [];
-    const fetchImpl = async (req: FakeReq | string) => { seen.push(req as FakeReq); return fakeResponse(); };
+    const seen: (FakeReq | string)[] = [];
+    const fetchImpl = async (req: FakeReq | string) => { seen.push(req); return fakeResponse(); };
     const { listeners } = runWorker(fetchImpl);
     let waited!: Promise<unknown>;
     listeners.install({ waitUntil: (p) => { waited = p; } });
     await waited;
     expect(seen).toHaveLength(1);
-    expect(seen[0].cache, "the one failure install's own comment says this whole mechanism exists to prevent").toBe('reload');
+    expect((seen[0] as FakeReq).cache, "the one failure install's own comment says this whole mechanism exists to prevent").toBe('reload');
   });
 
   it('asset() never caches a non-ok or opaque response, so a 404 or captive-portal body is not pinned until the next deployment', async () => {
@@ -395,9 +398,9 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
   });
 
   it('a shell miss under a controlling worker serves the network now and rebuilds the whole precache behind it', async () => {
-    const seen: FakeReq[] = [];
+    const seen: (FakeReq | string)[] = [];
     const net = fakeResponse();
-    const { listeners, named } = runWorker(async (req) => { seen.push(req as FakeReq); return net; }, LIST, PRINTS);
+    const { listeners, named } = runWorker(async (req) => { seen.push(req); return net; }, LIST, PRINTS);
     // No install ran: the cache is empty, which is what an eviction looks like to an active worker.
     const { respondWith, waitUntil } = dispatch(listeners, NAV);
     expect(await respondWith, 'the player gets the page from the network, without waiting for the rebuild').toBe(net);
@@ -406,7 +409,7 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
     expect(precached(named), 'every precached file is back, not only the shell').toEqual(
       ['https://example.com/assets/index-ABC.js', 'https://example.com/index.html']);
     // Same rule as install: a stale HTTP-cache entry must not be stored under this deployment's name.
-    const rebuilt = seen.filter(r => r.cache !== undefined);
+    const rebuilt = seen.filter((r): r is FakeReq => typeof r !== 'string' && r.cache !== undefined);
     expect(rebuilt, 'the rebuild fetches each precached file once').toHaveLength(LIST.length);
     expect(rebuilt.every(r => r.cache === 'reload')).toBe(true);
   });
@@ -414,9 +417,10 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
   it('a shell hit rebuilds nothing — the cache is only ever refilled when it is actually gone', async () => {
     const fetchImpl = vi.fn(async () => fakeResponse());
     const { listeners, named } = runWorker(fetchImpl, LIST, PRINTS);
-    named.set(NAMED_CACHE, new Map([['https://example.com/index.html', fakeResponse()]]));
+    const hit = fakeResponse();
+    named.set(NAMED_CACHE, new Map([['https://example.com/index.html', hit]]));
     const { respondWith, waitUntil } = dispatch(listeners, NAV);
-    await respondWith;
+    expect(await respondWith, 'the seeded shell is what navigation is served (#634)').toBe(hit);
     expect(waitUntil(), 'no rebuild on a hit').toBeUndefined();
     expect(fetchImpl, 'and no network at all').not.toHaveBeenCalled();
   });
@@ -434,6 +438,43 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
     await second.respondWith;
     await second.waitUntil();
     expect(precached(named), 'the failure did not latch — the next online launch rebuilt it').toHaveLength(LIST.length);
+  });
+
+  it('a rebuild where only one of two files fails stores neither — the cache is whole or empty (#634)', async () => {
+    const urlOf = (r: FakeReq | string) => (typeof r === 'string' ? r : r.url);
+    const { listeners, named } = runWorker(async (r) => {
+      if (urlOf(r).endsWith('index-ABC.js')) throw new Error('offline mid-way');
+      return fakeResponse();
+    }, LIST, PRINTS);
+    const { waitUntil } = dispatch(listeners, NAV);
+    await waitUntil();
+    expect(precached(named), 'index.html was fetched fine; a fetch + put loop would have kept it').toEqual([]);
+  });
+
+  // #633 / #281 item 1: "make install resilient too" (`open(CACHE).then(c => c && precache(c))`) is the next edit.
+  describe('install fails when the precache cannot be stored', () => {
+    const install = (w: ReturnType<typeof runWorker>) => {
+      let waited!: Promise<unknown>;
+      w.listeners.install({ waitUntil: (p) => { waited = p; } });
+      return waited;
+    };
+    it('with caches.open rejecting: the install rejects and the old worker keeps control', async () => {
+      const w = runWorker(async () => fakeResponse(), LIST, PRINTS);
+      w.caches.open = async () => { throw new Error('QuotaExceededError'); };
+      await expect(install(w)).rejects.toThrow(/QuotaExceededError/);
+      expect(w.skipWaiting).not.toHaveBeenCalled();
+    });
+    it('with one of two precache fetches rejecting: the install rejects, nothing is stored', async () => {
+      const w = runWorker(async (r) => { if ((r as FakeReq).url.endsWith('.js')) throw new Error('404'); return fakeResponse(); }, LIST, PRINTS);
+      await expect(install(w)).rejects.toThrow('404');
+      expect(w.skipWaiting).not.toHaveBeenCalled();
+      expect(precached(w.named)).toEqual([]);
+    });
+    it('and a good install does call skipWaiting, so the two tests above are not vacuous', async () => {
+      const w = runWorker(async () => fakeResponse(), LIST, PRINTS);
+      await install(w);
+      expect(w.skipWaiting).toHaveBeenCalledOnce();
+    });
   });
 
   it('two misses in flight share one rebuild rather than downloading the game twice', async () => {
@@ -471,18 +512,8 @@ describe('the worker degrades to the network and rebuilds an evicted precache (#
 describe('installed icons (#15 Part B)', () => {
   const bytes = (rel: string) => readFileSync(new URL(`../../public/${rel}`, import.meta.url));
 
-  /** Pixel size straight out of the header — PNG's IHDR, or WebP's VP8X canvas size. */
-  function dimensions(b: Buffer): { w: number; h: number; kind: string } {
-    if (b.subarray(1, 4).toString('latin1') === 'PNG') return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), kind: 'image/png' };
-    if (b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') {
-      // Only the extended (VP8X) form carries the canvas size in a fixed place; that is what the generator
-      // emits. A plain VP8/VP8L file would land here and be reported as unknown rather than guessed at.
-      if (b.subarray(12, 16).toString('latin1') !== 'VP8X') return { w: 0, h: 0, kind: 'image/webp (not VP8X)' };
-      const le24 = (at: number) => 1 + (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16));
-      return { w: le24(24), h: le24(27), kind: 'image/webp' };
-    }
-    return { w: 0, h: 0, kind: 'unknown' };
-  }
+  // The generator's own reader (#630): PNG, and all three WebP forms, so an opaque icon is not a false red (#631).
+  const dimensions = imageSize;
 
   it('every icon the manifest declares is really there, at the size and in the format it claims', () => {
     expect(manifest.icons, 'no icons array means the installed tile is a screenshot of the page').toBeInstanceOf(Array);
@@ -512,7 +543,7 @@ describe('installed icons (#15 Part B)', () => {
   });
 
   it('the Apple icon the page links is a real PNG, because Safari never reads the manifest', () => {
-    const href = html.match(/<link rel="apple-touch-icon" href="([^"]+)"/)?.[1];
+    const href = appleIconHref(html);   // rel and href matched independently: a `sizes` attribute is fine (#631)
     expect(href, 'iOS has no other way to be told, and screenshots the page without it').toBeTruthy();
     const { w, h, kind } = dimensions(bytes(href!));
     expect(kind, 'iOS will not take a WebP here, and fails to a screenshot without saying so').toBe('image/png');
@@ -522,11 +553,12 @@ describe('installed icons (#15 Part B)', () => {
   it('ships no icon nothing points at — every file in public/icons/ is declared', () => {
     const declared = new Set<string>([
       ...manifest.icons.map((i: { src: string }) => i.src.replace(/^icons\//, '')),
-      ...[...html.matchAll(/href="icons\/([^"]+)"/g)].map(m => m[1]),
+      ...[appleIconHref(html) ?? ''].map(h => h.replace(/^\.?\/?icons\//, '')),
     ]);
     const onDisk = readdirSync(new URL('../../public/icons/', import.meta.url));
-    // Every one of these is precached and downloaded by every player on first install, so an icon left
-    // behind by a rename is not clutter — it is weight, and the service worker will never let go of it.
+    // An icon left behind by a rename is weight in `dist/`, and all but the Apple one (excluded from the
+    // precache, #632) is downloaded by every player on first install. The precache half is tested in
+    // pwa-icons.test.ts, against the real `public/icons/`.
     expect([...onDisk].sort(), 'an undeclared icon is dead weight in the precache').toEqual([...declared].sort());
   });
 });

@@ -14,6 +14,7 @@ import { ri, pick, wordQ, sentGen, type Sent, PUNCT_SENTS } from '../util';
  * That last pair is why no command here ends with `!`: it would be correct English and would still make the
  * card a punctuation-spotting exercise with two defensible answers.
  */
+// The order is load-bearing twice: it is the union's membership and the difficulty unlock order (`slice(0, 2|3|4)` in y2SentenceType).
 export const SENTENCE_TYPE_NAMES = ['statement', 'question', 'command', 'exclamation'] as const;
 export type SentenceType = typeof SENTENCE_TYPE_NAMES[number];
 export const SENTENCE_TYPES: ReadonlyArray<readonly [string, SentenceType]> = [
@@ -79,8 +80,8 @@ export const TENSE_VERBS: ReadonlyArray<readonly [string, string, string, string
   ['swim', 'swims', 'swam', 'swimming'], ['sit', 'sits', 'sat', 'sitting'],
   ['sleep', 'sleeps', 'slept', 'sleeping'], ['fly', 'flies', 'flew', 'flying'],
 ];
-/** 1 = he/she present, 2 = past, 3 = the `-ing` form the progressive frames need. */
-type TenseCol = 1 | 2 | 3;
+/** 1 = he/she present, 2 = past, 3 = the `-ing` form the progressive frames need. Exported so a rail can key on it. */
+export type TenseCol = 1 | 2 | 3;
 export const TENSE_FRAMES: ReadonlyArray<readonly [string, TenseCol, 'present' | 'past']> = [
   ['Every day she ___ in the garden.', 1, 'present'],
   ['Every morning he ___ in the park.', 1, 'present'],

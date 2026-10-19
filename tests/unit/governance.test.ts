@@ -3946,7 +3946,7 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
     expect(r3, 'and why the filesystem kind is worse than the context kind').toMatch(/confident, specific, wrong greens/);
 
     const r4 = rule(4, '4. **What comes back**', null, 300);
-    for (const item of ['file:line', 'head SHA it judged', 'e2e not run (env)', 'one line per review agent'])
+    for (const item of ['file:line', 'head SHA it judged', 'e2e not run (env)', 'one line per review agent', 'its enumeration when the finding came from a sweep'])
       expect(r4, `the payload must carry ${item}, or §6's comment is written from assumption`).toContain(item);
     expect(r4, "and the parent must not fill the rest in — that is §2's falsification one level up")
       .toMatch(/posts nothing it did not receive/);
@@ -4027,10 +4027,10 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
    * numbered items below as a menu, not a checklist"*, and the grounds clause survived **inverted**, because
    * `whether or not the code cannot produce the list` contains the pinned substring and means the reverse.
    *
-   * So the load-bearing check is the one a budget rail makes, in the idiom `ROUTINE_PROMPT_BUDGET` uses two
-   * thousand lines above: **a window may grow, never shrink.** A rewrite that guts a rule is then a number
-   * going down in a reviewed diff, which is all any budget rail achieves and it is enough. An honest trim
-   * lowers the number in the same commit and says so in the body.
+   * So the check is the one a budget rail makes: **a window may grow, never shrink**, which catches deletion
+   * and only deletion (#475). A qualifier makes the window LONGER and walks straight past it; that half is
+   * `tests/unit/open-pr-modal-framing.test.ts`, which enumerates §4's modal framing. An honest trim lowers
+   * the number in the same commit and says so in the body.
    *
    * These replaced the per-slice `min` floors, which were **dominated**: the minimum text satisfying all
    * thirteen `attack()` assertions is 444 characters against a floor of 400, so no string could pass the
@@ -4082,7 +4082,7 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     + 'same reason: `open-pr` §4 calls that line the whole of the evidence, so a body without one has no '
     + 'evidence, not good news.';
 
-  it('the windows have not shrunk — the one check a qualifier cannot walk past', () => {
+  it('the windows have not shrunk — this catches deletion, not a qualifier (#475)', () => {
     // Typed over `SIZES`, so a budget deleted from the literal is a compile error rather than a silent
     // disappearance (PR #469 round 3, N1) — the same argument `sliceSkill`'s docstring makes for its
     // `keys must be [1..7]` guard. Trimmed, because that is what `slice()` compares.
@@ -4529,7 +4529,7 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
 
     const PINS: Array<{ what: string; unit: string }> = [
       { what: "the section opens by naming what a review is for", unit: "The reviews that missed something here all read the diff for whether it works. Read it for how it fails." },
-      { what: "mutate the code and watch the test go red, plus its two guards", unit: "- **Mutate the code and watch the test go red.** This is the whole job. Restore the bug the pull request fixes\n  and confirm the new rail fails; then break each *part* of the fix in turn. A rail that stays green under a\n  mutation is a rail that is not holding that property, whatever its name says.\n  - **Read the count of tests that ran, not the exit status.** A mistyped `-t` filter matches nothing, exits\n    **0**, and prints `177 skipped` — which scrolls past as a pass and turns every mutation after it into\n    evidence of nothing.\n  - **Restore the tree before you run anything else.** A mutation left behind makes every later green in that\n    checkout meaningless, including the one you are about to quote in your review." },
+      { what: "mutate the code and watch the test go red, plus its two guards", unit: "- **Mutate the code and watch the test go red.** This is the whole job. Restore the bug the pull request fixes\n  and confirm the new rail fails; then break each *part* of the fix in turn. A rail that stays green under a\n  mutation is a rail that is not holding that property, whatever its name says.\n  - **Read the count of tests that ran, not the exit status.** A mistyped `-t` filter matches nothing, exits\n    **0**, and prints `177 skipped` — which scrolls past as a pass and turns every mutation after it into\n    evidence of nothing.\n  - **Restore the tree before you run anything else.** A mutation left behind makes every later green in that\n    checkout meaningless, including the one you are about to quote in your review.\n  - **Clear the transform cache between runs and keep a control mutation in every battery (#339).** Rewriting\n    one file in place, run after run, makes Vite serve a stale transform, so a killed mutant reads `94 passed`.\n    Run `rm -rf node_modules/.vite` or pass `--no-cache` each time; the control is a mutation whose kill is\n    certain, and a green control means the harness is broken, not the code sound. Re-run a suspicious green by hand.\n  - **A rail pinning text under `.claude/` cannot be mutated in place (#449).** #342 refuses an unattended write\n    there by design: do not route around it. Mutate an in-memory copy instead and run the rail's own\n    assertions against it. That is evidence only with a baseline that reproduces the real suite's green and a\n    control mutation that goes red, and it checks the assertions as transcribed, so a rail you omit is unseen." },
       { what: "suspect a test that cannot fail", unit: "- **Suspect a test that cannot fail.** Work out, algebraically, whether the assertion is an identity. A test\n  named for a property is not evidence that the property is pinned — and a pull request body that *claims* a\n  property is covered is a claim to check, not to quote." },
       { what: "check the guard rail's reach", unit: "- **Check the guard rail's reach.** Rails here are text and DOM checks. Ask which spellings and which screens\n  this one actually sees, and which plausible rewrite walks straight past it." },
       { what: "a budget number may only go down", unit: "- **A budget number may only go down.** One raised to make a build pass is the finding." },
@@ -4983,7 +4983,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     + "are reserved by the copyright holder, and no permission to use, copy, modify or redistribute them is "
     + "granted by this file:";
   const LICENSE_DIRLIST = "- public/avatars/ the twelve ninja character illustrations - public/icons/ the "
-    + "app and home-screen icons - the name \"Sky Ninja Academy\", and the game's visual identity, including "
+    + "app and home-screen icons - the name \"Sharpwise\", and the game's visual identity, including "
     + "the favicon drawn inline in index.html - the praise lines, character names and other written game "
     + "text";
   const LICENSE_FREDOKA = "- Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the SIL Open "
@@ -4993,7 +4993,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     + "License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.";
   const README_CARVEOUT = "**The artwork and the game's written content are not.** The twelve character "
     + "illustrations under `public/avatars/` and the icons under `public/icons/` are **not licensed**: all "
-    + "rights in them are reserved, along with the name \"Sky Ninja Academy\", the game's visual identity "
+    + "rights in them are reserved, along with the name \"Sharpwise\", the game's visual identity "
     + "and its written text. The split is deliberate and it is the usual one for a game: the engine is worth "
     + "sharing, the characters are not mine to give away twice. `LICENSE` states exactly what falls each "
     + "side of the line.";
