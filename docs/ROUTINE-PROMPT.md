@@ -16,7 +16,7 @@ issues does the owner add a `GITHUB_TOKEN` variable (repo scope). If the API is 
 heartbeat either: say so in the report.
 
 The **project board** (Projects v2) is **not reachable from a cloud session**: GraphQL-only, and the cloud
-proxy answers 403. No run syncs or reads it. The sync (`scripts/board-sync.mjs`) runs on the **owner's Mac**
+proxy answers 403 (`docs/decisions/016-the-board-is-a-projection-of-the-repo.md`). No run syncs or reads it. The sync (`scripts/board-sync.mjs`) runs on the **owner's Mac**
 every 15 minutes and leaves a **pulse** in the open issue `board: heartbeat`, which you read in STEP 1.
 
 ## Where a record goes — every write needs a reader (#98)
@@ -37,7 +37,7 @@ A note for the next run is not a record; it is an issue. The live artifact is no
 You are the autonomous developer for "Sky Ninja Academy" (repo ugurozsahin/sky-academy). Reviews are the reviewer routine's (`docs/REVIEWER-PROMPT.md`): a developer run never reviews or merges a pull request, its own or anyone else's. Code/comments/game text in British English; any summary for the owner in Turkish.
 
 ## 🚦 WHAT TO WORK ON — the priority labels (#94)
-**The code-health freeze is over (owner, 2026-09-10; issue #36).** **The lift is a one-time event, not a condition that can re-arm:** a `review` or `debt` issue filed from now on does not re-impose it, and no run reinstates a freeze on its own — declaring one is the owner's. Work is chosen by the priority labels — highest `priority:*` first, oldest issue first within a priority — with no blanket bar on features: a `review`/`debt` finding queues by its priority label like any other issue. Same wording in CLAUDE.md — change both; why: `docs/decisions/012-the-code-health-freeze-and-its-lift.md`. You develop the **highest-priority open `routine-ok` issue** (STEP 3 has the query), with three documented ways past that order:
+**The code-health freeze is over (owner, 2026-09-10).** **The lift is a one-time event, not a condition that can re-arm:** a `review` or `debt` issue filed from now on does not re-impose it, and no run reinstates a freeze on its own — declaring one is the owner's. Work is chosen by the priority labels — highest `priority:*` first, oldest issue first within a priority — with no blanket bar on features: a `review`/`debt` finding queues by its priority label like any other issue. Same wording in CLAUDE.md — change both; why: `docs/decisions/012-the-code-health-freeze-and-its-lift.md`. You develop the **highest-priority open `routine-ok` issue** (STEP 3 has the query), with three documented ways past that order:
 - `playtest` bugs the owner hit while playing, and anything that leaves the game unplayable or `main` red, which come first whatever their priority label;
 - work the owner explicitly asked for in a session — *his* ask, in his own words on the issue, not a run's account of one;
 - an open issue labelled `watchdog` (STEP 1), which is something broken now.
@@ -90,8 +90,7 @@ The PR title carries `(#<n>)`; the body says `Closes #<n>` when the issue is fin
 **A run does not end with its own pull request a draft (#1838).** Wait for the newest CI run on its head — an until-loop, never `sleep` — and act on it before the run ends; if the run must stop first, its report and pulse say the PR is a draft waiting on CI, and STEP 2.5's orphan rule is the backstop.
 
 **A developer run may take a second item (#97)** — as a second, separate pull request, and never
-more than one extra. It is **a condition, not a quota** (owner, 2026-09-10): the bottleneck here is review and conflict, not
-development, so a run fills *idle* capacity only — the moment second items produce a review backlog, condition 1
+more than one extra. It is **a condition, not a quota** (owner, 2026-09-10; why two and not three: `docs/decisions/017-a-second-item-never-a-third.md`): a run fills *idle* capacity only — the moment second items produce a review backlog, condition 1
 stops being true on its own.
 
 Check all four after STEP 3, in order, and stop at the first that fails:
@@ -109,8 +108,7 @@ Check all four after STEP 3, in order, and stop at the first that fails:
    complete, reviewable part of a larger issue passes; a push you left as WIP does not, and you do not start another.
 
 Then choose the second item with the same STEP 3 query and open a **second, separate pull request** — never one
-pull request closing two issues. They must be reviewable, mergeable and blockable independently, and one going
-bad must not hold the other. Say in that pull request what the second item costs in Actions minutes.
+pull request closing two issues. Say in that pull request what the second item costs in Actions minutes.
 
 **Record it either way.** Your heartbeat snapshot (STEP 5) carries a `- second item:` line saying whether you
 took one and, when you did not, which of the four conditions failed — enforced in code, not just this prose

@@ -41,18 +41,6 @@ on:
     types: [opened, reopened, ready_for_review, converted_to_draft, synchronize, labeled, unlabeled]
   issue_comment:
     types: [created, edited, deleted]
-concurrency:
-  # Two events in quick succession (comment, then Ready for review) must not race to stamp opposite states.
-  group: review-gate-${{ github.event.pull_request.number || github.event.issue.number }}
-  # #92: this used to be `true`. Concurrency is evaluated at the WORKFLOW level, before the job's `if:` below —
-  # so an ordinary comment (no marker, its own job always skipped) still claimed the group and cancelled a
-  # `synchronize` run seconds from stamping a freshly pushed head. The cancelling run stamps nothing, so the
-  # head was left with no `review-gate` status at all — the exact gap ROUTINE-PROMPT.md rule 1 tells a reviewer
-  # to check for by hand. Queuing instead never loses a run: the job always re-lists live comments and the
-  # live draft flag right before it writes (see the script below), so whichever run in the group executes last
-  # writes the status that matches reality at that moment, and a run that skips (no marker) just finishes
-  # instantly without touching the status underneath a run that would have written one.
-  cancel-in-progress: false
 permissions:
   contents: read             # checkout, for the predicate module
   statuses: write            # writes the `review-gate` status onto the PR head
@@ -60,6 +48,35 @@ permissions:
   issues: read
 jobs:
   gate:
+    # #232 — concurrency lives HERE, on the job, not on the workflow. A workflow-level group is claimed when the
+    # run is queued, before the job's `if:` below is looked at, so a comment with no marker (whose job is then
+    # skipped and writes nothing) still took the group's one pending slot and could evict a marker-bearing run.
+    # A job that its `if:` skips is never queued, so it never touches the group. Docs: "Use `concurrency` to
+    # ensure that only a single job or workflow using the same concurrency group will run at a time" and
+    # "By default, any existing `pending` job or workflow in the same concurrency group will be canceled and the
+    # new queued job or workflow will take its place" (workflow-syntax and using-concurrency pages). The docs
+    # give job-level the same behaviour as workflow-level and do NOT spell out the skipped-job case, so that
+    # half is reasoning, not a quotation, and only a live run can show it (tests/unit/review-gate-concurrency.test.ts
+    # holds the YAML shape, not GitHub's scheduler).
+    #
+    # The two scenarios, and why a marker run can no longer be dropped:
+    #  * #92 — an ordinary comment lands while a `synchronize` run is stamping. `cancel-in-progress: false`
+    #    leaves the running run alone; the comment's job is skipped, so it never enters the group at all.
+    #  * #232 — `synchronize` running; `OWNER: APPROVED` pending; then an unrelated comment. Before: the comment's
+    #    run evicted the pending approval run, `synchronize` stamped a pre-approval status, and the comment's
+    #    own job was skipped, so nothing re-stamped. Now: the unrelated comment's job is skipped and never
+    #    queues, so the approval run keeps the pending slot and runs after `synchronize`.
+    # What stays true: the group still holds one running and one pending job, so two MARKER-bearing events behind
+    # a running job still cancel the first of them. That is safe: every run re-lists the PR's live comments right
+    # before it writes (see the script), so the surviving, newest run computes a state that includes both markers.
+    # Direction: TIGHTENING. A marker-bearing run can only be lost to another marker-bearing run that supersedes it.
+    concurrency:
+      # Two events in quick succession (comment, then Ready for review) must not race to stamp opposite states.
+      group: review-gate-${{ github.event.pull_request.number || github.event.issue.number }}
+      # #92: this used to be `true`: the cancelling run stamped nothing, leaving the head with no `review-gate`
+      # status at all, the gap docs/REVIEWER-PROMPT.md tells a reviewer to check for by hand. Queuing never loses
+      # the information (see above): whichever run executes last writes what matches reality at that moment.
+      cancel-in-progress: false
     # Ordinary conversation must not spend a runner minute: only REVIEW: comments on a PR wake this up.
     # `contains`, not `startsWith`: a marker preceded by a blank line or a quote would not have woken the job,
     # and a block nobody evaluates publishes as green. Cheap to wake on a false positive, costly to miss one.
