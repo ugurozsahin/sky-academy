@@ -444,6 +444,16 @@ describe('STEP 3 states where priority:P0 sorts (#157)', () => {
   });
 });
 
+describe('STEP 4 gives the query line a value, so an empty run still records one (#338)', () => {
+  it('STEP 4 gives the query line a value for a run that found nothing (#338, PR #341 review)', () => {
+    const prompt = readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
+    const step4 = prompt.split('\n').find((l) => l.startsWith('STEP 4')) ?? '';
+    expect(step4, 'STEP 4 must still exist, or this rail reads nothing').toContain('NOTHING ELIGIBLE');
+    expect(step4, 'or every such run invents its own word and the field stops meaning anything')
+      .toContain('- query top pick: none eligible · N blockers read live');
+  });
+});
+
 
 /**
  * #194 — STEP 2 (PR review) had no priority ordering at all; STEP 3 (issue selection) already did.
@@ -467,17 +477,6 @@ describe('STEP 3 states where priority:P0 sorts (#157)', () => {
  * rail's slice — now live in `docs/REVIEWER-PROMPT.md`. The slice ends where the four unmergeable rules
  * begin; the developer prompt's STEP 3 still carries its own copy of the order, pinned by the #157 rail above.
  */
-describe('STEP 4 gives the query line a value, so an empty run still records one (#338)', () => {
-  it('STEP 4 gives the query line a value for a run that found nothing (#338, PR #341 review)', () => {
-    const prompt = readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
-    const step4 = prompt.split('\n').find((l) => l.startsWith('STEP 4')) ?? '';
-    expect(step4, 'STEP 4 must still exist, or this rail reads nothing').toContain('NOTHING ELIGIBLE');
-    expect(step4, 'or every such run invents its own word and the field stops meaning anything')
-      .toContain('- query top pick: none eligible · N blockers read live');
-  });
-});
-
-
 describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
   const root = new URL('../../', import.meta.url);
 
@@ -1793,6 +1792,9 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
    * occurrence, anchored pin prefix intact, exactly the shape an upstream re-vendor produces — truncated the
    * real loader's description to sixteen words with this whole file green, because the old assertion asked
    * only whether a `: ` was present somewhere.
+   *
+   * Not modelled (#405): the plain parse throws for the whole block, not this value alone, and the repair's second
+   * step (re-parsing the re-quoted line) is not run. Both err toward a false red, never a false green.
    */
   const repairPassRuns = (value: string) => {
     const comment = value.search(/(^|\s)#/);
@@ -1846,7 +1848,9 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     const upstreamToken = HASH_IN_UPSTREAM_TEXT[name];
     if (upstreamToken) {
       expect(description!, `${file} no longer carries "${upstreamToken}" — drop its HASH_IN_UPSTREAM_TEXT entry`).toContain(upstreamToken);
-      expect(repairPassRuns(description!), `${file}: "${upstreamToken}" loads only because a ": " appears BEFORE it, which makes the loader's repair pass quote the line — the "#" now comes first, so the plain parse succeeds on the truncated text and everything after it is silently dropped (#312)`).toBe(true);
+      expect(repairPassRuns(description!), description!.includes(': ')
+        ? `${file}: "${upstreamToken}" now comes BEFORE the first ": ", so the plain parse succeeds on the truncated text, the repair pass never runs and everything after it is silently dropped (#312)`
+        : `${file}: the description has no ": " at all, so the plain parse never throws, the repair pass never runs and the "#" of "${upstreamToken}" opens a comment that drops everything after it (#405)`).toBe(true);
     }
     expect(upstreamToken ? description!.replace(upstreamToken, '') : description!, `${file}: " #" ends the description for a YAML loader — everything after it never reaches a turn's context (#150)`)
       .not.toMatch(/(^|\s)#/);
@@ -1962,29 +1966,24 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   });
 
   it('the ` #` exemption reads ordering, not presence: a "#" ahead of the first ": " is not exempt (#312)', () => {
-    // The live shape — a `: ` well ahead of the upstream token. The plain parse throws on the colon, the
-    // repair pass double-quotes the line, and the whole description reaches the turn's context.
-    expect(repairPassRuns('Use this agent when reviewing code changes in a pull request: see PR #1234 for the shape')).toBe(true);
-    // #312's reproduction: the same single token moved ahead of the first `: `, with the anchored pin prefix
-    // intact — the shape an upstream re-vendor produces. The plain parse succeeds on "… (see PR", the repair
-    // never runs, and every trigger clause after the `#` is gone. This is the case the old `toMatch(/: /)`
-    // assertion called exempt, with the whole file green.
-    const reproduction = 'Use this agent when reviewing a pull request (see PR #1234) to identify: silent failures';
-    expect(repairPassRuns(reproduction)).toBe(false);
-    // And the old assertion written out, so the difference is pinned rather than remembered: `toMatch(/: /)`
-    // is satisfied by that same string. This is the whole of #312 — the check was green on the one input it
-    // existed to refuse, and a run could only find out by driving the real loader.
-    expect(/: /.test(reproduction), 'the retired presence check called the reproduction exempt').toBe(true);
-    // No `: ` at all: nothing can make the plain parse throw, so the `#` is read as a comment and the rest is
-    // dropped — exempt on the old check the moment upstream reworded around its colon.
-    expect(repairPassRuns('Use this agent when reviewing changes for PR #1234')).toBe(false);
-    // A `#` that opens no comment, because no whitespace precedes it: the same reading as the ` #` check the
-    // exemption is carved out of, so the two cannot disagree about where a value ends.
-    expect(repairPassRuns('Use this agent on issue#5 when a diff: needs review')).toBe(true);
-    // The value the exemption is actually consulted for, read from the file rather than written out here, so
-    // this self-test fails with the rail if upstream reorders it rather than passing on a stand-in.
     const [, file] = FRONTMATTER_FILES.find(([n]) => n === 'silent-failure-hunter')!;
-    expect(repairPassRuns(frontmatter(file).description!)).toBe(true);
+    const real = frontmatter(file).description;
+    expect(real, `${file} has no description to read, so the self-test cannot run (#405)`).not.toBeNull();
+    const pin = DESCRIPTIONS['silent-failure-hunter'];
+    expect(repairPassRuns('Use this agent when reviewing code changes in a pull request: see PR #1234 for the shape'), 'live shape: a ": " well ahead of the token, so the repair pass quotes the line and it loads whole').toBe(true);
+    // #312's reproduction, faithful (#405): the anchored pin is GREEN and the token sits ahead of the first `: `,
+    // so the plain parse truncates it. Pin green + loader truncated is the whole of #312; the old `/: /` check called it exempt.
+    const reproduction = 'Use this agent when reviewing code changes in a pull request to identify silent failures (see PR #1234), inadequate error handling: and fallbacks';
+    expect(pin.test(reproduction), 'half one of the trap: the pin accepts it').toBe(true);
+    expect(repairPassRuns(reproduction), 'half two: the loader would truncate it').toBe(false);
+    expect(/: /.test(reproduction), 'the retired presence check called the reproduction exempt').toBe(true);
+    // The same trap on the REAL description, in memory (a run cannot edit `.claude/`).
+    const moved = real!.replace('identify silent failures', 'identify silent failures (see PR #1234)');
+    expect(moved, 'the mutation changed the description').not.toBe(real);
+    expect([pin.test(moved), repairPassRuns(moved)], 'real description with the token moved ahead of its first ": ": pin green, exemption refused').toEqual([true, false]);
+    expect(repairPassRuns('Use this agent when reviewing changes for PR #1234'), 'no ": " at all: nothing makes the plain parse throw, so the "#" is a comment').toBe(false);
+    expect(repairPassRuns('Use this agent on issue#5 when a diff: needs review'), 'a "#" with no space before it opens no comment, as in the ` #` check').toBe(true);
+    expect(repairPassRuns(real!), `${file}: the real description must load via the repair pass`).toBe(true);
   });
 
   it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {
