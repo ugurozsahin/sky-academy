@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review and QA another agent's pull request in Sky Ninja Academy. Use when acting as the reviewer for an open PR — deciding to merge it, or to block it with REVIEW: CHANGES REQUESTED.
+description: Review and QA another agent's pull request in Sharpwise. Use when acting as the reviewer for an open PR — deciding to merge it, or to block it with REVIEW: CHANGES REQUESTED.
 ---
 # Review a pull request
 
