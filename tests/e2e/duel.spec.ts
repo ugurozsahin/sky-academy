@@ -833,6 +833,30 @@ test.describe('Ninja Duel', () => {
     }
   });
 
+  test('guard rail: a question bar that changes height between rounds re-measures both arenas, with no window resize (#678)', async ({ page }) => {
+    await startDuel(page);
+    await resizeTo(page, { width: 844, height: 390 });
+    // Frozen so no round rewrites the card under the measurement; the arenas' own rAF-driven observer still runs.
+    await page.evaluate(() => { for (const p of ['a', 'b'] as const) window.__sna.arenas[p].paused = true; });
+    const backing = () => page.evaluate(() => (['arena-a', 'arena-b'] as const).map(id => {
+      const c = document.getElementById(id) as HTMLCanvasElement;
+      return { h: c.height, css: c.getBoundingClientRect().height, dpr: Math.min(window.devicePixelRatio || 1, 2) };
+    }));
+    const before = await backing();
+    const height = (m: { h: number; dpr: number }) => m.h / m.dpr;
+    // The ABSURD card is taller than any real one: the bar grows, the half below it shrinks, and no `resize` fires.
+    await dressAndMeasure(page, ABSURD);
+    await page.waitForFunction(() => (['arena-a', 'arena-b'] as const).every(id => {
+      const c = document.getElementById(id) as HTMLCanvasElement;
+      return Math.abs(c.height - Math.round(c.getBoundingClientRect().height * Math.min(window.devicePixelRatio || 1, 2))) <= 1;
+    }));
+    const after = await backing();
+    for (const i of [0, 1]) {
+      expect(height(after[i]), `arena ${i}: the bar grew, so the half below it is shorter than it was`).toBeLessThan(height(before[i]) - 1);
+      expect(Math.abs(height(after[i]) - after[i].css), `arena ${i}: the backing store follows the new box`).toBeLessThan(1);
+    }
+  });
+
   test('sideways, no question can take the height the split just won, whatever it puts on the card (#388)', async ({ page }) => {
     await startDuel(page);
     // Freeze both arenas for the sweep. This test measures LAYOUT over dozens of dressed cards and takes tens of
