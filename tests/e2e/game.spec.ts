@@ -1269,6 +1269,23 @@ test.describe('Sharpwise', () => {
     expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
   });
 
+  // #1019: Story Time prints its story on the card and asks the question; the story must fit the shortest phone.
+  test('y2-storytime: the story card and its question reach the shortest phone without overflow (#1019)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-storytime');
+    await expect(page.locator('.vis.sentence')).toBeVisible();
+    const overflow = await page.locator('.vis.sentence').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed by ${overflow}px`).toBeLessThanOrEqual(1);
+    const q = await page.evaluate(() => window.__sna.session.current);
+    expect(q.story, 'the card holds the story').toBeTruthy();
+    expect(await page.locator('.vis.sentence').innerText()).toContain(q.story!.split('.')[0]);
+    expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(q.prompt);
+    await expect(page.locator('#prompt')).toHaveText(q.prompt);
+    const promptOverflow = await page.locator('#prompt').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(promptOverflow, `the question overflowed by ${promptOverflow}px`).toBeLessThanOrEqual(1);
+  });
+
   // #1130: Retrieving Information prints its passage on the card and asks the question; the passage must fit the shortest phone.
   test('y4-retrieve: the passage card and its question reach the shortest phone without overflow (#1130)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });

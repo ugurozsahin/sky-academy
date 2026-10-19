@@ -1,6 +1,6 @@
 {
  "generated": "scripts/content-map.mjs",
- "topicCount": 341,
+ "topicCount": 342,
  "byYear": [
   {
    "year": "reception",
@@ -18,7 +18,7 @@
    "year": "year2",
    "title": "Year 2",
    "maths": 43,
-   "writing": 20
+   "writing": 21
   },
   {
    "year": "year3",
@@ -2628,6 +2628,27 @@
    "tip": "Tally the cars passing the window or the colours of socks, then say which has most and fewest.",
    "strands": [
     "y2-m-stats"
+   ]
+  },
+  {
+   "id": "y2-storytime",
+   "title": "Story Time",
+   "year": "year2",
+   "subject": "writing",
+   "nc": "Y2 Comprehension: listening; inference; answering questions",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": 49,
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y2-e-comprehension"
    ]
   },
   {
@@ -8146,6 +8167,7 @@
    ],
    "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
    "topics": [
+    "y2-storytime",
     "y2-infer"
    ]
   },
