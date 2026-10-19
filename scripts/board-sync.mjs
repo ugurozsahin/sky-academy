@@ -53,7 +53,7 @@
 // The pure parts (`desiredStatus`, `desiredPriority`, `linkedIssues`, `branchIssue`, `isNonWork`, `plan`,
 // `pulseNeeded`) are exported and held by tests/unit/board-sync.test.ts; the network shell is at the end.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { closingRefs, OWNER_GATES } from './review-gate.mjs';
@@ -401,6 +401,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   return `${line} · ${pulse}`;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths, not resolve(): a symlinked checkout (macOS /var -> /private/var) never matched, so the CLI silently did nothing (#309).
+const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) {
   main().then((line) => console.log(line), (err) => { console.error(err.message); process.exit(2); });
 }
