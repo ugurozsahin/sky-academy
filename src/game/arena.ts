@@ -111,7 +111,7 @@ export class Arena {
   resize = () => {
     const rect = this.canvas.getBoundingClientRect();
     const from: ArenaBox = { W: this.W, H: this.H };
-    this.W = Math.max(1, rect.width); this.H = Math.max(1, rect.height);
+    this.W = Math.max(1, Math.round(rect.width)); this.H = Math.max(1, Math.round(rect.height));   // whole CSS px: the duel halves settle a sub-pixel apart and must derive the same `g` (#389/#400, #678)
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.W * this.dpr); this.canvas.height = Math.round(this.H * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
