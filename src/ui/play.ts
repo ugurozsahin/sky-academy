@@ -1,20 +1,21 @@
-import { avatarById, SENSEI, VILLAIN, voiced } from '../avatars';
+import { avatarById, voiced } from '../avatars';
 import { topicsFor, type Topic } from '../curriculum';
-import { Arena } from '../game/arena';
+import type { Arena } from '../game/arena';
 import type { Miss, Resume, SessionOpts } from '../game/session';
 import { holdFor } from '../game/modes'; import { timeOptsFor } from '../game/time-options';
-import { scaled } from '../game/speed'; import { calmReduced, playStyleAttr } from '../device-settings';   // #32: test-only time compression; #906; #907
+import { scaled } from '../game/speed';   // #32: test-only time compression; #906; #907
 import { answerableBy } from '../game/pools'; import { createHud, heartCount } from './hud';   // #1065: one pool rule
-import { load, save, wallet } from '../storage';
+import { load, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
-import { canHear, haptic, sfx, sliceFx } from '../audio';
-import { $, esc, render } from './dom';
+import { canHear, sfx } from '../audio';
+import { $, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
-import { createPlayBeats } from './play-beats'; import { inputFor, inputMarkup, mountPad, type PlayInput } from './play-input'; import { seedRng } from '../game/daily-sprint';   // #1064: how a child answers
-import { BOMB, createPlaySession } from './play-session';   // #36
+import { createPlayBeats } from './play-beats'; import { inputFor, mountPad, type PlayInput } from './play-input'; import { seedRng } from '../game/daily-sprint';   // #1064: how a child answers
+import { createPlaySession } from './play-session';   // #36
 import { createResultsScreen } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { pressKey } from './key-answer'; import { pauseHTML } from './overlays';
 import type { PlayHooks } from './hooks';
+import { playMarkup } from './play-markup'; import { mountArena } from './play-arena';
 import { buildHooks } from './play-hooks'; import { createCommit } from './play-commit'; import { startSprintClock } from './play-clock'; import { modeFlags } from './play-flags';
 
 export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'>
@@ -27,28 +28,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   const fx = trailItem?.fx ?? av.fx;   // a bought element trail overrides the avatar's own particle/sound effect too (#69)
   const input = inputFor(o); const tracing = input === 'tracing'; const bubbles = input === 'bubbles';
   const { spec, sprint, boss, training, villainMode, title } = modeFlags(o);
-  render(`
-  <section class="screen play ${tracing ? 'tracing' : ''}" ${playStyleAttr(av.glow)}>
-    ${bubbles ? inputMarkup(input) : ''}
-    <div class="hud">
-      <div class="hud-top">
-        <button class="icon-btn" id="pause" aria-label="Pause">⏸</button>
-        ${sprint ? '<div class="timer" id="timer" aria-live="polite" aria-label="Time left"></div>' : '<div class="lives" id="lives" aria-live="polite"></div>'}
-        <div class="score"><small>SCORE</small><b id="score">0</b></div>
-      </div>
-      <div class="qcard" id="qcard">
-        <div class="qhead"><span class="pill" id="stage"></span><span class="ttl">${esc(title)}</span><button class="icon-btn speak" id="speak" aria-label="Read the question aloud" title="Tap the card to hear it again">🔊</button></div>
-        <div class="prompt" id="prompt"></div>
-        <div class="vis-wrap" id="vis"></div>
-        <div class="hint" id="hint"></div>
-      </div>
-      ${bubbles ? '' : inputMarkup(input)}
-      <div class="toast" id="toast" aria-live="polite"></div>
-      ${villainMode ? `<div class="villain${boss ? ' boss' : ''}" id="villain">${boss ? '<div class="hp" role="progressbar" aria-label="Hammer Man health"><i id="hp"></i></div>' : ''}<img src="${VILLAIN.img}" alt="Hammer Man"><span class="bubble" id="taunt" hidden></span></div>` : ''}
-    </div>
-    ${bubbles && !d.tutorialSeen ? `<div class="tutorial" id="tutorial" hidden aria-hidden="true"><div class="tut-sensei"><img src="${SENSEI.img}" alt=""></div><div class="tut-bubble">3</div><div class="tut-hand">☝️</div><div class="tut-text">Slice the bubble!</div></div>` : ''}
-    <div class="overlay" id="overlay" hidden></div>
-  </section>`, 'bg-play');
+  render(playMarkup({ input, glow: av.glow, title, sprint, villainMode, boss, showTutorial: !d.tutorialSeen }), 'bg-play');
 
   const els = {
     lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'),
@@ -100,35 +80,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   hud.drawLives(o.year.lives); hud.drawTimer(session.secondsLeft); hud.drawHp(session.bossHp, session.bossMax);
   const stopClock = startSprintClock(session, () => !!arena?.paused || paused);   // the real clock, frozen under Pause (#1504)
 
-  if (bubbles) {
-    arena = new Arena($('#arena') as HTMLCanvasElement, {
-      onHit(b, viaSwipe) {
-        if (!load().tutorialSeen) { save({ tutorialSeen: true }); hideTutorial(); }
-        if (b.label === BOMB) {
-          if (!session.waiting && !session.ended) {
-            sfx.life(); toast('TNT! Hammer Man got you', 'bad'); showTaunt();
-            arena!.burst(b.x, b.y, '#ff3b1a', 30); session.bomb();
-          }
-          return;
-        }
-        const r = session.hit(b.label);
-        if (r === 'ignored') return;
-        if (viaSwipe) { (sliceFx[fx] ?? sfx.slice)(); haptic('slice'); }
-      },
-      onFall(b) { if (b.label !== BOMB) session.fall(b.label); },
-      onWaveEnd: waveEnd,   // the beat lives with the callbacks (#36): it reads the outcome still being shown
-    }, {
-      trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx, reducedMotion: calmReduced(),
-      onSwish: () => sfx.swish(),
-      // A tap throws the ninja's projectile: the whoosh goes with the throw, the element slice with the pop (#48).
-      onThrow: () => sfx.whoosh(),
-      onLand: () => { (sliceFx[fx] ?? sfx.slice)(); haptic('slice'); },
-      // The TNT blows up under the finger — never chase it with a star, or it would burst twice and reward the hit.
-      throwFor: b => b.label !== BOMB, isHazard: label => label === BOMB,   // #742: TNT never re-enters play as a "free chance"
-      // #684: the rotating solid inside a 3-D Shapes bubble, tinted to the bubble's complement.
-      labelArt: (label, colour, phase) => playSession.bubbleArt(label, colour, phase),
-    });
-  }
+  if (bubbles) arena = mountArena({ session, playSession, fx, skin, glow: av.glow, hideTutorial, showTaunt, toast, waveEnd });
 
   function showPause() {
     playSession.hold(true); paused = true;         // #65: pauses the arena, and stops a sentence peek's clock with it
