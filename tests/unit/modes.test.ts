@@ -156,10 +156,16 @@ describe('the slow flag reaches every mode that eases (#311)', () => {
     // there either (modes.ts). Pinned so a later reader who wraps `endless` in `eased()` has to change this
     // test, and read the comment while doing it. It does ease for "Slower bubbles" (#905) — see the next
     // `describe` — which is a separate, per-child accessibility setting, not this per-question flag.
-    for (const q of [0, 12, 30]) {
-      expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q, slow: true })), `q=${q}`)
-        .toBe(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q, slow: false })));
+    // #336: `sequence` is looped as well as `slow` (easing it alone was the likelier tidy-up), and q = 0 is
+    // anchored by value below rather than compared — at the bottom step (1) an eased and a plain question
+    // both give 1, so an equality there passes whether or not `endless` eases. 12 and 30 are the iterations that can tell.
+    for (const q of [0, 12, 30]) for (const flag of [{ slow: true }, { sequence: true }, { slow: true, sequence: true }]) {
+      expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q, ...flag })), `q=${q} ${Object.keys(flag)}`)
+        .toBe(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q })));
     }
+    // each ramp tier by value, so a constant cannot satisfy the loop above
+    expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: 0 })), 'tier 1').toBe(1);
+    expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: 12 })), 'tier 2').toBe(2);
     expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: 30, slow: true })), 'full speed at the top of the ramp').toBe(3);
   });
 });

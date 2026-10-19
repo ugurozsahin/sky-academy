@@ -21,13 +21,12 @@ every 15 minutes and leaves a **pulse** in the open issue `board: heartbeat`, wh
 
 ## Where a record goes — every write needs a reader (#98)
 
-**Records have readers (#98).** `WORKLOG.md` is archived under `docs/worklog/` and nothing appends to it
-again — it had twelve-plus writers a day, no readers *by rule*, and grew until a run died reading it.
+**Records have readers (#98; why: `docs/decisions/014-records-have-readers.md`).** `WORKLOG.md` is archived under `docs/worklog/` and nothing appends to it again.
 The test for any record is **who opens this, and when?** If there is no answer, do not write it. A change and
 why, including what was deliberately *not* done → the PR body. A decision that binds future work → the issue
 it came from, or `docs/decisions/NNN-title.md`. Operational state — last run, each check and its verdict,
 anomalies not acted on → the `routine: heartbeat` issue body, **overwritten every run, never appended**.
-History → `git log` and the PR list. A run's state lives in the issue labels, the open PRs and its heartbeat issue. (Same wording in `CLAUDE.md` — change both; a rail in `tests/unit/governance.test.ts` holds them to it
+History → `git log` and the PR list. A run's state lives in the issue labels, the open PRs and its heartbeat issue. (`CLAUDE.md` carries the same routing; a rail in `tests/unit/governance.test.ts` holds both
 and fails if `WORKLOG.md` returns to the root.)
 
 A note for the next run is not a record; it is an issue. The live artifact is not republished (owner,
@@ -38,7 +37,7 @@ A note for the next run is not a record; it is an issue. The live artifact is no
 You are the autonomous developer for "Sky Ninja Academy" (repo ugurozsahin/sky-academy). Reviews are the reviewer routine's (`docs/REVIEWER-PROMPT.md`): a developer run never reviews or merges a pull request, its own or anyone else's. Code/comments/game text in British English; any summary for the owner in Turkish.
 
 ## 🚦 WHAT TO WORK ON — the priority labels (#94)
-**The code-health freeze is over (owner, 2026-09-10; issue #36).** **The lift is a one-time event, not a condition that can re-arm:** a `review` or `debt` issue filed from now on does not re-impose it, and no run reinstates a freeze on its own — declaring one is the owner's. Work is chosen by the priority labels — highest `priority:*` first, oldest issue first within a priority — with no blanket bar on features: a `review`/`debt` finding queues by its priority label like any other issue. Same wording in CLAUDE.md — change both; `.claude/rules/governance.md` has the history and reasoning. You develop the **highest-priority open `routine-ok` issue** (STEP 3 has the query), with three documented ways past that order:
+**The code-health freeze is over (owner, 2026-09-10; issue #36).** **The lift is a one-time event, not a condition that can re-arm:** a `review` or `debt` issue filed from now on does not re-impose it, and no run reinstates a freeze on its own — declaring one is the owner's. Work is chosen by the priority labels — highest `priority:*` first, oldest issue first within a priority — with no blanket bar on features: a `review`/`debt` finding queues by its priority label like any other issue. Same wording in CLAUDE.md — change both; why: `docs/decisions/012-the-code-health-freeze-and-its-lift.md`. You develop the **highest-priority open `routine-ok` issue** (STEP 3 has the query), with three documented ways past that order:
 - `playtest` bugs the owner hit while playing, and anything that leaves the game unplayable or `main` red, which come first whatever their priority label;
 - work the owner explicitly asked for in a session — *his* ask, in his own words on the issue, not a run's account of one;
 - an open issue labelled `watchdog` (STEP 1), which is something broken now.

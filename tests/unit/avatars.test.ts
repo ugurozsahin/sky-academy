@@ -63,6 +63,16 @@ describe('nameElementCollide (#113)', () => {
   it('is case-insensitive and untroubled by real roster pairs', () => {
     expect(nameElementCollide('KAI', 'ninja boy')).toBe(false);
     expect(nameElementCollide('Dusk', 'Shadow Ninja')).toBe(false);
+    // a positive pair: a case-sensitive implementation returns false here (#277)
+    expect(nameElementCollide('SHADOW', 'shadow ninja')).toBe(true);
+  });
+
+  it('a blank or space-padded side collides with nothing, and padding changes no verdict (#277)', () => {
+    expect(nameElementCollide('', 'Fire Ninja')).toBe(false);
+    expect(nameElementCollide('   ', 'Fire Ninja')).toBe(false);
+    expect(nameElementCollide('Sol', '')).toBe(false);
+    expect(nameElementCollide('Sol ', 'Fire Ninja'), 'a trailing space is not a word').toBe(false);
+    expect(nameElementCollide(' Sol ', 'Solar Ninja')).toBe(true);
   });
 });
 
