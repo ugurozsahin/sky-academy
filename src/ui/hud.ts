@@ -182,6 +182,9 @@ function buildPromptHTML(prompt: string, template: string, sequence: readonly st
  * The tracing fallback names what is traced through `traceNoun` (#1743) — the same decision the toast makes
  * (`traceFeedback`, #1556) — so a digit card reads "number" in both places and the two cannot drift apart
  * again; a letter or a word keeps "letters", the line every trace card showed before.
+ *
+ * An empty `hint: ''` counts as no hint (#650): the instruction shows rather than a blank line. No generator
+ * emits one today; `tests/unit/duel-card-wiring.test.ts` pins this and the fallbacks.
  */
 export function hintText(q: Pick<Question, 'hint' | 'answer'>, o: { reveal: boolean; tracing?: boolean; keypad?: boolean }): string {
   if (q.hint) return q.hint;
