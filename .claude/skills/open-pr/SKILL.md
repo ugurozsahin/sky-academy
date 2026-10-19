@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: Open a pull request in Sky Ninja Academy. Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR.
+description: Open a pull request in Sharpwise. Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR.
 ---
 # Open a pull request
 
