@@ -110,6 +110,9 @@ export const coinLabel = (p: number) => {
   const pounds = Math.floor(p / 100), pence = p % 100;
   return pence === 0 ? `£${pounds}` : `£${pounds} and ${pence}p`;
 };
+/** The spoken twin of `coinLabel` (#652): 150 is `1 pound and 50 pence`, never `1.5 pounds`; 100 is `1 pound`, 1 is `1 penny`. */
+export const coinSay = (p: number) => ([[Math.floor(p / 100), 'pound', 'pounds'], [p % 100, 'penny', 'pence']] as const)
+  .filter(([n]) => n).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`).join(' and ');
 
 export const OBJECTS = ['🍎', '⭐', '🐟', '🎈', '🍪', '🦋', '🐸', '🚗', '🌼', '🧁'];
 
@@ -280,7 +283,7 @@ export function unitQ(rng: Rng, total: number, coins: number[], max = Infinity):
   const first = pool.slice(0, 4).filter(ok);
   const ds = shuffle(rng, first.length >= 3 ? first : pool.filter(ok)).slice(0, 3);
   if (ds.length < 3) throw new Error(`unitQ: only ${ds.length} decoy(s) available for total ${total}p (max ${max}p)`);
-  return wordQ(rng, 'How much money?', `${total}p`, ds.map(x => `${x}p`), { visual: { type: 'coins', coins }, say: 'How many pence altogether?' });
+  return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: total < 100 ? 'How many pence altogether?' : 'How much money altogether?' });
 }
 
 // ---------- Position & direction — shared Year 1 / Year 2 (#8 Phase 2) ----------
