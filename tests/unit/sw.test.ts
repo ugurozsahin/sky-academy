@@ -20,15 +20,15 @@ const TEMPLATE = readFileSync(new URL('../../scripts/sw-template.js', import.met
 const ORIGIN = 'https://sky.test';
 const BASE = `${ORIGIN}/`;
 
-type Res = { ok: boolean; status: number; type: string; body: string; headers: Map<string, string>; clone(): Res };
+type Res = { ok: boolean; status: number; type: string; body: string; headers: Map<string, string>; clone(): Res; text(): Promise<string> };
 const res = (body: string, o: Partial<Res> = {}): Res => ({
-  ok: true, status: 200, type: 'basic', body, headers: new Map(),
+  ok: true, status: 200, type: 'basic', body, headers: new Map(), text: async () => body,
   clone() { return { ...this, clone: this.clone }; }, ...o,
 });
 
 class FakeCache {
   entries = new Map<string, { req: { url: string; headers: Map<string, string> }; res: Res }>();
-  constructor(private server: Server) {}
+  constructor(public server: Server) {}
   async addAll(reqs: { url: string; headers: Map<string, string> }[]) {
     const got: [typeof reqs[0], Res][] = [];
     for (const r of reqs) {
@@ -36,9 +36,12 @@ class FakeCache {
       if (!v || !v.ok) throw new TypeError('addAll: request failed');   // all-or-nothing, like the real thing
       got.push([r, v]);
     }
+    // A full device: everything was fetched, nothing can be kept (#635). The real error is a DOMException.
+    if (this.server.full) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
     for (const [r, v] of got) this.entries.set(r.url, { req: r, res: v });
   }
   async put(req: string | { url: string; headers: Map<string, string> }, v: Res) {
+    if (this.server.putFails) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
     const r = typeof req === 'string' ? { url: new URL(req, BASE).href, headers: new Map<string, string>() } : req;
     this.entries.set(r.url, { req: r, res: v });
   }
@@ -56,13 +59,14 @@ class FakeCache {
     }
     return hit.res;
   }
+  async delete(req: string) { return this.entries.delete(new URL(req, BASE).href); }
   async keys() { return [...this.entries.values()].map(e => e.req); }
 }
 
 /** What the network would answer, and what it charged for it. */
-type Server = { get(req: { url: string }): Res | undefined; hits: string[] };
+type Server = { get(req: { url: string }): Res | undefined; hits: string[]; full?: boolean; putFails?: boolean };
 
-function drive(files: Record<string, Res>, opts: { offline?: boolean } = {}) {
+function drive(files: Record<string, Res>, opts: { offline?: boolean; caches?: Map<string, FakeCache>; clock?: { t: number } } = {}) {
   const server: Server = {
     hits: [],
     get(req) {
@@ -71,13 +75,19 @@ function drive(files: Record<string, Res>, opts: { offline?: boolean } = {}) {
       return files[new URL(req.url, BASE).pathname.replace(/^\//, '')];
     },
   };
-  const caches = new Map<string, FakeCache>();
+  const caches = opts.caches ?? new Map<string, FakeCache>();
+  const clock = opts.clock ?? { t: 1.7e12 };
   const listeners: Record<string, ((e: unknown) => void)[]> = {};
   const claimed = { skipWaiting: 0, claim: 0 };
   const waits: Promise<unknown>[] = [];
 
   const cachesApi = {
-    async open(name: string) { if (!caches.has(name)) caches.set(name, new FakeCache(server)); return caches.get(name)!; },
+    async open(name: string) {
+      if (!caches.has(name)) caches.set(name, new FakeCache(server));
+      const c = caches.get(name)!;
+      c.server = server;   // a restarted worker is a new Server over the same storage
+      return c;
+    },
     async keys() { return [...caches.keys()]; },
     async delete(name: string) { return caches.delete(name); },
   };
@@ -93,7 +103,8 @@ function drive(files: Record<string, Res>, opts: { offline?: boolean } = {}) {
     Request: function (url: string, init: { cache?: string } = {}) {
       return { url: new URL(url, BASE).href, headers: new Map<string, string>(), cache: init.cache };
     } as unknown as typeof Request,
-    Response: { error: () => res('', { ok: false, status: 0, type: 'error' }) },
+    Response: Object.assign(function (body: string) { return res(String(body)); }, { error: () => res('', { ok: false, status: 0, type: 'error' }) }),
+    Date: { now: () => clock.t },
     fetch: async (req: string | { url: string }) => {
       const r = typeof req === 'string' ? { url: new URL(req, BASE).href } : req;
       const v = server.get(r);
@@ -112,12 +123,15 @@ function drive(files: Record<string, Res>, opts: { offline?: boolean } = {}) {
     };
     for (const fn of listeners[type] ?? []) fn(e);
     await Promise.all(waits.splice(0));
-    return responded ? await responded.catch((err: Error) => ({ thrown: err }) as unknown as Res) : undefined;
+    const out = responded ? await responded.catch((err: Error) => ({ thrown: err }) as unknown as Res) : undefined;
+    // `shell()` hands its rebuild to `waitUntil` only after it has looked in the cache, i.e. after the loop above.
+    await Promise.all(waits.splice(0));
+    return out;
   };
   const request = (url: string, extra: Record<string, unknown> = {}) =>
     ({ url: new URL(url, BASE).href, method: 'GET', mode: 'no-cors', headers: new Map<string, string>(), ...extra });
 
-  return { fire, request, caches, cachesApi, claimed, server, sandbox };
+  return { fire, request, caches, cachesApi, claimed, server, sandbox, clock };
 }
 
 const BUILD = () => ({
@@ -221,5 +235,113 @@ describe('the service worker, driven (#15)', () => {
     const cache = [...broken.caches.values()][0];
     expect(cache?.entries.size, 'addAll is all-or-nothing').toBe(0);
     expect(broken.claimed.skipWaiting, 'and a worker that cached nothing must not replace the one that works').toBe(0);
+  });
+});
+
+/**
+ * Bounded rebuilds (#635). An evicted cache (no `install` ran: the worker is active, the storage is empty) is
+ * what a shell miss looks like. `restart` is a new worker over the same storage, which is what every launch
+ * is: an idle worker is killed within seconds, so in-memory state alone forgets before the next launch.
+ *
+ * Prove them red: drop `giveUp(cache)` in `attempt`, drop the marker `put` in `giveUp`, drop `sameDeployment`,
+ * or make `err.name === 'TypeError'` always false (offline then latches).
+ */
+describe('a rebuild that keeps failing stops re-downloading the game (#635)', () => {
+  const SHELL_HTML = '<script src="/assets/app.js"></script>';
+  const BUILD2 = () => ({ ...BUILD(), 'index.html': res(SHELL_HTML) });
+  const NAV = (w: ReturnType<typeof drive>) => w.fire('fetch', { request: w.request('/', { mode: 'navigate' }) });
+  const cached = (w: ReturnType<typeof drive>) =>
+    [...w.caches.values()].flatMap(c => [...c.entries.keys()]).map(u => u.replace(BASE, '')).filter(k => k !== 'rebuild-gave-up').sort();
+  /** Downloads one navigation caused: the shell itself, plus a whole precache when it rebuilt. */
+  const cost = async (w: ReturnType<typeof drive>) => { w.server.hits.length = 0; const out = await NAV(w); return { out, hits: w.server.hits.length }; };
+  const WHOLE = ['assets/app.css', 'assets/app.js', 'avatars/blaze.webp', 'index.html'];
+
+  it('success: a miss serves the network at once and rebuilds the whole build behind it', async () => {
+    const w = drive(BUILD2());
+    const { out, hits } = await cost(w);
+    expect(out?.body, 'the player is not made to wait for the rebuild').toBe(SHELL_HTML);
+    expect(hits, 'the shell, then each of four files once').toBe(1 + 4);
+    expect(cached(w)).toEqual(WHOLE);
+  });
+
+  it('a full device: the second navigation, in the same worker or a restarted one, downloads only the page', async () => {
+    const caches = new Map<string, FakeCache>();
+    const w = drive(BUILD2(), { caches });
+    w.server.full = true;
+    const first = await cost(w);
+    expect(first.out?.body, 'the game still loads from the network').toBe(SHELL_HTML);
+    expect(first.hits, 'the first miss pays for the rebuild it cannot keep').toBe(1 + 4);
+    expect(cached(w), 'nothing half-stored').toEqual([]);
+    expect((await cost(w)).hits, 'same worker: no rebuild').toBe(1);
+    const restarted = drive(BUILD2(), { caches });
+    restarted.server.full = true;
+    expect((await cost(restarted)).hits, 'a restarted worker finds the marker in the cache').toBe(1);
+  });
+
+  it('the marker itself failing to store still stops the retries for the life of the worker', async () => {
+    const w = drive(BUILD2());
+    w.server.full = true;
+    w.server.putFails = true;
+    await NAV(w);
+    expect((await cost(w)).hits).toBe(1);
+  });
+
+  it('after a day the worker tries again, and a device with room is rebuilt', async () => {
+    const caches = new Map<string, FakeCache>();
+    const clock = { t: 1.7e12 };
+    const w = drive(BUILD2(), { caches, clock });
+    w.server.full = true;
+    await NAV(w);
+    clock.t += 23 * 3600e3;
+    expect((await cost(drive(BUILD2(), { caches, clock }))).hits, 'still inside the backoff').toBe(1);
+    clock.t += 2 * 3600e3;
+    const later = drive(BUILD2(), { caches, clock });
+    expect((await cost(later)).hits, 'past the backoff: shell + whole precache').toBe(1 + 4);
+    expect(cached(later)).toEqual(WHOLE);
+  });
+
+  it('offline: nothing is stored and nothing latches, so the first online launch after it rebuilds', async () => {
+    const files = BUILD2();
+    const caches = new Map<string, FakeCache>();
+    const w = drive(files, { caches });
+    const real = w.server.get;
+    w.server.get = () => undefined;
+    for (let i = 0; i < 3; i++) await NAV(w);   // three offline launches in one worker: still not given up
+    expect(cached(w)).toEqual([]);
+    w.server.get = real;
+    await NAV(w);
+    expect(cached(w), 'success after failure').toEqual(WHOLE);
+  });
+
+  it('partial failure: one file answering 500 stores neither, is not a give-up, and the next launch retries', async () => {
+    const files = BUILD2();
+    files['assets/app.css'] = res('', { ok: false, status: 500 });
+    const w = drive(files);
+    await NAV(w);
+    expect(cached(w), 'whole or empty').toEqual([]);
+    expect([...w.caches.values()].some(c => c.entries.has(BASE + 'rebuild-gave-up')), 'a flaky host is not a full disk').toBe(false);
+    files['assets/app.css'] = res('.hero{}');
+    await NAV(w);
+    expect(cached(w)).toEqual(WHOLE);
+  });
+
+  it('a shell from another deployment is not kept beside this one’s assets, and is not fetched again', async () => {
+    const files = BUILD2();
+    files['index.html'] = res('<script src="/assets/app-NEW.js"></script>');   // a host still serving old assets
+    const w = drive(files);
+    const first = await cost(w);
+    expect(first.out?.body, 'the player still gets the page the network serves').toContain('app-NEW.js');
+    expect(cached(w).includes('index.html'), 'the newer shell is removed again: a miss, not a mixed cache').toBe(false);
+    expect((await cost(w)).hits, 'and the next launch does not download the game again').toBe(1);
+  });
+
+  it('a new deployment is not held back by the old one’s give-up', async () => {
+    const caches = new Map<string, FakeCache>();
+    const old = drive(BUILD2(), { caches });
+    old.server.full = true;
+    await NAV(old);
+    const next = drive({ ...BUILD2(), 'assets/app.js': res('boot2()'), 'index.html': res(SHELL_HTML) }, { caches });
+    const { hits } = await cost(next);
+    expect(hits, 'a new CACHE name starts with no marker').toBe(1 + 4);
   });
 });
