@@ -919,13 +919,11 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
       'no total': { date: iso, progress: {}, done: [], streak: { last: '', days: 0 } },
     };
 
+    const kept = (name: string) => (name.startsWith('a date that') ? {} : { date: iso });   // the only field the repair must replace is `date` there
     it.each(Object.keys(broken))('%s: the day ends normally and the coins are paid', (name) => {
       expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: broken[name] })), name).toBe(true);
-      // The key is gone and `DEFAULT` has filled it back in — which is the fix, rather than each reader of
-      // the interior coping (the three results screens reach `applyEvent()` through `recordGameEnd()` since
-      // #365; `dojoCard()` and `dojoToday()` read it directly). Three of these shapes throw without it and the rest load a
-      // half-built state, so this line is what every case here pins.
-      expect(load().dojo, name).toEqual({ date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 });
+      // Only the broken field is replaced by its fresh value (#413); whatever was valid stays (see sanitize-types.test.ts).
+      expect(load().dojo, name).toEqual({ date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0, ...kept(name) });
       // `carriedStreak`, not `dojoToday`: the map screen's `dojoCard()` is the FIRST reader of the interior
       // and it reads a superset of what `applyEvent()` does, so this is the call that actually threw (PR
       // #408 review, note 7 — `dojoFor()` reads only `.date` and was never at risk).

@@ -8,8 +8,8 @@ describe('sanitizeTypes branches (via migrate)', () => {
     expect(migrate({ ...base, streak: null }).streak).toEqual(migrate(base).streak);
     expect(migrate({ ...base, progress: [] }).progress).toEqual({});
   });
-  it('drops a malformed dojo and keeps a wellformed one', () => {
-    expect(migrate({ ...base, dojo: { date: '2026-10-17' } }).dojo).toEqual(migrate(base).dojo);
+  it('repairs a malformed dojo field by field (#413 — see sanitize-storage.test.ts)', () => {
+    expect(migrate({ ...base, dojo: { date: '2026-10-17' } }).dojo).toEqual({ ...migrate(base).dojo, date: '2026-10-17' });
   });
   it('drops a non-array list field', () => {
     expect(migrate({ ...base, owned: 'x' }).owned).toEqual([]);
