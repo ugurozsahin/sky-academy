@@ -641,7 +641,7 @@ describe('guard rails', () => {
   it('the review gate queues instead of cancelling, so a skip-filtered run cannot cancel one that stamps (#92)', () => {
     const yml = workflow('review-gate.yml');
     const code = yml.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
-    const concurrency = code.slice(code.indexOf('concurrency:'), code.indexOf('permissions:'));
+    const concurrency = code.slice(code.indexOf('concurrency:'), code.indexOf('concurrency:') + 400);   // job-level since #232
     expect(concurrency.length).toBeGreaterThan(20);                        // never assert against an empty slice
     expect(concurrency, 'cancel-in-progress must be false, or a skipped run can cancel one that stamps (#92)')
       .toMatch(/cancel-in-progress:\s*false/);
