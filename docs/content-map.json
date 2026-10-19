@@ -1,6 +1,6 @@
 {
  "generated": "scripts/content-map.mjs",
- "topicCount": 342,
+ "topicCount": 343,
  "byYear": [
   {
    "year": "reception",
@@ -42,7 +42,7 @@
    "year": "year6",
    "title": "Year 6",
    "maths": 35,
-   "writing": 15
+   "writing": 16
   }
  ],
  "topics": [
@@ -6919,6 +6919,27 @@
    ]
   },
   {
+   "id": "y6-inference",
+   "title": "Inference",
+   "year": "year6",
+   "subject": "writing",
+   "nc": "Y5–6 Comprehension: inferring feelings, thoughts and motives, justified with evidence",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y56-e-comprehension"
+   ]
+  },
+  {
    "id": "y6-figurative",
    "title": "Figurative Language",
    "year": "year6",
@@ -8358,6 +8379,7 @@
    "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
    "topics": [
     "y5-factopinion",
+    "y6-inference",
     "y6-figurative"
    ]
   },
