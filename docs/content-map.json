@@ -1,6 +1,6 @@
 {
  "generated": "scripts/content-map.mjs",
- "topicCount": 340,
+ "topicCount": 341,
  "byYear": [
   {
    "year": "reception",
@@ -30,7 +30,7 @@
    "year": "year4",
    "title": "Year 4",
    "maths": 35,
-   "writing": 16
+   "writing": 17
   },
   {
    "year": "year5",
@@ -4692,6 +4692,27 @@
    ]
   },
   {
+   "id": "y4-retrieve",
+   "title": "Retrieving Information",
+   "year": "year4",
+   "subject": "writing",
+   "nc": "Y3–4 Comprehension: retrieve and record information from non-fiction",
+   "mode": "solo",
+   "input": "bubbles",
+   "difficulties": [
+    1,
+    2,
+    3
+   ],
+   "stages": 5,
+   "questionBank": "generated",
+   "hasVisual": false,
+   "tip": "After a bedtime story, ask who it was about, what happened and where, then how many or why.",
+   "strands": [
+    "y34-e-comprehension"
+   ]
+  },
+  {
    "id": "y4-context",
    "title": "Words in Context",
    "year": "year4",
@@ -8212,6 +8233,7 @@
    ],
    "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
    "topics": [
+    "y4-retrieve",
     "y4-context"
    ]
   },
