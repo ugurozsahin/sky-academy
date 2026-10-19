@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM hook script
 import { check, REQUIRED_LINES } from '../../.claude/hooks/github-write-guard.mjs';
 
 /**

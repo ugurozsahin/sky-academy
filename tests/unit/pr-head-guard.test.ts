@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
 import { BRANCH_PATTERN, check, prHead } from '../../.claude/hooks/github-write-guard.mjs';
 import { pinSentence } from './helpers/pin-sentence';
 
