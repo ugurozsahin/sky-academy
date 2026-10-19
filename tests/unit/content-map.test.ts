@@ -6,12 +6,13 @@ import { describe, expect, it } from 'vitest';
 import { TOPICS, YEARS } from '../../src/curriculum';
 import { R_STORIES } from '../../src/curriculum/stories-r';
 import { Y1_STORIES } from '../../src/curriculum/stories-y1';
+import { Y2_STORIES } from '../../src/curriculum/stories-y2';
 import { tipFor } from '../../src/game/tips';
 import { buildContentMap, curriculumIds, strandsOf, type StrandTable } from '../../scripts/content-map-lib.mjs';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 const strands: StrandTable = JSON.parse(read('docs/content-map-strands.json'));
-const banks = { 'r-storytime': R_STORIES.length, 'y1-storytime': Y1_STORIES.length };
+const banks = { 'r-storytime': R_STORIES.length, 'y1-storytime': Y1_STORIES.length, 'y2-storytime': Y2_STORIES.length };
 const input = { topics: TOPICS, years: YEARS, strands, tipFor, banks };
 const built = buildContentMap(input);
 const REGEN = 'run `npm run content-map` and commit docs/content-map.json and docs/CONTENT-MAP.md';

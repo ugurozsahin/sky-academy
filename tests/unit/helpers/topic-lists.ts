@@ -7,6 +7,7 @@ import {
 import { y2Related } from '../../../src/curriculum/year2-related';
 import { y2StatsOrder } from '../../../src/curriculum/year2-stats-order';
 import { y2StatsTable } from '../../../src/curriculum/year2-stats-table';
+import { y2StoryTime } from '../../../src/curriculum/stories-y2';
 import { y2OddEven } from '../../../src/curriculum/year2-oddeven';
 import { y2MeasureCompare } from '../../../src/curriculum/year2-measure-compare';
 import { y2Equiv } from '../../../src/curriculum/year2-equiv';
@@ -39,7 +40,7 @@ export const Y2_IDS = [
   'y2-pv', 'y2-compare', 'y2-skip', 'y2-add', 'y2-sub', 'y2-related', 'y2-three', 'y2-inverse', 'y2-story-add', 'y2-anyorder', 'y2-tables', 'y2-story-times', 'y2-oddeven',
   'y2-fractions', 'y2-equiv', 'y2-money', 'y2-story-money', 'y2-coincombo', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-estimate', 'y2-shapes', 'y2-objects3d', 'y2-faces', 'y2-symmetry',
   'y2-patterns', 'y2-position', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-measure-compare', 'y2-temp', 'y2-scales', 'y2-duration', 'y2-balance',
-  'y2-stats', 'y2-stats-order', 'y2-stats-table', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-nouns', 'y2-suffix-root', 'y2-homophones', 'y2-spell-kn', 'y2-spell-le', 'y2-spell-dge', 'y2-spell-c', 'y2-spell-tion', 'y2-spell-more', 'y2-wordclass',
+  'y2-stats', 'y2-stats-order', 'y2-stats-table', 'y2-storytime', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-nouns', 'y2-suffix-root', 'y2-homophones', 'y2-spell-kn', 'y2-spell-le', 'y2-spell-dge', 'y2-spell-c', 'y2-spell-tion', 'y2-spell-more', 'y2-wordclass',
   'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-conjunction', 'y2-infer', 'y2-trace',
 ];
 
@@ -53,7 +54,7 @@ export const Y2_GENS: Record<string, Topic['gen']> = {
   'y2-money': y2Money, 'y2-story-money': y2StoryMoney, 'y2-coincombo': y2CoinCombo, 'y2-time': y2Time, 'y2-words': y2Words, 'y2-order': y2Order, 'y2-line': y2Line,
   'y2-shapes': y2Shapes, 'y2-objects3d': y2Objects3d, 'y2-faces': y2Faces, 'y2-symmetry': y2Symmetry, 'y2-patterns': y2Patterns, 'y2-position': y2Position, 'y2-length': y2Length,
   'y2-mass': y2Mass, 'y2-capacity': y2Capacity, 'y2-measure-compare': y2MeasureCompare, 'y2-temp': y2Temp, 'y2-scales': y2Scales, 'y2-duration': y2Duration, 'y2-balance': y2Balance,
-  'y2-stats': y2Stats, 'y2-stats-order': y2StatsOrder, 'y2-stats-table': y2StatsTable, 'y2-spelling': y2Spelling, 'y2-contractions': y2Contractions, 'y2-suffix': y2Suffix, 'y2-suffix-root': y2SuffixRoot,
+  'y2-stats': y2Stats, 'y2-stats-order': y2StatsOrder, 'y2-stats-table': y2StatsTable, 'y2-storytime': y2StoryTime, 'y2-spelling': y2Spelling, 'y2-contractions': y2Contractions, 'y2-suffix': y2Suffix, 'y2-suffix-root': y2SuffixRoot,
   'y2-homophones': y2Homophones, 'y2-spell-kn': y2SpellKn, 'y2-spell-le': y2SpellLe, 'y2-spell-dge': y2SpellDge, 'y2-spell-c': y2SpellC, 'y2-spell-tion': y2SpellTion, 'y2-spell-more': y2SpellMore, 'y2-wordclass': y2WordClass, 'y2-sentencetype': y2SentenceType, 'y2-tense': y2Tense, 'y2-punct': y2Punct,
   'y2-sentence': y2Sentence, 'y2-conjunction': y2Conjunction, 'y2-infer': y2Infer, 'y2-nouns': y2Nouns, 'y2-trace': y2Trace,
 };
@@ -102,6 +103,7 @@ export const NO_REPEATED_SET = new Set([
 'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
   'y2-conjunction d1', 'y2-conjunction d2', 'y2-conjunction d3', // #1007: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y2-nouns d1', 'y2-nouns d2', 'y2-nouns d3', // #1008: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
+  'y2-storytime d2', 'y2-storytime d3', // #1019: each story question carries its own decoys, so an option set never recurs with a different answer; d1 does compare (the names Mum and Dad recur)
   'r-storytime d2', 'r-storytime d3', // #1020: each story question carries its own pictures or digits, so an option set never recurs with a different answer; d1 compares
   'y1-storytime d2', 'y1-storytime d3', // #1018: each story question carries its own decoys, so an option set never recurs with a different answer; d1 does compare (the names Mum and Dad recur)
   'y1-share d2', 'y1-share d3', // #986: the decoys are the total, k and answer ±1, all derived from the card, so no option set recurs with a different answer at these seeds
