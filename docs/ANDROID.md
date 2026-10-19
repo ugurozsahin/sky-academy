@@ -26,9 +26,15 @@ Play takes an Android App Bundle (`.aab`), not an APK ([docs](https://developer.
 5. Repository **Variable**: `ANDROID_RELEASE_ENABLED` = `true` (a job-level condition cannot read secrets, so a variable is the switch). With it set and a secret missing, the job fails with a message naming it.
 6. Tag `vX.Y.Z` (or Run workflow), download **sharpwise-aab**, and upload it to the internal test track.
 
-**App Links:** the SHA-256 that matters for `assetlinks.json` is **Google's app-signing key** (Play Console, Test and release, App signing), not the upload key and not the debug key (issue #2028).
+**App Links:** the SHA-256 that matters for `assetlinks.json` is **Google's app-signing key**, not the upload key you create here; see "App Links" below for where it goes.
 
 The workflow decodes the keystore to a temp file, passes its path and the passwords to Gradle through environment variables (`android/app/build.gradle`, `signingConfigs.release`), and deletes the file afterwards. With none of those set, `./gradlew assembleDebug` below works as before and `bundleRelease` gives an unsigned bundle.
+
+## App Links: `https://sharpwise.co.uk/play/…` opens the app (#2028)
+`AndroidManifest.xml` has an `autoVerify` filter on `MainActivity` for `https://sharpwise.co.uk/play`; `src/deeplink-native.ts` hands the URL the OS opened to `handleDeepLink` (warm start: `appUrlOpen`; cold start: `App.getLaunchUrl()`) and ignores any other host or path. The app trusts the domain only if `https://sharpwise.co.uk/.well-known/assetlinks.json` lists this app's signing fingerprint.
+- **Until the owner supplies the fingerprint nothing is published**: the Pages workflow (`scripts/app-links.mjs`) writes `assetlinks.json` only when the repository variable `ANDROID_APP_LINKS_SHA256` is set (comma or space separated for several), with the package from `capacitor.config.ts`. A file with no real fingerprint would verify nothing, and a debug key changes every CI run. Without verification Android opens the link in the browser, i.e. the web game at `/play/`: a safe fallback. A malformed value fails the deploy.
+- With Play App Signing the fingerprint is **Google's app signing key** (Play Console, Setup, App signing, SHA-256), not the upload key. Add it (and the debug key's, to test a debug APK) to the variable. Details: `docs/WEBSITE.md`.
+- Check on a device or emulator (Android 12+) after installing: `adb shell pm verify-app-links --re-verify uk.co.sharpwise`, then `adb shell pm get-app-links uk.co.sharpwise` (expect `sharpwise.co.uk: verified`), then `adb shell am start -a android.intent.action.VIEW -d "https://sharpwise.co.uk/play/?topic=<topicId>"`. Unverified on a device so far: the Android CI job proves the build only.
 
 ## Build locally (optional)
 Android Studio (or the SDK command-line tools) + JDK 21:
