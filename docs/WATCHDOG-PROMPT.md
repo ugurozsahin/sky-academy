@@ -147,11 +147,10 @@ your first finding and the only one you can report.
    declares a freeze, and it would appear in CLAUDE.md and `docs/ROUTINE-PROMPT.md` together, so a
    bar in one place alone is a finding. **(b) Has the order been skipped?** Since 2026-09-11 the order is
    **the labels, not a list** (#94), which is the version of this check you can actually evaluate: run STEP 3's
-   query as `docs/ROUTINE-PROMPT.md` writes it, and apply its drops in its order — never a copy of either
-   here: a copy drifted the day the query gained `creator=` (#284), and a run would then have been accused of
-   skipping an issue it was right to skip — then highest `priority:*`, oldest issue number first — and
-   compare the issue it names with the issue each PR opened
-   since your last check actually develops. A PR developing a lower-priority issue while that one sat
+   query as `docs/ROUTINE-PROMPT.md` writes it, apply its drops and then its sort, in its order, and compare
+   the issue it names with the issue each PR opened since your last check actually develops. Never a copy of
+   any of that here: a copy drifted the day the query gained `creator=` (#284), and a run would then have been
+   accused of skipping an issue it was right to skip. A PR developing a lower-priority issue while that one sat
    unstarted is the finding, and the query is reproducible, so it is evidence rather than an impression.
    Run it too when a pulse says `none eligible` (#1369): with no PR there is nothing to compare, so an eligible
    issue the query returns is the finding, and so is a `blockers read live` count the query does not bear out.
