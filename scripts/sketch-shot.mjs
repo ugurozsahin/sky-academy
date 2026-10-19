@@ -7,8 +7,8 @@
 // The CLI builds EVERY time by default: a checkout nearly always has a `dist/` from an earlier build, and a
 // gallery shot from it would be of the previous object while saying nothing (silent-failure review).
 import { spawn, execSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const OUT_DIR = 'docs/sketchbook';
@@ -69,7 +69,9 @@ async function up(url, alive, tries = 60) {
 }
 
 // Same guard as build-sw.mjs / bundle-single.mjs (#116): importing this module must run nothing.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths, not resolve(): a symlinked checkout (macOS /var -> /private/var) never matched, so the CLI silently did nothing (#309).
+const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) {
   const args = process.argv.slice(2);
   const noBuild = args.includes('--no-build');
   const out = args.find(a => !a.startsWith('--')) ?? OUT_DIR;
