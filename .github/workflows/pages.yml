@@ -24,6 +24,10 @@ jobs:
         run: npx tsc --noEmit && npx vite build --base=/play/ --outDir site/play --emptyOutDir && node scripts/build-sw.mjs site/play
       - name: Add the site pages, CNAME and .nojekyll
         run: cp -a website/. site/
+      - name: Android App Links file (#2028; none until the owner sets ANDROID_APP_LINKS_SHA256)
+        run: node scripts/app-links.mjs site
+        env:
+          ANDROID_APP_LINKS_SHA256: ${{ vars.ANDROID_APP_LINKS_SHA256 }}
       - uses: actions/upload-pages-artifact@v4
         with: { path: site }
   deploy:
