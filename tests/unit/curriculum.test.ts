@@ -196,7 +196,7 @@ describe('curriculum ranges', () => {
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
         const q = t.gen(d, r);
         const m = q.prompt.match(SUM);
-        if (!m) continue;
+        if (!m) { expect(q.prompt, 'an add/subtract card that SUM no longer reads (#329)').not.toMatch(/ = \?$/); continue; }
         sums++;
         const [, aStr, unit, op, bStr] = m;
         const a = Number(aStr), b = Number(bStr);
@@ -834,7 +834,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
         expect(q.prompt, id).toMatch(/^Which holds (more|less|the most|the least)\?$/);
         // `litres` joins `millilitres` with #298 slice 1: Year 2 compares in `l` where `ml` would need
         // hundreds. The verb is what this rail is about and is still asserted — only the unit is widened.
-        expect(q.say, 'the spoken line says what each one holds').toMatch(/ holds \d+ (millilitres|litres)/);
+        expect(q.say, 'the spoken line says what each one holds, in the unit the hint prints (#329)').toMatch(new RegExp(` holds \\d+ ${{ ml: 'millilitres', l: 'litres' }[q.hint!.match(/\d+ (ml|l)(?: ·|$)/)![1] as 'ml' | 'l']}\\b`));
         expect(q.say, id).not.toMatch(/full|empt/);
       }
     }
