@@ -12,3 +12,4 @@ export declare function blockState(pr: { draft: boolean; labels?: string[]; comm
   { blocked: boolean; reasons: string[] };
 export declare const CLOSING_KEYWORDS: string[];
 export declare function closingRefs(body: string): number[];
+export declare const INVISIBLE: RegExp;

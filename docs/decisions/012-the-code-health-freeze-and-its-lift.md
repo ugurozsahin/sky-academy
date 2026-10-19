@@ -1,7 +1,8 @@
 # 012 — The code-health freeze ended on 2026-09-10, and its lift does not re-arm
 
-**Status:** accepted — owner, 2026-09-10. The freeze is first written down in `docs/worklog/2026-09.md` (the
-2026-09-07 01:40 entry, landed with commit `0d455dec`, #74) and its lift in commit `ba2c1a7d` (#169); issue #36 only
+**Status:** accepted — owner, 2026-09-10. The freeze is first recorded in `docs/worklog/2026-09.md` (the
+2026-09-07 01:40 entry, which commit `7cf7dd58` carried), its wording went into `CLAUDE.md` and
+`docs/ROUTINE-PROMPT.md` with commit `0d455dec` (#74), and its lift is commit `ba2c1a7d` (#169); issue #36 only
 opens the batch of refactors it was about. Written as a backfill by #636 (#322 row 1): it records a decision
 already taken and changes no behaviour.
 

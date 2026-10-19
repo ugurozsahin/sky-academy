@@ -1,6 +1,7 @@
 # 016 — The project board is a projection of the repo, written from the owner's Mac
 
-**Status:** accepted — owner, 2026-09; a backfill by #640 (#322 row 5) of the arrangement #158 and #87 built.
+**Status:** accepted — owner, 2026-09; a backfill by #640 (#322 row 5) of the arrangement commit `1d7fe5d1` (PR #197, which names
+the issue as #158) and #87 built.
 It records a decision already taken and changes no behaviour.
 
 ## Context
