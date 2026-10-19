@@ -222,16 +222,14 @@ function wireCertificate(deps: ResultsDeps, earned: CertInfo) {
     // (the full-screen view carries its own save hint), so a stale error from an earlier failed attempt would
     // otherwise still be sitting there, unread, once the child closes a screen that just worked fine.
     const msg = $('#cert-msg', overlay); msg.hidden = true; msg.textContent = '';
-    try {
-      const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, () => askGrownUp('share the certificate'));
-      if (!scope.alive) return;   // torn down mid-delivery — see the comment on `certMsg` above
-      if (how === 'shared') certMsg('Certificate shared!');
-      else if (how === 'saved' || how === 'downloaded') certMsg('Certificate saved!');
-      else if (how === 'declined') certMsg('No problem — you can save it next time!');
-      // 'shown' opens the full-screen view with its own save hint — the reset above already cleared any
-      // earlier message, so there is nothing left to show here.
-    }
-    catch (e) { console.error('certificate delivery failed', e); if (scope.alive) certMsg('Could not make the certificate', true); }
-    b.disabled = false;
+    let how: Awaited<ReturnType<typeof deliverCertificate>>;   // #674: the try holds the delivery only, so reporting a failure cannot throw into its own catch
+    try { how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, () => askGrownUp('share the certificate')); }
+    catch (e) { console.error('certificate delivery failed', e); if (scope.alive) certMsg('Could not make the certificate', true); return; }
+    finally { b.disabled = false; }
+    if (!scope.alive) return;   // torn down mid-delivery — see the comment on `certMsg` above
+    if (how === 'shared') certMsg('Certificate shared!');
+    else if (how === 'saved' || how === 'downloaded') certMsg('Certificate saved!');
+    else if (how === 'declined') certMsg('No problem — you can save it next time!');
+    // 'shown': the full-screen view has its own save hint and the reset above cleared any earlier message
   });
 }

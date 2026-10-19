@@ -110,6 +110,9 @@ export const coinLabel = (p: number) => {
   const pounds = Math.floor(p / 100), pence = p % 100;
   return pence === 0 ? `£${pounds}` : `£${pounds} and ${pence}p`;
 };
+/** The spoken twin of `coinLabel` (#652): 150 is `1 pound and 50 pence`, never `1.5 pounds`; 100 is `1 pound`, 1 is `1 penny`. */
+export const coinSay = (p: number) => ([[Math.floor(p / 100), 'pound', 'pounds'], [p % 100, 'penny', 'pence']] as const)
+  .filter(([n]) => n).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`).join(' and ');
 
 export const OBJECTS = ['🍎', '⭐', '🐟', '🎈', '🍪', '🦋', '🐸', '🚗', '🌼', '🧁'];
 
@@ -249,9 +252,9 @@ export function unitChoice(rng: Rng, things: [string, string][], small: string, 
  * inside the range either way. The third decoy is the other operation — the mistake the question is about.
  *
  * Two invariants the bounds below carry, both pinned in `tests/unit/curriculum.test.ts` because neither is
- * visible in the ranges at a glance: `b ≥ 10`, without which the other-operation decoy collides with
- * `answer − 10` and `wordQ` silently dedupes the card down to three options; and `b ≤ 34`, above which
- * `ri(rng, b + 20, 90 - b)` inverts and hands back values below its own minimum.
+ * visible in the ranges at a glance: `b ≥ 10` (margin: the other-operation decoy collides with `answer ∓ 10`
+ * at exactly `b = 5`, and `wordQ` would dedupe the card to three options); and `b ≤ 35`, above which (`b ≥ 36`)
+ * `ri(rng, b + 20, 90 - b)` inverts and hands back values below its own minimum (`b = 35`: `ri(55, 55)`).
  */
 export function measureSum(rng: Rng, unit: string, verb: [string, string]): Question {
   const b = ri(rng, 10, 30), a = ri(rng, b + 20, 90 - b), add = rng() < 0.5;
@@ -280,7 +283,7 @@ export function unitQ(rng: Rng, total: number, coins: number[], max = Infinity):
   const first = pool.slice(0, 4).filter(ok);
   const ds = shuffle(rng, first.length >= 3 ? first : pool.filter(ok)).slice(0, 3);
   if (ds.length < 3) throw new Error(`unitQ: only ${ds.length} decoy(s) available for total ${total}p (max ${max}p)`);
-  return wordQ(rng, 'How much money?', `${total}p`, ds.map(x => `${x}p`), { visual: { type: 'coins', coins }, say: 'How many pence altogether?' });
+  return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: total < 100 ? 'How many pence altogether?' : 'How much money altogether?' });
 }
 
 // ---------- Position & direction — shared Year 1 / Year 2 (#8 Phase 2) ----------
@@ -511,6 +514,7 @@ export function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3, f
   // a difficulty, whatever it repeats.
   const repeated = letters.length - uniq.length;
   const need = Math.max(1, Math.min(decoys + repeated, 10 - uniq.length));
+  if (pool.length < need) throw new RangeError(`spellQ "${word}": ${pool.length} decoy letters available, ${need} needed`);   // #134, like gapQ: slice would deal fewer, silently
   const ds = shuffle(rng, pool).slice(0, need);
   return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order', hintIsData: false, listen: word };
 }

@@ -13,7 +13,7 @@ import { topicsFor, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
 import { Duel, DUEL_PLAYERS, duelHistoryLine, duelPool, type DuelPlayer } from '../game/duel';
 import { load, type StoredDuel } from '../storage';
-import { haptic, hush, say, sfx } from '../audio';
+import { haptic, hush, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { pushBackGuard, screenScope } from './screen';
 import { pauseHTML } from './overlays';
@@ -80,7 +80,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
 
   const beats = createDuelBeats({ o, av, NAME, scope, arenas, commitOnce: r => results.commitOnce(r), showResults: (r, p) => results.showResults(r, p) });
   const duel = new Duel({ topic, difficulty }, beats.callbacks); beats.bind(duel);
-  const { waveEnd, hold } = beats;
+  const { waveEnd, hold, repeat } = beats;
 
   mountArenas(arenas, av, duel, waveEnd);
   // The settlement and the results overlay (#1500) sit in duel-results.ts; they need the beats' `hold`, and the beats
@@ -94,11 +94,10 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
   function pauseIfLive(): boolean { if (!overlay.hidden || duel.ended) return false; showPause(); return true; }   // #885, #884's shape
-  const repeat = () => { const q = duel.current; if (q) say(q.say ?? q.prompt, true); };
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
   $('#speak').addEventListener('click', repeat); $('#qcard').addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeat(); });
   // #73: a route change tears the arenas down — two rAF loops leaked across screens would be twice the incident.
-  function cleanup() { for (const p of PLAYERS) arenas[p].destroy(); scope.dispose(); }
+  function cleanup() { for (const p of PLAYERS) arenas[p].destroy(); beats.stop(); scope.dispose(); }
 
   window.__sna = createDuelHooks({ duel, arenas, topic, beats, m, paused: () => paused });   // #1500: the test hooks live in duel-hooks.ts
   duel.start();
