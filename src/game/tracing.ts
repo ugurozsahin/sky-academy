@@ -1,4 +1,5 @@
 // Letter / word tracing: the child paints over a faint glyph; we measure how much of it they covered.
+import { watchBox } from './box-watch';
 export interface TraceResult { coverage: number; outside: number; pass: boolean; glyphs: number[] /* coverage per letter */; weakest: number /* index of the least-covered letter */ }
 /** Pass rule (pure, unit-tested): every letter must be mostly covered — tracing 2 of 3 letters is not a word. */
 export const GLYPH_MIN = 0.55, WORD_MIN = 0.65, OUTSIDE_MAX = 0.45;
@@ -78,15 +79,15 @@ export class Tracer {
   private grid!: TraceGrid; private tally!: TraceTally;
   private glyphTotals: number[] = [];   // cells in each letter's mask; the denominator scoreTrace divides by
   private drawing = false; private last: { x: number; y: number } | null = null; private W = 0; private H = 0; private brush = 14;
-  strokes = 0; done = false;
+  strokes = 0; done = false; private unwatch: () => void;
   constructor(public canvas: HTMLCanvasElement, public text: string, private onProgress: (r: TraceResult) => void, public color = '#7fe0ff') {
     this.ctx = canvas.getContext('2d')!;
     this.setup();
     canvas.addEventListener('pointerdown', this.down); canvas.addEventListener('pointermove', this.move);
     window.addEventListener('pointerup', this.up); window.addEventListener('pointercancel', this.up);
-    window.addEventListener('resize', this.resize);
+    this.unwatch = watchBox(canvas, this.resize);
   }
-  destroy() { this.canvas.removeEventListener('pointerdown', this.down); this.canvas.removeEventListener('pointermove', this.move); window.removeEventListener('pointerup', this.up); window.removeEventListener('pointercancel', this.up); window.removeEventListener('resize', this.resize); }
+  destroy() { this.canvas.removeEventListener('pointerdown', this.down); this.canvas.removeEventListener('pointermove', this.move); window.removeEventListener('pointerup', this.up); window.removeEventListener('pointercancel', this.up); this.unwatch(); }
   /** #592: `setup()` re-reads the canvas box and rebuilds the mask for it — same fix as Arena's own `resize`.
    *  Assigning `canvas.width` below wipes the bitmap, so this also clears the child's ink; that is deliberate,
    *  not a side effect to work around — scoring the old strokes against a mask built for a different box is
