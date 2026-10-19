@@ -252,9 +252,9 @@ export function unitChoice(rng: Rng, things: [string, string][], small: string, 
  * inside the range either way. The third decoy is the other operation — the mistake the question is about.
  *
  * Two invariants the bounds below carry, both pinned in `tests/unit/curriculum.test.ts` because neither is
- * visible in the ranges at a glance: `b ≥ 10`, without which the other-operation decoy collides with
- * `answer − 10` and `wordQ` silently dedupes the card down to three options; and `b ≤ 34`, above which
- * `ri(rng, b + 20, 90 - b)` inverts and hands back values below its own minimum.
+ * visible in the ranges at a glance: `b ≥ 10` (margin: the other-operation decoy collides with `answer ∓ 10`
+ * at exactly `b = 5`, and `wordQ` would dedupe the card to three options); and `b ≤ 35`, above which (`b ≥ 36`)
+ * `ri(rng, b + 20, 90 - b)` inverts and hands back values below its own minimum (`b = 35`: `ri(55, 55)`).
  */
 export function measureSum(rng: Rng, unit: string, verb: [string, string]): Question {
   const b = ri(rng, 10, 30), a = ri(rng, b + 20, 90 - b), add = rng() < 0.5;
@@ -514,6 +514,7 @@ export function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3, f
   // a difficulty, whatever it repeats.
   const repeated = letters.length - uniq.length;
   const need = Math.max(1, Math.min(decoys + repeated, 10 - uniq.length));
+  if (pool.length < need) throw new RangeError(`spellQ "${word}": ${pool.length} decoy letters available, ${need} needed`);   // #134, like gapQ: slice would deal fewer, silently
   const ds = shuffle(rng, pool).slice(0, need);
   return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order', hintIsData: false, listen: word };
 }
