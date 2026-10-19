@@ -7,8 +7,8 @@
 //
 // Usage: node scripts/build-sw.mjs [distDir]
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, readdirSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -96,11 +96,13 @@ export function renderSw(template, list, prints) {
     .replace('__PRECACHE__', JSON.stringify(list, null, 2));
 }
 
-// `resolve(argv[1]) === fileURLToPath(import.meta.url)` compares two filesystem paths, not a raw path against
+// Comparing two filesystem paths, not a raw path against
 // a percent-encoded URL (#116): the old `` `file://${process.argv[1]}` `` broke on any character `file://`
 // URLs escape — a space, `#`, anything non-ASCII — so a checkout under a path like `~/Documents/Sky Academy/…`
 // made this whole block silently skip, and `npm run build` exited 0 with no `sw.js` and no error anywhere.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths, not resolve(): a symlinked checkout (macOS /var -> /private/var) never matched, so the CLI silently did nothing (#309).
+const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) {
   const dist = process.argv[2] ?? 'dist';
   if (!existsSync(join(dist, 'index.html'))) throw new Error(`${dist}/index.html is missing — run vite build first`);
   const list = precacheList(listFiles(dist));

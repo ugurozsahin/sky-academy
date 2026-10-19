@@ -3,8 +3,8 @@
 // so the owner picks a variant on his phone (`three-art` skill §4). Images are inlined as data URLs: the page
 // travels alone. Usage: node scripts/sketch-gallery.mjs <object> [--avatar <id>] [out.html]
 // Default output: docs/sketchbook/<object>/gallery.html.
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const esc = (s) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -41,7 +41,9 @@ th{color:#9aa5cf;font-weight:600}img{max-width:100%;height:auto;border-radius:12
 </body></html>`;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths, not resolve(): a symlinked checkout (macOS /var -> /private/var) never matched, so the CLI silently did nothing (#309).
+const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) {
   const args = process.argv.slice(2);
   const object = args.shift();
   if (!object) { console.error('usage: node scripts/sketch-gallery.mjs <object> [--avatar <id>] [out.html]'); process.exit(2); }

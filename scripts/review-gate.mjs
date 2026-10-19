@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -155,7 +154,9 @@ export function closingRefs(body) {
 // CLI: `node scripts/review-gate.mjs <file>` prints what that body would close, so a run can check its PR
 // body against what it actually means before opening the PR (docs/ROUTINE-PROMPT.md). Import-safe: it runs
 // only when this file is the entry point, so the review gate workflow's `await import(...)` is unaffected.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths, not resolve(): a symlinked checkout (macOS /var -> /private/var) never matched, so the CLI silently did nothing (#309).
+const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) {
   const refs = closingRefs(readFileSync(process.argv[2], 'utf8'));
   console.log(refs.length ? `closes: ${refs.map((n) => '#' + n).join(', ')}` : 'closes: nothing');
 }
