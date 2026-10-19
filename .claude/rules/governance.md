@@ -63,9 +63,9 @@ paths:
 - **The run's heartbeat snapshot (issue #62) must say whether it took a second item and, if not, which of the
   four #97 eligibility conditions failed (#239).** Enforced in code: a `PreToolUse` hook in
   `.claude/settings.json` denies an `issue_write` create or update to the heartbeat whose body has no
-  `- second item: ` line. It finds the heartbeat by **title** — `routine: heartbeat` — falling back to the
-  number for an update that carries none, because STEP 5 tells a run to recreate the issue if it is gone and a
-  recreated one carries a new number (#353); issue #62 is the one it has today. The four eligibility conditions
+  `- second item: ` line. It finds the heartbeat by **number first** (#62 is the one it has today, and no title
+  talks a write to it out of the rules, #679), then by **title** — `routine: heartbeat` — because STEP 5 tells a
+  run to recreate the issue if it is gone and a recreated one carries a new number (#353). The four eligibility conditions
   themselves (are more than three reviews waiting, is
   there time left in the run, are the second item's files disjoint from the first's, did the first item
   actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,

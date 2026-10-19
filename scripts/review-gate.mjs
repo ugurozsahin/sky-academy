@@ -33,13 +33,31 @@ import { fileURLToPath } from 'node:url';
  * and the honest fix is a second identity (a machine account), not more code.
  */
 
+/**
+ * Characters GitHub renders as nothing, so a human reading a comment never sees them (#229). One list, shared:
+ * `.claude/hooks/github-write-guard.mjs` imports it, so the gate that READS a verdict and the hook that REFUSES
+ * an agent's forged one cannot come to disagree about which characters are invisible. It lives here because
+ * `review-gate.yml` sparse-checks-out this one file and so cannot import from the hooks directory. A UNION on
+ * purpose (#221): swapping Cf/Cc for Default_Ignorable_Code_Point once dropped real format characters. Add to
+ * it, never replace.
+ */
+export const INVISIBLE = /[\p{Cf}\p{Cc}\p{Default_Ignorable_Code_Point}\u3164\ufe0f]+/gu;
+
+/**
+ * The text with those characters deleted, except the line and tab controls: Cc includes \n and \t, and deleting
+ * them here would fuse `REVIEW:\nCHANGES` into one word before whitespace is collapsed, so a marker split across
+ * a line break would stop counting. Whitespace is `loose()`'s and the strict matchers' to judge.
+ */
+const unseen = (body) => (body || '').replace(INVISIBLE, (run) => run.replace(/[^\t\n\v\f\r]/gu, ''));
+
 /** Emphasis, quoting and heading marks stripped; whitespace collapsed; upper-cased. */
-const loose = (body) => (body || '').replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+const loose = (body) => unseen(body).replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+const strict = (body) => unseen(body).replace(/^\s+/, '');
 
 export const isChangesRequested = (body) => loose(body).startsWith('REVIEW: CHANGES REQUESTED');
-export const isCleared = (body) => (body || '').replace(/^\s+/, '').startsWith('REVIEW: CLEARED');
+export const isCleared = (body) => strict(body).startsWith('REVIEW: CLEARED');
 export const isOwnerRejected = (body) => loose(body).startsWith('OWNER: REJECTED');
-export const isOwnerApproved = (body) => (body || '').replace(/^\s+/, '').startsWith('OWNER: APPROVED');
+export const isOwnerApproved = (body) => strict(body).startsWith('OWNER: APPROVED');
 
 /**
  * A REVIEW: CHANGES REQUESTED comment carries its own session URL (#189, #199). One GitHub account serves
@@ -74,7 +92,7 @@ const isOwner = (c) => c.author_association === 'OWNER';
 export const OWNER_GATES = ['owner-approval', 'loosening'];
 
 /**
- * @param {{draft: boolean, labels?: string[], comments: {body: string, created_at: string, author_association?: string}[]}} pr
+ * @param {{draft: boolean, labels?: string[], comments: {body: string, created_at: string, author_association?: import('./review-gate.d.mts').AuthorAssociation}[]}} pr
  * @returns {{blocked: boolean, reasons: string[]}} newest marker wins, so block → clear → block works.
  */
 export function blockState({ draft, labels, comments }) {
