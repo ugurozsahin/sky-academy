@@ -75,11 +75,12 @@ self.addEventListener('activate', (e) => {
  * and a full precache, so a shell in a versioned cache is consistent with its own assets by construction.
  * (Raised in review of this PR.)
  *
- * The one other writer is the rebuild below, and it does not break that rule: it runs only on a MISS, when
- * there is no shell to be inconsistent with, and it fills the shell and every asset together in one atomic
- * `addAll` (all or nothing), so what it stores is one fetch of the deployment the server serves now. Its
- * residual risk is a host that still serves superseded hashed assets under the old cache name; nothing deploys
- * that way today (#281 item 5, parked until a web deploy exists).
+ * The one other writer is the rebuild below, and it keeps the rule rather than breaking it: it runs only on a
+ * MISS, when there is no shell to be inconsistent with, and it fills the shell and every asset together in one
+ * atomic `addAll` (all or nothing). What it fetched is whatever the server serves NOW, so it then reads the
+ * stored shell back and requires every `assets/…` file it names to be in this deployment's PRECACHE. If a host
+ * still serving superseded assets under the old name handed it a newer shell, the shell is deleted again and
+ * the rebuild gives up: the cache is back to a miss, never a shell beside assets it will not hold (#635).
  *
  * A MISS means the browser evicted the cache (#116 item 5). A worker only handles fetches once it is active,
  * and `install` cannot complete without the precache, so under a controlling worker the shell is either there
@@ -103,14 +104,63 @@ async function shell(e) {
  *  cache name must not reuse it. */
 let rebuilding = null;
 function rebuild(cache) {
-  if (!rebuilding) {
-    // Offline as well as evicted there is nothing to rebuild from: `addAll` rejects, stores nothing (it is
-    // atomic), and the next online launch misses the shell again and tries again. Swallowed rather than
-    // surfaced because it is not awaited by anything that could act on it, and an unhandled rejection here
-    // would be a console error on every offline launch after an eviction. (#116 item 5)
-    rebuilding = precache(cache).catch(() => {}).then(() => { rebuilding = null; });
-  }
+  if (!rebuilding) rebuilding = attempt(cache).catch(() => {}).then(() => { rebuilding = null; });
   return rebuilding;
+}
+
+/**
+ * Bounded retries (#635). A rebuild fails in two ways, and only one of them is worth another go.
+ *  - Offline, or a non-ok answer: `addAll` rejects with a `TypeError` having stored nothing and, offline,
+ *    downloaded nothing. The next launch simply tries again; it costs nothing.
+ *  - Anything else (`QuotaExceededError` on a full device, a corrupt store, a shell from another deployment):
+ *    the ~1.2 MB WAS fetched and cannot be kept, so trying again on every launch would pay it every launch.
+ *    The worker gives up for `RETRY_AFTER`, in memory and by a marker inside CACHE (an idle worker is killed
+ *    within seconds, so memory alone forgets before the next launch). The marker lives in this deployment's
+ *    cache, so a new deployment starts clean and the old one's marker goes with its cache. Giving up costs
+ *    the player nothing they have today: a shell miss already serves the network (they lose offline play
+ *    until the device has room, or a day passes).
+ * The failure is swallowed because nothing awaits it that could act on it, and an unhandled rejection would
+ * be a console error on every launch. (#116 item 5)
+ */
+const GAVE_UP = 'rebuild-gave-up';
+const RETRY_AFTER = 24 * 60 * 60 * 1000;
+let gaveUpAt = 0;
+
+async function attempt(cache) {
+  if (!(await mayRebuild(cache))) return;
+  try { await precache(cache); } catch (err) {
+    if (err && err.name === 'TypeError') return;
+    return giveUp(cache);
+  }
+  if (!(await sameDeployment(cache))) {
+    await cache.delete(SHELL).catch(() => {});
+    await giveUp(cache);
+  }
+}
+
+async function mayRebuild(cache) {
+  if (backingOff(gaveUpAt)) return false;
+  const mark = await cache.match(GAVE_UP).catch(() => undefined);
+  const at = mark ? Number(await mark.clone().text().catch(() => 0)) : 0;
+  return !backingOff(at);
+}
+
+/** A timestamp from the future (a clock that was ahead and has been corrected) is expired, not a ban for years. */
+function backingOff(at) {
+  const age = Date.now() - at;
+  return at > 0 && age >= 0 && age < RETRY_AFTER;
+}
+
+async function giveUp(cache) {
+  gaveUpAt = Date.now();
+  await cache.put(GAVE_UP, new Response(String(gaveUpAt))).catch(() => {});
+}
+
+/** True when every hashed file the stored shell names is one this deployment precached. */
+async function sameDeployment(cache) {
+  const hit = await cache.match(SHELL, { ignoreVary: true });
+  const html = hit ? await hit.clone().text() : '';
+  return (html.match(/assets\/[^"'\s)>]+\.\w+/g) || []).every(f => PRECACHE.includes(f));
 }
 
 /**
