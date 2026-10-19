@@ -85,7 +85,7 @@ const nav = {
     if (load().onboarded) { changeAvatarScreen(() => nav.map()); return; }
     chooseNinjaScreen(() => { enter('onboard-name'); renderName(); });
   },
-  map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); openLink(); },
+  map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); if (!missionAfterAsk) openLink(); },   // #2041: a new child's school-year question comes first; the link then outranks the first mission
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
   play: ((o: StartOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(played(o), up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, pro: o.pro, seed: replaySeed(o.topic, o.seed), input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : o.mode === 'paper' ? paperDeck(Math.random) : o.title === DAILY_TEN_TITLE ? dailyTenDeck(topicsFor(o.year.id), Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend, pro: o.pro })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
@@ -175,6 +175,8 @@ const relaunch = () => {
 // the complexity rail with #887's added branch (`.has(s)` costs one branch each; nine `||`s would have cost
 // nine).
 const BACK_ONE = new Set<string | undefined>(['play', 'memory', 'duel', 'shop', 'parents']);
+/** Screens from which one Back reaches the map, so a warm-start link can still be opened (#2041). */
+const LINK_REACHABLE = new Set<string | undefined>([undefined, 'island']);
 const GUARDED_SCREEN = new Set<string | undefined>(['play', 'duel']);
 /** Draw whatever the entry a pop landed on stands for (see the notes in the listener below on the wizard steps and the reset). */
 const landOn = (s: string | undefined) => {
@@ -234,7 +236,8 @@ wireBackButton({
 const params = new URLSearchParams(location.search);
 if (params.get('reset')) { try { localStorage.clear(); } catch { /* ignore */ } }
 queueLink(location.href); stripLinkParams();   // #2027: the link waits for a profile; the address bar drops it so reload and back never replay it
-wireDeepLinks(() => { if (load().onboarded) relaunch(); });
+wireDeepLinks(relaunch, () => !load().onboarded ? 'keep' : backGuard() || !LINK_REACHABLE.has(history.state?.screen) ? 'drop' : 'go');   // #2041: never tear a live mission down, never strand a link behind two Backs
+
 document.addEventListener('visibilitychange', () => restClock.show(document.visibilityState === 'visible'));   // #940: hidden time never counts toward the rest prompt
 applyCalm();   // #906: the grown-ups' Calm motion switch, as a class on <html> before the first screen
 initGameSpeed();   // #32: test-only `?fast=N` time compression; default 1 (ordinary play)
