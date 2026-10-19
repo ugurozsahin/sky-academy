@@ -7013,6 +7013,8 @@ test('y6-graphs: a conversion graph and a cyclist graph fit a 390×664 phone (#1
   await page.setViewportSize({ width: 390, height: 664 });
   await seedPlayer(page);
   await startTopic(page, 'year6', 'y6-graphs');
+  await page.waitForFunction(() => window.__sna.bubbles().length > 0);   // the wave spawns in a rAF after the prompt; freezing before that freezes nothing
+  await freezeWave(page);   // #2079: fourteen cards walked on a loaded runner let the wave fall, the game ended and .qcard was gone
   const gen = TOPICS.find(t => t.id === 'y6-graphs')!.gen;
   // d1 and d3 draw the conversion graph; d2 draws it or the cyclist's, so walk seeds until both shapes have been fitted.
   const seen = new Set<string>();
