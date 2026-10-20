@@ -26,7 +26,7 @@ In this order, because GitHub wants the domain claimed before DNS points at it
    ([docs](https://developers.cloudflare.com/fundamentals/manage-domains/redirect-domain/)):
    - `A` records `@` and `www`, value `192.0.2.1`, **Proxied** (orange cloud): the address routes nowhere, it only lets Cloudflare answer.
    - Rules, Redirect Rules: hostname `sharpwise.uk` or `www.sharpwise.uk`, dynamic target `concat("https://sharpwise.co.uk", http.request.uri.path)`, **301**, preserve query string.
-7. **Mail.** Namecheap's email forwarding stops when the nameservers move. Cloudflare Email Routing receives for sharpwise.co.uk (its MX, SPF and DKIM records). It does not send: #2084.
+7. **Mail.** Namecheap's email forwarding stops when the nameservers move. Cloudflare Email Routing receives for sharpwise.co.uk (its MX, SPF and DKIM records). It does not send: #2084. sharpwise.uk has no mail at all: its Namecheap forwarding ended with the move too, and nothing replaces it.
 8. **Check**: `https://sharpwise.co.uk/play/` loads, works offline after one visit, and installs as an app;
    `curl -sI http://sharpwise.uk` shows `301`.
 
