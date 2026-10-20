@@ -12,6 +12,17 @@ describe('GitHub Pages deployment (#1933)', () => {
     expect(wf).toMatch(/uses: actions\/upload-pages-artifact@v\d/);
     expect(wf).toMatch(/uses: actions\/deploy-pages@v\d/);
   });
+  // #2085: upload-pages-artifact leaves out every dotfile unless told otherwise (v4 could not be told), and the
+  // site carries two: .well-known/ (scripts/app-links.mjs, #2028) and .nojekyll (website/). Without the input
+  // assetlinks.json is built, then silently left out of the deploy.
+  it('uploads the site with its hidden files, so .well-known/assetlinks.json reaches the deploy (#2085)', () => {
+    const upload = wf.match(/uses: actions\/upload-pages-artifact@v(\d+)\n(?:\s*#.*\n)*\s*with: \{([^}]*)\}/);
+    expect(upload, 'the upload-pages-artifact step and its one-line `with:` must be read').toBeTruthy();
+    expect(Number(upload![1]), 'v5 is the first major with include-hidden-files').toBeGreaterThanOrEqual(5);
+    expect(upload![2]).toMatch(/\bpath: site\b/);
+    expect(upload![2]).toMatch(/\binclude-hidden-files: true\b/);
+    expect(read('scripts/app-links.mjs'), 'the file the input exists for still lives under a dot directory').toContain('/.well-known/assetlinks.json');
+  });
   it('is skipped until the owner opts in, so main is not red while Pages is off', () => {
     expect(wf).toMatch(/^  build:\n    if: vars\.PAGES_ENABLED == 'true'/m);
     expect(read('docs/WEBSITE.md')).toContain('`PAGES_ENABLED` = `true`');

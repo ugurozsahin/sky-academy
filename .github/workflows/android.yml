@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     timeout-minutes: 30
     permissions:
       contents: write          # the tag step attaches the APK to a GitHub Release
@@ -66,7 +66,7 @@ jobs:
   # job is skipped, not failed, and main and tag runs stay green. The upload key comes from secrets only.
   release:
     if: ${{ github.event_name != 'pull_request' && vars.ANDROID_RELEASE_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     timeout-minutes: 30
     permissions:
       contents: read
