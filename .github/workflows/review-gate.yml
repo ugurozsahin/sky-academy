@@ -114,7 +114,7 @@ jobs:
           startsWith(github.event.changes.body.from, '**REVIEW:') ||
           startsWith(github.event.changes.body.from, '> REVIEW:') ||
           contains(github.event.changes.body.from, 'OWNER:')))))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5          # for scripts/review-gate.mjs, the tested predicate

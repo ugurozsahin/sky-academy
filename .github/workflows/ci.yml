@@ -85,7 +85,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/2","2/2"]' || '["1/1"]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     # 45, raised from 30 on 2026-09-25 (#718) as a STOP-GAP, on the owner's decision in session. The nightly
     # full-matrix job had grown 899s -> 1816s in eight days and crossed the old ceiling, so the 2026-09-25 run
     # was cancelled 10 of 348 e2e tests short. A cancelled run reports NOTHING, which is worse than a slow one:
@@ -304,7 +304,7 @@ jobs:
   # is worth investigating rather than accommodating.
   branch-name:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     timeout-minutes: 5
     steps:
       - name: Head branch follows feature|fix|chore/<issue>-<slug> (#89)

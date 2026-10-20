@@ -21,7 +21,7 @@ on:
         default: '8'
 jobs:
   trial:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     # Two ~8-9 minute mobile legs plus setup; #754 raised the sibling ci.yml job to 45 for the same class of
     # reason (a cancelled run reports nothing). This job reports nothing useful either if it is cut short
     # mid-second-leg, so it gets the same headroom rather than the bare sum of two legs.

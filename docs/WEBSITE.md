@@ -5,28 +5,32 @@
 The game is built with `--base=/play/` into `site/play/`. `npm run build` is unchanged, so Android still embeds a root-based `dist/`.
 The manifest (`start_url`, `scope`, `id` are `./`), the worker registration and the precache are all relative, so the PWA is scoped to `/play/`.
 
-## Owner steps (once; nothing here can be done from the repo)
+## Owner steps (set up 2026-10-21; nothing here can be done from the repo)
 
-0. **Opt in.** Repo Settings, Secrets and variables, Actions, Variables: add `PAGES_ENABLED` = `true`. Until it exists the workflow is skipped, so `main` stays green (the deploy fails with a 404 while Pages is off).
-1. **Enable Pages.** Repo Settings, Pages, Build and deployment, Source: **GitHub Actions**
-   ([docs](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-with-a-custom-github-actions-workflow)).
-2. **Run the workflow** once (Actions, Deploy to GitHub Pages, Run workflow), or push to `main`.
-3. **Custom domain.** Settings, Pages, Custom domain: `sharpwise.co.uk`, Save. With a GitHub Actions publishing source GitHub ignores a `CNAME` file, so this setting is what counts; the file in `website/` only records the name for readers
-   ([docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)).
-4. **DNS for sharpwise.co.uk, at the registrar**
-   ([docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site#configuring-an-apex-domain)):
+DNS for both domains is on **Cloudflare** (free plan); the domains stay registered at Namecheap, whose nameservers point at Cloudflare.
+In this order, because GitHub wants the domain claimed before DNS points at it
+([docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)):
+
+1. **Verify the domain.** GitHub profile Settings, Pages, Add a domain: `sharpwise.co.uk`, and add the TXT record it gives (`_github-pages-challenge-ugurozsahin`). **Keep that record**: GitHub says the domain stays verified only while it exists
+   ([docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages)).
+2. **Enable Pages and claim the domain.** Repo Settings, Pages: Source **GitHub Actions**; Custom domain `sharpwise.co.uk`, Save. With a GitHub Actions source GitHub ignores a `CNAME` file, so this setting is what counts; the file in `website/` only records the name for readers.
+3. **DNS for sharpwise.co.uk, in Cloudflare, every record DNS only (grey cloud).** Proxied, GitHub cannot issue its certificate (community reports, not GitHub's docs: [#22052](https://github.com/orgs/community/discussions/22052)). Cloudflare's banner suggesting the proxy is advice and is ignored here.
    - Apex `A` records, four of them, host `@`: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
    - Apex `AAAA` records, four of them, host `@`: `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`.
-   - `CNAME` record, host `www`, value `ugurozsahin.github.io` (GitHub then redirects `www` to the apex).
-   - Check the addresses against the docs page above on the day: GitHub owns them.
-   - Do not add a wildcard record, and verify the domain in your GitHub account settings, Pages, to stop takeover
-     ([docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages)).
-5. **HTTPS.** When DNS has propagated (up to 24 hours), tick **Enforce HTTPS** in Settings, Pages. GitHub issues the certificate itself.
-6. **sharpwise.uk.** At the registrar, use its URL forwarding feature: `sharpwise.uk` and `www.sharpwise.uk` to `https://sharpwise.co.uk`, type **301 (permanent)**. GitHub Pages cannot serve a second domain for the same site, so the redirect has to be the registrar's.
-7. **Check**: `https://sharpwise.co.uk/play/` loads, works offline after one visit, and installs as an app;
+   - `CNAME` record, host `www`, value `ugurozsahin.github.io`, without the repository name (GitHub then redirects `www` to the apex).
+   - No wildcard record, and no leftover registrar parking record: either stops the certificate.
+   - Check the addresses against GitHub's docs page on the day: GitHub owns them.
+4. **Opt in and deploy.** Repo Settings, Secrets and variables, Actions, **Variables** (a repository variable, not an environment one: the gate sits on the `build` job, which has no environment): add `PAGES_ENABLED` = `true`. Then Actions, Deploy to GitHub Pages, Run workflow. Until the variable exists the workflow is skipped, so `main` stays green.
+5. **HTTPS.** Once the certificate is issued, tick **Enforce HTTPS** in Settings, Pages.
+6. **sharpwise.uk, in Cloudflare.** GitHub Pages cannot serve a second domain for the same site, so Cloudflare redirects it
+   ([docs](https://developers.cloudflare.com/fundamentals/manage-domains/redirect-domain/)):
+   - `A` records `@` and `www`, value `192.0.2.1`, **Proxied** (orange cloud): the address routes nowhere, it only lets Cloudflare answer.
+   - Rules, Redirect Rules: hostname `sharpwise.uk` or `www.sharpwise.uk`, dynamic target `concat("https://sharpwise.co.uk", http.request.uri.path)`, **301**, preserve query string.
+7. **Mail.** Namecheap's email forwarding stops when the nameservers move. Cloudflare Email Routing receives for sharpwise.co.uk (its MX, SPF and DKIM records). It does not send: #2084.
+8. **Check**: `https://sharpwise.co.uk/play/` loads, works offline after one visit, and installs as an app;
    `curl -sI http://sharpwise.uk` shows `301`.
 
-8. **Android App Links (#2028, optional until the app is published).** Repo Settings, Secrets and variables, Actions, Variables: add `ANDROID_APP_LINKS_SHA256` = the SHA-256 certificate fingerprint of the key that signs the installed app. With Play App Signing that is **Google's app signing key**: Play Console, Setup, App signing, "App signing key certificate", SHA-256 (the upload key's is not enough). Several fingerprints may be separated by commas. The next deploy then publishes `/.well-known/assetlinks.json`; until then no file is published and links open in the browser, so the web game still works. Testing: `docs/ANDROID.md`.
+9. **Android App Links (#2028, optional until the app is published).** Repo Settings, Secrets and variables, Actions, Variables: add `ANDROID_APP_LINKS_SHA256` = the SHA-256 certificate fingerprint of the key that signs the installed app. With Play App Signing that is **Google's app signing key**: Play Console, Setup, App signing, "App signing key certificate", SHA-256 (the upload key's is not enough). Several fingerprints may be separated by commas. The next deploy then publishes `/.well-known/assetlinks.json`; until then no file is published and links open in the browser, so the web game still works. Testing: `docs/ANDROID.md`.
 
 ## Checking the `.well-known` files (#2029)
 
