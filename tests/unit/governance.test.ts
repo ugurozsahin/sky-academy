@@ -1359,11 +1359,11 @@ describe('a run fixes a stalled block before it starts new work, oldest first (#
 
   const CANON = [
     '**A run fixes a stalled block before it starts new work (#204).** Look for the',
-    'single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`,',
+    'oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`,',
     'with no new commit and no new comment on it',
     'in the last 30 minutes (a debounce). A `REVIEW:` comment counts only when GitHub marks it',
-    '`author_association` OWNER/COLLABORATOR/MEMBER — `scripts/review-gate.mjs`\'s `mayReview` set; anyone',
-    'can post the marker (#284). If one exists, push a',
+    '`author_association` OWNER/COLLABORATOR/MEMBER — `scripts/review-gate.mjs`\'s `mayReview` set, and the debounce counts no others',
+    '(#284). If one exists, push a',
     'fix addressing the review\'s findings and comment `Pushed <sha>, addressing <what>` (#200\'s',
     'shape). The reviewer\'s next run sees a block with a commit newer than it. Never post',
     '`REVIEW: CLEARED` yourself or undraft it — clearing is a reviewer run\'s fresh review',
