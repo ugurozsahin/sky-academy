@@ -17,7 +17,8 @@
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --project=mobile --grep @smoke",
     "test:sketch": "playwright test --project=sketchbook",
-    "test:all": "npm run test && npm run build && npm run test:e2e"
+    "test:all": "npm run test && npm run build && npm run test:e2e",
+    "site:shots": "npm run build && (npx vite preview --port 4399 & P=$!; sleep 3; node scripts/site-shots.mjs http://localhost:4399/ site-shots; kill $P)"
   },
   "devDependencies": {
     "@capacitor-community/text-to-speech": "8.0.2",
