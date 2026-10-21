@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import ts from 'typescript';
+import { decodeEntities } from './helpers/html-entities';
 
 /**
  * #2092: the guides under website/guides/. A guide quotes the game's own words in `<q>` (a button, a heading, a
@@ -14,8 +15,7 @@ const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 const files = (dir: string, ext: string): string[] => readdirSync(new URL(dir, root), { withFileTypes: true })
   .flatMap(e => e.isDirectory() ? files(`${dir}/${e.name}`, ext) : e.name.endsWith(ext) ? [`${dir}/${e.name}`] : []);
 
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", rsquo: '’', nbsp: ' ' };
-const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&(#?\w+);/g, (m, e) => ENTITIES[e] ?? m).replace(/\s+/g, ' ').trim();
+const text = (html: string) => decodeEntities(html.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
 /** Every `<q>` and `<kbd>` in a page, as the words a reader sees. */
 const quoted = (html: string) => [...html.matchAll(/<(q|kbd)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(m => text(m[2]));
 

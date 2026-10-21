@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
+import { launchSilent } from '../tests/e2e/mute.mjs';
 import onboard from './flow-onboard.mjs';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const b = await launchSilent(chromium, { executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 const p = await ctx.newPage();
 await p.goto('http://localhost:4173/?reset=1'); await onboard(p, 'blaze', 'Ada');

@@ -4,6 +4,7 @@
 // The Chromium path comes from PW_CHROMIUM, else Playwright's own download. Exits non-zero on any failure,
 // and on any file over MAX_BYTES.
 import { chromium } from '@playwright/test';
+import { launchSilent } from '../tests/e2e/mute.mjs';
 import { mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -97,7 +98,7 @@ const toWebp = (page, png) => page.evaluate(async b64 => {
 async function main([base, out]) {
   if (!base || !out) throw new Error('usage: node scripts/site-shots.mjs <base-url> <out-dir>');
   mkdirSync(out, { recursive: true });
-  const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+  const browser = await launchSilent(chromium, process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const enc = await (await browser.newContext()).newPage();
   const written = [], errors = [];
   try {
@@ -117,7 +118,9 @@ async function main([base, out]) {
         }, [SEED]);
         await page.goto(base, { waitUntil: 'networkidle' });
         await page.waitForSelector('.home', { timeout: ACTION_TIMEOUT });
-        await shot.run(page);
+        try { await shot.run(page); } catch (e) {                    // Playwright's timeout names neither the shot nor the size, and the page errors that likely caused it would be dropped
+          throw new Error(`${shot.name}-${size}: ${e.message.split('\n')[0]}${errors.length ? ` (page errors: ${errors.join('; ')})` : ''}`);
+        }
         await page.waitForTimeout(500);
         await freeze(page);                                          // a wave that spawned after the shot's own steps (the results' backdrop) goes on the grid too
         await page.evaluate(() => {                                  // the bubbles' sway is driven by frame time: pin it, then hold
