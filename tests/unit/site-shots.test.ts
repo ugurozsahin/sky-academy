@@ -54,6 +54,21 @@ describe('site screenshots (#2088)', () => {
   });
 });
 
+/** #2106: a shot of a broken screen must fail the deploy, and a picture's alt text must not name a seeded sum. */
+describe('site screenshots fail loudly (#2106)', () => {
+  const src = readFileSync(root + 'scripts/site-shots.mjs', 'utf8');
+  it('records failed requests and responses of 400 or above as errors', () => {
+    expect(src).toContain("page.on('requestfailed'");
+    expect(src).toMatch(/page\.on\('response', r => \{ if \(r\.status\(\) >= 400\) errors\.push/);
+  });
+  it('keeps the home ten-frame alt text free of a sum', () => {
+    const html = readFileSync(root + 'website/index.html', 'utf8');
+    const alt = /ten-frame-phone\.webp"[^>]*?alt="([^"]*)"/s.exec(html)?.[1] ?? '';
+    expect(alt, 'the ten-frame alt text').not.toBe('');
+    expect(alt).not.toMatch(/\d\s*[+−-]\s*[?\d]|=/);
+  });
+});
+
 /** #2102: a local preview must never be a picture of an older build, and must never outlive the run. */
 describe('npm run site:shots (#2102)', () => {
   const script: string = JSON.parse(readFileSync(root + 'package.json', 'utf8')).scripts['site:shots'];
