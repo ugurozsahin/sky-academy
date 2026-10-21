@@ -19,7 +19,13 @@ export function watchBox(el: HTMLElement, onChange: () => void): () => void {
     });
   }) : null;
   measure();
+  // #2184: and the visual viewport, which a phone's toolbar can resize with no window `resize` on some browsers.
+  // Only on a real change of the element's own box: a pinch-zoom fires this every frame, and each `resize` wipes
+  // the canvas bitmap. Synchronous, not batched, so `--vh` (main.ts, registered first) is already current.
+  const vv = (window as { visualViewport?: EventTarget | null }).visualViewport ?? null;
+  const onViewport = () => { const r = el.getBoundingClientRect(); if (Math.abs(r.width - w) >= BOX_EPSILON || Math.abs(r.height - h) >= BOX_EPSILON) fire(); };
   window.addEventListener('resize', fire);
+  vv?.addEventListener('resize', onViewport);
   ro?.observe(el);
-  return () => { window.removeEventListener('resize', fire); ro?.disconnect(); if (raf) cancelAnimationFrame(raf); raf = 0; };
+  return () => { window.removeEventListener('resize', fire); vv?.removeEventListener('resize', onViewport); ro?.disconnect(); if (raf) cancelAnimationFrame(raf); raf = 0; };
 }
