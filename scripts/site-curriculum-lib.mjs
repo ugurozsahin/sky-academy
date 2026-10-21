@@ -1,9 +1,9 @@
 // The /curriculum/ page (#2089): the pure half. Given docs/content-map.json and the home page it returns the page
 // as a string, so `scripts/site-curriculum.mjs` (writes it) and `tests/unit/site-curriculum.test.ts` (fails on
 // drift) run the very same code. Every line about the curriculum comes from the content map; this file only
-// arranges it. One render function per year (`renderYear`) for /curriculum/, and one page per year
-// (`renderYearPage`, #2090) at /curriculum/<year>/, which says the same topics in plain words with the map's tips,
-// then carries that year's tables and gaps in a collapsed teachers' section and a year switcher (#2160).
+// arranges it. /curriculum/ is a short hub of seven year cards (`renderCurriculumPage`, #2161), and each year has
+// its own page (`renderYearPage`, #2090) at /curriculum/<year>/, which says its topics in plain words with the map's
+// tips, then carries that year's tables and gaps in a collapsed teachers' section and a year switcher (#2160).
 
 const ORIGIN = 'https://sharpwise.co.uk';
 /** Subject id in the content map → the word a parent uses. */
@@ -113,63 +113,56 @@ export function gapsOf(map, year) {
   return map.coverage.filter(c => c.years.includes(year.year) && !named.has(c.id));
 }
 
-/** One year: its heading, a maths table, an English table and what is not covered yet. */
-export function renderYear(map, year) {
-  const slug = yearSlug(year.year);
-  const gaps = gapsOf(map, year);
-  const label = (s) => SUBJECTS.find(([id]) => id === s)[1];
-  const notCovered = gaps.length
-    ? ['<ul>', ...gaps.map(c => `  <li>${esc(areaName(c.name))} (${label(c.subject)})</li>`), '</ul>']
-    : ['<p>Every part of the curriculum listed for this year has at least one topic.</p>'];
-  const body = [
-    `<h2 id="${slug}-title">${esc(year.title)}</h2>`,
-    `<p>${topicWord(year.maths)} in maths and ${topicWord(year.writing)} in English. <a href="${yearPath(year.year)}">${esc(year.title)} in plain words</a>, with ideas to try at home.</p>`,
-    ...SUBJECTS.map(([id]) => subjectTable(map, year, id)).filter(Boolean),
-    `<h3>Not covered yet in ${esc(year.title)}</h3>`,
-    ...notCovered,
-  ];
-  return [
-    `<section id="${slug}" aria-labelledby="${slug}-title">`,
-    '  <div class="wrap">',
-    ...body.flatMap(b => b.split('\n')).map(l => `    ${l}`),
-    '  </div>',
-    '</section>',
-  ].join('\n');
+/** A JSON-LD list in the head: a BreadcrumbList on a year page, the ItemList of the years on /curriculum/ (#2161). */
+const ldString = (s) => JSON.stringify(s).replaceAll('<', '\\u003c');
+const ldList = (type, head, items) => ['  <script type="application/ld+json">', '  {', '    "@context": "https://schema.org",',
+  `    "@type": "${type}",`, ...head, '    "itemListElement": [', items.join(',\n'), '    ]', '  }', '  </script>', ''].join('\n');
+
+/** What a year page says a topic practises: its objective in plain words, or its area's name when only a code is left. */
+export const topicWords = (map, t) => plainObjective(t.nc) || areaName(map.coverage.find(c => c.id === t.strands[0]).name);
+
+/**
+ * A one-line taste of a year (#2161): the first topic of its first two maths areas and of its first English area,
+ * in the year page's plain words. Only the first clause of each, so a `;` inside one never reads as a separator.
+ */
+export function tasteOf(map, year) {
+  const firsts = (subject) => map.coverage.filter(c => c.subject === subject && c.years.includes(year.year))
+    .map(c => map.topics.find(t => t.year === year.year && t.subject === subject && t.strands[0] === c.id)).filter(Boolean);
+  return [...firsts('maths').slice(0, 2), ...firsts('writing').slice(0, 1)].map(t => topicWords(map, t).split(';')[0].trim());
 }
 
-/** The in-page index: one entry per year, with its counts. */
-function yearIndex(map) {
-  return [
-    '<nav aria-labelledby="index-title">',
-    '  <h2 id="index-title">Jump to a year</h2>',
-    '  <dl class="facts">',
-    ...map.byYear.map(y => `    <div><dt><a href="#${yearSlug(y.year)}">${esc(y.title)}</a></dt><dd>${topicWord(y.maths)} in maths, ${topicWord(y.writing)} in English. <a href="${yearPath(y.year)}">${esc(y.title)} in plain words</a></dd></div>`),
-    '  </dl>',
-    '</nav>',
-  ].join('\n');
-}
+/** One year's card on /curriculum/: its name as the link to its page, its two counts, and the taste. */
+const yearCard = (map, y) => `<li><h3><a href="${yearPath(y.year)}">${esc(y.title)}</a></h3>` +
+  `<p>${topicWord(y.maths)} in maths and ${topicWord(y.writing)} in English.</p>` +
+  `<p>For example: ${tasteOf(map, y).map(esc).join('; ')}.</p></li>`;
 
-/** The whole /curriculum/ page. `home` is website/index.html, the source of the shared shell. */
+/**
+ * The whole /curriculum/ page (#2161): a short hub, one card per school year. The topics themselves, their
+ * objectives and the gaps live on the year pages (#2160). `home` is website/index.html, the source of the shell.
+ */
 export function renderCurriculumPage(map, home) {
   const { header, footer } = shellFrom(home, '/curriculum/');
-  const covered = map.coverage.filter(c => c.topics.length).length;
   const url = `${ORIGIN}/curriculum/`;
-  const title = 'Curriculum: every Sharpwise topic, Reception to Year 6';
-  const description = `All ${map.topicCount} Sharpwise maths and English topics, Reception to Year 6, by year and curriculum area, with what is not covered yet.`;
-  const intro = [
-    '<section aria-labelledby="page-title">',
-    '  <div class="wrap">',
-    '    <h1 id="page-title">What Sharpwise covers</h1>',
-    `    <p class="lede">Sharpwise has ${map.topicCount} maths and English topics, from Reception to Year 6. Each one is listed below under its school year, with the part of the curriculum it practises.</p>`,
-    '    <p>Reception topics follow the EYFS Early Learning Goals. Years 1 to 6 follow the National Curriculum for England. This page is made from the game\'s own list of topics, so it changes when the game does.</p>',
-    `    <p>${covered} of the ${map.coverage.length} parts of the curriculum we track have at least one topic. Each year ends with the parts that are not covered yet.</p>`,
-    indent(yearIndex(map), 4),
-    '  </div>',
-    '</section>',
-  ].join('\n');
-  return page({ title, description, url, header, footer, main: `${indent(intro, 4)}
-
-${map.byYear.map(y => indent(renderYear(map, y), 4)).join('\n\n')}` });
+  const total = (k) => map.byYear.reduce((n, y) => n + y[k], 0);
+  const counts = `${total('maths')} in maths and ${total('writing')} in English`;
+  const title = 'Curriculum: Sharpwise topics by school year, Reception to Year 6';
+  const description = `Sharpwise's ${map.topicCount} maths and English topics, Reception to Year 6, by school year: ${counts}, aligned to the National Curriculum for England.`;
+  const intro = section('', [
+    '<h1 id="page-title">What Sharpwise covers</h1>',
+    `<p class="lede">Sharpwise has ${map.topicCount} maths and English topics, from Reception to Year 6: ${counts}.</p>`,
+    '<p>Reception follows the EYFS Early Learning Goals, and Years 1 to 6 are aligned to the National Curriculum for England. This page is made from the game\'s own list of topics, so it changes when the game does.</p>',
+    '<p><a class="btn" href="/play/">Play Sharpwise</a></p>',
+  ]);
+  const years = section('years', [
+    '<h2 id="years-title">Pick a school year</h2>',
+    '<p>Each year has its own page: every topic in plain words, ideas to try at home, and for teachers the curriculum objective each topic practises.</p>',
+    '<ul class="years">',
+    ...map.byYear.map(y => `  ${yearCard(map, y)}`),
+    '</ul>',
+  ]);
+  const jsonLd = ldList('ItemList', ['    "name": "Sharpwise topics by school year",', `    "numberOfItems": ${map.byYear.length},`],
+    map.byYear.map((y, i) => `      { "@type": "ListItem", "position": ${i + 1}, "name": ${ldString(y.title)}, "url": "${ORIGIN}${yearPath(y.year)}" }`));
+  return page({ title, description, url, header, footer, main: [intro, years].map(s => indent(s, 4)).join('\n\n'), jsonLd });
 }
 
 /**
@@ -197,12 +190,12 @@ export function plainObjective(nc) {
 }
 
 /** One curriculum area on a year page: its topics in plain words, then each distinct home tip once. */
-function areaBlock(area, topics) {
+function areaBlock(map, area, topics) {
   const tips = [...new Set(topics.map(t => t.tip).filter(Boolean))];
   return [
     `<h3>${esc(areaName(area.name))}</h3>`,
     '<dl class="facts">',
-    ...topics.map(t => `  <div><dt>${esc(t.title)}</dt><dd>${esc(plainObjective(t.nc) || areaName(area.name))}</dd></div>`),
+    ...topics.map(t => `  <div><dt>${esc(t.title)}</dt><dd>${esc(topicWords(map, t))}</dd></div>`),
     '</dl>',
     ...(tips.length ? ['<p class="note">Try at home:</p>', '<ul>', ...tips.map(tip => `  <li>${esc(tip)}</li>`), '</ul>'] : []),
   ];
@@ -218,7 +211,7 @@ function subjectSection(map, year, subject) {
     `<p>${topicWord(rows.length)}, grouped by the part of the curriculum each one practises.</p>`];
   for (const area of map.coverage.filter(c => c.subject === subject && c.years.includes(year.year))) {
     const inArea = rows.filter(t => t.strands[0] === area.id);
-    if (inArea.length) body.push(...areaBlock(area, inArea));
+    if (inArea.length) body.push(...areaBlock(map, area, inArea));
   }
   return section(id, body);
 }
@@ -234,9 +227,7 @@ const section = (id, body, label) => [
 /** Home › Curriculum › this year, for search results (the guides carry the same shape, #1936). */
 function breadcrumbs(year) {
   const crumbs = [['Home', '/'], ['Curriculum', '/curriculum/'], [year.title, yearPath(year.year)]];
-  const items = crumbs.map(([name, path], i) => `      { "@type": "ListItem", "position": ${i + 1}, "name": ${JSON.stringify(name).replaceAll('<', '\\u003c')}, "item": "${ORIGIN}${path}" }`);
-  return ['  <script type="application/ld+json">', '  {', '    "@context": "https://schema.org",', '    "@type": "BreadcrumbList",',
-    '    "itemListElement": [', items.join(',\n'), '    ]', '  }', '  </script>', ''].join('\n');
+  return ldList('BreadcrumbList', [], crumbs.map(([name, path], i) => `      { "@type": "ListItem", "position": ${i + 1}, "name": ${ldString(name)}, "item": "${ORIGIN}${path}" }`));
 }
 
 /**
@@ -276,7 +267,7 @@ function switcher(map, year) {
     ...(next ? [`    <li>${link(next, `Next: ${esc(next.title)}`, 'next')}</li>`] : []),
     '  </ul>',
     '</nav>',
-    '<p>Every year on one page, with the curriculum objective for each topic: <a href="/curriculum/">the curriculum page</a>.</p>',
+    '<p>All seven years side by side, with their topic counts: <a href="/curriculum/">the curriculum page</a>.</p>',
   ]);
 }
 

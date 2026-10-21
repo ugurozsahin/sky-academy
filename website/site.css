@@ -212,6 +212,10 @@ th[scope="rowgroup"] { color: var(--accent); padding-top: 22px; }
 .switcher a[aria-current="page"] { color: var(--accent); font-weight: 600; text-decoration-thickness: 3px; }
 main summary { min-height: var(--tap); padding: 8px 0; font-weight: 600; cursor: pointer; }
 
+/* The curriculum hub (#2161) reuses the home page's .years list, its names now links: each a 44px target that keeps
+   the heading's line height, so the rail and its dots sit where they do on the home page. */
+.years h3 a { display: inline-flex; align-items: center; min-height: var(--tap); margin: -10px 0; }
+
 @media (prefers-reduced-motion: no-preference) {
   a, .btn { transition: color .15s ease, background-color .15s ease, text-decoration-thickness .15s ease; }
   .nav-years > summary::after { transition: transform .15s ease; }
