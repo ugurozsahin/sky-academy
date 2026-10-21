@@ -11,7 +11,8 @@ import { serve } from '../../scripts/site-serve.mjs';
  *   - no request leaves the page's own origin. Nothing is allowed through: a font, a script or a picture from
  *     anywhere else is a third party that sees the reader. A link out (`<a href="https://ico.org.uk/…">`) is not a
  *     request, so it is neither followed nor counted.
- * `/play/` is in the sitemap but is the game, which the game's own projects check; here only its link must answer.
+ * `/play/` is in the sitemap but is the game, not a page of website/: it is served here from dist/ (built for `/`,
+ * not for `/play/` as the deploy builds it), so only its link must answer, never its page be walked.
  */
 const ORIGIN = 'https://sharpwise.co.uk';
 const GAME = '/play/';
@@ -40,6 +41,7 @@ for (const path of pages) {
     page.on('websocket', ws => outbound.push(ws.url()));
     const res = await page.goto(site.origin + path, { waitUntil: 'load' });
     expect(res?.status(), `${path} must answer 200`).toBe(200);
+    expect(res?.request().redirectedFrom()?.url(), `${path} must answer itself, not redirect`).toBeUndefined();
     // A lazy picture below the fold is never fetched at this height: fetch every one now, so one that would leave
     // the origin is seen here rather than only by a reader who scrolls.
     await page.evaluate(() => document.querySelectorAll('[loading="lazy"]').forEach(e => e.setAttribute('loading', 'eager')));
@@ -51,11 +53,14 @@ for (const path of pages) {
     expect(scroll, `${path} scrolls sideways at 360 px: something is ${scroll} px wide`).toBeLessThanOrEqual(view);
 
     const hrefs = await page.$$eval('a[href]', as => as.map(a => a.getAttribute('href') ?? ''));
-    const onSite = new Set<string>();
+    const onSite = new Set<string>(), here = new URL(page.url()), anchors = new Set<string>();
     for (const href of hrefs) {
       const url = new URL(href, page.url());
       if (url.origin === site.origin || url.origin === ORIGIN) onSite.add(url.pathname + url.search);
+      if (url.origin === site.origin && url.pathname === here.pathname && url.hash) anchors.add(decodeURIComponent(url.hash.slice(1)));
     }
+    const lost = await page.evaluate(ids => ids.filter(id => !document.getElementById(id)), [...anchors]);
+    expect(lost, `${path} links to spots on itself that no element carries`).toEqual([]);
     expect(onSite.size, `${path} must link somewhere on the site`).toBeGreaterThan(0);
     const broken: string[] = [];
     for (const target of onSite) {

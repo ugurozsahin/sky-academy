@@ -17,8 +17,8 @@ paths:
   e2e step visibly skipped, never a missing check.
 - The website has its own project, `site` (#2096): every page in `website/sitemap.xml` at 360 px, served by
   `scripts/site-serve.mjs` — no sideways scroll, every on-site link answers 200, no request leaves the origin.
-  A pull request runs it when its diff touches `website/`, `tests/site/`, `scripts/site-serve.mjs` or
-  `playwright.config.*` (ci.yml's `SITE_PATHS`); the nightly runs it with every project. Locally:
+  A pull request runs it when its diff touches `website/`, `tests/site/`, `scripts/site-serve.*` or what the run
+  stands on (ci.yml's `SITE_PATHS`); the nightly runs it with every project. Locally:
   `npm run build`, then `npx playwright test --project=site`.
 - `window.__sna` (`answer()`, `wrong()`, `bubbles()`, `state()`) is how these tests drive the game — keep new
   scenarios going through it rather than clicking through timing-sensitive UI where a hook already exists.

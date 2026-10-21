@@ -92,7 +92,13 @@ describe('ci.yml sends a website diff to the site project, and only there (#2096
     [['website/site.css'], { e2e: 'false', site: 'true' }],
     [['tests/site/site.spec.ts'], { e2e: 'false', site: 'true' }],
     [['scripts/site-serve.mjs'], { e2e: 'false', site: 'true' }],
+    [['scripts/site-serve.d.mts'], { e2e: 'false', site: 'true' }],
     [['playwright.config.ts'], { e2e: 'true', site: 'true' }],   // it declares the project
+    [['tests/e2e/fixtures.ts'], { e2e: 'true', site: 'true' }],  // the spec imports it
+    [['tests/e2e/mute.mjs'], { e2e: 'true', site: 'true' }],
+    [['package-lock.json'], { e2e: 'true', site: 'true' }],      // Playwright's version
+    [['.github/workflows/ci.yml'], { e2e: 'true', site: 'true' }],
+    [['tests/e2e/game.spec.ts'], { e2e: 'true', site: 'false' }],
     [['src/ui/play.ts'], { e2e: 'true', site: 'false' }],
     [['scripts/site-sitemap.mjs'], { e2e: 'false', site: 'false' }],
     [['docs/ROUTINE-PROMPT.md'], { e2e: 'false', site: 'false' }],
@@ -138,6 +144,8 @@ describe('the site project walks the sitemap at 360 px and lets nothing off the 
     expect(spec).toContain("readFileSync('website/sitemap.xml'");
     expect(spec).toContain("from '../../scripts/site-serve.mjs'");
     expect(spec).toMatch(/new URL\(url\)\.origin === site\.origin\) return route\.continue\(\)/);
+    expect(spec.match(/route\.continue\(/g), 'one way through, the local origin: a second `continue` is an allow-list').toHaveLength(1);
+    expect(spec, 'a sitemap entry that redirects is not an answer').toContain('redirectedFrom()');
     expect(spec).toMatch(/expect\(outbound[^)]*\)\.toEqual\(\[\]\)/);
     expect(spec).toMatch(/scrollWidth/);
     expect(spec).toMatch(/maxRedirects:\s*0/);

@@ -179,8 +179,9 @@ jobs:
           fi
           # #2096: the website. A file here runs the `site` Playwright project (every sitemap page at 360 px: no
           # sideways scroll, every on-site link 200, nothing leaves the origin) and NOT the game's e2e, which no
-          # page under website/ can reach. playwright.config.* declares the project, so it runs both.
-          SITE_PATHS='^(website/|tests/site/|scripts/site-serve\.mjs$|playwright\.config\.)'
+          # page under website/ can reach. Also what the run itself stands on (the project's declaration, the e2e
+          # fixture it imports, Playwright's version, this file), which run the game's e2e as well.
+          SITE_PATHS='^(website/|tests/site/|scripts/site-serve\.|tests/e2e/(fixtures\.ts|mute\.mjs)$|playwright\.config\.|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'
           if echo "$files" | grep -Eq "$SITE_PATHS"; then
             echo "site=true" >> "$GITHUB_OUTPUT"
             { echo "### website: **running** — the diff touches the site (#2096)";
