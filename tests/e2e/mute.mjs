@@ -9,7 +9,7 @@
  * (AVSpeechSynthesizer) honours. `speak` is still called and voices, events and `speaking` stay real, so the
  * voice probe, every pacing test and every speech spy see what they always did.
  */
-export const MUTE_ARGS = ['--mute-audio'];
+export const MUTE_ARGS = Object.freeze(['--mute-audio']);
 
 /** An init script: wraps `SpeechSynthesis.prototype.speak` to zero the utterance's volume, then passes the call on. */
 export function muteSpeech() {
@@ -22,7 +22,8 @@ export function muteSpeech() {
 /**
  * `chromium.launch` for a script: launched with `MUTE_ARGS`, and every context or page it opens runs `muteSpeech`
  * first. It hands back only `newContext`, `newPage` and `close`, so a script that reaches for anything else on the
- * browser fails loudly instead of opening a page that can speak.
+ * browser fails loudly instead of opening a page that can speak. Unlike Playwright's own `newPage`, closing the page
+ * leaves its context open until `close()`; no script opens enough pages for that to matter.
  */
 export async function launchSilent(chromium, options = {}) {
   const browser = await chromium.launch({ ...options, args: [...(options.args ?? []), ...MUTE_ARGS] });

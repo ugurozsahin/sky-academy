@@ -7,9 +7,13 @@ import { launchSilent, muteSpeech, MUTE_ARGS } from '../e2e/mute.mjs';
 // `chromium.launch` itself skips both switches, so the rail is on those two doors, not on the sound.
 const config = readFileSync('playwright.config.ts', 'utf8');
 const testDirs = [...config.matchAll(/testDir: '([^']+)'/g)].map(m => m[1]);
-const specs = testDirs.flatMap(dir => readdirSync(dir).filter(f => /\.spec\.ts$/.test(f)).map(f => `${dir}/${f}`));
-const scripts = readdirSync('scripts').filter(f => f.endsWith('.mjs')).map(f => `scripts/${f}`)
-  .filter(f => /\bchromium\b/.test(readFileSync(f, 'utf8')));
+// Recursive, as Playwright's own discovery is: a spec in a subfolder runs, so it is checked too.
+const specs = testDirs.flatMap(dir => readdirSync(dir, { recursive: true, encoding: 'utf8' })
+  .filter(f => /\.spec\.ts$/.test(f)).map(f => `${dir}/${f}`));
+// Every file under scripts/, whatever its extension, and every browser type Playwright can launch.
+const scriptFiles = readdirSync('scripts', { recursive: true, encoding: 'utf8' }).map(f => `scripts/${f}`)
+  .filter(f => /\.[cm]?[jt]s$/.test(f) && !f.endsWith('.d.mts'));
+const scripts = scriptFiles.filter(f => /\bchromium\b/.test(readFileSync(f, 'utf8')));
 
 describe('every Playwright run is silent (#1460, #2148)', () => {
   it('finds the test directories and specs it is about', () => {
@@ -21,6 +25,8 @@ describe('every Playwright run is silent (#1460, #2148)', () => {
     const src = readFileSync(spec, 'utf8');
     expect(src).toMatch(/import \{ test, expect \} from '(\.\/|\.\.\/e2e\/)fixtures';/);
     expect(src).not.toMatch(/import \{[^}]*\btest\b[^}]*\} from '@playwright\/test'/);
+    // The `browser` fixture opens contexts the fixture never sees.
+    expect(src).not.toMatch(/\bbrowser\.new(Context|Page)\(/);
   });
 
   it('the fixture runs muteSpeech in every context', () => {
@@ -28,8 +34,10 @@ describe('every Playwright run is silent (#1460, #2148)', () => {
   });
 
   it('the config launches Chromium with --mute-audio for every project, so a headed run is silent too', () => {
-    expect(config).toContain("args: ['--mute-audio']");
+    // In the shared top-level `use`, the one every project inherits — not one project's own.
+    expect(config).toMatch(/^  use: \{[^\n]*launchOptions: \{[^\n]*args: \['--mute-audio'\]/m);
     expect(MUTE_ARGS).toEqual(['--mute-audio']);
+    expect(Object.isFrozen(MUTE_ARGS), 'one shared array: a caller must not be able to change it for everyone').toBe(true);
     // A project's own `launchOptions` would replace the shared one whole, flag and all.
     expect(config.match(/launchOptions/g), 'launchOptions is set once, in the shared `use`').toHaveLength(1);
   });
@@ -41,6 +49,11 @@ describe('every Playwright run is silent (#1460, #2148)', () => {
     expect(src).not.toMatch(/\bchromium\.launch\w*\(/);
     expect(src).toContain('launchSilent(chromium');
     expect(src).toContain("import { launchSilent } from '../tests/e2e/mute.mjs';");
+  });
+
+  it('no script launches any browser type itself', () => {
+    const direct = scriptFiles.filter(f => /\b(chromium|firefox|webkit)\.launch\w*\(/.test(readFileSync(f, 'utf8')));
+    expect(direct).toEqual([]);
   });
 
   describe('muteSpeech', () => {
@@ -64,10 +77,10 @@ describe('every Playwright run is silent (#1460, #2148)', () => {
 
   describe('launchSilent', () => {
     function fakeChromium() {
-      const launched: unknown[] = [], scripts: unknown[] = [], closed: string[] = [];
+      const launched: unknown[] = [], scripts: unknown[] = [], closed: string[] = [], contexts: unknown[] = [];
       const context = { addInitScript: async (s: unknown) => { scripts.push(s); }, newPage: async () => 'page' };
-      const browser = { newContext: async () => context, close: async () => { closed.push('browser'); } };
-      return { launched, scripts, closed, chromium: { launch: async (o: unknown) => { launched.push(o); return browser; } } };
+      const browser = { newContext: async (o: unknown) => { contexts.push(o); return context; }, close: async () => { closed.push('browser'); } };
+      return { launched, scripts, closed, contexts, chromium: { launch: async (o: unknown) => { launched.push(o); return browser; } } };
     }
 
     it('keeps the caller\'s options and adds --mute-audio to its own args', async () => {
@@ -80,9 +93,11 @@ describe('every Playwright run is silent (#1460, #2148)', () => {
     it('runs muteSpeech in every context and page it opens, and hands back nothing else', async () => {
       const f = fakeChromium();
       const browser = await launchSilent(f.chromium as never);
-      await browser.newContext();
-      expect(await browser.newPage()).toBe('page');
+      const phone = { viewport: { width: 390, height: 844 }, isMobile: true }, icon = { viewport: { width: 192, height: 192 } };
+      await browser.newContext(phone);
+      expect(await browser.newPage(icon)).toBe('page');
       await browser.close();
+      expect(f.contexts, 'the caller\'s context and page options reach the browser unchanged').toEqual([phone, icon]);
       expect(f.scripts).toEqual([muteSpeech, muteSpeech]);
       expect(f.closed).toEqual(['browser']);
       expect(Object.keys(browser).sort()).toEqual(['close', 'newContext', 'newPage']);
