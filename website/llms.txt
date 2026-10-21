@@ -25,3 +25,4 @@
 - [About](https://sharpwise.co.uk/about/): who makes Sharpwise (Inobil Technology Ltd), what it teaches and the promises it keeps
 - [Privacy](https://sharpwise.co.uk/privacy/): Sharpwise collects nothing about a child; what the game keeps on the device, and what can leave it
 - [Support](https://sharpwise.co.uk/support/): how to contact us, move a save to another device, or start again
+- [Teachers' guide](https://sharpwise.co.uk/guides/teachers/): using Sharpwise in class: shared devices and a ninja for each child, no accounts and no pupil data, whole-class play, the curriculum it follows and Tables Check practice
