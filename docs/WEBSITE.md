@@ -54,12 +54,13 @@ Never measured yet: whether Pages serves the extensionless `apple-app-site-assoc
 - If custom headers are ever needed, Cloudflare Pages is the free fallback ([headers](https://developers.cloudflare.com/pages/configuration/headers/)).
 - The site (#1935) has no script and no third party: every page under `website/` shares one header, navigation and footer and links `website/site.css`; fonts and the icon are copies of the game's. The only absolute URLs are `https://sharpwise.co.uk/` and the store badge links (`tests/unit/pages.test.ts`).
 - The deploy installs Chromium, serves the assembled `site/` on port 4173 and runs `scripts/site-shots.mjs` into `site/img/`, which the pages show as `/img/<name>.webp` (#2088). Nothing under `website/img/` is committed.
-- Pages not built yet (features, guides, about, privacy, support) are one-line `noindex` placeholders on the shell, so no navigation link is dead; each one's issue replaces it.
+- Pages not built yet (guides, about, privacy, support) are one-line `noindex` placeholders on the shell, so no navigation link is dead; each one's issue replaces it.
 - `/curriculum/` is generated, not hand-written (#2089): `npm run content-map` rewrites `docs/content-map.json` and then `scripts/site-curriculum.mjs` renders it into `website/curriculum/index.html`, with the home page's header and footer. Commit both; `tests/unit/site-curriculum.test.ts` fails when the page is stale.
+- `/features/` is generated: edit `docs/site/features.json`, then run `node scripts/site-features.mjs` (#2101). Each `today` entry names the module or test that shows it, each `later` entry its open issue; `tests/unit/site-features.test.ts` fails on a stale page or a dated plan.
 
 ## Screenshots (#2088)
 
 `node scripts/site-shots.mjs <base-url> <out-dir>` captures every picture the pages and the store listing need, at phone
-and desktop size, from fixed seeds. The Pages deploy runs it and serves the files at `/img/<name>.webp`; no image is
+and desktop size, from fixed seeds. #1935's Pages step runs it and serves the files at `/img/<name>.webp`; no image is
 committed. Locally, `npm run site:shots` writes to the git-ignored `site-shots/`. Set `PW_CHROMIUM` for a browser
 Playwright did not download. The shot list is in the script; a rail fails if a page references a file it does not make.

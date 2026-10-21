@@ -142,6 +142,10 @@ export function renderCurriculumPage(map, home) {
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="${esc(ogAlt)}">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(title)}">
+  <meta name="twitter:description" content="${esc(description)}">
+  <meta name="twitter:image" content="${ORIGIN}/share.jpg">
+  <meta name="twitter:image:alt" content="${esc(ogAlt)}">
 </head>
 <body>
   ${header}
