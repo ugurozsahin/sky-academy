@@ -3300,6 +3300,29 @@ test.describe('Sharpwise', () => {
     expect(flight.minY + flight.r, 'the bubble never rose clear of the floor').toBeLessThan(flight.H);
   });
 
+  // #2184, the owner's iPhone report: the first wave rose past the card and off the top, as a wave laid out for a
+  // box taller than the one it plays in would. A resize now reads the card live (`measureInset`) instead of scaling
+  // the old line, and every arc still to climb — queued ones included — is held under it.
+  test('guard rail: a wave laid out in a taller box stays under the card when the box shrinks mid-wave (#2184)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-bonds');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 0);
+    await page.setViewportSize({ width: 390, height: 664 });
+    const seen = await (await page.waitForFunction(() => {
+      const a = window.__sna.arena!;
+      if (a.H !== 664) return false;
+      const climbing = a.bubbles.filter(b => !b.dead && b.vy < 0 && b.g > 0);
+      return climbing.length > 0 && {
+        top: a.topInset, card: document.querySelector('.qcard')!.getBoundingClientRect().bottom + 6, H: a.H,
+        past: climbing.filter(b => b.y - (b.vy * b.vy) / (2 * b.g) < a.topInset + b.r - 0.5).map(b => b.label),
+      };
+    })).jsonValue();
+    console.log(`[guard rail #2184 tall→short] topInset=${seen.top.toFixed(1)} card=${seen.card.toFixed(1)}`);
+    expect(seen.top, 'the card line is read live, not scaled from the taller box').toBeCloseTo(Math.min(seen.card, seen.H / 2), 0);
+    expect(seen.past, 'an arc still climbing would rise past the card').toEqual([]);
+  });
+
   /**
    * #328: `@media (max-height: 640px)` in `src/style.css` hid `.hint` outright to buy the play card vertical
    * space, and a phone held sideways is ~390px tall — squarely in that band. For the seven measure topics

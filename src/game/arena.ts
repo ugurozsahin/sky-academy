@@ -45,7 +45,7 @@ export interface ArenaOpts {
 export class Arena {
   private ctx: CanvasRenderingContext2D;
   W = 0; H = 0; dpr = 1; private inset = 120;
-  get topInset() { return this.inset; } set topInset(v: number) { this.inset = v; holdUnderCard(this.bubbles, v, this.H); }   // #2184: the card line — no apex rises past topInset + r, even one already up
+  get topInset() { return Math.min(this.inset, this.H * TOP_INSET_MAX); } set topInset(v: number) { if (Number.isFinite(v)) this.inset = v; holdUnderCard(this.bubbles, this.topInset, this.H); }   // #2184: the card line, at most half the box — no apex rises past topInset + r, even one already up
   bubbles: Bubble[] = [];
   private particles: Particle[] = [];
   shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
@@ -134,7 +134,7 @@ export class Arena {
     for (const t of this.trail) { t.x *= sx; t.y *= sy; }
     // The question card moves too, and its measured bottom is what bounds the next wave's apex
     // (`play-session.ts` re-measures on the next question; this keeps the one in between in the box).
-    this.topInset = nextInset(this.measureInset?.(), this.topInset, sy, to.H);   // #2184: read live where it can be — the card does not scale with the box
+    this.topInset = nextInset(this.measureInset?.(), this.inset, sy, to.H);   // #2184: read live where it can be — the card does not scale with the box
     for (const s of this.strokes.values()) s.stale = true;   // #331/#463: every stroke's `lastPt` is in the OLD,
     // unrescaled box, so each one's next move must re-seat its anchor rather than draw from a stale point
   }
@@ -154,7 +154,7 @@ export class Arena {
    */
   spawnWave(o: WaveOpts, shared?: { rng: Rng; now: number }) {
     this.bubbles = []; this.shots = []; this.frozen = false;
-    const inset = this.inset; if (boxMoved(this.canvas.getBoundingClientRect(), this.W, this.H)) this.resize(); this.topInset = Math.min(inset, this.H * TOP_INSET_MAX);   // #2184: lay out for the box as it is now, not as the observer last reported it (wave-bounds.ts); the caller's card line is fresh, so not scaled
+    const inset = this.inset; if (boxMoved(this.canvas.getBoundingClientRect(), this.W, this.H)) this.resize(); this.topInset = inset;   // #2184: lay out for the box as it is now, not as the observer last reported it (wave-bounds.ts); the caller's card line is fresh, so not scaled
     this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
     this.orderedLabels = new Set(o.ordered);        // #591: same set, for the fall re-launch below
     this.gentleTarget = o.gentleTarget; this.gentleUsed = false; this.gentleTargetFallen = null; this.gentleDecoys = [];   // #700/#742: a fresh trip for this wave

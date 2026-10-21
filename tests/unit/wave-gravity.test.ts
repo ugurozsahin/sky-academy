@@ -170,6 +170,12 @@ describe('keepUnderCard lowers an arc to the card line without stopping it falli
     expect(b.g).toBeGreaterThan(0);
     expect(844 + b.r - (b.ovy * b.ovy) / (2 * b.g), 'the relaunch arc is held to the line too').toBeGreaterThanOrEqual(400 - 1e-9);
   });
+  it('a bubble already falling keeps its flight, and only its relaunch arc (#591) is lowered to the line', () => {
+    const b = { y: 600, vy: 150, g: 200, r: 30, ovy: -600 };            // launch rise 900, room 844 + 30 - 400 = 474
+    keepUnderCard(b, 400, 844);
+    expect({ vy: b.vy, g: b.g }).toEqual({ vy: 150, g: 200 });
+    expect(844 + b.r - (b.ovy * b.ovy) / (2 * b.g)).toBeCloseTo(400, 9);
+  });
   it('an arc already under the line is untouched, and one above it stops climbing', () => {
     const under = { y: 700, vy: -100, g: 200, r: 30 };
     keepUnderCard(under, 400, 844);
@@ -229,6 +235,14 @@ describe('the arena lays a wave out for the box it really has (#2184)', () => {
       sim.destroy(); sim = null;
     }
   });
+  it('the card line reads at most half the box, and a non-number never replaces it', () => {
+    sim = createSim({ W: 667, H: 375, seed: 1 });
+    sim.arena.topInset = 465;                    // a y4-coords card on a landscape phone
+    expect(sim.arena.topInset).toBe(375 * TOP_INSET_MAX);
+    sim.arena.topInset = 100; sim.arena.topInset = NaN;
+    expect(sim.arena.topInset).toBe(100);
+  });
+
   it('a wave laid out in a stale TALL box keeps under the card once the box shrinks (844 → 664)', () => {
     const CARD = 300;                            // the card does not move when the toolbar settles
     sim = createSim({ W: 390, H: 844, seed: 5, arena: { measureInset: () => CARD } });

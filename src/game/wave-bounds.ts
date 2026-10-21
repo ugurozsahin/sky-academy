@@ -8,6 +8,7 @@
 // in a box the arena had not caught up with — the 300×150 canvas default, a 1×1 hidden canvas, a phone whose
 // toolbar settles after the first wave — kept that box's arc: re-anchored, it either flew off at once or, from a
 // box taller than the one it played in, rose past the card and off the top of the screen.
+import { BOX_EPSILON } from './box-watch';
 
 /** The most of the box the question card may take from the flight — the same cap `Arena.reanchor` applies. */
 export const TOP_INSET_MAX = 0.5;
@@ -61,9 +62,10 @@ export function nextInset(live: number | undefined, old: number, sy: number, H: 
   return Math.min(live !== undefined && Number.isFinite(live) ? live : old * sy, H * TOP_INSET_MAX);
 }
 
-/** Whether a measured rect is a different box, in the whole CSS px `Arena.resize` keeps (#389/#400, #678). */
+/** Whether a measured rect is a different box from the whole-px `W`×`H` the arena holds: by `BOX_EPSILON`, the
+ *  observer's own threshold, so two duel halves a sub-pixel apart are never re-measured apart (#389/#400, #678). */
 export const boxMoved = (rect: { width: number; height: number }, W: number, H: number) =>
-  Math.max(1, Math.round(rect.width)) !== W || Math.max(1, Math.round(rect.height)) !== H;
+  Math.abs(rect.width - W) >= BOX_EPSILON || Math.abs(rect.height - H) >= BOX_EPSILON;
 
 /**
  * Where the question card ends, as the arena's `topInset`: read in the same frame as the layout it bounds
