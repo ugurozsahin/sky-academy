@@ -17,6 +17,8 @@ const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 const isFile = (p: string) => { try { return statSync(new URL(p, root)).isFile(); } catch { return false; } };
 const data: FeaturesData = JSON.parse(read('docs/site/features.json'));
 const page = read('website/features/index.html');
+/** Whether `css` defines the class `c` by its whole name; the suffix of a `url()` address is not a class. */
+const defines = (css: string, c: string) => new RegExp(`\\.${c}(?![\\w-])`).test(css.replace(/url\([^)]*\)/g, ''));
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&');
 
 describe('docs/site/features.json (#2101)', () => {
@@ -45,7 +47,7 @@ describe('docs/site/features.json (#2101)', () => {
     expect(bad({ later: [{ title: 'L', blurb: 'B.' }] }), 'no issue').toHaveLength(1);
     expect(bad({ later: [{ title: '', blurb: 'B.', issue: 54 }] }), 'no title').toHaveLength(1);
     expect(bad({ later: [] }), 'an empty list').toHaveLength(1);
-    for (const words of ['Ready soon.', 'Out in 2027.', 'From March.', 'In May.', 'On the 3rd.', 'On 12/4.', 'It will be available here.', 'It will  be\navailable.', 'SOON', 'By september.', 'In JUNE.', 'From Sept.']) {
+    for (const words of ['Ready soon.', 'Out in 2027.', 'From March.', 'In May.', 'On the 3rd.', 'On 12/4.', 'It will be available here.', 'It will  be\navailable.', 'SOON', 'By september.', 'In JUNE.', 'From Sept.', 'From jan.', 'Out in MAY.', 'Coming SEPT.', 'In MARCH.']) {
       expect(bad({ later: [{ title: 'L', blurb: words, issue: 54 }] }), words).toHaveLength(1);
     }
     for (const words of ['Year 3–4 lists.', '25 questions, 6 seconds each.', 'Children may play.', 'Ninjas march on.', 'Year 6 practice.']) {
@@ -58,6 +60,14 @@ describe('docs/site/features.json (#2101)', () => {
     const lines = text(main).split(/\s{2,}/).filter(Boolean).map(l => ({ title: 'page', blurb: l, issue: 1 }));
     expect(lines.length).toBeGreaterThan(data.today.length);
     expect(featureProblems({ today: data.today, later: lines }, isFile)).toEqual([]);
+  });
+
+  it('the title and descriptions of the page name no date or promise of timing either', () => {
+    const metas = [...page.matchAll(/<meta (?:name|property)="(?:description|og:title|og:description|twitter:title|twitter:description)" content="([^"]+)"/g)].map(m => text(m[1]));
+    const lines = [text(page.match(/<title>([^<]+)<\/title>/)![1]), ...metas].map(l => ({ title: 'page', blurb: l, issue: 1 }));
+    expect(lines.length).toBeGreaterThan(1);
+    expect(featureProblems({ today: data.today, later: lines }, isFile)).toEqual([]);
+    expect(featureProblems({ today: data.today, later: [{ title: 'page', blurb: 'Sharpwise features, coming 2027', issue: 1 }] }, isFile)).toHaveLength(1);
   });
 
   it('the claims read from the game itself say what the game says', () => {
@@ -96,9 +106,16 @@ describe('website/features/index.html (#2101)', () => {
     expect(page).toContain('<li><a href="/features/" aria-current="page">Features</a></li>');
   });
 
+  it('matches a class by its whole name, and ignores the suffixes of url() addresses', () => {
+    expect(defines('.site-header { }', 'site')).toBe(false);
+    expect(defines('.site { }', 'site')).toBe(true);
+    expect(defines('.site, .x { }', 'site')).toBe(true);
+    expect(defines('@font-face { src: url(/fonts/a.woff2) }', 'woff2')).toBe(false);
+  });
+
   it('uses only classes website/site.css defines', () => {
     const css = read('website/site.css');
     const used = new Set([...page.matchAll(/class="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/)));
-    for (const c of used) expect(css, c).toMatch(new RegExp(`\\.${c}\\b`));
+    for (const c of used) expect(defines(css, c), c).toBe(true);
   });
 });
