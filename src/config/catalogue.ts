@@ -69,8 +69,8 @@ export const STAGES = 5;
 const SPEED_SET = [0, 1, 2, 3], DIFF_SET = [1, 2, 3];
 /** One mission-pill segment per question, so a stage stays short enough for the pill to draw. */
 const PER_STAGE_MAX = 10, LIVES_MIN = 1, LIVES_MAX = 5;
-export const OVERRIDABLE_KEYS = ['perStage', 'lives', 'gentle', 'speeds', 'diffs', 'airTime', 'stagger'] as const;
-export const YEAR_ONLY_KEYS = ['sprintStars', 'maxAnswer', 'minAnswer'] as const;
+export const OVERRIDABLE_KEYS = ['perStage', 'lives', 'gentle', 'speeds', 'diffs', 'airTime', 'stagger'] as const satisfies readonly (keyof Overridable)[];
+export const YEAR_ONLY_KEYS = ['sprintStars', 'maxAnswer', 'minAnswer'] as const satisfies readonly Exclude<keyof YearSettings, keyof Overridable>[];
 const YEAR_KEYS: readonly string[] = ['perStage', 'lives', 'gentle', 'speeds', 'diffs', ...YEAR_ONLY_KEYS];
 /** The global code constants: required in `defaults`, overridable everywhere else. */
 const TIMING_KEYS: readonly string[] = ['airTime', 'stagger'];
@@ -88,7 +88,8 @@ const stageList = (allowed: number[]): Check => (v) =>
 const speedTable: Check = (v) =>
   Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x) && x > 0) ? null : 'must be 3 positive numbers, one per bubble speed 0 to 2';
 
-const SETTING_RULES: Record<(typeof OVERRIDABLE_KEYS)[number], Check> = {
+/** Keyed by `Overridable` itself, so a key added to the type without a rule fails to compile. */
+const SETTING_RULES: Record<keyof Overridable, Check> = {
   perStage: (v) => (isInt(v, 1, PER_STAGE_MAX) ? null : `must be a whole number from 1 to ${PER_STAGE_MAX}`),
   lives: (v) => (isInt(v, LIVES_MIN, LIVES_MAX) ? null : `must be a whole number from ${LIVES_MIN} to ${LIVES_MAX}`),
   gentle: (v) => (typeof v === 'boolean' ? null : 'must be true or false'),

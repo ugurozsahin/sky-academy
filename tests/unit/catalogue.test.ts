@@ -36,6 +36,8 @@ describe('catalogue coverage: one node per game and per year (#2193)', () => {
     expect(Object.keys(CATALOGUE.groups)).toEqual(GROUP_IDS);
     expect(Object.values(CATALOGUE.groups).flat().sort()).toEqual(YEARS.map((y) => y.id).sort());
     expect([...CATALOGUE.groups.eyfs, ...CATALOGUE.groups.ks1].sort()).toEqual([...EYFS_KS1].sort());
+    // The map the issue fixes: `groupSettings` will apply by it (#2198), so a year moved between groups is a rail failure.
+    expect(CATALOGUE.groups).toEqual({ eyfs: ['reception'], ks1: ['year1', 'year2'], lks2: ['year3', 'year4'], uks2: ['year5', 'year6'] });
   });
 });
 
@@ -133,6 +135,15 @@ const MUTATIONS: [string, (c: Doc) => void, string][] = [
   ['a missing year node', (c) => { delete c.years.year3; }, 'years.year3: missing'],
   ['a year node no group names', (c) => { c.years.year7 = c.years.year6; }, 'years.year7: unknown key'],
   ['an island visible that is not "auto" or boolean', (c) => { c.years.year1.visible = 'yes'; }, 'years.year1.visible: must be "auto"'],
+  ['a missing island key', (c) => { delete c.years.year1.playability; }, 'years.year1.playability: missing'],
+  ['an unknown island key', (c) => { c.years.year1.visable = true; }, 'years.year1.visable: unknown key'],
+  ['a missing defaults.settings', (c) => { delete c.defaults.settings; }, 'defaults.settings: missing'],
+  ['an unknown key beside defaults.settings', (c) => { c.defaults.lives = 3; }, 'defaults.lives: unknown key'],
+  ['settings that are not an object', (c) => { c.games[GAME].settings = null; }, `games.${GAME}.settings: must be an object`],
+  ['a game node that is not an object', (c) => { c.games[GAME] = 'y1-bonds'; }, `games.${GAME}: must be an object`],
+  ['a game-year node that is not an object', (c) => { c.games[GAME].years.year1 = true; }, `games.${GAME}.years.year1: must be an object`],
+  ['a thumbnail given as a bare path', (c) => { c.games[GAME].media.thumbnail = `img/games/${GAME}/thumb.webp`; }, `games.${GAME}.media.thumbnail: must be { src, alt }`],
+  ['a screenshot that is not an object', (c) => { c.years.year1.media.screenshots[0] = null; }, 'years.year1.media.screenshots[0]: must be { src, alt }'],
   ['a missing year setting', (c) => { delete c.years.year1.settings.lives; }, 'years.year1.settings.lives: missing'],
   ['an unknown setting', (c) => { c.years.year1.settings.speed = 1; }, 'years.year1.settings.speed: not a setting'],
   ['lives below 1', (c) => { c.years.year1.settings.lives = 0; }, 'years.year1.settings.lives: must be a whole number from 1 to 5'],
@@ -145,6 +156,9 @@ const MUTATIONS: [string, (c: Doc) => void, string][] = [
   ['too few stages', (c) => { c.years.year1.settings.speeds.pop(); }, 'years.year1.settings.speeds: must be 5 values'],
   ['a difficulty outside 1-3', (c) => { c.years.year1.settings.diffs[0] = 0; }, 'years.year1.settings.diffs: must be 5 values'],
   ['twoStar not below threeStar', (c) => { c.years.year1.settings.sprintStars.twoStar = 12; }, 'years.year1.settings.sprintStars: must be whole numbers'],
+  ['twoStar 0', (c) => { c.years.year1.settings.sprintStars.twoStar = 0; }, 'years.year1.settings.sprintStars: must be whole numbers'],
+  ['a fractional minAnswer', (c) => { c.years.year4.settings.minAnswer = -1.5; }, 'years.year4.settings.minAnswer: must be a whole number'],
+  ['an empty group', (c) => { c.groups.ks1 = []; }, 'groups.ks1: must be a list'],
   ['an unknown sprintStars key', (c) => { c.years.year1.settings.sprintStars.oneStar = 1; }, 'years.year1.settings.sprintStars.oneStar: unknown key'],
   ['maxAnswer 0', (c) => { c.years.year1.settings.maxAnswer = 0; }, 'years.year1.settings.maxAnswer: must be a whole number above 0'],
   ['minAnswer not below maxAnswer', (c) => { c.years.year1.settings.minAnswer = 120; }, 'years.year1.settings.minAnswer: must be a whole number below maxAnswer'],
@@ -208,10 +222,9 @@ describe('validateCatalogue catches each kind of error in a seeded bad copy (#21
     const copy = onDisk();
     copy.games[GAME].settings = { perStage: 4, lives: 5, gentle: true, speeds: [0, 0, 1, 1, 2], diffs: [1, 1, 1, 2, 2], airTime: [9, 7, 5], stagger: [600, 500, 400] };
     copy.games[GAME].groupSettings = { ks1: { lives: 1 }, eyfs: {} };
-    copy.games[GAME].years.year1.settings = { speeds: [3, 3, 3, 3, 3] };
     copy.years.year1.settings.airTime = [8, 6, 4];
     copy.games[GAME].playability = play;
-    copy.games[GAME].years.year1 = { visible: false, settings: {}, playability: { ...play, score: 0 } };
+    copy.games[GAME].years.year1 = { visible: false, settings: { speeds: [3, 3, 3, 3, 3] }, playability: { ...play, score: 0 } };
     copy.years.year2.visible = false;
     copy.games[GAME].media.screenshots.push({ src: `img/games/${GAME}/2.webp`, alt: 'Two', caption: 'Stage 2', kind: 'tablet' });
     expect(validateCatalogue(copy)).toEqual([]);

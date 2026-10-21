@@ -19,7 +19,9 @@ if (existsSync(OUT) && !process.argv.includes('--force')) {
 /** Air time (s) and stagger (ms) at speeds 0..2, measured from `layoutWave` at `speedK` 1. */
 function speedTable(layoutWave) {
   const plans = [0, 1, 2].map((speed) => layoutWave({ labels: ['1', '2', '3'], speed }, { W: 390, H: 700, topInset: 0 }, 1, 0, () => 0.5));
-  return { airTime: plans.map((p) => p.waveT / 1000), stagger: plans.map((p) => p.stagger) };
+  const table = { airTime: plans.map((p) => p.waveT / 1000), stagger: plans.map((p) => p.stagger) };
+  if (![...table.airTime, ...table.stagger].every((n) => Number.isFinite(n) && n > 0)) throw new Error(`catalogue-init: layoutWave no longer reports waveT/stagger: ${JSON.stringify(table)}`);
+  return table;
 }
 
 const yearSettings = (y) => ({
