@@ -14,9 +14,9 @@ const map: ContentMap = JSON.parse(read('docs/content-map.json'));
 const home = read('website/index.html');
 const fileOf = (id: YearId) => `website/curriculum/${yearSlug(id)}/index.html`;
 const REGEN = 'run `npm run content-map` and commit website/curriculum/';
-/** The teachers' section's details element (#2160), or '' when the page has none. */
+/** The details element in the teachers' section (#2160), never the header's menu (#2159); '' when there is none. */
 const teachers = (html: string) => {
-  const at = html.indexOf('<details>'), end = html.indexOf('</details>', at);
+  const at = html.indexOf('<details>', html.indexOf('<section id="for-teachers"')), end = html.indexOf('</details>', at);
   return at < 0 || end < 0 ? '' : html.slice(at, end);
 };
 const terms = (html: string) => [...html.matchAll(/<div><dt>([^<]*)<\/dt><dd>([^<]*)<\/dd><\/div>/g)].map(m => ({ dt: m[1], dd: m[2] }));
@@ -180,7 +180,8 @@ describe('the year pages carry the teachers\' detail, collapsed (#2160)', () => 
   it('puts it in one closed details, below the plain-words lists, with the summary the issue names', () => {
     for (const y of map.byYear) {
       const html = read(fileOf(y.year));
-      expect(html.match(/<details\b[^>]*>/g), y.year).toEqual(['<details>']);
+      const main = html.match(/<main\b[\s\S]*<\/main>/)![0];   // the header's Curriculum menu is a details too (#2159)
+      expect(main.match(/<details\b[^>]*>/g), y.year).toEqual(['<details>']);
       expect(html, y.year).toContain('<details>\n          <summary>For teachers: National Curriculum references and gaps</summary>');
       const open = html.indexOf('<details>');
       for (const [id, n] of [['maths', y.maths], ['english', y.writing]] as const) {
