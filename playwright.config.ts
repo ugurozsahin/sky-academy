@@ -100,5 +100,11 @@ export default defineConfig({
     // is the #116 rail's shape for a non-tablet project; with its own `testDir` it has nothing to ignore. It
     // depends on `setup` like every other leg (#486): the identity spec proves the preview serves this dist/.
     { name: 'sketchbook', testDir: 'tests/sketch', testIgnore: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 600, height: 600 }, deviceScaleFactor: 2 } },
+    // #2096: the website, not the game. Every page `website/sitemap.xml` lists, at the narrowest phone the site is
+    // built for, served by `scripts/site-serve.mjs`, which the spec starts itself on a free port, so the game's
+    // `baseURL` and `webServer` are not involved. Its own `testDir` keeps it off every game leg; ci.yml runs it on a
+    // pull request whose diff touches `website/` (SITE_PATHS), and on the nightly with every other project. It
+    // depends on `setup` like every leg (#486): `/play/` is served from this dist/, so its link answers 200.
+    { name: 'site', testDir: 'tests/site', testIgnore: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 360, height: 740 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
   ],
 });

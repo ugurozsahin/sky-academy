@@ -41,7 +41,8 @@ describe('the site shell is the same on every page (#1935)', () => {
   });
   it('the header has the logo, Home, Curriculum, Features, Guides and About, then Play now', () => {
     const links = [...shell(home).header.matchAll(/<a [^>]*href="([^"]+)"/g)].map(m => m[1]);
-    expect(links).toEqual(['#main', '/', '/', '/curriculum/', '/features/', '/guides/', '/about/', '/play/']);
+    const years = ['reception', ...[1, 2, 3, 4, 5, 6].map(n => `year-${n}`)].map(y => `/curriculum/${y}/`);   // #2159
+    expect(links).toEqual(['#main', '/', '/', '/curriculum/', ...years, '/features/', '/guides/', '/about/', '/play/']);
   });
   it('the footer has Privacy, Support and About, and the company name with the year (3.2.6: help in one place)', () => {
     const { footer } = shell(home);
@@ -53,7 +54,7 @@ describe('the site shell is the same on every page (#1935)', () => {
       // A year page's switcher in main (#2160) has its own rail in site-curriculum-years.test.ts; every other page is read whole.
       const html = /^website\/curriculum\/[^/]+\/index\.html$/.test(p) ? read(p).replace(/<main\b[\s\S]*<\/main>/, '') : read(p), path = p.replace(/^website/, '').replace(/index\.html$/, '');
       const nav = [...html.matchAll(/<li><a href="([^"]+)"( aria-current="page")?>/g)];
-      expect(nav.length, p).toBe(8);
+      expect(nav.length, p).toBe(15);   // Home, Features, Guides, About; the eight under Curriculum (#2159); the footer's three
       for (const [, href, current] of nav) expect(Boolean(current), `${p}: ${href}`).toBe(href === path);
     }
   });
