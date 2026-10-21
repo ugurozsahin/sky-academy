@@ -38,7 +38,7 @@ async function openTopic(page, year, topic, tab = 'maths') {
   await freeze(page);
 }
 
-/** The product the grown-ups gate asks for: "6 × 8", or "thirty-seven times twenty-four" (the same reading as tests/e2e/viewport.ts). */
+/** The product the grown-ups gate asks for: "6 × 8", or "thirty-seven times twenty-four" (tests/e2e/viewport.ts re-exports this). */
 export function gateProduct(q) {
   const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
   const tens = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
@@ -80,6 +80,8 @@ export const SHOTS = [
   } },
   { name: 'island', run: async page => { await page.click('.island[data-year="year1"]'); await page.waitForSelector('.island-screen'); } },
 ];
+/** The files over MAX_BYTES, as the lines the failure names: `[{ file, bytes }]` in, `["file (n bytes)"]` out. */
+export const oversized = files => files.filter(f => f.bytes > MAX_BYTES).map(f => `${f.file} (${f.bytes} bytes)`);
 export const shotFiles = () => SHOTS.flatMap(s => Object.keys(SIZES).map(z => `${s.name}-${z}.webp`));
 
 export const isWebp = buf => buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
@@ -97,7 +99,7 @@ async function main([base, out]) {
   mkdirSync(out, { recursive: true });
   const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const enc = await (await browser.newContext()).newPage();
-  const tooBig = [], errors = [];
+  const written = [], errors = [];
   try {
     for (const [size, viewport] of Object.entries(SIZES)) {
       for (const shot of SHOTS) {
@@ -128,12 +130,13 @@ async function main([base, out]) {
         if (!isWebp(buf)) throw new Error(`${shot.name}-${size}: the browser did not encode WebP`);   // toDataURL falls back to PNG silently
         const file = `${out}/${shot.name}-${size}.webp`;
         writeFileSync(file, buf);
-        if (statSync(file).size > MAX_BYTES) tooBig.push(`${file} (${buf.length} bytes)`);
+        written.push({ file, bytes: statSync(file).size });
         await ctx.close();
       }
     }
   } finally { await browser.close(); }
   if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
+  const tooBig = oversized(written);
   if (tooBig.length) throw new Error(`over ${MAX_BYTES} bytes: ${tooBig.join(', ')}`);
   console.log(`site-shots: wrote ${shotFiles().length} files to ${out}`);
 }
