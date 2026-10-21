@@ -79,6 +79,7 @@ describe('/guides/play/ says only what the game does (#2094)', () => {
     const ev = new Proxy({}, { get: () => () => {} }) as SessionEvents;
     const s = new Session({ mode: 'mission', year, topic: topicById(topic)!, rng: () => 0.42 }, ev);
     s.start();
+    expect(s.current, `${topic}: the mission's first question`).not.toBeNull();
     return s;
   };
   const Y1 = YEARS.find(y => y.id === 'year1')!;
@@ -100,14 +101,14 @@ describe('/guides/play/ says only what the game does (#2094)', () => {
     }
     expect(text).toContain('From Year 1, missing the right bubble costs one too. A missed bubble falls off the bottom of the screen.');
   });
-  it('hearts: clearing a stage gives a lost heart back', () => {
+  it('hearts: clearing a stage gives a lost heart back; Reception gets every one back', () => {
     for (const [y, t] of cases) {
       const s = mission(y, t);
-      s.hit('not the answer'); s.advance();
-      for (let i = 1; i < y.perStage; i++) { s.hit(s.current!.answer); s.advance(); }
-      expect([s.stage, s.index, s.lives], `${y.id}: stage 1 cleared, one heart down`).toEqual([1, y.perStage, y.lives - 1]);
+      for (let i = 0; i < 2; i++) { s.hit('not the answer'); s.advance(); }   // two hearts down: +1 and a refill differ
+      for (let i = 2; i < y.perStage; i++) { expect(s.hit(s.current!.answer), `${y.id}: question ${i}`).toBe('correct'); s.advance(); }
+      expect([s.stage, s.index, s.lives], `${y.id}: stage 1 cleared, two hearts down`).toEqual([1, y.perStage, y.lives - 2]);
       s.nextStage();
-      expect([s.stage, s.lives], y.id).toEqual([2, y.lives]);
+      expect([s.stage, s.lives], y.id).toEqual([2, y.gentle ? y.lives : y.lives - 1]);
     }
     expect(text).toContain('Lost a heart? Clear the stage to get one back.');
   });
@@ -143,6 +144,7 @@ describe('/guides/play/ says only what the game does (#2094)', () => {
   it('stickers: spending every coin keeps every sticker already held', () => {
     const earned = evaluateStickers({ ...DEFAULT, coins: 120 });
     expect(earned).toEqual(stickersFor(120));
+    expect(evaluateStickers({ ...DEFAULT, coins: 200, spent: 200 }), 'read from lifetime coins, not coins left').toEqual(stickersFor(200));
     // Buying adds to `spent` and leaves `coins`, the lifetime total stickersFor reads, alone.
     const bought = buy({ coins: 200, spent: 0, owned: [], equipped: {} }, 'trail-gold');
     expect([bought.ok, bought.wallet.coins, bought.wallet.spent]).toEqual([true, 200, 200]);
