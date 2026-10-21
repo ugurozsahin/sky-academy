@@ -3087,11 +3087,11 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // Two silent decays this holds: the `sketchbook` project loses `testDir` (it then runs the whole game suite
   // nightly at 600×600 and the shot spec runs nowhere), or the spec is "tidied" into `tests/e2e/` (every
   // pull request's mobile leg then screenshots into docs/sketchbook/).
-  it('the sketchbook project alone declares a testDir, tests/sketch, and holds the shot spec', () => {
+  it('only the sketchbook and the website (#2096) declare a testDir, tests/sketch and tests/site, and the shot spec is held', () => {
     const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
     const parts = cfg.slice(cfg.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
     const withDir = parts.filter(p => /\btestDir:/.test(p)).map(p => ({ name: p.match(/name:\s*'([^']+)'/)![1], dir: p.match(/testDir:\s*'([^']+)'/)?.[1] }));
-    expect(withDir).toEqual([{ name: 'sketchbook', dir: 'tests/sketch' }]);
+    expect(withDir).toEqual([{ name: 'sketchbook', dir: 'tests/sketch' }, { name: 'site', dir: 'tests/site' }]);
     const sketchSpecs = readdirSync(new URL('../../tests/sketch', import.meta.url)).filter(f => f.endsWith('.spec.ts'));
     expect(sketchSpecs.length, 'tests/sketch must hold the shot spec').toBeGreaterThan(0);
     for (const f of readdirSync(new URL('../../tests/e2e', import.meta.url)))
@@ -3099,7 +3099,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   });
 
   // #713 decision 5 and the owner's rule (2026-09-25): the game's e2e runs with 3-D off, stored the way a
-  // grown-up stores it. Every project that is not `setup` or `sketchbook` is a game project and must start from
+  // grown-up stores it. Every project that is not `setup`, `sketchbook` or `site` is a game project and must start from
   // `THREE_OFF` — read from the projects, not a list here, so a new game project without it fails too. And the
   // key it stores must be the key the game reads, or the setting would be stored and never seen.
   it('every game e2e project starts with the grown-ups 3-D setting off (#713 decision 5)', () => {
@@ -3108,7 +3108,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     expect(cfg, 'THREE_OFF must store THREE_KEY as off').toMatch(/name:\s*THREE_KEY,\s*value:\s*'off'/);
     const parts = cfg.slice(cfg.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
     const named = parts.map(p => ({ name: p.match(/name:\s*'([^']+)'/)![1], body: p }));
-    const game = named.filter(p => p.name !== 'setup' && p.name !== 'sketchbook');
+    const game = named.filter(p => p.name !== 'setup' && p.name !== 'sketchbook' && p.name !== 'site');   // #2096: the website, never the game
     expect(game.map(p => p.name), 'the game projects the rail reads').toEqual(expect.arrayContaining(['mobile', 'desktop']));
     for (const p of game) expect(p.body, `${p.name} must start with 3-D off`).toMatch(/storageState:\s*THREE_OFF\b/);
   });
