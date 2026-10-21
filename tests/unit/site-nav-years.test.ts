@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { YEARS } from '../../src/curriculum';
+import type { YearId } from '../../src/curriculum/types';
 import { yearPath } from '../../scripts/site-curriculum-lib.mjs';
 
 /**
@@ -8,6 +9,7 @@ import { yearPath } from '../../scripts/site-curriculum-lib.mjs';
  * on every page. The years come from the game's registry, not from the header, so a year added to the game and
  * not to the menu fails here. site-home.test.ts holds the header byte-identical and the current-page marks.
  * #2174: website/nav.js turns it into a button and an overlay at run time; the markup on disk stays this <details>.
+ * #2178: All years first, on its own, then the years in two lists by key stage, each named by its visible label.
  */
 const root = new URL('../../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
@@ -71,5 +73,48 @@ describe('the Curriculum item opens the seven school years (#2159)', () => {
   });
   it('the scripted list is hidden while the button says collapsed, so aria-expanded is its one state', () => {
     expect(rules.find(r => r.selector === '.site-nav div.nav-years > [aria-expanded="false"] + ul')?.body).toMatch(/display:\s*none/);
+  });
+});
+
+/**
+ * #2178: the years are grouped the way schools in England speak of them. Key Stage 1 is Years 1 and 2; Reception
+ * is the Early Years Foundation Stage, so the first group's label names it. The membership is pinned by the
+ * registry's ids, so a year added to the game and to no group fails here.
+ */
+const GROUPS: { id: string; label: string; years: YearId[] }[] = [
+  { id: 'nav-ks1', label: 'Reception and Key Stage 1', years: ['reception', 'year1', 'year2'] },
+  { id: 'nav-ks2', label: 'Key Stage 2', years: ['year3', 'year4', 'year5', 'year6'] },
+];
+/** Each group in the header: the label's id and text, the id its list is named by, and the pages it links. */
+const groups = (html: string) => [...disclosure(html).matchAll(/<li>\s*<p id="([^"]+)">([^<]+)<\/p>\s*<ul aria-labelledby="([^"]+)">([\s\S]*?)<\/ul>\s*<\/li>/g)]
+  .map(m => ({ id: m[1], label: m[2], by: m[3], links: [...m[4].matchAll(/<a href="([^"]+)"/g)].map(h => h[1]) }));
+
+describe('the Curriculum menu groups the years by key stage (#2178)', () => {
+  const all = pages();
+  it('the two groups cover every year of the registry once, in order', () => {
+    expect(GROUPS.flatMap(g => g.years)).toEqual(YEARS.map(y => y.id));
+  });
+  it('on every page: All years first on its own, then each group as a list named by its visible label', () => {
+    const want = GROUPS.map(g => ({ id: g.id, label: g.label, by: g.id, links: g.years.map(yearPath) }));
+    for (const p of all) {
+      const html = read(p);
+      expect(groups(html), p).toEqual(want);
+      expect(disclosure(html), `${p}: All years comes before the groups`).toMatch(/^\s*<summary>Curriculum<\/summary>\s*<ul>\s*<li><a href="\/curriculum\/"(?: aria-current="page")?>All years<\/a><\/li>\s*<li>\s*<p id="nav-ks1">/);
+      for (const g of GROUPS) expect(html.split(`id="${g.id}"`), `${p}: ${g.id} is one id on the page`).toHaveLength(2);
+    }
+  });
+  it('reads a group it is shown, and not a list named by anything else', () => {
+    const one = '<details class="nav-years"><summary>Curriculum</summary><ul><li><p id="a">A</p><ul aria-labelledby="b"><li><a href="/x/">X</a></li></ul></li></ul></details>';
+    expect(groups(`<header>${one}</header>`)).toEqual([{ id: 'a', label: 'A', by: 'b', links: ['/x/'] }]);
+  });
+  it('the scripted list stacks the groups on a phone and sets them side by side from 900px', () => {
+    const rule = (sel: string, media = false) => {
+      const at = css.indexOf('@media (min-width: 900px)', css.indexOf('.site-nav div.nav-years > ul {'));
+      const scope = media ? css.slice(at) : css.slice(0, at);
+      return [...scope.matchAll(/([^{}]*)\{([^}]*)\}/g)].find(m => m[1].trim() === sel)?.[2] ?? '';
+    };
+    expect(rule('.site-nav div.nav-years > ul')).toMatch(/grid-template-columns:\s*1fr;/);
+    expect(rule('.site-nav div.nav-years > ul', true)).toMatch(/grid-template-columns:\s*auto auto;/);
+    expect(rule('.site-nav div.nav-years > ul > li:first-child')).toMatch(/grid-column:\s*1 \/ -1/);
   });
 });
