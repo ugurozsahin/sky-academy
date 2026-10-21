@@ -12,3 +12,4 @@
 - [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
 - [Curriculum](https://sharpwise.co.uk/curriculum/): every topic by school year and subject, with the EYFS or National Curriculum objective it practises and what is not covered yet
 - [Features](https://sharpwise.co.uk/features/): what the game does today, and what is planned
+- [Teachers' guide](https://sharpwise.co.uk/guides/teachers/): using Sharpwise in class: shared devices and a ninja for each child, no accounts and no pupil data, whole-class play, the curriculum it follows and Tables Check practice
