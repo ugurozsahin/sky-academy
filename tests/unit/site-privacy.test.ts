@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
+import ts from 'typescript';
 import { SOURCES } from './helpers/sources';
 import { ABOUT_LINES } from '../../src/ui/about';
 import { voiceScore } from '../../src/voice-score';
@@ -57,14 +58,13 @@ const LEAVES: Record<string, string> = {
 };
 const SENDS = /clipboard|\.share\s*\??\.?\s*\(|navigator\.share\b|\[['"]share['"]\]|execCommand\s*\(\s*['"]copy/i;
 
-/** Every `say(…, true)`: a line spoken even with read aloud off, because someone tapped to hear it. The page says
+/** Every `say(…)` of the speech module's with a force argument that is not `false` (`parents.ts` has its own `say`, which only writes a message): a line spoken even with read aloud off, because someone tapped to hear it. The page says
  *  none carries the child's name, so each is listed here; a new one fails until it is read and added. */
 const FORCED: Record<string, string[]> = {
   '/src/ui/home.ts': ["'Read aloud is on'", 'dojoRowLine(c, Math.min(c.goal, dojoState.progress[c.id] ?? 0))', 'lockedStickerLine(i >= 0 && i < STICKER_COST.length ? STICKER_COST[i] : undefined, ach?.title)'],
   '/src/ui/shop.ts': ['shopItemLine(it)', '`You bought the ${name}!`'],
   '/src/ui/play-beats.ts': ['q.say ?? q.prompt'],
   '/src/ui/duel-beats.ts': ['spokenQuestion(q, duel.round)'],
-  '/src/ui/parents.ts': ["'Paste a code into the box above first.'", "'This replaces all the progress on this device. Tap Restore again to go ahead.'", "'That code is not a Sharpwise save.'"],
 };
 /** The helpers those lines call, by signature: none is handed the child's name. */
 const FORCED_HELPERS = [
@@ -73,7 +73,42 @@ const FORCED_HELPERS = [
   ['/src/ui/home.ts', 'export function lockedStickerLine(cost: number | undefined, achievementTitle: string | undefined): string'],
   ['/src/game/duel.ts', 'export function spokenQuestion(q: Question, round: number): string'],
 ];
-const forcedSays = (text: string) => [...text.matchAll(/\bsay\(((?:(?!\bsay\()[^\n])*?),\s*true\s*[,)]/g)].map(m => m[1]);
+/** Calls found by syntax, not by text, so a wrapped line, an aliased import or a variable argument cannot slip by. */
+const parse = (text: string) => ts.createSourceFile('x.ts', text, ts.ScriptTarget.Latest, true);
+const walk = (n: ts.Node, f: (n: ts.Node) => void) => { f(n); n.forEachChild(c => walk(c, f)); };
+const fold = (s: string) => s.replace(/\s+/g, ' ');
+/** The first argument, in a file that imports `say` from the audio or speech module, of every `say(…)` whose second argument is present and not the literal `false`. */
+const forcedSays = (text: string) => {
+  const out: string[] = [], file = parse(text);
+  let imports = false;
+  walk(file, n => { if (ts.isImportDeclaration(n) && /\/(audio|speech)'?$/.test(n.moduleSpecifier.getText().replace(/['"]/g, '')) && n.getText().match(/\bsay\b/)) imports = true; });
+  if (!imports) return out; // a `say` from elsewhere, or only a local helper, is not the speech one
+  walk(file, n => {
+    if (!ts.isCallExpression(n) || !ts.isIdentifier(n.expression) || n.expression.text !== 'say' || n.arguments.length < 2) return;
+    if (n.arguments[1].kind !== ts.SyntaxKind.FalseKeyword) out.push(fold(n.arguments[0].getText()));
+  });
+  return out;
+};
+/** Every way `say` could be reached under another name, or speech started without it: aliased imports of `say`, and any `.speak(` or `speechEngine(` call. */
+const speechBypasses = (text: string) => {
+  const out: string[] = [];
+  walk(parse(text), n => {
+    if (ts.isImportSpecifier(n) && (n.propertyName ?? n.name).text === 'say' && n.name.text !== 'say') out.push(`say imported as ${n.name.text}`);
+    if (ts.isCallExpression(n)) {
+      const f = n.expression;
+      if (ts.isPropertyAccessExpression(f) && f.name.text === 'speak') out.push('.speak(');
+      if (ts.isIdentifier(f) && f.text === 'speechEngine') out.push('speechEngine(');
+    }
+  });
+  return out;
+};
+/** The text of a top-level function's body, so a helper's body is read, not only its signature. */
+const bodyOf = (text: string, name: string) => {
+  let body = '';
+  walk(parse(text), n => { if (ts.isFunctionDeclaration(n) && n.name?.text === name && n.body) body = n.body.getText(); });
+  return body;
+};
+const NAMES = /praiseLine|\bd\.name\b|load\s*\(|childName|profile/;
 
 describe('the privacy page: "collects nothing" is held to the code (#1934)', () => {
   it('says the game collects nothing and sets no cookie, on the page and in the at-a-glance list', () => {
@@ -84,7 +119,7 @@ describe('the privacy page: "collects nothing" is held to the code (#1934)', () 
   it('rests on the #1937 no-tracking rail, which still scans the built game and package.json', () => {
     const rail = read('tests/unit/guardrails-no-tracking.test.ts');
     for (const t of ['the built game reaches no tracking domain or SDK', 'package.json holds no analytics or ads package']) expect(rail, t).toContain(`it('${t}'`);
-    expect(rail, 'a skipped or focused rail no longer proves anything').not.toMatch(/\b(describe|it)\.(skip|only|todo)\b|\bx(it|describe)\(/);
+    expect(rail, 'a skipped or focused rail no longer proves anything').not.toMatch(/\b(describe|it)\.(skip|only|todo|skipIf|runIf)\b|\bx(it|describe)\(/);
     expect(rail).toContain('expect(trackingHits(built)).toEqual([]);');
     expect(rail).toContain('expect(badPackages(pkg)).toEqual([]);');
   });
@@ -147,14 +182,26 @@ describe('the privacy page\'s other facts (#1934)', () => {
     const found = Object.fromEntries(Object.entries(SOURCES).filter(([p]) => p !== '/src/speech.ts').map(([p, t]) => [p, forcedSays(t)]).filter(([, a]) => a.length));
     expect(found).toEqual(FORCED);
     for (const arg of Object.values(FORCED).flat()) expect(arg, arg).not.toMatch(/praiseLine|\bd\.name\b|load\(\)\.name|childName/);
-    for (const [file, sig] of FORCED_HELPERS) expect(SOURCES[file], sig).toContain(sig);
+    for (const [file, sig] of FORCED_HELPERS) {
+      expect(SOURCES[file], sig).toContain(sig);
+      const name = /function (\w+)/.exec(sig)![1], body = bodyOf(SOURCES[file], name);
+      expect(body.length, `${name}'s body it reads`).toBeGreaterThan(10);
+      expect(body, `${name} must not read the child's name`).not.toMatch(NAMES);
+    }
+    const bypasses = Object.entries(SOURCES).filter(([p]) => !/^\/src\/speech[^/]*\.ts$/.test(p)).map(([p, t]) => [p, speechBypasses(t)]).filter(([, a]) => a.length);
+    expect(bypasses, 'speech is started only through say(), whose force flag the list above reads').toEqual([]);
     expect(privacy).toContain('With read aloud off, it speaks only when someone taps something to hear it');
     expect(privacy).toContain('Those lines never include your child\'s name.');
     expect(privacy).not.toMatch(/switch read aloud off .*avoid|To avoid them/);
-    expect(forcedSays('say(a, true); say(b); say(c, false); say(d, true, { queue: true })')).toEqual(['a', 'd']);
+    expect(forcedSays('import { say } from "./audio"; say(a, true); say(b); say(c, false); say(d, true, { queue: true })')).toEqual(['a', 'd']);
+    expect(forcedSays('import { say } from "./audio"; say(\n  f(x,\n    y),\n  true,\n)')).toEqual(['f(x, y)']);
+    expect(forcedSays('import { say as speak } from "./audio"; say(line, tapped); say(l, false, { queue: true })')).toEqual(['line']);
+    expect(speechBypasses('import { say as speak } from "./speech"; speechEngine().speak(t)')).toEqual(['say imported as speak', '.speak(', 'speechEngine(']);
+    expect(speechBypasses('import { say } from "./speech"; say(a)')).toEqual([]);
+    expect(bodyOf('function f() { return load().name; }', 'f')).toMatch(NAMES);
   });
   it('Android backup is on in the manifest, and both pages say the save may go to the family\'s Google backup', () => {
-    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    const manifest = read('android/app/src/main/AndroidManifest.xml').replace(/<!--[\s\S]*?-->/g, '');
     expect(manifest, 'turned off? then change both pages, which say Android may back the save up').toContain('android:allowBackup="true"');
     expect(manifest, 'backup rules could exclude the save; the pages would then overstate it').not.toMatch(/fullBackupContent|dataExtractionRules/);
     expect(privacy).toContain('Android may copy the game\'s save, name included, to a private folder in the Google account the device uses');
