@@ -76,6 +76,10 @@ export function renderFeaturesPage(data, homeHtml) {
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Sharpwise: a ninja ready to slice the right answer. Free maths and English, Reception to Year 6.">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(TITLE)}">
+  <meta name="twitter:description" content="${esc(DESCRIPTION)}">
+  <meta name="twitter:image" content="https://sharpwise.co.uk/share.jpg">
+  <meta name="twitter:image:alt" content="Sharpwise: a ninja ready to slice the right answer. Free maths and English, Reception to Year 6.">
 </head>
 <body>
   ${header}
