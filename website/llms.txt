@@ -10,3 +10,4 @@
 
 - [Home](https://sharpwise.co.uk/): what Sharpwise is, who it is for and the years it covers
 - [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
+- [About](https://sharpwise.co.uk/about/): who makes Sharpwise (Inobil Technology Ltd), what it teaches and the promises it keeps
