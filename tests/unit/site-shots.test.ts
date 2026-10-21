@@ -68,3 +68,15 @@ describe('site screenshots fail loudly (#2106)', () => {
     expect(alt).not.toMatch(/\d\s*[+−-]\s*[?\d]|=/);
   });
 });
+
+/** #2102: a local preview must never be a picture of an older build, and must never outlive the run. */
+describe('npm run site:shots (#2102)', () => {
+  const script: string = JSON.parse(readFileSync(root + 'package.json', 'utf8')).scripts['site:shots'];
+  it('fails before building when port 4399 already answers', () => {
+    expect(script.indexOf("port 4399 is busy")).toBeGreaterThan(-1);
+    expect(script.indexOf('port 4399 is busy')).toBeLessThan(script.indexOf('npm run build'));
+  });
+  it('kills the preview on exit, Ctrl-C and termination', () => {
+    expect(script).toMatch(/trap 'kill \$P 2>\/dev\/null' EXIT INT TERM/);
+  });
+});
