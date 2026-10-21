@@ -79,6 +79,16 @@ export const SHOTS = [
     await page.click('#gate-go');
     await page.waitForSelector('.parents-dash', { timeout: ACTION_TIMEOUT });
   } },
+  { name: 'rewards', run: async page => {                       // the album with the first sticker won: coins and the sticker are seeded, then the save is read again
+    await page.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('sna:v1')); d.coins = 40; d.stickers = ['volt'];
+      localStorage.setItem('sna:v1', JSON.stringify(d));
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('.home', { timeout: ACTION_TIMEOUT });
+    await page.click('#rewards');
+    await page.waitForSelector('.rewards .sticker.got', { timeout: ACTION_TIMEOUT });
+  } },
   { name: 'island', run: async page => { await page.click('.island[data-year="year1"]'); await page.waitForSelector('.island-screen'); } },
 ];
 /** The files over MAX_BYTES, as the lines the failure names: `[{ file, bytes }]` in, `["file (n bytes)"]` out. */
