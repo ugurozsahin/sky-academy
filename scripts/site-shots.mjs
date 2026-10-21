@@ -4,6 +4,7 @@
 // The Chromium path comes from PW_CHROMIUM, else Playwright's own download. Exits non-zero on any failure,
 // on any failed request or response of 400 or above (a missing asset), and on any file over MAX_BYTES.
 import { chromium } from '@playwright/test';
+import { launchSilent } from '../tests/e2e/mute.mjs';
 import { mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -97,7 +98,7 @@ const toWebp = (page, png) => page.evaluate(async b64 => {
 async function main([base, out]) {
   if (!base || !out) throw new Error('usage: node scripts/site-shots.mjs <base-url> <out-dir>');
   mkdirSync(out, { recursive: true });
-  const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+  const browser = await launchSilent(chromium, process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const enc = await (await browser.newContext()).newPage();
   const written = [], errors = [];
   try {
