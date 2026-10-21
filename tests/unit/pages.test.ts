@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { precacheList } from '../../scripts/build-sw.mjs';
 
 /** #1933: the game is served from `/play/` on GitHub Pages. These rails hold the pieces that make that safe. */
@@ -56,6 +56,9 @@ describe('GitHub Pages deployment (#1933)', () => {
     expect(shots, 'the screenshots, from the assembled site, into site/img').toBeGreaterThan(install);
     expect(upload, 'and all of it before the upload').toBeGreaterThan(shots);
     expect(wf.slice(install, shots)).toContain('python3 -m http.server 4173 --directory site');
+    expect(wf.slice(install, shots), 'a server that never starts says so').toContain('the local server never answered');
+    // #2099 brings the script. Red until it is on main, so this cannot merge first and break every deploy.
+    expect(existsSync(new URL('../../scripts/site-shots.mjs', import.meta.url)), 'scripts/site-shots.mjs (#2088) is on this branch').toBe(true);
   });
 });
 

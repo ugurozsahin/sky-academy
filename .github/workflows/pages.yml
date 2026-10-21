@@ -35,8 +35,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Screenshots into site/img (#2088)
         run: |
-          python3 -m http.server 4173 --directory site >/dev/null 2>&1 &
+          python3 -m http.server 4173 --directory site >"$RUNNER_TEMP/http.log" 2>&1 &
           for i in $(seq 1 30); do curl -sf http://localhost:4173/play/ >/dev/null && break; sleep 1; done
+          curl -sf http://localhost:4173/play/ >/dev/null || { cat "$RUNNER_TEMP/http.log"; echo "the local server never answered"; exit 1; }
           node scripts/site-shots.mjs http://localhost:4173/play/ site/img
       - uses: actions/upload-pages-artifact@v5
         # v4 dropped every dotfile with no way back, so .well-known/assetlinks.json never shipped (#2085)
