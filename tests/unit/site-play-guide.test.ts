@@ -58,7 +58,7 @@ describe('/guides/play/ (#2094)', () => {
   });
   it('shows only deploy-time screenshots, each with an alt text', () => {
     const imgs = [...main.matchAll(/<img\b[^>]*>/g)].map(m => m[0]);
-    expect(imgs).toHaveLength(5);
+    expect(imgs).toHaveLength(6);
     for (const img of imgs) {
       expect(shotFiles()).toContain(img.match(/src="\/img\/([^"]+)"/)?.[1]);
       expect(img).toMatch(/\balt="[^"]{10,}"/);
