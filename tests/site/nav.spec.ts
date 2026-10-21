@@ -70,6 +70,9 @@ for (const width of [360, 1280]) {
       await expect(button(page)).not.toBeFocused();
       await page.mouse.click(outside.x, outside.y);
       await expanded(page, false);
+      await button(page).dispatchEvent('click');
+      await page.touchscreen.tap(outside.x, outside.y);
+      await expanded(page, false);
       await button(page).click();
       await button(page).click();
       await expanded(page, false);
@@ -88,6 +91,24 @@ for (const width of [360, 1280]) {
       await page.keyboard.press('Escape');
       await expanded(page, false);
       await expect(button(page)).toBeFocused();
+      // Escape while it is closed leaves focus where it is; Escape after a press that gave the button no focus
+      // (Safari, iOS) still closes it and puts focus on the button.
+      const features = page.locator('.site-nav a[href="/features/"]');
+      await features.focus();
+      await page.keyboard.press('Escape');
+      await expect(features).toBeFocused();
+      await button(page).dispatchEvent('click');
+      await expanded(page, true);
+      await page.keyboard.press('Escape');
+      await expanded(page, false);
+      await expect(button(page)).toBeFocused();
+    });
+
+    test('a page shown again from the back-forward cache shows it closed', async ({ page }) => {
+      await button(page).click();
+      await expanded(page, true);
+      await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+      await expanded(page, false);
     });
 
     test('Tab walks the eight links uncovered and closes it on leaving; Shift+Tab out of the button closes it too', async ({ page }) => {

@@ -21,6 +21,7 @@ function tokens(source: string): { text: string; strings: string[] } {
   for (let k = scanner.scan(); k !== ts.SyntaxKind.EndOfFileToken; k = scanner.scan()) {
     out.push(scanner.getTokenText());
     if (k === ts.SyntaxKind.StringLiteral || k === ts.SyntaxKind.NoSubstitutionTemplateLiteral) strings.push(scanner.getTokenValue());
+    if (k === ts.SyntaxKind.TemplateHead) strings.push('`${`');   // a built string: its parts cannot be read, so it fails
   }
   return { text: out.join(' '), strings };
 }
@@ -31,12 +32,16 @@ const FORBIDDEN: [string, RegExp][] = [
   ['sessionStorage', /\bsessionStorage\b/], ['document.cookie', /\bcookie\b/], ['indexedDB', /\bindexedDB\b/],
   ['WebSocket', /\bWebSocket\b/], ['EventSource', /\bEventSource\b/], ['Worker', /\b(?:Shared)?Worker\b|\bserviceWorker\b/],
   ['eval', /\beval\b|\bFunction\s*\(/], ['src or href set', /\.\s*(?:src|href|srcset)\b/],
+  ['address attribute', /\bsetAttribute(?:NS)?\s*\(\s*(?:[^,)]*,\s*)?['"`](?:src|href|srcset|action|formaction|ping|data|poster)['"`]/],
+  ['HTML written', /\b(?:innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment|DOMParser|write|writeln)\b/],
+  ['navigation', /\blocation\b|\bopen\s*\(|\bsubmit\b/],
 ];
 function reaches(source: string): string[] {
   const { text, strings } = tokens(source);
   const found = FORBIDDEN.filter(([, re]) => re.test(text)).map(([name]) => name);
-  // An address needs a slash or a colon: no string in the script may carry one, so it can name no URL.
-  for (const s of strings) if (/[/:]/.test(s)) found.push(`string "${s}"`);
+  // An address needs a slash or a colon: no string in the script may carry one, so it can name no URL; nor may it
+  // build a string from parts (a template with a substitution), which this cannot read.
+  for (const s of strings) if (/[/:]/.test(s) || s === "`${`") found.push(`string "${s}"`);
   return found;
 }
 
@@ -53,12 +58,16 @@ describe('website/nav.js opens the Curriculum menu and does nothing else (#2174)
       ['import(', "import('./a.js')"], ['new Image', 'new Image()'], ['localStorage', "localStorage.setItem('a', 1)"],
       ['sessionStorage', 'sessionStorage.a = 1'], ['document.cookie', "document.cookie = 'a=1'"], ['indexedDB', 'indexedDB.open(n)'],
       ['WebSocket', 'new WebSocket(u)'], ['EventSource', 'new EventSource(u)'], ['Worker', 'new Worker(u)'],
-      ['eval', 'eval(x)'], ['src or href set', 'img.src = u'],
+      ['eval', 'eval(x)'], ['src or href set', 'img.src = u'], ['address attribute', "box.setAttribute('src', u)"],
+      ['HTML written', "box.insertAdjacentHTML('beforeend', h)"], ['navigation', "location.assign('x')"],
     ];
     expect(cases.map(([name]) => name), 'one case per forbidden entry').toEqual(FORBIDDEN.map(([name]) => name));
-    for (const [name, line] of cases) expect(reaches(`${nav}\n${line.replace(/'[^']*'/g, "'x'")};`), line).toContain(name);
+    for (const [name, line] of cases) expect(reaches(`${nav}\n${line.replace(/'[^']*[/:][^']*'/g, "'x'")};`), line).toContain(name);
     expect(reaches("const a = 'https://example.com';")).toEqual(['string "https://example.com"']);
     expect(reaches("const a = '/x.js';")).toEqual(['string "/x.js"']);
+    expect(reaches('const a = `https://x.com/${b}`;'), 'a template with a substitution').toContain('string "`${`"');
+    expect(reaches("box.setAttribute('aria-controls', list.id); const open = 1; String(open);"), 'what nav.js itself does').toEqual([]);
+    for (const line of ["box.innerHTML = h", "box.outerHTML = h", "window.open(u)", "form.submit()", "document.write(h)"]) expect(reaches(line), line).not.toEqual([]);
     expect(reaches('// nothing is fetched, no fetch(), no localStorage\n/* new Image */ const a = 1;')).toEqual([]);
   });
   it('stays under 2 KB', () => {

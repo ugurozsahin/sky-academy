@@ -23,7 +23,8 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && isOpen()) { set(false); button.focus(); }
   });
-  box.addEventListener('focusout', e => { if (!box.contains(e.relatedTarget)) set(false); });
+  // Focus moving to nothing (Safari blurs the button when a link in the list is clicked) is left to pointerdown.
+  box.addEventListener('focusout', e => { if (e.relatedTarget && !box.contains(e.relatedTarget)) set(false); });
   // pointerdown, not click: a tap on plain page text fires no click on iOS, and focus does not move either.
   document.addEventListener('pointerdown', e => { if (!box.contains(e.target)) set(false); });
   addEventListener('pageshow', () => set(false));   // back to this page: the menu is closed, as on a fresh load
