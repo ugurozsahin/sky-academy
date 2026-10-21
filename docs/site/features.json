@@ -1,0 +1,39 @@
+{
+  "about": "The /features/ page (#2101). `today`: what the game does on main, each with the repo path that shows it. `later`: what is planned, each with its open issue. `node scripts/site-features.mjs` renders website/features/index.html; tests/unit/site-features.test.ts holds the rules.",
+  "today": [
+    { "title": "Missions", "blurb": "Every topic is a mission of five waves that get harder as they go, with lives to keep and up to three stars to win.", "source": "src/game/modes.ts" },
+    { "title": "Sky Storm", "blurb": "An endless storm of mixed questions that speeds up the longer a child keeps going, with Hammer Man's TNT bubbles to avoid.", "source": "src/game/modes.ts" },
+    { "title": "Ninja Sprint", "blurb": "Sixty seconds to slice as many right answers as possible, with no lives to lose.", "source": "src/game/session.ts" },
+    { "title": "Boss Battle", "blurb": "Right answers knock down Hammer Man's health bar until he is out.", "source": "src/game/session.ts" },
+    { "title": "Ninja Duel", "blurb": "Two players share one device and one question, and the first right slice wins the round.", "source": "src/game/duel.ts" },
+    { "title": "Memory Match", "blurb": "A calm card game of finding matching pairs, with no slicing.", "source": "src/game/memory.ts" },
+    { "title": "Train with Sensei", "blurb": "Sensei picks the topics a child finds hardest and puts them into one practice session.", "source": "src/game/sensei.ts" },
+    { "title": "Letter tracing", "blurb": "Reception children trace letters with a finger, starting with the ones they learn to read first.", "source": "src/curriculum/reception.ts" },
+    { "title": "Daily Dojo", "blurb": "Three new challenges every day, with bonus coins and a streak for coming back.", "source": "src/game/dojo.ts" },
+    { "title": "Tables Check practice", "blurb": "Year 4 practice with the same timing as the multiplication tables check: 25 questions, 6 seconds each.", "source": "src/game/mtc.ts" },
+    { "title": "Arithmetic practice", "blurb": "Year 6 practice in the style of the arithmetic paper: ten questions, at the paper's own pace.", "source": "src/game/arithmetic-paper.ts" },
+    { "title": "Statutory spelling lists", "blurb": "Every word on the statutory Year 3–4 and Year 5–6 spelling lists.", "source": "src/curriculum/statutory-lists.ts" },
+    { "title": "Coins and the Ninja Shop", "blurb": "Right answers earn coins, which buy new slice trails in the Ninja Shop.", "source": "src/game/shop.ts" },
+    { "title": "Sticker album", "blurb": "Stickers of the ninjas and Hammer Man fill an album as coins add up and a child tries new topics, bosses and years.", "source": "src/storage/stickers.ts" },
+    { "title": "Certificates", "blurb": "Winning a mission makes a certificate to print or share, and every certificate is kept in an album.", "source": "src/ui/certificate.ts" },
+    { "title": "Belts and trophies", "blurb": "Ninja belts grow with the stars earned across every topic, and each topic has a bronze, silver or gold trophy to win in Ninja Sprint.", "source": "src/game/trophies.ts" },
+    { "title": "Four children, one device", "blurb": "Up to four children can each have their own ninja and their own progress on one phone, tablet or computer.", "source": "src/storage/profile-index.ts" },
+    { "title": "The grown-ups' area", "blurb": "Behind a quick sum, grown-ups see questions answered, accuracy, stars and the topics a child finds hardest.", "source": "src/ui/parents.ts" },
+    { "title": "Progress report", "blurb": "Grown-ups can share a short progress summary as text or as a one-page picture.", "source": "src/ui/report.ts" },
+    { "title": "Read aloud", "blurb": "Questions can be read aloud, so children who cannot read yet can still play.", "source": "src/speech.ts" },
+    { "title": "Slower bubbles and extra time", "blurb": "Grown-ups can slow the bubbles down, and give extra time or no time limit on timed questions.", "source": "src/ui/parents-settings.ts" },
+    { "title": "Whiteboard mode", "blurb": "For a class at the front of the room: slower bubbles, questions read aloud, practice with no lives, and nothing saved.", "source": "src/storage/guest.ts" },
+    { "title": "Reception to Year 6", "blurb": "Seven islands, one for each school year from Reception to Year 6, each with maths and English topics.", "source": "src/curriculum/index.ts" },
+    { "title": "Plays offline and installs", "blurb": "After the first visit it plays without a connection, and it can be added to the home screen like an app.", "source": "src/pwa.ts" },
+    { "title": "Move to another device", "blurb": "A save code carries a child's progress to another phone, tablet or computer.", "source": "src/storage/backup.ts" },
+    { "title": "No adverts, no tracking", "blurb": "No adverts, no analytics and no account: progress is kept on the device.", "source": "src/ui/about.ts" }
+  ],
+  "later": [
+    { "title": "Sharpwise on Google Play", "blurb": "An Android app in the Google Play store, made for families.", "issue": 1927 },
+    { "title": "Sharpwise on the App Store", "blurb": "An app for iPhone and iPad.", "issue": 1928 },
+    { "title": "A recorded voice", "blurb": "A real recorded voice for the game's everyday phrases, in place of the device's computer voice.", "issue": 106 },
+    { "title": "Celebration poses", "blurb": "Each ninja celebrating a win in a pose of its own.", "issue": 13 },
+    { "title": "A 3-D Sky Map", "blurb": "The Sky Map as floating 3-D islands.", "issue": 685 },
+    { "title": "Schools and classes", "blurb": "A way for a teacher to set up a class for the children to join.", "issue": 54 }
+  ]
+}
