@@ -60,6 +60,6 @@ Never measured yet: whether Pages serves the extensionless `apple-app-site-assoc
 ## Screenshots (#2088)
 
 `node scripts/site-shots.mjs <base-url> <out-dir>` captures every picture the pages and the store listing need, at phone
-and desktop size, from fixed seeds. The Pages deploy runs it and serves the files at `/img/<name>.webp`; no image is
+and desktop size, from fixed seeds. #1935's Pages step runs it and serves the files at `/img/<name>.webp`; no image is
 committed. Locally, `npm run site:shots` writes to the git-ignored `site-shots/`. Set `PW_CHROMIUM` for a browser
 Playwright did not download. The shot list is in the script; a rail fails if a page references a file it does not make.
