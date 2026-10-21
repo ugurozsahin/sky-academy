@@ -7,9 +7,9 @@ import { MODES, type EndCtx } from '../../src/game/modes';
 import { buy } from '../../src/game/shop';
 import { ACHIEVEMENTS, STICKER_COST, stickersFor } from '../../src/storage/stickers';
 
-/** #2094: /guide/play/, How to play for children. Short sentences, one picture per card, and every fact true of the game. */
+/** #2094: /guides/play/, How to play for children. Short sentences, one picture per card, and every fact true of the game. */
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
-const page = read('website/guide/play/index.html').replace(/<!--[\s\S]*?-->/g, '');   // comments first: one may quote a tag
+const page = read('website/guides/play/index.html').replace(/<!--[\s\S]*?-->/g, '');   // comments first: one may quote a tag
 const main = page.slice(page.indexOf('<main id="main"'), page.indexOf('</main>'));
 const text = main.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const MAX_WORDS = 12;
@@ -23,7 +23,7 @@ function sentences(html: string): string[] {
 const words = (s: string) => s.split(' ').filter(w => /[\p{L}\p{N}]/u.test(w)).length;
 const tooLong = (html: string) => sentences(html).filter(s => words(s) > MAX_WORDS);
 
-describe('/guide/play/ (#2094)', () => {
+describe('/guides/play/ (#2094)', () => {
   it('flags a sentence over 12 words, in the text or in an alt text, and passes a short one', () => {
     expect(tooLong('<p>Slice it. Then slice the next one.</p><img alt="A short alt.">')).toEqual([]);
     const long = 'One two three four five six seven eight nine ten eleven twelve thirteen.';
@@ -58,7 +58,7 @@ describe('/guide/play/ (#2094)', () => {
 });
 
 /** The page quotes numbers and rules from the game. If the game changes, this fails and the page is rewritten. */
-describe('/guide/play/ says only what the game does (#2094)', () => {
+describe('/guides/play/ says only what the game does (#2094)', () => {
   const reception = YEARS.find(y => y.id === 'reception')!, rest = YEARS.filter(y => y.id !== 'reception');
   it('hearts: Reception has four and a miss is free; every other year has three and a miss costs one', () => {
     expect([reception.lives, reception.gentle]).toEqual([4, true]);

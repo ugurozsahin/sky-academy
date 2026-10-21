@@ -10,4 +10,4 @@
 
 - [Home](https://sharpwise.co.uk/): what Sharpwise is, who it is for and the years it covers
 - [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
-- [How to play](https://sharpwise.co.uk/guide/play/): a picture guide for children on slicing the right answer, hearts, stars, coins, stickers and the Sky Map
+- [How to play](https://sharpwise.co.uk/guides/play/): a picture guide for children on slicing the right answer, hearts, stars, coins, stickers and the Sky Map
