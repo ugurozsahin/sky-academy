@@ -7,6 +7,7 @@ import { yearPath } from '../../scripts/site-curriculum-lib.mjs';
  * #2159: the main menu's Curriculum item is a <details> disclosure listing All years and the seven school years,
  * on every page. The years come from the game's registry, not from the header, so a year added to the game and
  * not to the menu fails here. site-home.test.ts holds the header byte-identical and the current-page marks.
+ * #2174: website/nav.js turns it into a button and an overlay at run time; the markup on disk stays this <details>.
  */
 const root = new URL('../../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
@@ -48,13 +49,27 @@ describe('the Curriculum item opens the seven school years (#2159)', () => {
     for (const y of YEARS) expect(current(`website${yearPath(y.id)}index.html`), y.id).toEqual([yearPath(y.id)]);
     expect(current('website/index.html')).toEqual([]);
   });
-  it('the CSS styles the summary as current on a curriculum page, opens in the flow, and never on hover alone', () => {
+  it('the CSS styles the item as current on a curriculum page, and never opens it on hover alone', () => {
     expect(rules.length, 'the .nav-years rules it reads').toBeGreaterThan(3);
-    expect(rules.some(r => r.selector.includes(':has([aria-current="page"]) > summary') && /color:\s*var\(--accent\)/.test(r.body))).toBe(true);
-    for (const r of rules) {
-      expect(r.body, `${r.selector}: a panel over the page could hide the next focused link (2.4.11)`).not.toMatch(/position:\s*(absolute|fixed|sticky)/);
-      expect(r.selector, `${r.selector}: hover must not open it (1.4.13)`).not.toMatch(/:hover[^,]*(ul|details-content)/);
+    for (const el of ['summary', 'button']) {
+      expect(rules.some(r => r.selector.includes(`:has([aria-current="page"]) > ${el}`) && /color:\s*var\(--accent\)/.test(r.body)), el).toBe(true);
     }
-    expect(rules.find(r => r.selector === '.nav-years > summary')?.body).toContain('min-height: var(--tap)');
+    for (const r of rules) expect(r.selector, `${r.selector}: hover must not open it (1.4.13)`).not.toMatch(/:hover[^,]*(ul|details-content)/);
+    expect(rules.find(r => r.selector === '.nav-years > summary, .nav-years > button')?.body).toContain('min-height: var(--tap)');
+  });
+  // #2174: only the scripted menu (nav.js turns the <details> into a div.nav-years with a button) may lie over the
+  // page, because only it closes when focus leaves. The <details> a reader without the script gets has nothing to
+  // close it, so its list stays in the header's flow, where it can hide nothing (2.4.11).
+  const overlay = (body: string) => /position:\s*(absolute|fixed|sticky)/.test(body);
+  const scripted = (selector: string) => selector.split(',').every(s => s.trim().startsWith('.site-nav div.nav-years'));
+  it('lies over the page only once nav.js has made it closable; the no-script list opens in the flow', () => {
+    const over = rules.filter(r => overlay(r.body));
+    expect(over.map(r => r.selector), 'the overlay rule it reads').toContain('.site-nav div.nav-years > ul');
+    for (const r of over) expect(scripted(r.selector), `${r.selector}: a panel no script can close could hide the next focused link (2.4.11)`).toBe(true);
+    expect(overlay('position: absolute') && overlay('position:fixed'), 'what it reads as an overlay').toBe(true);
+    expect(['.site-nav .nav-years ul', 'details.nav-years > ul', '.site-nav div.nav-years > ul, .nav-years ul'].map(scripted), 'what it refuses').toEqual([false, false, false]);
+  });
+  it('the scripted list is hidden while the button says collapsed, so aria-expanded is its one state', () => {
+    expect(rules.find(r => r.selector === '.site-nav div.nav-years > [aria-expanded="false"] + ul')?.body).toMatch(/display:\s*none/);
   });
 });
