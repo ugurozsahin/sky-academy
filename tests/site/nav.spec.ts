@@ -7,7 +7,7 @@ import { serve } from '../../scripts/site-serve.mjs';
  * the mouse and with Enter or Space; closes on Escape (focus back to the button), on a press outside and when Tab
  * or Shift+Tab leaves it; aria-expanded follows; the header keeps its height; nothing scrolls sideways; and the
  * open list never covers the element that has focus. At the site project's 360 px phone, and at 1280 px.
- * Without the script the <details> still opens: the last test.
+ * Without the script the <details> still opens: the last test. #2178: the years in two key-stage lists.
  */
 let site: { origin: string; close: () => Promise<void> };
 test.beforeAll(async () => { site = await serve(); });
@@ -76,6 +76,25 @@ for (const width of [360, 1280]) {
       await button(page).click();
       await button(page).click();
       await expanded(page, false);
+    });
+
+    test('the years sit in two lists named by their labels: stacked at 360 px, side by side at 1280 px (#2178)', async ({ page }) => {
+      await button(page).click();
+      await expanded(page, true);
+      const ks1 = list(page).getByRole('list', { name: 'Reception and Key Stage 1', exact: true });
+      const ks2 = list(page).getByRole('list', { name: 'Key Stage 2', exact: true });
+      await expect(ks1.getByRole('link')).toHaveText(['Reception', 'Year 1', 'Year 2']);
+      await expect(ks2.getByRole('link')).toHaveText(['Year 3', 'Year 4', 'Year 5', 'Year 6']);
+      const all = (await list(page).getByRole('link', { name: 'All years' }).boundingBox())!;
+      const [a, b] = [(await ks1.boundingBox())!, (await ks2.boundingBox())!];
+      expect(a.y, 'All years sits above both groups').toBeGreaterThan(all.y + all.height - 1);
+      if (width < 900) {
+        expect(b.y, 'Key Stage 2 under Reception and Key Stage 1').toBeGreaterThanOrEqual(a.y + a.height);
+        expect(b.x).toBe(a.x);
+      } else {
+        expect(b.y, 'side by side').toBe(a.y);
+        expect(b.x, 'Key Stage 2 to the right').toBeGreaterThanOrEqual(a.x + a.width);
+      }
     });
 
     test('Enter and Space toggle it, Escape closes it and puts focus back on the button', async ({ page }) => {
