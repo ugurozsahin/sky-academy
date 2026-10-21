@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
+import { YEARS, topicById } from '../../src/curriculum';
 import { shotFiles, SHOTS, SIZES, MAX_BYTES, gateProduct, isWebp, oversized } from '../../scripts/site-shots.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
@@ -78,5 +79,50 @@ describe('npm run site:shots (#2102)', () => {
   });
   it('kills the preview on exit, Ctrl-C and termination', () => {
     expect(script).toMatch(/trap 'kill \$P 2>\/dev\/null' EXIT INT TERM/);
+  });
+});
+
+/** #2146: a guide's alt text names the year of the shot it describes, and the shot's `run` reads the data it is railed to. */
+describe('guide alt texts match their shots (#2146)', () => {
+  type Shot = { name: string; year?: string; topic?: string };
+  const titles = YEARS.map(y => y.title);
+  /** The problems with every `<img src="/img/<name>-<size>.webp" alt="…">` in `html`, judged against `shots`. */
+  const mismatched = (html: string, shots: Shot[]) => [...html.matchAll(/<img\s[^>]*?src="\/img\/([a-z-]+?)-(?:phone|desktop)\.webp"[^>]*?alt="([^"]*)"/gs)].flatMap(m => {
+    const shot = shots.find(s => s.name === m[1]);
+    if (!shot?.year) return [];
+    const want = YEARS.find(y => y.id === shot.year)!.title;
+    // "Year 1" must not be read inside "Year 10": match the title as a whole word
+    const named = titles.filter(t => new RegExp(`\\b${t}\\b`).test(m[2]));
+    return named.length === 1 && named[0] === want ? [] : [`${m[1]}: alt names [${named.join(', ')}], the shot is ${want}`];
+  });
+  it('gives every shot with a topic a year, and a topic that exists in it', () => {
+    for (const s of SHOTS as Shot[]) {
+      if (!s.topic) continue;
+      expect(YEARS.some(y => y.id === s.year), `${s.name} year`).toBe(true);
+      expect(topicById(s.topic)?.year, `${s.name} topic ${s.topic}`).toBe(s.year);
+    }
+  });
+  it('has each shot with a year read its year and topic in run', () => {
+    const src = readFileSync(root + 'scripts/site-shots.mjs', 'utf8');
+    expect(src).toContain('await shot.run(page, shot)');
+    for (const s of SHOTS as Shot[]) {
+      if (s.year) expect(s.name, 'run must take the shot').toSatisfy((n: string) => (SHOTS.find(x => x.name === n)!.run as unknown as { length: number }).length === 2);
+    }
+    expect(src).not.toMatch(/openTopic\(page, '/);
+    expect(src).not.toMatch(/data-year="year/);
+  });
+  it('flags a wrong year, an unnamed year and two years, and passes the right one (fixture)', () => {
+    const shots: Shot[] = [{ name: 'slice', year: 'year1', topic: 'y1-add' }, { name: 'sky-map' }];
+    const img = (name: string, alt: string) => `<img src="/img/${name}-phone.webp" width="390"\n alt="${alt}">`;
+    expect(mismatched(img('slice', 'A Year 1 adding question'), shots)).toEqual([]);
+    expect(mismatched(img('slice', 'A Year 2 adding question'), shots)).toHaveLength(1);
+    expect(mismatched(img('slice', 'An adding question'), shots)).toHaveLength(1);
+    expect(mismatched(img('slice', 'Year 1 and Year 2 questions'), shots)).toHaveLength(1);
+    expect(mismatched(img('sky-map', 'One island per year'), shots)).toEqual([]);
+  });
+  it('holds every guide picture of a shot with a year to that year', () => {
+    const guides = pages('website/guides').filter(p => p.endsWith('.html'));
+    expect(guides.length, 'the guides it reads').toBeGreaterThan(0);
+    expect(guides.flatMap(p => mismatched(readFileSync(p, 'utf8'), SHOTS as Shot[]).map(e => `${p.replace(root, '')} ${e}`))).toEqual([]);
   });
 });
