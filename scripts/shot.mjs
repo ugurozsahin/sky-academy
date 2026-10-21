@@ -1,7 +1,8 @@
 // Usage: node scripts/shot.mjs <url> <out.png> [w] [h] [script-file]
 import { chromium } from '@playwright/test';
+import { launchSilent } from '../tests/e2e/mute.mjs';
 const [url, out, w = '390', h = '844', script] = process.argv.slice(2);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const b = await launchSilent(chromium, { executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ viewport: { width: +w, height: +h }, deviceScaleFactor: 2, hasTouch: true, isMobile: +w < 700 });
 const p = await ctx.newPage();
 p.on('pageerror', e => console.log('PAGE ERROR:', e.message)); p.on('console', m => { if (m.type() === 'error') console.log('CONSOLE:', m.text()); });
