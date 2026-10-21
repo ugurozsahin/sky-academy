@@ -78,6 +78,8 @@ export const SHOTS = [
 ];
 export const shotFiles = () => SHOTS.flatMap(s => Object.keys(SIZES).map(z => `${s.name}-${z}.webp`));
 
+export const isWebp = buf => buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
+
 /** Chromium can encode WebP but Playwright's screenshot cannot: re-encode the PNG on a canvas. */
 const toWebp = (page, png) => page.evaluate(async b64 => {
   const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
@@ -91,13 +93,13 @@ async function main([base, out]) {
   mkdirSync(out, { recursive: true });
   const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const enc = await (await browser.newContext()).newPage();
-  const tooBig = [];
+  const tooBig = [], errors = [];
   try {
     for (const [size, viewport] of Object.entries(SIZES)) {
       for (const shot of SHOTS) {
         const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: size === 'phone', isMobile: size === 'phone' });
         const page = await ctx.newPage();
-        page.on('pageerror', e => { throw new Error(`${shot.name}-${size}: ${e.message}`); });
+        page.on('pageerror', e => errors.push(`${shot.name}-${size}: ${e.message}`));   // thrown after the loop: a throw here would be Playwright's emitter's, not main()'s
         await page.clock.setFixedTime(new Date('2026-10-21T10:00:00Z'));
         await page.addInitScript(([seed]) => {
           let a = seed;                                              // mulberry32: the same stream on every run
@@ -116,6 +118,7 @@ async function main([base, out]) {
         });
         await page.waitForTimeout(150);
         const buf = Buffer.from(await toWebp(enc, await page.screenshot({ animations: 'disabled', caret: 'hide' })), 'base64');
+        if (!isWebp(buf)) throw new Error(`${shot.name}-${size}: the browser did not encode WebP`);   // toDataURL falls back to PNG silently
         const file = `${out}/${shot.name}-${size}.webp`;
         writeFileSync(file, buf);
         if (statSync(file).size > MAX_BYTES) tooBig.push(`${file} (${buf.length} bytes)`);
@@ -123,6 +126,7 @@ async function main([base, out]) {
       }
     }
   } finally { await browser.close(); }
+  if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
   if (tooBig.length) throw new Error(`over ${MAX_BYTES} bytes: ${tooBig.join(', ')}`);
   console.log(`site-shots: wrote ${shotFiles().length} files to ${out}`);
 }
