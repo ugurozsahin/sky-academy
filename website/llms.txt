@@ -11,4 +11,11 @@
 - [Home](https://sharpwise.co.uk/): what Sharpwise is, who it is for and the years it covers
 - [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
 - [Curriculum](https://sharpwise.co.uk/curriculum/): every topic by school year and subject, with the EYFS or National Curriculum objective it practises and what is not covered yet
+- [Reception](https://sharpwise.co.uk/curriculum/reception/): what a child practises in Reception, in plain words, with ideas to try at home
+- [Year 1](https://sharpwise.co.uk/curriculum/year-1/): what a child practises in Year 1, in plain words, with ideas to try at home
+- [Year 2](https://sharpwise.co.uk/curriculum/year-2/): what a child practises in Year 2, in plain words, with ideas to try at home
+- [Year 3](https://sharpwise.co.uk/curriculum/year-3/): what a child practises in Year 3, in plain words, with ideas to try at home
+- [Year 4](https://sharpwise.co.uk/curriculum/year-4/): what a child practises in Year 4, in plain words, with ideas to try at home
+- [Year 5](https://sharpwise.co.uk/curriculum/year-5/): what a child practises in Year 5, in plain words, with ideas to try at home
+- [Year 6](https://sharpwise.co.uk/curriculum/year-6/): what a child practises in Year 6, in plain words, with ideas to try at home
 - [Features](https://sharpwise.co.uk/features/): what the game does today, and what is planned
