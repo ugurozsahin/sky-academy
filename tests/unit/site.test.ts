@@ -11,24 +11,30 @@ import { shotFiles } from '../../scripts/site-shots.mjs';
  */
 const root = new URL('../../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
-const pages = (dir = 'website'): string[] => readdirSync(new URL(dir, root), { withFileTypes: true })
-  .flatMap(e => e.isDirectory() ? pages(`${dir}/${e.name}`) : e.name.endsWith('.html') ? [`${dir}/${e.name}`] : []);
+const files = (ext: string, dir = 'website'): string[] => readdirSync(new URL(dir, root), { withFileTypes: true })
+  .flatMap(e => e.isDirectory() ? files(ext, `${dir}/${e.name}`) : e.name.endsWith(ext) ? [`${dir}/${e.name}`] : []);
+const pages = () => files('.html');
+const uncommented = (html: string) => html.replace(/<!--[\s\S]*?-->/g, '');
 /** The URL path a page is served at: website/about/index.html is /about/. */
 const urlPath = (page: string) => page.replace(/^website/, '').replace(/index\.html$/, '');
 const ORIGIN = 'https://sharpwise.co.uk';
-const noindex = (html: string) => /<meta name="robots" content="[^"]*\bnoindex\b/.test(html);
+/** A placeholder's `noindex`; one left in a comment when the page goes live does not count. */
+const noindex = (html: string) => /<meta name="robots" content="[^"]*\bnoindex\b/.test(uncommented(html));
 
-/** Every address a page points at on this site: `href`/`src` attributes, CSS `url()`, and every absolute
- *  sharpwise.co.uk URL anywhere in the file (Open Graph, JSON-LD). Other origins are pages.test.ts's business. */
+/** Every address a page points at on this site: `href`/`src`/`srcset` attributes (single or double quotes), CSS
+ *  `url()`, and every absolute sharpwise.co.uk URL anywhere in the file (Open Graph, JSON-LD). JSON-LD's
+ *  `"@id": ".../#organization"` is a name, never a jump, so its fragment is dropped. Other origins are
+ *  pages.test.ts's business. */
 function links(text: string): string[] {
-  const out = [...text.matchAll(/\s(?:href|src)=(["'])(.*?)\1|url\(\s*["']?([^"')]+)["']?\s*\)/gi)].map(m => m[2] ?? m[3]);
-  for (const [u] of text.matchAll(/https:\/\/sharpwise\.co\.uk(?=[/"'\s<)]|$)[^\s"'<>)]*/g)) out.push(u);
-  return out.filter(u => !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(u) || u.startsWith(`${ORIGIN}/`) || u === ORIGIN);
+  const out = [...text.matchAll(/\s(href|src|srcset)=(["'])(.*?)\2|url\(\s*["']?([^"')]+)["']?\s*\)/gi)]
+    .flatMap(m => m[1]?.toLowerCase() === 'srcset' ? m[3].split(',').map(c => c.trim().split(/\s+/)[0]) : [m[3] ?? m[4]]);
+  const ids = text.replace(/("@id":\s*"[^"#]*)#[^"]*"/g, '$1"');
+  for (const [u] of ids.matchAll(/https:\/\/sharpwise\.co\.uk(?=[/"'\s<)]|$)[^\s"'<>)]*/g)) out.push(u);
+  return [...new Set(out)].filter(u => !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(u) || u.startsWith(`${ORIGIN}/`) || u === ORIGIN);
 }
 
 /** Why `link`, found in `from` (a path under website/), would not load once deployed; '' when it would. */
 function dead(link: string, from: string): string {
-  const abs = link.startsWith(ORIGIN);
   const url = new URL(link, `${ORIGIN}${urlPath(from) || '/'}`);
   if (url.origin !== ORIGIN) return `${link}: leaves the site`;
   const path = decodeURIComponent(url.pathname);
@@ -38,8 +44,8 @@ function dead(link: string, from: string): string {
   if (img) return shotFiles().includes(img[1]) ? '' : `${link}: not in the site-shots.mjs shot list (#2088)`;
   const file = `website${path.endsWith('/') ? `${path}index.html` : path}`;
   if (!existsSync(new URL(file, root)) || !statSync(new URL(file, root)).isFile()) return `${link}: no ${file}`;
-  // A fragment on a page must name an id there. JSON-LD's "@id": ".../#organization" is a name, never a jump.
-  if (!abs && url.hash && file.endsWith('.html') && !read(file).includes(` id="${decodeURIComponent(url.hash.slice(1))}"`)) {
+  // A fragment must name an id attribute on the page it points at.
+  if (url.hash && file.endsWith('.html') && !read(file).includes(` id="${decodeURIComponent(url.hash.slice(1))}"`)) {
     return `${link}: no id="${url.hash.slice(1)}" in ${file}`;
   }
   return '';
@@ -58,7 +64,10 @@ describe('every page under website/ (#2087)', () => {
   it('that search engines may index names itself as its canonical URL on sharpwise.co.uk; a noindex placeholder may not', () => {
     const indexed = all.filter(p => !noindex(read(p)));
     expect(indexed, 'the home page is indexed').toContain('website/index.html');
-    for (const p of indexed) expect(read(p).match(/<link rel="canonical" href="([^"]*)">/)?.[1], p).toBe(`${ORIGIN}${urlPath(p)}`);
+    for (const p of indexed) {
+      const canonical = [...uncommented(read(p)).matchAll(/<link rel="canonical" href="([^"]*)">/g)].map(m => m[1]);
+      expect(canonical, p).toEqual([`${ORIGIN}${urlPath(p)}`]);
+    }
   });
   it('links only to files in website/, to /play/, to a deploy-time screenshot and to ids on the page', () => {
     const found = all.flatMap(p => links(read(p)));
@@ -66,18 +75,20 @@ describe('every page under website/ (#2087)', () => {
     expect(found.some(l => l.startsWith('/img/')), 'a deploy-time screenshot among them').toBe(true);
     for (const p of all) expect(deadLinks(p), p).toEqual([]);
   });
-  it('site.css loads only fonts that are in website/', () => {
-    const css = links(read('website/site.css'));
-    expect(css).toContain('/fonts/fredoka-latin.woff2');
-    expect(deadLinks('website/site.css')).toEqual([]);
+  it('every stylesheet loads only files that are in website/', () => {
+    expect(files('.css')).toContain('website/site.css');
+    expect(links(read('website/site.css'))).toContain('/fonts/fredoka-latin.woff2');
+    for (const f of files('.css')) expect(deadLinks(f), f).toEqual([]);
   });
   it('flags a dead page, file, fragment and screenshot, and passes the ones that resolve', () => {
     const page = '<a href="/nope/"> <link href="/gone.css"> <a href="#top"> <img src="/img/nope-phone.webp"> <a href="/play/x.html">' +
-      ` <meta content="${ORIGIN}/missing.jpg"> <a href="about/"> <a href='/single/'> <a href="#skip">`;
+      ` <meta content="${ORIGIN}/missing.jpg"> <a href="about/"> <a href='/single/'> <a href="#skip">` +
+      ` <source srcset="/img/slice-phone.webp 390w, /img/slice-tablet.webp 768w"> <a href="${ORIGIN}/#faq">`;
     expect(deadLinks('website/index.html', page)).toEqual([
       '/nope/: no website/nope/index.html', '/gone.css: no website/gone.css', '#top: no id="top" in website/index.html',
       '/img/nope-phone.webp: not in the site-shots.mjs shot list (#2088)', '/play/x.html: only /play/ itself is known to exist',
       "/single/: no website/single/index.html", '#skip: no id="skip" in website/index.html',
+      '/img/slice-tablet.webp: not in the site-shots.mjs shot list (#2088)', `${ORIGIN}/#faq: no id="faq" in website/index.html`,
       `${ORIGIN}/missing.jpg: no website/missing.jpg`,
     ]);
     expect(deadLinks('website/about/index.html', '<a href="../curriculum/"> <a href="/#main"> <img src="/img/slice-desktop.webp">' +
