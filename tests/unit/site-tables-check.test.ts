@@ -17,13 +17,13 @@ const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 const files = (ext: string, dir = 'website'): string[] => readdirSync(new URL(dir, root), { withFileTypes: true })
   .flatMap(e => e.isDirectory() ? files(ext, `${dir}/${e.name}`) : e.name.endsWith(ext) ? [`${dir}/${e.name}`] : []);
 
-const BLOCK = /<\/?(?:p|li|dt|dd|h[1-6]|td|th|caption|title|figcaption|figure|div|section|ul|ol|dl|tr|table|header|footer|nav|main|head|body|blockquote)\b[^>]*>/gi;
+const BLOCK = /<\/?(?:p|li|dt|dd|h[1-6]|td|th|caption|title|figcaption|figure|div|section|ul|ol|dl|tr|table|header|footer|nav|main|head|body|blockquote|article|aside|summary|details|form|label|button)\b[^>]*>/gi;
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', ndash: '–', mdash: '—', times: '×' };
 const decode = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) =>
   e[0] !== '#' ? NAMED[e.toLowerCase()] ?? m : String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : Number(e.slice(1))));
 /** Sentence ends, but not inside "e.g." or "i.e.". */
 const split = (s: string) => s.split(/(?<=[.!?])(?<!\be\.g\.)(?<!\bi\.e\.)\s+/);
-const tidy = (s: string) => s.replace(/\s+/g, ' ').trim();
+const tidy = (s: string) => s.replace(/\s+/g, ' ').replace(/ ([.,!?;:])/g, '$1').trim();
 
 /** Every string value in parsed JSON-LD, except keys, `@` values and URLs. */
 const jsonStrings = (v: unknown): string[] => typeof v === 'string' ? (/^https?:\/\//.test(v) ? [] : [v])
@@ -35,14 +35,14 @@ function sentences(html: string): string[] {
   const clean = html.replace(/<!--[\s\S]*?-->/g, ' ');
   const ld = [...clean.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap(m => jsonStrings(JSON.parse(m[1])));
   const noScript = clean.replace(/<script\b[\s\S]*?<\/script>/gi, ' ');
-  const attrs = [...noScript.matchAll(/\s(?:content|alt|title|aria-label)=(["'])(.*?)\1/g)].map(m => m[2]);
-  const body = noScript.replace(/\s+/g, ' ').replace(/<br\s*\/?>/gi, ' ').replace(BLOCK, '\n').replace(/<[^>]+>/g, '');
+  const attrs = [...noScript.matchAll(/\s(?:content|alt|title|aria-label)=(["'])([\s\S]*?)\1/g)].map(m => m[2]);
+  const body = noScript.replace(/\s+/g, ' ').replace(/<br\s*\/?>/gi, ' ').replace(BLOCK, '\n').replace(/<[^>]+>/g, ' ');
   return [...ld, ...attrs, ...body.split('\n')].flatMap(s => split(tidy(decode(s)))).filter(Boolean);
 }
 /** The same for a text file such as llms.txt: one paragraph or list item per line, Markdown links kept as their text. */
 const textSentences = (txt: string) => txt.split('\n').flatMap(l => split(tidy(l.replace(/\]\([^)]*\)/g, ']')))).filter(Boolean);
 
-const NAMES_CHECK = /\btables? check\b|\b(?:multiplication|times)[- ]tables? (?:check|test)\b|\bmultiplication check\b|\bMTC\b|\bofficial(?:ly)?\b[^.!?]*\b(?:check|test)\b/i;
+const NAMES_CHECK = /\btables? (?:check|test)s?\b|\b(?:multiplication|times)[- ]tables? (?:check|test)s?\b|\bmultiplication checks?\b|\bMTC\b|\bofficial(?:ly)?\b[^.!?]*\b(?:check|test)s?\b/i;
 const BODIES = /\b(?:STA|DfE|Standards and Testing Agency|Department for Education)\b/i;
 const CLAIMS = /\b(?:identical|exactly the same|same as the real|endorsed|approved|only free)\b/i;
 
@@ -69,12 +69,15 @@ describe('the website never presents Tables Check practice as the official check
   });
   it('flags each way a sentence can break the rule', () => {
     expect(pageProblems('<p>Sit the Multiplication Tables Check here.</p>')).toEqual(['no "practice": Sit the Multiplication Tables Check here.']);
-    for (const name of ['multiplication table check', 'Year 4 multiplication check', 'times tables test', 'MTC', 'Tables&#160;Check', 'tables\n check']) {
+    for (const name of ['multiplication table check', 'Year 4 multiplication check', 'times tables test', 'MTC', 'Tables&#160;Check', 'tables\n check', 'Year 4 tables test', 'multiplication tables checks']) {
       expect(pageProblems(`<p>Try the ${name}.</p>`), name).toHaveLength(1);
     }
     expect(pageProblems('<meta name="description" content="Practise for the official multiplication tables check.">'))
       .toEqual(['"official" not as "not the official": Practise for the official multiplication tables check.']);
     expect(pageProblems('<p>Tables Check practice, officially.</p>')).toHaveLength(1);
+    expect(pageProblems('<meta name="description" content="Sit the official\n  multiplication tables check.">')).toHaveLength(2);
+    expect(pageProblems('<article>Tables Check practice</article><aside>It is endorsed.</aside>')).toEqual(['claims a match: It is endorsed.']);
+    expect(pageProblems('<span>Tables Check</span><span>practice, endorsed.</span>')).toEqual(['claims a match: Tables Check practice, endorsed.']);
     expect(pageProblems('<p>Questions written by the DfE.</p>')).toEqual(['names the STA or the DfE: Questions written by the DfE.']);
     expect(pageProblems('<p>Tables Check practice is free. It is approved by teachers.</p>')).toEqual(['claims a match: It is approved by teachers.']);
     expect(pageProblems('<p>Tables Check practice, exactly the same as the real one.</p>')).toHaveLength(1);
