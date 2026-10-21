@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../e2e/fixtures';
 import { shoot } from '../../scripts/sketch-shot.mjs';
 import { TIERS } from '../../src/three/stage/tiers';
 import { CATALOGUE, variantsOf } from '../../src/three/sketchbook/catalogue';
