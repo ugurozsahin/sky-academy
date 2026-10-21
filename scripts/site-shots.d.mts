@@ -7,3 +7,4 @@ export declare const SHOTS: { name: string; run: (page: Page) => Promise<unknown
 export declare const shotFiles: () => string[];
 export declare const isWebp: (buf: Buffer) => boolean;
 export declare function gateProduct(q: string): number;
+export declare const oversized: (files: { file: string; bytes: number }[]) => string[];
