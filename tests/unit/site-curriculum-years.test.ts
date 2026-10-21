@@ -5,12 +5,13 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TOPICS, YEARS } from '../../src/curriculum';
-import { esc, plainObjective, renderYearPage, yearPath, yearSlug, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
+import type { YearId } from '../../src/curriculum/types';
+import { esc, gapsOf, plainObjective, renderYearPage, yearPath, yearSlug, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 const map: ContentMap = JSON.parse(read('docs/content-map.json'));
 const home = read('website/index.html');
-const fileOf = (id: string) => `website/curriculum/${yearSlug(id as never)}/index.html`;
+const fileOf = (id: YearId) => `website/curriculum/${yearSlug(id)}/index.html`;
 const REGEN = 'run `npm run content-map` and commit website/curriculum/';
 const terms = (html: string) => [...html.matchAll(/<div><dt>([^<]*)<\/dt><dd>([^<]*)<\/dd><\/div>/g)].map(m => ({ dt: m[1], dd: m[2] }));
 
@@ -68,6 +69,10 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
       }
     }
   });
+  it('falls back to the area name only for the one objective that is nothing but a code', () => {
+    const fellBack = map.topics.filter(t => !plainObjective(t.nc)).map(t => `${t.year} ${t.title}`);
+    expect(fellBack, 'give a new one real words in its nc, or add it here on purpose').toEqual(['year6 Spell the missing word']);
+  });
   it('plainObjective drops the code and the reference and keeps the map\'s words', () => {
     expect(plainObjective('Y3 NPV: identify, represent and estimate numbers (3M4)')).toBe('Identify, represent and estimate numbers');
     expect(plainObjective('Y6 ASMD: multi-step problems, estimating to check (6M11–13)')).toBe('Multi-step problems, estimating to check');
@@ -83,6 +88,38 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
     expect(html).toContain('<dt>&lt;b&gt;Odd&lt;/b&gt;</dt><dd>&lt;i&gt;x&lt;/i&gt;</dd>');
     expect(html).toContain('<li>&lt;u&gt;tip&lt;/u&gt;</li>');
     expect(html).not.toMatch(/<[biu]>/);
+  });
+});
+
+describe('the year pages agree with /curriculum/ (#2090)', () => {
+  const areaOf = (id: string) => esc(map.coverage.find(c => c.id === id)!.name.replace(/^Years? [\d–-]+ /, ''));
+  it('puts every topic under the curriculum area of its first strand', () => {
+    for (const y of map.byYear) {
+      const html = read(fileOf(y.year));
+      for (const t of map.topics.filter(x => x.year === y.year)) {
+        const before = html.slice(0, html.indexOf(`<dt>${esc(t.title)}</dt>`));
+        const heading = [...before.matchAll(/<h3>([^<]*)<\/h3>/g)].at(-1)![1];
+        expect(areaOf(t.strands[0]), `${y.year}: ${t.title}`).toBe(heading);
+      }
+    }
+  });
+  it('lists as not covered yet exactly the year\'s gaps that /curriculum/ lists', () => {
+    for (const y of map.byYear) {
+      const html = read(fileOf(y.year)), at = html.indexOf('<section id="not-covered"');
+      const listed = [...html.slice(at, html.indexOf('</section>', at)).matchAll(/<li>([^<]*)<\/li>/g)].map(m => m[1]);
+      const gaps = gapsOf(map, y).map(c => `${areaOf(c.id)} (${c.subject === 'maths' ? 'maths' : 'English'})`);
+      expect(listed, y.year).toEqual(gaps);
+      if (!gaps.length) expect(html.slice(at), y.year).toContain('Every part of the curriculum listed for this year has at least one topic.');
+    }
+    expect(gapsOf(map, map.byYear.find(y => y.year === 'year3')!).length, 'a year with gaps is among them').toBeGreaterThan(0);
+  });
+  it('uses only classes website/site.css defines, so it adds no look of its own', () => {
+    const css = read('website/site.css');
+    for (const y of map.byYear) {
+      for (const [, list] of read(fileOf(y.year)).matchAll(/class="([^"]+)"/g)) {
+        for (const c of list.split(/\s+/)) expect(css, `${y.year}: .${c}`).toMatch(new RegExp(`\\.${c}\\b`));
+      }
+    }
   });
 });
 
