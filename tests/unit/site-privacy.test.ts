@@ -94,6 +94,18 @@ describe('the privacy page: "collects nothing" is held to the code (#1934)', () 
     expect(Object.values(CSS).every(t => t.length > 0), 'each .css file read with its contents').toBe(true);
     expect(leaks(GAME)).toEqual([]);
   });
+  it('the service worker names no other company\'s host and answers only its own origin (#2125)', () => {
+    const sw = read('scripts/sw-template.js');
+    // The worker's own `fetch(` calls are how it answers the game's requests, so that one way is not a leak here;
+    // what matters is that nothing foreign is named and that no handler answers a request from another origin.
+    const swLeaks = (text: string) => leaks({ 'sw-template.js': text }).filter(l => l !== 'sw-template.js: fetch(');
+    expect(sw.length, 'the worker source it reads').toBeGreaterThan(1000);
+    expect(swLeaks(sw)).toEqual([]);
+    expect(sw, 'every respondWith is for a navigation or the worker\'s own origin').toSatisfy((t: string) =>
+      [...t.matchAll(/^.*\be\.respondWith\(.*$/gm)].every(m => /req\.mode === 'navigate'|self\.location\.origin/.test(m[0])));
+    expect(swLeaks('const FONT_HOSTS = ["https://fonts.googleapis.com"]')).toEqual(['sw-template.js: https://fonts.googleapis.com']);
+    expect(swLeaks('new WebSocket(u)')).toEqual(['sw-template.js: WebSocket']);
+  });
   it('goes red on each way of sending something, and on a third-party URL', () => {
     for (const [name, , probe] of NETWORK) expect(leaks({ 'x.ts': probe }), name).toEqual([`x.ts: ${name}`]);
     expect(leaks({ 'x.ts': 'const u = "https://www.google-analytics.com/collect"' })).toEqual(['x.ts: https://www.google-analytics.com/collect']);
