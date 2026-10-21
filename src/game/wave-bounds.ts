@@ -29,23 +29,30 @@ export const boundedRise = (raw: number, H: number, topInset: number) => Math.mi
  * Keep one bubble's arc at or below the card line `ceiling` (= `topInset + r`) in a box of height `H`.
  *
  * A re-anchor scales an arc with the box, but the question card does not scale, so a wave laid out in a box taller
- * than the one it plays in keeps its share of the box and rises past the card. This lowers what is left of the
- * flight instead, by the move `reanchorBubble` already uses — `vy`, `g` and the remembered launch speed `ovy`
- * scaled by one factor `k`, so the rise scales by `k` and the time to the apex does not. `k` is never 0 (the room
- * above the launch line is at least half the box while `topInset ≤ H/2`), so gravity stays positive. A bubble
- * already above the line stops climbing. The relaunch arc (`ovy`, #591) is held to the same line by `ovy` alone,
- * so the flight in progress is untouched by that half.
+ * than the one it plays in keeps its share of the box and rises past the card. Two cases, by where the bubble is:
+ * - **Queued, on the launch line** (`y ≥ H + r`): its whole flight is still ahead, so `vy`, `g` and the remembered
+ *   launch speed `ovy` scale by one factor `k`, as `reanchorBubble` does — the rise scales by `k`, the time to the
+ *   apex does not. `k` is bounded: the room above the launch line is at least half the box while `topInset ≤ H/2`.
+ * - **In flight**: only `vy` is lowered, to `-√(2·g·room)`, and `g` is left alone. Scaling `g` here too would keep
+ *   the time to the apex but take `k` towards 0 for a bubble just under the line, and the fall would then run
+ *   `1/√k` slower — 47 s instead of 9 s after a mid-wave rotation (PR #2186 review, round 1). The apex comes a
+ *   little sooner instead, and the fall is the normal one. A bubble already above the line stops climbing.
+ * The relaunch arc (`ovy`, #591) is then held to the same line with `g` as it is, by `ovy` alone, so a sequence
+ * word comes back as high as the line allows, never as a sliver at the floor.
  */
 export function keepUnderCard(b: { y: number; vy: number; g: number; r: number; ovy?: number }, ceiling: number, H: number) {
   if (!(b.g > 0)) return;
   const rise = (v: number) => (v * v) / (2 * b.g);
   const launchRoom = H + b.r - ceiling;
   if (b.vy < 0) {
-    const room = b.y - ceiling;            // a bubble still queued sits on the launch line, so this is its launch room
+    const room = b.y - ceiling;
     if (room <= 0) b.vy = 0;
-    else if (rise(b.vy) > room) { const k = room / rise(b.vy); b.vy *= k; b.g *= k; if (b.ovy !== undefined) b.ovy *= k; }
+    else if (rise(b.vy) > room) {
+      if (b.y >= H + b.r) { const k = room / rise(b.vy); b.vy *= k; b.g *= k; if (b.ovy !== undefined) b.ovy *= k; }   // queued: exact, k bounded
+      else b.vy = -Math.sqrt(2 * b.g * room);                                                                       // in flight: g untouched
+    }
   }
-  if (b.ovy !== undefined && b.ovy < 0 && launchRoom > 0 && rise(b.ovy) > launchRoom) b.ovy *= Math.sqrt(launchRoom / rise(b.ovy));
+  if (b.ovy !== undefined && b.ovy < 0 && launchRoom > 0 && rise(b.ovy) > launchRoom) b.ovy = -Math.sqrt(2 * b.g * launchRoom);
 }
 
 /** `keepUnderCard` for every live bubble, under a card ending at `topInset`. */
@@ -70,6 +77,7 @@ export const boxMoved = (rect: { width: number; height: number }, W: number, H: 
 /**
  * Where the question card ends, as the arena's `topInset`: read in the same frame as the layout it bounds
  * (`play-session.ts`), and again by the arena on every resize (`ArenaOpts.measureInset`), never scaled from an
- * older measurement.
+ * older measurement. A card with no box (`display: none`) is no reading — `NaN`, which the `topInset` setter and
+ * `nextInset` both ignore — not a card line 6 px from the top (PR #2186 review, round 1).
  */
-export const cardInset = (card: HTMLElement) => card.getBoundingClientRect().bottom + 6;
+export const cardInset = (card: HTMLElement) => { const r = card.getBoundingClientRect(); return r.height > 0 ? r.bottom + 6 : NaN; };

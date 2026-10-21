@@ -161,14 +161,34 @@ describe('no box gives a wave that does not fall back inside it (#2184)', () => 
 });
 
 describe('keepUnderCard lowers an arc to the card line without stopping it falling (#2184)', () => {
-  it('a rising bubble whose apex is past the line rises to the line, in the same time, and still falls', () => {
-    const b = { y: 700, vy: -400, g: 200, r: 30, ovy: -500 };
+  it('a queued bubble on the launch line is scaled whole: apex on the line, the same time to it', () => {
+    const b = { y: 844 + 30, vy: -700, g: 400, r: 30, ovy: -700 };   // rise 612.5, room 474
     const t = -b.vy / b.g;
     keepUnderCard(b, 400, 844);
     expect(b.y - (b.vy * b.vy) / (2 * b.g)).toBeCloseTo(400, 9);
     expect(-b.vy / b.g, 'time to the apex').toBeCloseTo(t, 12);
-    expect(b.g).toBeGreaterThan(0);
-    expect(844 + b.r - (b.ovy * b.ovy) / (2 * b.g), 'the relaunch arc is held to the line too').toBeGreaterThanOrEqual(400 - 1e-9);
+    expect(b.g / 400, 'k is bounded on the launch line').toBeGreaterThan(0.5);
+    expect(b.ovy).toBeCloseTo(b.vy, 12);
+  });
+  it('a bubble in flight is slowed to the line with its gravity untouched, so it falls in normal time (PR #2186 review)', () => {
+    // The review's case: just under the line, rising fast. Scaling g by k = room/rise gave g = 0.5 and a fall
+    // `1/√k` = 20× slower; here only vy changes.
+    const b = { y: 401, vy: -400, g: 200, r: 30, ovy: -500 };
+    const designedUp = -b.ovy / b.g;                                // the launch arc's time to the apex: 2.5 s
+    keepUnderCard(b, 400, 844);
+    expect(b.g, 'gravity is not touched').toBe(200);
+    expect(b.y - (b.vy * b.vy) / (2 * b.g)).toBeCloseTo(400, 9);
+    const fall = Math.sqrt(2 * (844 + b.r - 400) / b.g);           // apex to the launch line
+    expect(fall, 'apex to floor within the designed half-flight, give or take').toBeLessThanOrEqual(1.5 * designedUp);
+  });
+  it('a relaunch (#591) of a bubble held under the line still comes back at least a quarter of the box high', () => {
+    for (const y of [401, 450, 600, 800]) for (const ovy of [-300, -500, -900]) {
+      const b = { y, vy: -400, g: 200, r: 30, ovy };
+      keepUnderCard(b, 400, 844);
+      const relaunchRise = (b.ovy * b.ovy) / (2 * b.g);
+      expect(relaunchRise, `y ${y} ovy ${ovy}`).toBeGreaterThanOrEqual(Math.min(RISE_MIN * 844, (ovy * ovy) / 400) - 1e-9);
+      expect(844 + b.r - relaunchRise, `y ${y} ovy ${ovy}: relaunch past the line`).toBeGreaterThanOrEqual(400 - 1e-9);
+    }
   });
   it('a bubble already falling keeps its flight, and only its relaunch arc (#591) is lowered to the line', () => {
     const b = { y: 600, vy: 150, g: 200, r: 30, ovy: -600 };            // launch rise 900, room 844 + 30 - 400 = 474
@@ -268,4 +288,32 @@ describe('the arena lays a wave out for the box it really has (#2184)', () => {
     for (const b of sim.arena.bubbles) if (b.vy < 0) expect(b.y - (b.vy * b.vy) / (2 * b.g), b.label).toBeGreaterThanOrEqual(320 + b.r - 1e-6);
     flyOut(sim, 'inset 0 then 320');
   });
+  it('1,200 mid-wave rotations under a live card: no wave runs more than 1.5× its unrotated length (PR #2186 review)', () => {
+    // The reviewer's reproduction: 390×760 with a 240 px card, six bubbles at speed 1, turned to 844×330 with the card
+    // now 160 px, at every 25 ms of the wave, seeds 1–5. With g scaled for in-flight bubbles, 22 of these ran over
+    // 1.5× (worst 47.3 s against 9.1 s); main's src ran none.
+    const run = (seed: number, rotateAt: number | null) => {
+      let card = 240;
+      const s = createSim({ W: 390, H: 760, seed, arena: { measureInset: () => card } });
+      try {
+        s.arena.topInset = card;
+        s.spawn({ labels: labels(6), speed: 1 });
+        const t0 = s.now();
+        if (rotateAt !== null) { s.advance(rotateAt); card = 160; setRect(s, 844, 330); s.arena.resize(); }
+        advanceUntil(s, () => s.arena.bubbles.every(b => b.dead), `seed ${seed} rotated at ${rotateAt}: the wave never ended`, 120_000);
+        return s.now() - t0;
+      } finally { s.destroy(); }
+    };
+    let rotations = 0;
+    const slow: string[] = [];
+    for (let seed = 1; seed <= 5; seed++) {
+      const base = run(seed, null);
+      for (let at = 0; at < 6000; at += 25) {
+        const ms = run(seed, at); rotations++;
+        if (ms > 1.5 * base) slow.push(`seed ${seed} at ${at} ms: ${ms} vs ${base}`);
+      }
+    }
+    expect(rotations).toBe(1200);
+    expect(slow).toEqual([]);
+  }, 120_000);
 });
