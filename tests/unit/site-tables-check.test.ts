@@ -25,10 +25,10 @@ const decode = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: str
 const split = (s: string) => s.split(/(?<=[.!?])(?<!\be\.g\.)(?<!\bi\.e\.)\s+/);
 const tidy = (s: string) => s.replace(/\s+/g, ' ').replace(/ ([.,!?;:])/g, '$1').trim();
 
-/** Every string value in parsed JSON-LD, except keys, `@` values and URLs. */
+/** Every string value in parsed JSON-LD, inside `@graph` too, except `@type`/`@id`/`@context` strings and URLs. */
 const jsonStrings = (v: unknown): string[] => typeof v === 'string' ? (/^https?:\/\//.test(v) ? [] : [v])
   : Array.isArray(v) ? v.flatMap(jsonStrings)
-  : v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => k.startsWith('@') ? [] : jsonStrings(x)) : [];
+  : v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => k.startsWith('@') && typeof x === 'string' ? [] : jsonStrings(x)) : [];
 
 /** Every sentence a reader, a search result or a screen reader can meet in a page. */
 function sentences(html: string): string[] {
@@ -42,7 +42,7 @@ function sentences(html: string): string[] {
 /** The same for a text file such as llms.txt: one paragraph or list item per line, Markdown links kept as their text. */
 const textSentences = (txt: string) => txt.split('\n').flatMap(l => split(tidy(l.replace(/\]\([^)]*\)/g, ']')))).filter(Boolean);
 
-const NAMES_CHECK = /\btables? (?:check|test)s?\b|\b(?:multiplication|times)[- ]tables? (?:check|test)s?\b|\bmultiplication checks?\b|\bMTC\b|\bofficial(?:ly)?\b[^.!?]*\b(?:check|test)s?\b/i;
+const NAMES_CHECK = /\bYear 4 (?:multiplication |tables? )?checks?\b|\btables? (?:check|test)s?\b|\b(?:multiplication|times)[- ]tables? (?:check|test)s?\b|\bmultiplication checks?\b|\bMTC\b|\bofficial(?:ly)?\b[^.!?]*\b(?:check|test)s?\b/i;
 const BODIES = /\b(?:STA|DfE|Standards and Testing Agency|Department for Education)\b/i;
 const CLAIMS = /\b(?:identical|exactly the same|same as the real|endorsed|approved|only free)\b/i;
 
@@ -66,10 +66,12 @@ describe('the website never presents Tables Check practice as the official check
       '<script type="application/ld+json">{"@type": "Thing", "url": "https://sharpwise.co.uk/", "description": "Five."}</script>'))
       .toEqual(['Five.', 'Four.', 'A.', 'B', 'One two.', 'Three?', 'Tables Check & e.g. this.']);
     expect(textSentences('- [Teachers](https://sharpwise.co.uk/x/): one. Two')).toEqual(['- [Teachers]: one.', 'Two']);
+    expect(sentences('<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "VideoGame", "@id": "x#game", ' +
+      '"name": "Six.", "offers": {"@type": "Offer", "description": "Seven."}}]}</script>')).toEqual(['Six.', 'Seven.']);
   });
   it('flags each way a sentence can break the rule', () => {
     expect(pageProblems('<p>Sit the Multiplication Tables Check here.</p>')).toEqual(['no "practice": Sit the Multiplication Tables Check here.']);
-    for (const name of ['multiplication table check', 'Year 4 multiplication check', 'times tables test', 'MTC', 'Tables&#160;Check', 'tables\n check', 'Year 4 tables test', 'multiplication tables checks']) {
+    for (const name of ['multiplication table check', 'Year 4 multiplication check', 'times tables test', 'MTC', 'Tables&#160;Check', 'tables\n check', 'Year 4 tables test', 'multiplication tables checks', 'Year 4 check', 'Year 4 tables checks']) {
       expect(pageProblems(`<p>Try the ${name}.</p>`), name).toHaveLength(1);
     }
     expect(pageProblems('<meta name="description" content="Practise for the official multiplication tables check.">'))
@@ -83,6 +85,9 @@ describe('the website never presents Tables Check practice as the official check
     expect(pageProblems('<p>Tables Check practice, exactly the same as the real one.</p>')).toHaveLength(1);
     expect(pageProblems('<script type="application/ld+json">{"description": "The official MTC app."}</script>')).toHaveLength(2);
     expect(pageProblems('<p>This is the official check.</p>')).toHaveLength(2);
+    expect(pageProblems('<p>It is identical to the Year 4 check, and it is official.</p>')).toHaveLength(3);
+    expect(pageProblems('<script type="application/ld+json">{"@graph": [{"@type": "VideoGame", "description": "The official multiplication tables check, approved by the DfE."}]}</script>'))
+      .toHaveLength(4);
   });
   it('passes the right wording, and a check or an approval that is not this one', () => {
     expect(pageProblems('<p>Tables Check practice is practice only, not the official multiplication tables check. A quick check, not a password. ' +
