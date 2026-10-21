@@ -1,0 +1,6 @@
+# Every crawler is welcome, search and AI training bots included (GPTBot, ClaudeBot, Google-Extended and the rest).
+# The owner chose maximum visibility on 2026-10-21 (#1936); a Disallow added here reverses that decision.
+User-agent: *
+Allow: /
+
+Sitemap: https://sharpwise.co.uk/sitemap.xml

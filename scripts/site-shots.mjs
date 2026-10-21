@@ -19,7 +19,8 @@ const waitTarget = page => page.waitForFunction(() => {
 }, null, { timeout: ACTION_TIMEOUT });
 /** Stop the wave and lay its bubbles out on a fixed grid, so the frame never depends on how fast this machine drew. */
 const freeze = page => page.evaluate(() => {
-  const a = window.__sna.arena, live = a.bubbles.filter(x => !x.dead && !x.hit);
+  const a = window.__sna?.arena; if (!a) return;
+  const live = a.bubbles.filter(x => !x.dead && !x.hit);
   const cols = Math.min(live.length, a.W > 600 ? 5 : 3), rows = Math.ceil(live.length / cols);
   const top = a.topInset + 60, bottom = a.H - 40;
   live.forEach((x, i) => {
@@ -37,7 +38,7 @@ async function openTopic(page, year, topic, tab = 'maths') {
   await freeze(page);
 }
 
-/** The product the grown-ups gate asks for: "6 × 8", or "thirty-seven times twenty-four" (the same reading as tests/e2e/viewport.ts). */
+/** The product the grown-ups gate asks for: "6 × 8", or "thirty-seven times twenty-four" (tests/e2e/viewport.ts re-exports this). */
 export function gateProduct(q) {
   const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
   const tens = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
@@ -65,8 +66,11 @@ export const SHOTS = [
       await page.evaluate(() => window.__sna.answer());
       await page.waitForFunction(n => window.__sna.session.questionsAsked > n, i + 1, { timeout: ACTION_TIMEOUT });
     }
-    await page.evaluate(() => window.__sna.session.end(true));
+    // The praise line is drawn from Math.random, and how many draws the live arena took by now varies by machine:
+    // hold the arena, re-pin the stream, and only then end the mission.
+    await page.evaluate(seed => { window.__sna.arena.paused = true; window.__shotsReseed(seed); window.__sna.session.end(true); }, SEED);
     await page.waitForSelector('.modal.results', { timeout: ACTION_TIMEOUT });
+    await page.evaluate(() => { window.__sna.arena.bubbles.length = 0; });   // the backdrop is blurred: whatever wave is left behind the modal differs by a few pixels between runs
   } },
   { name: 'parents', run: async page => {
     await page.click('#grownups');
@@ -76,6 +80,8 @@ export const SHOTS = [
   } },
   { name: 'island', run: async page => { await page.click('.island[data-year="year1"]'); await page.waitForSelector('.island-screen'); } },
 ];
+/** The files over MAX_BYTES, as the lines the failure names: `[{ file, bytes }]` in, `["file (n bytes)"]` out. */
+export const oversized = files => files.filter(f => f.bytes > MAX_BYTES).map(f => `${f.file} (${f.bytes} bytes)`);
 export const shotFiles = () => SHOTS.flatMap(s => Object.keys(SIZES).map(z => `${s.name}-${z}.webp`));
 
 export const isWebp = buf => buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
@@ -93,16 +99,17 @@ async function main([base, out]) {
   mkdirSync(out, { recursive: true });
   const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const enc = await (await browser.newContext()).newPage();
-  const tooBig = [], errors = [];
+  const written = [], errors = [];
   try {
     for (const [size, viewport] of Object.entries(SIZES)) {
       for (const shot of SHOTS) {
-        const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: size === 'phone', isMobile: size === 'phone' });
+        const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: size === 'phone', isMobile: size === 'phone', reducedMotion: 'reduce' });
         const page = await ctx.newPage();
         page.on('pageerror', e => errors.push(`${shot.name}-${size}: ${e.message}`));   // thrown after the loop: a throw here would be Playwright's emitter's, not main()'s
         await page.clock.setFixedTime(new Date('2026-10-21T10:00:00Z'));
         await page.addInitScript(([seed]) => {
           let a = seed;                                              // mulberry32: the same stream on every run
+          window.__shotsReseed = v => { a = v; };                    // how many draws the live arena took varies by machine, so a shot re-pins the stream where it matters
           Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
           window.__SNA_FAST = 4;
           localStorage.setItem('sna:three', 'off');
@@ -112,21 +119,24 @@ async function main([base, out]) {
         await page.waitForSelector('.home', { timeout: ACTION_TIMEOUT });
         await shot.run(page);
         await page.waitForTimeout(500);
+        await freeze(page);                                          // a wave that spawned after the shot's own steps (the results' backdrop) goes on the grid too
         await page.evaluate(() => {                                  // the bubbles' sway is driven by frame time: pin it, then hold
           const a = window.__sna?.arena; if (!a) return;
-          a.bubbles.forEach((x, i) => { x.wobble = i; }); a.paused = true;
+          a.bubbles.forEach((x, i) => { x.wobble = i; }); a.particles.length = 0; a.shots.length = 0; a.trail.length = 0; a.paused = true;   // sparks and the trail come from the answers just given
+          a.dirty = true;                                            // a paused arena keeps its last bitmap, drawn before the pin: repaint it once
         });
         await page.waitForTimeout(150);
         const buf = Buffer.from(await toWebp(enc, await page.screenshot({ animations: 'disabled', caret: 'hide' })), 'base64');
         if (!isWebp(buf)) throw new Error(`${shot.name}-${size}: the browser did not encode WebP`);   // toDataURL falls back to PNG silently
         const file = `${out}/${shot.name}-${size}.webp`;
         writeFileSync(file, buf);
-        if (statSync(file).size > MAX_BYTES) tooBig.push(`${file} (${buf.length} bytes)`);
+        written.push({ file, bytes: statSync(file).size });
         await ctx.close();
       }
     }
   } finally { await browser.close(); }
   if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
+  const tooBig = oversized(written);
   if (tooBig.length) throw new Error(`over ${MAX_BYTES} bytes: ${tooBig.join(', ')}`);
   console.log(`site-shots: wrote ${shotFiles().length} files to ${out}`);
 }
