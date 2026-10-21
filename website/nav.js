@@ -27,5 +27,6 @@
   box.addEventListener('focusout', e => { if (e.relatedTarget && !box.contains(e.relatedTarget)) set(false); });
   // pointerdown, not click: a tap on plain page text fires no click on iOS, and focus does not move either.
   document.addEventListener('pointerdown', e => { if (!box.contains(e.target)) set(false); });
-  addEventListener('pageshow', () => set(false));   // back to this page: the menu is closed, as on a fresh load
+  // Closed on a return from the back-forward cache only: the first load's pageshow must not shut an open menu.
+  addEventListener('pageshow', e => { if (e.persisted) set(false); });
 })();

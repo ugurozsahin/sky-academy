@@ -104,11 +104,28 @@ for (const width of [360, 1280]) {
       await expect(button(page)).toBeFocused();
     });
 
-    test('a page shown again from the back-forward cache shows it closed', async ({ page }) => {
+    test('a page shown again from the back-forward cache shows it closed; the first load\'s pageshow does not', async ({ page }) => {
       await button(page).click();
+      await expanded(page, true);
+      await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false })));
       await expanded(page, true);
       await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
       await expanded(page, false);
+    });
+
+    test('opened while pictures are still loading, it stays open when the page finishes loading (#2175 review)', async ({ page }) => {
+      let release!: () => void;
+      const held = new Promise<void>(r => { release = r; });
+      await page.route('**/*.webp', async route => { await held; await route.continue(); });
+      await page.goto(`${site.origin}/`, { waitUntil: 'domcontentloaded' });
+      await button(page).click();
+      await expanded(page, true);
+      expect(await page.evaluate(() => document.readyState), 'the page is still loading when the menu opens').not.toBe('complete');
+      const loaded = page.waitForFunction(() => document.readyState === 'complete');
+      release();
+      await loaded;
+      await page.evaluate(() => new Promise(r => setTimeout(r, 50)));   // pageshow follows load in its own task
+      await expanded(page, true);
     });
 
     test('Tab walks the eight links uncovered and closes it on leaving; Shift+Tab out of the button closes it too', async ({ page }) => {
