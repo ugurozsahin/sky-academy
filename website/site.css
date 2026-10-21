@@ -73,18 +73,48 @@ main:focus { outline: none; }   /* the skip link's target: focus lands there, th
 .brand img { width: 40px; height: 40px; border-radius: 12px; }
 .site-nav { grid-area: nav; }
 .site-nav ul, .site-footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; }
-.site-nav ul { justify-content: space-between; margin: 0 -6px; }
+.site-nav ul { justify-content: space-between; margin: 0 -4px; }
 .site-nav a, .site-footer a {
   display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 8px;
   color: var(--text); text-decoration: none; font-weight: 500;
 }
-.site-nav a { padding: 0 6px; font-size: 1rem; }   /* five links fit one row at 360px */
+.site-nav a { padding: 0 4px; font-size: 1rem; }   /* five links and Curriculum's arrow fit one row at 360px */
 .site-nav a:hover, .site-footer a:hover { color: var(--accent-2); }
 .site-nav a[aria-current="page"] { color: var(--accent); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 8px; }
 @media (min-width: 900px) {
   .site-header .wrap { grid-template-columns: auto 1fr auto; grid-template-areas: "brand nav play"; padding-bottom: 10px; }
   .site-nav ul { justify-content: center; gap: 4px; margin: 0; }
   .site-nav a { padding: 0 12px; font-size: 1.0625rem; }
+}
+
+/* Curriculum opens the seven years (#2159): a <details>, so Enter, Space and the expanded state come without a
+   script. The list opens in the header's flow and pushes the page down, never over it: no script can close it
+   when focus leaves, so a panel on top would hide the next link focused (2.4.11). It takes no width of its own
+   (contain), so opening it moves no other link sideways. On a /curriculum/ page the summary reads as current. */
+.nav-years > summary {
+  display: inline-flex; align-items: center; gap: 5px; min-height: var(--tap); padding: 0 4px;
+  font-size: 1rem; font-weight: 500; cursor: pointer; list-style: none;
+}
+.nav-years > summary::-webkit-details-marker { display: none; }
+.nav-years > summary::after {
+  content: ""; width: 6px; height: 6px; border: solid currentColor; border-width: 0 2px 2px 0;
+  transform: translateY(-2px) rotate(45deg);
+}
+.nav-years[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+.nav-years > summary:hover { color: var(--accent-2); }
+.nav-years:has([aria-current="page"]) > summary {
+  color: var(--accent); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 8px;
+}
+.site-nav .nav-years ul {
+  display: block; contain: inline-size; margin: 4px 0 10px; padding: 6px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px;
+}
+.site-nav .nav-years a { display: flex; padding: 0 10px; border-radius: 10px; }
+.site-nav .nav-years a:hover { background: var(--line); }
+.site-nav ul { align-items: flex-start; }
+@media (min-width: 900px) {
+  .site-header .wrap { align-items: start; }   /* the brand and Play now stay put while the list is open */
+  .nav-years > summary { padding: 0 12px; font-size: 1.0625rem; }
 }
 
 .btn {
@@ -177,4 +207,5 @@ th[scope="rowgroup"] { color: var(--accent); padding-top: 22px; }
 
 @media (prefers-reduced-motion: no-preference) {
   a, .btn { transition: color .15s ease, background-color .15s ease, text-decoration-thickness .15s ease; }
+  .nav-years > summary::after { transition: transform .15s ease; }
 }
