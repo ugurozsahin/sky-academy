@@ -43,7 +43,7 @@ export function chooseNinjaScreen(go: () => void) {
   const master = masterProgress(shownYears().map(y => topicsFor(y.id)), safeRecord<TopicProgress>(d.progress));   // #95: tolerant of a hand-edited/corrupted save; the 11th ninja unlocks when three islands are fully starred
   render(`
   <section class="screen avatar-screen choose-ninja-screen">
-    <header class="brand"><span class="kanji">忍</span><h1>Sharp<span>wise</span></h1><p class="tag">Choose your ninja</p></header>
+    <header class="brand"><span class="kanji" aria-hidden="true">賢</span><h1>Sharp<span>wise</span></h1><p class="tag">Choose your ninja</p></header>
     ${wizardProgress(1, 3)}
     <div class="avatar-grid" role="list">
       ${ALL_AVATARS.map(a => { const locked = a.id === MASTER.id && !master.unlocked && d.avatar !== MASTER.id; /* an earned Master is never taken away */ return `
@@ -81,7 +81,7 @@ export function nameScreen(go: () => void) {
   const avatar = avatarById(d.avatar);
   render(`
   <section class="screen avatar-screen name-screen">
-    <header class="brand"><span class="kanji">忍</span><h1>Sharp<span>wise</span></h1><p class="tag" id="name-heading" tabindex="-1">What's your name?</p></header>
+    <header class="brand"><span class="kanji" aria-hidden="true">賢</span><h1>Sharp<span>wise</span></h1><p class="tag" id="name-heading" tabindex="-1">What's your name?</p></header>
     ${wizardProgress(2, 3)}
     <div class="name-preview" style="--glow:${avatar.glow}"><span class="figure"><img src="${avatar.img}" alt=""></span><b>${esc(avatar.name)}</b></div>
     <label class="name-row"><span>Your name</span><input id="name" maxlength="${NAME_MAX}" autocomplete="off" aria-describedby="name-hint" placeholder="Ninja" value="${esc(d.name)}"></label>
@@ -118,7 +118,7 @@ export function changeAvatarScreen(go: () => void) {
   const master = masterProgress(shownYears().map(y => topicsFor(y.id)), safeRecord<TopicProgress>(d.progress));
   render(`
   <section class="screen avatar-screen change-avatar">
-    <header class="brand"><span class="kanji">忍</span><h1>Sharp<span>wise</span></h1><p class="tag">Choose your ninja</p></header>
+    <header class="brand"><span class="kanji" aria-hidden="true">賢</span><h1>Sharp<span>wise</span></h1><p class="tag">Choose your ninja</p></header>
     <div class="avatar-grid" role="list">
       ${ALL_AVATARS.map(a => { const locked = a.id === MASTER.id && !master.unlocked && d.avatar !== MASTER.id; return `
         <button class="avatar-card${d.avatar === a.id ? ' sel' : ''}${locked ? ' locked' : ''}" data-id="${a.id}" style="--glow:${a.glow}" role="listitem" aria-label="${a.name}, ${a.element}${locked ? `, locked: ${master.done} of ${master.total} islands fully starred` : ''}" ${locked ? 'aria-disabled="true"' : ''}>

@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
-"""Generate the Android launcher icons and splash screens from the game's 忍 mark (issue #53).
+"""Generate the Android launcher icons and splash screens from the game's 賢 (wise) mark (issues #53, #2136).
 Run after `npx cap add android` or whenever the mark changes: python3 scripts/android-assets.py
-Needs Pillow (`pip install pillow`) and a Noto CJK font (Debian/Ubuntu: fonts-noto-cjk; macOS uses Hiragino)."""
+Needs Pillow (`pip install pillow`) and a CJK font with the mark (Debian/Ubuntu: fonts-noto-cjk;
+macOS: Hiragino Kaku Gothic W6, which ships with the system)."""
 from PIL import Image, ImageDraw, ImageFont
 import os
 RES = 'android/app/src/main/res'
 BG, FG = '#131a33', '#3ec9ff'
-FONTS = ['/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc', '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc', '/System/Library/Fonts/Hiragino Sans GB.ttc']
+MARK = '賢'
+# Bold, not Black: 賢 has 16 strokes, and a heavier weight fills its counters at 48 dp (#2136).
+FONTS = ['/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc', '/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc']
 FONT = next((f for f in FONTS if os.path.exists(f)), None)
 if not FONT: raise SystemExit('No CJK font found — install fonts-noto-cjk (or edit FONTS)')
+def ink(ch):
+    im = Image.new('L', (96, 96)); ImageDraw.Draw(im).text((8, 8), ch, font=ImageFont.truetype(FONT, 64), fill=255); return im.tobytes()
+if ink(MARK) == ink('\U000F0000'):   # a font without the glyph draws the same missing-glyph box for both
+    raise SystemExit(f'{FONT} has no glyph for {MARK} — pick another font in FONTS')
 
 def mark(size, pad=0.0, circle=True):
     im = Image.new('RGBA', (size, size), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     if circle: d.ellipse([pad * size, pad * size, size - pad * size, size - pad * size], fill=BG)
-    f = ImageFont.truetype(FONT, int(size * (0.52 - pad * 0.6)))
-    box = d.textbbox((0, 0), '忍', font=f, anchor='lt'); w, h = box[2] - box[0], box[3] - box[1]
-    d.text(((size - w) / 2 - box[0], (size - h) / 2 - box[1] + size * 0.02), '忍', font=f, fill=FG)
+    f = ImageFont.truetype(FONT, int(size * (0.6 - pad * 0.6)))
+    box = d.textbbox((0, 0), MARK, font=f, anchor='lt'); w, h = box[2] - box[0], box[3] - box[1]
+    d.text(((size - w) / 2 - box[0], (size - h) / 2 - box[1]), MARK, font=f, fill=FG, anchor='lt')   # same anchor as the box: centred
     return im
 
 DENS = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
