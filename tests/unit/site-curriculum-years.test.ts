@@ -1,7 +1,8 @@
 // The per-year pages (#2090): website/curriculum/<year>/index.html is generated from docs/content-map.json by
 // scripts/site-curriculum.mjs, like /curriculum/ itself (site-curriculum.test.ts). This regenerates each in memory
 // and fails on drift, holds each page's topics to the registry, and holds the words to plain ones: no curriculum
-// code a parent cannot read, and every home tip the map has for the year.
+// code a parent cannot read, and every home tip the map has for the year. Since #2160 each page also carries its
+// year's tables and gaps in a collapsed teachers' section, and a year switcher: the last two describes hold those.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TOPICS, YEARS } from '../../src/curriculum';
@@ -13,6 +14,11 @@ const map: ContentMap = JSON.parse(read('docs/content-map.json'));
 const home = read('website/index.html');
 const fileOf = (id: YearId) => `website/curriculum/${yearSlug(id)}/index.html`;
 const REGEN = 'run `npm run content-map` and commit website/curriculum/';
+/** The details element in the teachers' section (#2160), never the header's menu (#2159); '' when there is none. */
+const teachers = (html: string) => {
+  const at = html.indexOf('<details>', html.indexOf('<section id="for-teachers"')), end = html.indexOf('</details>', at);
+  return at < 0 || end < 0 ? '' : html.slice(at, end);
+};
 const terms = (html: string) => [...html.matchAll(/<div><dt>([^<]*)<\/dt><dd>([^<]*)<\/dd><\/div>/g)].map(m => ({ dt: m[1], dd: m[2] }));
 
 describe('one page per school year, generated from the content map (#2090)', () => {
@@ -123,13 +129,17 @@ describe('the year pages agree with /curriculum/ (#2090)', () => {
       }
     }
   });
-  it('lists as not covered yet exactly the year\'s gaps that /curriculum/ lists', () => {
+  it('lists as not covered yet, inside the teachers\' section, exactly the year\'s gaps (#2160)', () => {
     for (const y of map.byYear) {
-      const html = read(fileOf(y.year)), at = html.indexOf('<section id="not-covered"');
-      const listed = [...html.slice(at, html.indexOf('</section>', at)).matchAll(/<li>([^<]*)<\/li>/g)].map(m => m[1]);
-      const gaps = gapsOf(map, y).map(c => `${areaOf(c.id)} (${c.subject === 'maths' ? 'maths' : 'English'})`);
-      expect(listed, y.year).toEqual(gaps);
-      if (!gaps.length) expect(html.slice(at), y.year).toContain('Every part of the curriculum listed for this year has at least one topic.');
+      const detail = teachers(read(fileOf(y.year))), at = detail.indexOf('<h2 id="not-covered-title">');
+      expect(at, `${y.year}: the gaps sit inside the details`).toBeGreaterThan(-1);
+      const listed = [...detail.slice(at).matchAll(/<li>([^<]*)<\/li>/g)].map(m => m[1]);
+      // Worked out here from the map, not with the generator's own gapsOf: a strand of this year no topic of this year names.
+      const named = new Set(map.topics.filter(t => t.year === y.year).flatMap(t => t.strands));
+      const expected = map.coverage.filter(c => c.years.includes(y.year) && !named.has(c.id)).map(c => `${areaOf(c.id)} (${c.subject === 'maths' ? 'maths' : 'English'})`);
+      expect(listed, y.year).toEqual(expected);
+      expect(gapsOf(map, y).map(c => c.id), `${y.year}: the generator agrees`).toEqual(map.coverage.filter(c => c.years.includes(y.year) && !named.has(c.id)).map(c => c.id));
+      if (!expected.length) expect(detail.slice(at), y.year).toContain('Every part of the curriculum listed for this year has at least one topic.');
     }
     expect(gapsOf(map, map.byYear.find(y => y.year === 'year3')!).length, 'a year with gaps is among them').toBeGreaterThan(0);
   });
@@ -160,7 +170,81 @@ describe('the year pages and /curriculum/ link to each other (#2090)', () => {
       expect(main, y.year).toContain('<a href="/curriculum/">');
       expect(main, y.year).toContain('href="/play/"');
       for (const o of map.byYear.filter(o => o.year !== y.year)) expect(main, `${y.year} → ${o.year}`).toContain(`<a href="${yearPath(o.year)}">${o.title}</a>`);
-      expect(main, `${y.year} does not link to itself`).not.toContain(`<a href="${yearPath(y.year)}">`);
+      expect(main, `${y.year} links to itself only as the current page`).not.toContain(`<a href="${yearPath(y.year)}">`);
+    }
+  });
+});
+
+describe('the year pages carry the teachers\' detail, collapsed (#2160)', () => {
+  const rows = (html: string) => [...html.matchAll(/<tr><th scope="row">([^<]*)<\/th><td>([^<]*)<\/td><\/tr>/g)].map(m => [m[1], m[2]]);
+  it('puts it in one closed details, below the plain-words lists, with the summary the issue names', () => {
+    for (const y of map.byYear) {
+      const html = read(fileOf(y.year));
+      const main = html.match(/<main\b[\s\S]*<\/main>/)![0];   // the header's Curriculum menu is a details too (#2159)
+      expect(main.match(/<details\b[^>]*>/g), y.year).toEqual(['<details>']);
+      expect(html, y.year).toContain('<details>\n          <summary>For teachers: National Curriculum references and gaps</summary>');
+      const open = html.indexOf('<details>');
+      for (const [id, n] of [['maths', y.maths], ['english', y.writing]] as const) {
+        const at = html.indexOf(`<section id="${id}"`);
+        expect(at > -1, `${y.year}: a ${id} section when the year has ${id} topics`).toBe(n > 0);
+        if (n) expect(html.indexOf('</section>', at), `${y.year}: ${id} comes first`).toBeLessThan(open);
+      }
+      expect(rows(html).length, `${y.year}: every table row is inside the details`).toBe(rows(teachers(html)).length);
+    }
+  });
+  it('no row is lost or doubled: the (year, topic, objective) rows across the seven pages are the content map\'s', () => {
+    const onPages = map.byYear.flatMap(y => rows(teachers(read(fileOf(y.year)))).map(([title, nc]) => `${y.year} | ${title} | ${nc}`));
+    const inMap = map.topics.map(t => `${t.year} | ${esc(t.title)} | ${esc(t.nc)}`);
+    expect(new Set(onPages).size, 'no row twice').toBe(onPages.length);
+    expect(onPages.sort()).toEqual(inMap.sort());
+    expect(onPages, 'and the registry has as many topics').toHaveLength(TOPICS.length);
+    expect(onPages, 'escaped once, read against a known row rather than esc()').toContain('year3 | Mental Adding and Subtracting | Y3 A&amp;S: 3-digit number and 1s, 10s, 100s mentally (3M7)');
+  });
+  it('gives each table a caption first, column headers, and a row header on every data row', () => {
+    for (const y of map.byYear) {
+      const tables = [...teachers(read(fileOf(y.year))).matchAll(/<table>([\s\S]*?)<\/table>/g)].map(m => m[1]);
+      expect(tables.length, y.year).toBe((y.maths ? 1 : 0) + (y.writing ? 1 : 0));
+      for (const t of tables) {
+        expect(t.trimStart().startsWith('<caption>'), `${y.year}: caption first`).toBe(true);
+        expect(t).toContain('<thead><tr><th scope="col">Topic</th><th scope="col">Curriculum objective</th></tr></thead>');
+        for (const [row] of t.matchAll(/<tr>(?!<th scope="(?:col|rowgroup)")[\s\S]*?<\/tr>/g)) expect(row).toMatch(/^<tr><th scope="row">/);
+      }
+    }
+  });
+});
+
+describe('every year page has a year switcher (#2160)', () => {
+  const switcherOf = (html: string) => {
+    const navs = html.match(/<nav class="switcher" aria-label="School years">[\s\S]*?<\/nav>/g) ?? [];
+    expect(navs, 'one switcher').toHaveLength(1);
+    return navs[0] ?? '';
+  };
+  const links = (nav: string) => [...nav.matchAll(/<a href="([^"]+)"([^>]*)>([^<]*)<\/a>/g)].map(m => ({ href: m[1], attrs: m[2], text: m[3] }));
+  it('lists all seven years in order, and marks exactly one, the page\'s own, as the current page', () => {
+    for (const y of map.byYear) {
+      const all = links(switcherOf(read(fileOf(y.year)))).filter(l => !/\brel=/.test(l.attrs));
+      expect(all.map(l => [l.href, l.text]), y.year).toEqual(YEARS.map(o => [yearPath(o.id), o.title]));
+      const current = all.filter(l => l.attrs.includes('aria-current="page"'));
+      expect(current.map(l => l.href), y.year).toEqual([yearPath(y.year)]);
+      expect(all.every(l => l.attrs === '' || l.attrs === ' aria-current="page"'), y.year).toBe(true);
+      const main = read(fileOf(y.year)).match(/<main\b[\s\S]*<\/main>/)![0];
+      expect(main.match(/aria-current=/g), `${y.year}: one current-page mark in main, the switcher's`).toHaveLength(1);
+    }
+  });
+  it('links the years either side as Previous and Next, and Reception has no Previous, Year 6 no Next', () => {
+    YEARS.forEach((y, i) => {
+      const nav = links(switcherOf(read(fileOf(y.id))));
+      const prev = nav.filter(l => l.attrs === ' rel="prev"'), next = nav.filter(l => l.attrs === ' rel="next"');
+      expect(prev.map(l => [l.href, l.text]), y.id).toEqual(i ? [[yearPath(YEARS[i - 1].id), `Previous: ${YEARS[i - 1].title}`]] : []);
+      expect(next.map(l => [l.href, l.text]), y.id).toEqual(i < YEARS.length - 1 ? [[yearPath(YEARS[i + 1].id), `Next: ${YEARS[i + 1].title}`]] : []);
+    });
+  });
+  it('every switcher link resolves to a page under website/', () => {
+    for (const y of map.byYear) {
+      for (const { href } of links(switcherOf(read(fileOf(y.year))))) {
+        expect(href, y.year).toMatch(/^\/[a-z0-9/-]*\/$/);
+        expect(existsSync(`website${href}index.html`), `${y.year}: ${href}`).toBe(true);
+      }
     }
   });
 });

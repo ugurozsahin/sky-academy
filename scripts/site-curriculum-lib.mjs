@@ -2,7 +2,8 @@
 // as a string, so `scripts/site-curriculum.mjs` (writes it) and `tests/unit/site-curriculum.test.ts` (fails on
 // drift) run the very same code. Every line about the curriculum comes from the content map; this file only
 // arranges it. One render function per year (`renderYear`) for /curriculum/, and one page per year
-// (`renderYearPage`, #2090) at /curriculum/<year>/, which says the same topics in plain words with the map's tips.
+// (`renderYearPage`, #2090) at /curriculum/<year>/, which says the same topics in plain words with the map's tips,
+// then carries that year's tables and gaps in a collapsed teachers' section and a year switcher (#2160).
 
 const ORIGIN = 'https://sharpwise.co.uk';
 /** Subject id in the content map → the word a parent uses. */
@@ -222,8 +223,8 @@ function subjectSection(map, year, subject) {
   return section(id, body);
 }
 
-const section = (id, body) => [
-  `<section${id ? ` id="${id}" aria-labelledby="${id}-title"` : ' aria-labelledby="page-title"'}>`,
+const section = (id, body, label) => [
+  `<section${!id ? ' aria-labelledby="page-title"' : label ? ` id="${id}" aria-label="${esc(label)}"` : ` id="${id}" aria-labelledby="${id}-title"`}>`,
   '  <div class="wrap">',
   ...body.map(l => `    ${l}`),
   '  </div>',
@@ -238,12 +239,51 @@ function breadcrumbs(year) {
     '    "itemListElement": [', items.join(',\n'), '    ]', '  }', '  </script>', ''].join('\n');
 }
 
+/**
+ * The teachers' detail on a year page (#2160), collapsed so a parent reads the plain words first: this year's
+ * tables from /curriculum/ (`subjectTable`, the same rows) and the parts of the curriculum no topic names yet.
+ */
+function forTeachers(map, year, framework) {
+  const t = esc(year.title), gaps = gapsOf(map, year);
+  return section('for-teachers', [
+    '<details>',
+    '  <summary>For teachers: National Curriculum references and gaps</summary>',
+    `  <p>Each ${t} topic with the objective it practises from ${framework}, grouped by curriculum area.</p>`,
+    ...SUBJECTS.map(([id]) => subjectTable(map, year, id)).filter(Boolean).flatMap(tb => tb.split('\n')).map(l => `  ${l}`),
+    `  <h2 id="not-covered-title">Not covered yet in ${t}</h2>`,
+    ...(gaps.length
+      ? ['  <p>These parts of the curriculum have no topic in this year yet.</p>', '  <ul>',
+        ...gaps.map(c => `    <li>${esc(areaName(c.name))} (${SUBJECTS.find(([id]) => id === c.subject)[1]})</li>`), '  </ul>']
+      : ['  <p>Every part of the curriculum listed for this year has at least one topic.</p>']),
+    '</details>',
+  ], 'For teachers');
+}
+
+/** Every year in order, this one marked as the current page, then the years either side of it (#2160). */
+function switcher(map, year) {
+  const at = map.byYear.findIndex(y => y.year === year.year);
+  const link = (y, text = esc(y.title), rel = '') =>
+    `<a href="${yearPath(y.year)}"${rel ? ` rel="${rel}"` : ''}${!rel && y.year === year.year ? ' aria-current="page"' : ''}>${text}</a>`;
+  const prev = map.byYear[at - 1], next = map.byYear[at + 1];
+  return section('years', [
+    '<h2 id="years-title">Reception to Year 6</h2>',
+    '<nav class="switcher" aria-label="School years">',
+    '  <ul>',
+    ...map.byYear.map(y => `    <li>${link(y)}</li>`),
+    '  </ul>',
+    '  <ul>',
+    ...(prev ? [`    <li>${link(prev, `Previous: ${esc(prev.title)}`, 'prev')}</li>`] : []),
+    ...(next ? [`    <li>${link(next, `Next: ${esc(next.title)}`, 'next')}</li>`] : []),
+    '  </ul>',
+    '</nav>',
+    '<p>Every year on one page, with the curriculum objective for each topic: <a href="/curriculum/">the curriculum page</a>.</p>',
+  ]);
+}
+
 /** The page /curriculum/<year>/ (#2090): what a child practises in one school year, in plain words. */
 export function renderYearPage(map, year, home) {
   const { header, footer } = shellFrom(home, yearPath(year.year));
   const t = esc(year.title);
-  const gaps = gapsOf(map, year);
-  const others = map.byYear.filter(y => y.year !== year.year).map(y => `<a href="${yearPath(y.year)}">${esc(y.title)}</a>`);
   const framework = year.year === 'reception' ? 'the EYFS Early Learning Goals' : 'the National Curriculum for England';
   const intro = section('', [
     `<nav aria-label="Breadcrumb"><p><a href="/curriculum/">Curriculum</a> › ${t}</p></nav>`,
@@ -252,20 +292,8 @@ export function renderYearPage(map, year, home) {
     `<p>${t} topics follow ${framework}. This page is made from the game's own list of topics, so it changes when the game does.</p>`,
     '<p><a class="btn" href="/play/">Play Sharpwise</a></p>',
   ]);
-  const notCovered = section('not-covered', [
-    `<h2 id="not-covered-title">Not covered yet in ${t}</h2>`,
-    ...(gaps.length
-      ? ['<p>These parts of the curriculum have no topic in this year yet.</p>', '<ul>',
-        ...gaps.map(c => `  <li>${esc(areaName(c.name))} (${SUBJECTS.find(([id]) => id === c.subject)[1]})</li>`), '</ul>']
-      : ['<p>Every part of the curriculum listed for this year has at least one topic.</p>']),
-  ]);
-  const more = section('more', [
-    '<h2 id="more-title">Other years</h2>',
-    `<p>${others.join(' · ')}</p>`,
-    '<p>Every year on one page, with the curriculum objective for each topic: <a href="/curriculum/">the curriculum page</a>.</p>',
-  ]);
-  const main = [intro, ...SUBJECTS.map(([id]) => subjectSection(map, year, id)).filter(Boolean), notCovered, more]
-    .map(s => indent(s, 4)).join('\n\n');
+  const main = [intro, ...SUBJECTS.map(([id]) => subjectSection(map, year, id)).filter(Boolean),
+    forTeachers(map, year, framework), switcher(map, year)].map(s => indent(s, 4)).join('\n\n');
   return page({
     title: `${year.title} maths and English practice game | Sharpwise`,
     description: `What your child practises in ${year.title} with Sharpwise, a free game: ${topicWord(year.maths)} in maths and ${topicWord(year.writing)} in English, in plain words, with ideas to try at home.`,
