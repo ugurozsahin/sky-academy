@@ -19,3 +19,5 @@
 - [Year 5](https://sharpwise.co.uk/curriculum/year-5/): what a child practises in Year 5, in plain words, with ideas to try at home
 - [Year 6](https://sharpwise.co.uk/curriculum/year-6/): what a child practises in Year 6, in plain words, with ideas to try at home
 - [Features](https://sharpwise.co.uk/features/): what the game does today, and what is planned
+- [Guides](https://sharpwise.co.uk/guides/): the guides to Sharpwise, starting with the parents' guide
+- [Parents' guide](https://sharpwise.co.uk/guides/parents/): installing Sharpwise like an app, the grown-ups' area, a ninja for each child, moving a save to another device, starting again, settings, Ninja Duel and offline play
