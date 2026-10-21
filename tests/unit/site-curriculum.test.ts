@@ -4,13 +4,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TOPICS, YEARS } from '../../src/curriculum';
-import { esc, gapsOf, renderCurriculumPage, renderYear, yearSlug, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
+import type { YearId } from '../../src/curriculum/types';
+import { esc, renderCurriculumPage, renderYear, yearSlug, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 const map: ContentMap = JSON.parse(read('docs/content-map.json'));
 const page = read('website/curriculum/index.html');
 const REGEN = 'run `npm run content-map` and commit website/curriculum/index.html';
 const text = (html: string) => html.replace(/<head>[\s\S]*<\/head>/, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+const sectionOf = (id: string) => { const at = page.indexOf(`<section id="${yearSlug(id as YearId)}"`); return page.slice(at, page.indexOf('</section>', at)); };
 const rowHeads = (html: string) => [...html.matchAll(/<th scope="row">([^<]*)<\/th>/g)].map(m => m[1]);
 
 describe('the curriculum page is generated, never hand-kept (#2089)', () => {
@@ -18,7 +20,6 @@ describe('the curriculum page is generated, never hand-kept (#2089)', () => {
     expect(page, REGEN).toBe(renderCurriculumPage(map, read('website/index.html')));
   });
   it('lists every registry topic exactly once and says how many there are', () => {
-    const sectionOf = (id: string) => { const at = page.indexOf(`<section id="${yearSlug(id)}"`); return page.slice(at, page.indexOf('</section>', at)); };
     const onPage = YEARS.flatMap(y => rowHeads(sectionOf(y.id)).map(title => `${y.id} ${title}`));
     expect(onPage.sort(), 'each topic under its own year').toEqual(TOPICS.map(t => `${t.year} ${esc(t.title)}`).sort());
     expect(rowHeads(page)).toHaveLength(TOPICS.length);
@@ -46,19 +47,36 @@ describe('the curriculum page is generated, never hand-kept (#2089)', () => {
       for (const [row] of t.matchAll(/<tr>(?!<th scope="(?:col|rowgroup)")[\s\S]*?<\/tr>/g)) expect(row).toMatch(/^<tr><th scope="row">/);
     }
   });
-  it('lists, in each year, every strand the content map says no topic names', () => {
+  it('lists under each year exactly the strands of that year that no topic of that year names', () => {
+    const area = (name: string) => esc(name.replace(/^Years? [\d–-]+ /, ''));
     for (const y of map.byYear) {
-      const section = renderYear(map, y);
-      for (const gap of gapsOf(map, y)) expect(section, `${y.year}: ${gap.name}`).toContain(esc(gap.name.replace(/^Years? [\d–-]+ /, '')));
+      const named = new Set(map.topics.filter(t => t.year === y.year).flatMap(t => t.strands));
+      const expected = map.coverage.filter(c => c.years.includes(y.year) && !named.has(c.id)).map(c => area(c.name));
+      const section = sectionOf(y.year);
+      const listed = [...section.slice(section.indexOf('<h3>Not covered yet')).matchAll(/<li>([^<]*) \((?:maths|English)\)<\/li>/g)].map(m => m[1]);
+      expect(listed, y.year).toEqual(expected);
     }
-    const all = map.coverage.filter(c => !c.topics.length);
-    expect(all.length, 'the content map has gaps to show').toBeGreaterThan(0);
-    for (const gap of all) expect(gap.years.some(y => gapsOf(map, map.byYear.find(b => b.year === y)!).includes(gap)), gap.id).toBe(true);
+    expect(sectionOf('year3'), 'a strand shared with Year 4 is a gap in Year 3 when only Year 4 has topics').toContain('<li>Reading: comprehension (English)</li>');
   });
-  it('escapes what it prints: a topic title with markup in it comes out as text', () => {
-    const odd = { ...map, topics: map.topics.map((t, i) => (i ? t : { ...t, title: '<b>Odd</b> & "co"' })) };
+  it('puts every topic under the curriculum area of its first strand', () => {
+    for (const y of map.byYear) {
+      for (const [, group] of sectionOf(y.year).matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)) {
+        const heading = group.match(/<th scope="rowgroup" colspan="2">([^<]*)<\/th>/)![1];
+        for (const title of rowHeads(group)) {
+          const homes = map.topics.filter(t => t.year === y.year && esc(t.title) === title)
+            .map(t => esc(map.coverage.find(c => c.id === t.strands[0])!.name.replace(/^Years? [\d–-]+ /, '')));
+          expect(homes, `${y.year}: ${title}`).toContain(heading);
+        }
+      }
+    }
+  });
+  it('escapes what it prints: markup in a title, an objective or an area name comes out as text', () => {
+    const odd = { ...map, topics: map.topics.map((t, i) => (i ? t : { ...t, title: '<b>Odd</b> & "co"', nc: 'A<i>&</i>B' })),
+      coverage: map.coverage.map((c, i) => (i ? c : { ...c, name: 'Area <u>x</u>' })) };
     const y = renderYear(odd, odd.byYear[0]);
     expect(y).toContain('&lt;b&gt;Odd&lt;/b&gt; &amp; &quot;co&quot;');
-    expect(y).not.toContain('<b>Odd</b>');
+    expect(y).toContain('A&lt;i&gt;&amp;&lt;/i&gt;B');
+    expect(y).toContain('Area &lt;u&gt;x&lt;/u&gt;');
+    expect(y).not.toMatch(/<[biu]>/);
   });
 });

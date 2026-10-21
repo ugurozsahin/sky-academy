@@ -33,7 +33,8 @@ export function shellFrom(home, currentPath) {
 }
 
 /** One subject's table for one year, rows grouped by curriculum area in the strand table's order. */
-export function subjectTable(map, year, subject, label) {
+export function subjectTable(map, year, subject) {
+  const label = SUBJECTS.find(([id]) => id === subject)[1];
   const rows = map.topics.filter(t => t.year === year.year && t.subject === subject);
   if (!rows.length) return '';
   const out = [
@@ -52,9 +53,13 @@ export function subjectTable(map, year, subject, label) {
   return out.join('\n');
 }
 
-/** The parts of this year's programmes of study that no topic names yet. */
+/**
+ * The parts of this year's programmes of study that no topic of this year names yet. Counted per year: a strand
+ * shared by Years 3 and 4 with topics only in Year 4 is a gap in Year 3.
+ */
 export function gapsOf(map, year) {
-  return map.coverage.filter(c => !c.topics.length && c.years.includes(year.year));
+  const named = new Set(map.topics.filter(t => t.year === year.year).flatMap(t => t.strands));
+  return map.coverage.filter(c => c.years.includes(year.year) && !named.has(c.id));
 }
 
 /** One year: its heading, a maths table, an English table and what is not covered yet. */
@@ -68,7 +73,7 @@ export function renderYear(map, year) {
   const body = [
     `<h2 id="${slug}-title">${esc(year.title)}</h2>`,
     `<p>${topicWord(year.maths)} in maths and ${topicWord(year.writing)} in English.</p>`,
-    ...SUBJECTS.map(([id, word]) => subjectTable(map, year, id, word)).filter(Boolean),
+    ...SUBJECTS.map(([id]) => subjectTable(map, year, id)).filter(Boolean),
     `<h3>Not covered yet in ${esc(year.title)}</h3>`,
     ...notCovered,
   ];
