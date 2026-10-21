@@ -1,20 +1,194 @@
 <!doctype html>
 <html lang="en-GB">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sharpwise</title>
-  <!-- #1933: a holding page until the promotional site (#1925) lands. No script, no tracking, no third party. -->
-  <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #131a33; color: #fff;
-           font-family: system-ui, sans-serif; text-align: center; }
-    a { color: #3ec9ff; }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sharpwise: free maths and English game for Reception to Year 6</title>
+  <meta name="description" content="A free maths and English game for children in Reception to Year 6, following the National Curriculum for England. No adverts, no tracking, nothing to install.">
+  <link rel="canonical" href="https://sharpwise.co.uk/">
+  <meta name="theme-color" content="#131a33">
+  <link rel="icon" href="/icons/icon-192.webp" type="image/webp">
+  <link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/site.css">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Sharpwise">
+  <meta property="og:locale" content="en_GB">
+  <meta property="og:url" content="https://sharpwise.co.uk/">
+  <meta property="og:title" content="Sharpwise: free maths and English game for Reception to Year 6">
+  <meta property="og:description" content="Children slice the right answer as it floats up. Free, no adverts, no tracking, and it plays in the browser.">
+  <meta property="og:image" content="https://sharpwise.co.uk/share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Sharpwise: a ninja ready to slice the right answer. Free maths and English, Reception to Year 6.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sharpwise: free maths and English game for Reception to Year 6">
+  <meta name="twitter:description" content="Children slice the right answer as it floats up. Free, no adverts, no tracking, and it plays in the browser.">
+  <meta name="twitter:image" content="https://sharpwise.co.uk/share.jpg">
+  <meta name="twitter:image:alt" content="Sharpwise: a ninja ready to slice the right answer. Free maths and English, Reception to Year 6.">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://sharpwise.co.uk/#organization",
+        "name": "Inobil Technology Ltd",
+        "url": "https://sharpwise.co.uk/",
+        "logo": "https://sharpwise.co.uk/icons/icon-192.webp"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://sharpwise.co.uk/#website",
+        "name": "Sharpwise",
+        "url": "https://sharpwise.co.uk/",
+        "inLanguage": "en-GB",
+        "publisher": { "@id": "https://sharpwise.co.uk/#organization" }
+      },
+      {
+        "@type": ["VideoGame", "WebApplication"],
+        "@id": "https://sharpwise.co.uk/#game",
+        "name": "Sharpwise",
+        "url": "https://sharpwise.co.uk/play/",
+        "description": "A free maths and English game for children in Reception to Year 6. A question appears, answers float up in bubbles, and the child slices the right one.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any modern web browser",
+        "inLanguage": "en-GB",
+        "typicalAgeRange": "4-11",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" },
+        "image": "https://sharpwise.co.uk/share.jpg",
+        "screenshot": "https://sharpwise.co.uk/img/slice-phone.webp",
+        "publisher": { "@id": "https://sharpwise.co.uk/#organization" }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
-  <main>
-    <h1>Sharpwise</h1>
-    <p><a href="/play/">Play the game</a></p>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/icons/icon-192.webp" width="40" height="40" alt="">Sharpwise</a>
+      <nav class="site-nav" aria-label="Main">
+        <ul>
+          <li><a href="/" aria-current="page">Home</a></li>
+          <li><a href="/curriculum/">Curriculum</a></li>
+          <li><a href="/features/">Features</a></li>
+          <li><a href="/guides/">Guides</a></li>
+          <li><a href="/about/">About</a></li>
+        </ul>
+      </nav>
+      <a class="btn play" href="/play/">Play now</a>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="cut" aria-hidden="true"></div>
+      <div class="wrap">
+        <div>
+          <h1 id="hero-title">Maths and English, one slice at a time</h1>
+          <p class="lede">Sharpwise is a free learning game for children in Reception to Year 6. A question appears, answers float up in bubbles, and your child slices the right one.</p>
+          <p><a class="btn big" href="/play/">Play in your browser</a></p>
+          <p class="note">No download, no account and no adverts.</p>
+        </div>
+        <figure class="phone">
+          <img src="/img/slice-phone.webp" width="390" height="844" fetchpriority="high"
+               alt="A Year 1 adding question in Sharpwise: the sum sits at the top and numbered bubbles float up to be sliced.">
+        </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="facts-title">
+      <div class="wrap">
+        <h2 id="facts-title">Sharpwise at a glance</h2>
+        <dl class="facts">
+          <div><dt>Who it is for</dt><dd>Children aged 4 to 11, and the parents and teachers helping them.</dd></div>
+          <div><dt>School years</dt><dd>Reception to Year 6. Reception topics follow the EYFS Early Learning Goals; Years 1 to 6 follow the National Curriculum for England.</dd></div>
+          <div><dt>Subjects</dt><dd>Maths and English: number, calculation, fractions, measures, phonics, spelling, grammar and reading.</dd></div>
+          <div><dt>Price</dt><dd>Free.</dd></div>
+          <div><dt>Adverts</dt><dd>None.</dd></div>
+          <div><dt>Tracking</dt><dd>None. There is no account to make, and progress is saved on the device.</dd></div>
+          <div><dt>Where it plays</dt><dd>In any modern web browser, on a phone, tablet or computer. After the first visit it also works offline.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section aria-labelledby="how-title">
+      <div class="wrap split">
+        <div>
+          <h2 id="how-title">How a round works</h2>
+          <ol class="steps">
+            <li>A question appears at the top of the screen. It can be read aloud, so children who cannot read yet can still play.</li>
+            <li>Possible answers float up from the bottom in bubbles.</li>
+            <li>Your child slices the right bubble with a finger or the mouse. Right answers earn stars, and each island has new topics to unlock.</li>
+          </ol>
+        </div>
+        <figure class="phone small">
+          <img src="/img/ten-frame-phone.webp" width="390" height="844" loading="lazy"
+               alt="A Reception number bond question, 3 + ? = 5, shown on a ten-frame, with answer bubbles below it.">
+          <figcaption>Pictures such as ten-frames help the youngest children see the numbers.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="years-title">
+      <div class="wrap">
+        <h2 id="years-title">Reception to Year 6</h2>
+        <p>Each school year is an island with its own topics, in the order children meet them in class.</p>
+        <ol class="years">
+          <li><h3>Reception</h3><span class="age">ages 4 to 5</span><p>First steps: counting, sounds and letters.</p></li>
+          <li><h3>Year 1</h3><span class="age">ages 5 to 6</span><p>Number bonds, adding, phonics and spelling.</p></li>
+          <li><h3>Year 2</h3><span class="age">ages 6 to 7</span><p>Times tables, money, time and tricky words.</p></li>
+          <li><h3>Year 3</h3><span class="age">ages 7 to 8</span><p>Hundreds, the 3, 4 and 8 times tables, fractions and Roman numerals.</p></li>
+          <li><h3>Year 4</h3><span class="age">ages 8 to 9</span><p>Tables to 12 × 12, decimals, area and coordinates.</p></li>
+          <li><h3>Year 5</h3><span class="age">ages 9 to 10</span><p>Millions, primes, percentages and angles.</p></li>
+          <li><h3>Year 6</h3><span class="age">ages 10 to 11</span><p>Long division, ratio, algebra and SATs practice.</p></li>
+        </ol>
+        <p><a href="/curriculum/">See every topic on the curriculum page</a></p>
+      </div>
+    </section>
+
+    <section aria-labelledby="inside-title">
+      <div class="wrap">
+        <h2 id="inside-title">Inside the game</h2>
+        <div class="gallery">
+          <figure class="phone small">
+            <img src="/img/sky-map-phone.webp" width="390" height="844" loading="lazy"
+                 alt="The Sky Map: the school years from Reception upwards, each with its island and a Go button.">
+            <figcaption>The Sky Map. Children tap their school year to start.</figcaption>
+          </figure>
+          <figure class="phone small">
+            <img src="/img/parents-phone.webp" width="390" height="844" loading="lazy"
+                 alt="The grown-ups dashboard: questions answered, accuracy, stars earned and progress on each island.">
+            <figcaption>The grown-ups' area, behind a quick sum, shows how a child is getting on.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta" aria-labelledby="start-title">
+      <div class="wrap">
+        <h2 id="start-title">Start playing</h2>
+        <p>Sharpwise runs in the browser, so there is nothing to install. Choose a year and slice your first answer.</p>
+        <!-- #1935: the Google Play and App Store badges go here once each listing exists, in each store's own
+             artwork and under its rules. Until then there is no badge and no store link. -->
+        <p><a class="btn big" href="/play/">Play in your browser</a></p>
+      </div>
+    </section>
   </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <nav aria-label="Footer">
+        <ul>
+          <li><a href="/privacy/">Privacy</a></li>
+          <li><a href="/support/">Support</a></li>
+          <li><a href="/about/">About</a></li>
+        </ul>
+      </nav>
+      <p>© 2026 Inobil Technology Ltd, the company behind Sharpwise.</p>
+    </div>
+  </footer>
 </body>
 </html>
