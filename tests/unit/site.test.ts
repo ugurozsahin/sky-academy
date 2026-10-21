@@ -26,12 +26,17 @@ const noindex = (html: string) => /<meta name="robots" content="[^"]*\bnoindex\b
  *  `"@id": ".../#organization"` is a name, never a jump, so its fragment is dropped. Other origins are
  *  pages.test.ts's business. */
 function links(text: string): string[] {
-  const out = [...text.matchAll(/\s(href|src|srcset)=(["'])(.*?)\2|url\(\s*["']?([^"')]+)["']?\s*\)/gi)]
-    .flatMap(m => m[1]?.toLowerCase() === 'srcset' ? m[3].split(',').map(c => c.trim().split(/\s+/)[0]) : [m[3] ?? m[4]]);
+  const out = [...text.matchAll(/\s(href|src|srcset|imagesrcset|poster)\s*=\s*(["'])([\s\S]*?)\2|url\(\s*["']?([^"')]+)["']?\s*\)/gi)]
+    .flatMap(m => /srcset$/i.test(m[1] ?? '') ? m[3].split(',').map(c => c.trim().split(/\s+/)[0]) : [m[3] ?? m[4]]);
   const ids = text.replace(/("@id":\s*"[^"#]*)#[^"]*"/g, '$1"');
   for (const [u] of ids.matchAll(/https:\/\/sharpwise\.co\.uk(?=[/"'\s<)]|$)[^\s"'<>)]*/g)) out.push(u);
   return [...new Set(out)].filter(u => !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(u) || u.startsWith(`${ORIGIN}/`) || u === ORIGIN);
 }
+
+/** An address attribute written without quotes: the link rail cannot read it, so it is a failure, not a skip. */
+const unquoted = (text: string) => [...uncommented(text).matchAll(/\s(?:href|src|srcset|imagesrcset|poster)\s*=\s*[^\s"'>]/gi)].map(m => m[0].trim());
+
+const hasId = (html: string, id: string) => new RegExp(`\\sid=(["'])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1`).test(uncommented(html));
 
 /** Why `link`, found in `from` (a path under website/), would not load once deployed; '' when it would. */
 function dead(link: string, from: string): string {
@@ -43,9 +48,12 @@ function dead(link: string, from: string): string {
   const img = path.match(/^\/img\/([^/]+)$/);
   if (img) return shotFiles().includes(img[1]) ? '' : `${link}: not in the site-shots.mjs shot list (#2088)`;
   const file = `website${path.endsWith('/') ? `${path}index.html` : path}`;
-  if (!existsSync(new URL(file, root)) || !statSync(new URL(file, root)).isFile()) return `${link}: no ${file}`;
+  if (!existsSync(new URL(file, root)) || !statSync(new URL(file, root)).isFile()) {
+    const dir = existsSync(new URL(`website${path}/index.html`, root)) ? ' (add the trailing slash)' : '';
+    return `${link}: no ${file}${dir}`;
+  }
   // A fragment must name an id attribute on the page it points at.
-  if (url.hash && file.endsWith('.html') && !read(file).includes(` id="${decodeURIComponent(url.hash.slice(1))}"`)) {
+  if (url.hash && file.endsWith('.html') && !hasId(read(file), decodeURIComponent(url.hash.slice(1)))) {
     return `${link}: no id="${url.hash.slice(1)}" in ${file}`;
   }
   return '';
@@ -59,7 +67,7 @@ describe('every page under website/ (#2087)', () => {
     expect(all).toContain('website/about/index.html');
   });
   it('has the viewport meta', () => {
-    for (const p of all) expect(read(p), p).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">');
+    for (const p of all) expect(uncommented(read(p)), p).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">');
   });
   it('that search engines may index names itself as its canonical URL on sharpwise.co.uk; a noindex placeholder may not', () => {
     const indexed = all.filter(p => !noindex(read(p)));
@@ -74,6 +82,7 @@ describe('every page under website/ (#2087)', () => {
     expect(found, 'the links it checks').toEqual(expect.arrayContaining(['/', '/play/', '#main', '/site.css', `${ORIGIN}/share.jpg`]));
     expect(found.some(l => l.startsWith('/img/')), 'a deploy-time screenshot among them').toBe(true);
     for (const p of all) expect(deadLinks(p), p).toEqual([]);
+    for (const p of all) expect(unquoted(read(p)), p).toEqual([]);
   });
   it('every stylesheet loads only files that are in website/', () => {
     expect(files('.css')).toContain('website/site.css');
@@ -91,6 +100,14 @@ describe('every page under website/ (#2087)', () => {
       '/img/slice-tablet.webp: not in the site-shots.mjs shot list (#2088)', `${ORIGIN}/#faq: no id="faq" in website/index.html`,
       `${ORIGIN}/missing.jpg: no website/missing.jpg`,
     ]);
+    const multi = '<picture><source srcset="/img/slice-phone.webp 1x,\n  /img/nope-tablet.webp 2x"></picture><p id=\'faq\'>f</p><a href = "#faq"> <video poster="/gone.png">' +
+      ' <link rel="preload" imagesrcset="/img/slice-phone.webp 1x, /img/nope2.webp 2x"> <!-- <p id="ghost"> --> <a href="#ghost"> <a href="/about">';
+    expect(deadLinks('website/index.html', multi)).toEqual([
+      '/img/nope-tablet.webp: not in the site-shots.mjs shot list (#2088)', '#faq: no id="faq" in website/index.html',
+      '/gone.png: no website/gone.png', '/img/nope2.webp: not in the site-shots.mjs shot list (#2088)',
+      '#ghost: no id="ghost" in website/index.html', '/about: no website/about (add the trailing slash)',
+    ]);
+    expect(unquoted('<a href=/x/> <img src = y.png> <a href="/ok/">')).toEqual(['href=/', 'src = y']);
     expect(deadLinks('website/about/index.html', '<a href="../curriculum/"> <a href="/#main"> <img src="/img/slice-desktop.webp">' +
       ` <a href="mailto:a@b.c"> <a href="https://play.google.com/store"> "@id": "${ORIGIN}/#organization"`)).toEqual([]);
   });
