@@ -12,6 +12,8 @@ import { DEFAULT } from '../../src/storage/shape';
  * - No sentence anywhere names the STA or the DfE.
  * - No sentence that names the check, and no sentence right after one, claims to be identical, the same as the
  *   real one, approved, endorsed or the only free one.
+ * "official" in a sentence that does not name the check ("The official app.") is allowed, pinned below; the game's own
+ * parents' settings line (src/ui/parents-settings.ts) names the real check deliberately and is held by parents.test.ts only.
  * Everything a reader, a search result or an AI crawler can meet is read: visible text, titles, alt, title,
  * aria-label and meta content attributes in either quote, the string values of JSON-LD, and website/llms.txt.
  */
@@ -21,8 +23,8 @@ const files = (ext: string, dir = 'website'): string[] => readdirSync(new URL(di
   .flatMap(e => e.isDirectory() ? files(ext, `${dir}/${e.name}`) : e.name.endsWith(ext) ? [`${dir}/${e.name}`] : []);
 
 const BLOCK = /<\/?(?:p|li|dt|dd|h[1-6]|td|th|caption|title|figcaption|figure|div|section|ul|ol|dl|tr|table|header|footer|nav|main|head|body|blockquote|article|aside|summary|details|form|label|button)\b[^>]*>/gi;
-const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', ndash: '–', mdash: '—', times: '×' };
-const decode = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) =>
+const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', thinsp: ' ', ensp: ' ', emsp: ' ', shy: '', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', ndash: '–', mdash: '—', times: '×' };
+const decode = (s: string) => s.replace(/\u00ad/g, '').replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) =>
   e[0] !== '#' ? NAMED[e.toLowerCase()] ?? m : String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : Number(e.slice(1))));
 /** Sentence ends, but not inside "e.g." or "i.e.". */
 const split = (s: string) => s.split(/(?<=[.!?])(?<!\be\.g\.)(?<!\bi\.e\.)\s+/);
@@ -36,17 +38,19 @@ const jsonStrings = (v: unknown): string[] => typeof v === 'string' ? (/^https?:
 /** Every sentence a reader, a search result or a screen reader can meet in a page. */
 function sentences(html: string): string[] {
   const clean = html.replace(/<!--[\s\S]*?-->/g, ' ');
-  const ld = [...clean.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap(m => jsonStrings(JSON.parse(m[1])));
+  const ldTags = [...clean.matchAll(/<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json\b[^>]*>([\s\S]*?)<\/script>/gi)];
+  if (ldTags.length !== (clean.match(/application\/ld\+json/gi) ?? []).length) throw new Error('a JSON-LD script the rail could not read');
+  const ld = ldTags.flatMap(m => jsonStrings(JSON.parse(m[1])));
   const noScript = clean.replace(/<script\b[\s\S]*?<\/script>/gi, ' ');
-  const attrs = [...noScript.matchAll(/\s(?:content|alt|title|aria-label)=(["'])([\s\S]*?)\1/g)].map(m => m[2]);
+  const attrs = [...noScript.matchAll(/\s(?:content|alt|title|aria-label|aria-description|placeholder|value)\s*=\s*(?:(["'])([\s\S]*?)\1|([^\s"'=<>`]+))/gi)].map(m => m[2] ?? m[3]);
   const body = noScript.replace(/\s+/g, ' ').replace(/<br\s*\/?>/gi, ' ').replace(BLOCK, '\n').replace(/<[^>]+>/g, ' ');
   return [...ld, ...attrs, ...body.split('\n')].flatMap(s => split(tidy(decode(s)))).filter(Boolean);
 }
 /** The same for a text file such as llms.txt: one paragraph or list item per line, Markdown links kept as their text. */
-const textSentences = (txt: string) => txt.split('\n').flatMap(l => split(tidy(l.replace(/\]\([^)]*\)/g, ']')))).filter(Boolean);
+const textSentences = (txt: string) => txt.replace(/\n[ \t]+(?=\S)/g, ' ').split('\n').flatMap(l => split(tidy(l.replace(/\]\([^)]*\)/g, ']')))).filter(Boolean);
 
-const NAMES_CHECK = /\bYear 4 (?:multiplication |tables? )?checks?\b|\btables? (?:check|test)s?\b|\b(?:multiplication|times)[- ]tables? (?:check|test)s?\b|\bmultiplication checks?\b|\bMTC\b|\bofficial(?:ly)?\b[^.!?]*\b(?:check|test)s?\b/i;
-const BODIES = /\b(?:STA|DfE|Standards and Testing Agency|Department for Education)\b/i;
+const NAMES_CHECK = /\bYear 4 (?:multiplication |tables? )?checks?\b|\btables?[ -](?:check|test)s?\b|\b(?:multiplication|times)[- ]tables?[ -](?:check|test)s?\b|\bmultiplication checks?\b|\bMTC\b|\bofficial(?:ly)?\b[^.!?]*\b(?:check|test)s?\b/i;
+const BODIES = /\b(?:STA|DfE|Standards (?:and|&) Testing Agency|Department for Education)\b/i;
 const CLAIMS = /\b(?:identical|exactly the same|same as the real|endorsed|approved|only free)\b/i;
 
 /** Why each sentence breaks the #1291 rules; [] when none does. */
@@ -54,7 +58,7 @@ function wordingProblems(all: string[]): string[] {
   return all.flatMap((s, i) => {
     const names = NAMES_CHECK.test(s), after = i > 0 && NAMES_CHECK.test(all[i - 1]);
     return [
-      ...(names && !/\bpracti[cs]/i.test(s) ? [`no "practice": ${s}`] : []),
+      ...(names && !/\bpractices?\b|\bpractis(?:e|es|ed|ing)\b/i.test(s) ? [`no "practice": ${s}`] : []),
       ...(names && /\bofficial(?:ly)?\b/i.test(s.replace(/\bnot (?:the|an) official\b/gi, '')) ? [`"official" not as "not the official": ${s}`] : []),
       ...(BODIES.test(s) ? [`names the STA or the DfE: ${s}`] : []),
       ...((names || after) && CLAIMS.test(s) ? [`claims a match: ${s}`] : []),
@@ -91,6 +95,23 @@ describe('the website never presents Tables Check practice as the official check
     expect(pageProblems('<p>It is identical to the Year 4 check, and it is official.</p>')).toHaveLength(3);
     expect(pageProblems('<script type="application/ld+json">{"@graph": [{"@type": "VideoGame", "description": "The official multiplication tables check, approved by the DfE."}]}</script>'))
       .toHaveLength(4);
+  });
+  it('reads the shapes and spellings a page edit could plausibly produce (#2152)', () => {
+    const bad = (html: string) => expect(pageProblems(html), html).not.toEqual([]);
+    bad('<script id="ld" type="application/ld+json">{"description":"Sit the official MTC."}</script>');
+    bad('<img alt=MTC>');
+    bad('<input placeholder="Sit the official MTC">');
+    bad('<img alt = "Sit the Tables Check">');
+    bad('<p aria-description="Sit the Tables Check"></p>');
+    bad('<p>Sit the Ta&shy;bles Check.</p>');
+    bad('<p>Sit the Tables&thinsp;Check.</p>');
+    bad('<p>Sit the tables-check.</p>');
+    bad('<p>A practical way to sit the multiplication tables check.</p>');
+    bad('<p>Tables Check practice, approved by the Standards &amp; Testing Agency.</p>');
+    expect(() => sentences('<script type="application/ld+json" data-x="1">{}</script><script type=\'application/ld+json\'>{</script>')).toThrow();
+    expect(() => sentences('<script src="x.js" data-type="application/ld+json"></script>')).toThrow();
+    expect(textSentences('- Tables Check practice,\n  the official one.').filter(s => NAMES_CHECK.test(s))).toEqual(['- Tables Check practice, the official one.']);
+    expect(pageProblems('<p>Tables Check practice.</p><p>The official app.</p>'), 'official outside a sentence naming the check').toEqual([]);
   });
   it('passes the right wording, and a check or an approval that is not this one', () => {
     expect(pageProblems('<p>Tables Check practice is practice only, not the official multiplication tables check. A quick check, not a password. ' +
