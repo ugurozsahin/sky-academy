@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
+import { timeOptsFor } from '../../src/game/time-options';
+import { MODES } from '../../src/game/modes';
+import { DEFAULT } from '../../src/storage/shape';
 
 /**
  * #2093, holding the #1291 wording rules on the website: Sharpwise's Tables Check is practice, never the official
@@ -109,6 +112,16 @@ describe('the teachers\' guide (#2093)', () => {
   it('has a section for each part the issue names, and links the curriculum page', () => {
     for (const id of ['devices', 'class', 'privacy', 'curriculum', 'tables']) expect(page, id).toContain(`<section aria-labelledby="${id}-title">`);
     expect(page).toContain('href="/curriculum/"');
+  });
+  it('states the time settings as the game applies them (#2142 review round 2)', () => {
+    expect(page).toContain('so 9 seconds in Tables Check practice');
+    expect((MODES.mtc.questionMs ?? 0) * (timeOptsFor('mtc', { timeX: 1.5, slow: false }).timeScale ?? 1)).toBe(9000);
+    expect(page).toContain('though a Ninja Sprint gets 90 seconds instead');
+    expect(MODES.sprint.title).toBe('Ninja Sprint');
+    expect(timeOptsFor('sprint', { timeX: 0, slow: false }).seconds).toBe(90);
+    expect(timeOptsFor('mtc', { timeX: 0, slow: false }).timeScale).toBe(Infinity);
+    expect(page).toContain('Guest play and Whiteboard mode always use the normal time');
+    expect(DEFAULT.settings.timeX, 'a guest save starts from DEFAULT (startGuest)').toBe(1);
   });
   it('is indexable, with its canonical URL', () => {
     expect(page).not.toContain('noindex');
