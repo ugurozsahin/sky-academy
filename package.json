@@ -13,7 +13,7 @@
     "lint": "eslint src tests/unit",
     "hooks": "git config core.hooksPath .githooks",
     "test": "vitest run",
-    "content-map": "node scripts/content-map.mjs",
+    "content-map": "node scripts/content-map.mjs && node scripts/site-curriculum.mjs",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --project=mobile --grep @smoke",
     "test:sketch": "playwright test --project=sketchbook",

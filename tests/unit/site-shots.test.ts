@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
-import { shotFiles, SHOTS, SIZES, MAX_BYTES, gateProduct, isWebp } from '../../scripts/site-shots.mjs';
+import { shotFiles, SHOTS, SIZES, MAX_BYTES, gateProduct, isWebp, oversized } from '../../scripts/site-shots.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
 const pages = (dir: string): string[] => readdirSync(root + dir, { withFileTypes: true, recursive: true })
-  .filter(e => e.isFile() && e.name.endsWith('.html')).map(e => `${e.parentPath}/${e.name}`);
+  .filter(e => e.isFile() && /\.(html|css)$/.test(e.name)).map(e => `${e.parentPath}/${e.name}`);
 
 /** #2088: the website's pictures are made at deploy time from fixed seeds; none is ever committed. */
 describe('site screenshots (#2088)', () => {
@@ -15,7 +15,7 @@ describe('site screenshots (#2088)', () => {
   });
   it('tracks nothing under site-shots/ and git-ignores it', () => {
     expect(execFileSync('git', ['ls-files', 'site-shots'], { cwd: root, encoding: 'utf8' }).trim()).toBe('');
-    expect(readFileSync(root + '.gitignore', 'utf8').split('\n')).toContain('site-shots/');
+    expect(() => execFileSync('git', ['check-ignore', '-q', 'site-shots/x.webp'], { cwd: root }), 'site-shots/ is not ignored').not.toThrow();
   });
   it('makes a phone and a desktop file for every shot, each named once', () => {
     const files: string[] = shotFiles();
@@ -27,14 +27,19 @@ describe('site screenshots (#2088)', () => {
   // empty `refs` would pass whatever the regex did.
   const missing = (html: string) => {
     const made = new Set<string>(shotFiles());
-    return [...html.matchAll(/\/img\/([\w.-]+\.webp)/g)].map(m => m[1]).filter(r => !made.has(r));
+    return [...html.matchAll(/(?:^|["'(\s/,])img\/([\w.-]+\.webp)/g)].map(m => m[1]).filter(r => !made.has(r));
   };
-  it('flags a /img/ reference to a file the deploy does not make, and passes one it does', () => {
+  it('flags a missing picture however it is spelt, and passes one the deploy makes', () => {
     expect(missing('<img src="/img/sky-map-phone.webp">')).toEqual([]);
     expect(missing('<img src="/img/nope-phone.webp"> <img src="/img/slice-desktop.webp">')).toEqual(['nope-phone.webp']);
+    expect(missing('<img src="img/nope-phone.webp">')).toEqual(['nope-phone.webp']);
+    expect(missing('<img srcset="img/x-phone.webp 1x, img/y-phone.webp 2x">')).toEqual(['x-phone.webp', 'y-phone.webp']);
+    expect(missing('.hero { background: url(img/nope-desktop.webp) }')).toEqual(['nope-desktop.webp']);
+    expect(missing('.hero { background: url("../img/nope-desktop.webp") }')).toEqual(['nope-desktop.webp']);
+    expect(missing('<img src="img/sky-map-phone.webp">')).toEqual([]);
   });
-  it('every /img/<name>.webp a website page references is in the shot list', () => {
-    expect(pages('website').length, 'the pages it reads').toBeGreaterThan(0);
+  it('every img/<name>.webp a website page or stylesheet references is in the shot list', () => {
+    expect(pages('website').length, 'the files it reads').toBeGreaterThan(0);
     expect(pages('website').flatMap(p => missing(readFileSync(p, 'utf8'))), 'a page points at a picture the deploy does not make').toEqual([]);
   });
   it('tells WebP from the PNG that toDataURL falls back to', () => {
@@ -42,6 +47,7 @@ describe('site screenshots (#2088)', () => {
     expect(isWebp(Buffer.from('\x89PNG\r\n\x1a\n\0\0\0\rIHDR', 'latin1'))).toBe(false);
   });
   it('holds each file to 150 KB and reads the grown-ups gate in digits and words', () => {
+    expect(oversized([{ file: 'a.webp', bytes: MAX_BYTES }, { file: 'b.webp', bytes: MAX_BYTES + 1 }])).toEqual([`b.webp (${MAX_BYTES + 1} bytes)`]);
     expect(MAX_BYTES).toBe(150 * 1024);
     expect(gateProduct('6 × 8')).toBe(48);
     expect(gateProduct('thirty-seven times twenty-four')).toBe(888);
