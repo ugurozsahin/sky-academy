@@ -1,0 +1,169 @@
+/* Sharpwise website shell (#1935): the header, navigation, footer and the home page. Every page under website/
+   links this one file and adds no look of its own (#2087 to #2095 build on it). No script, no third party.
+   The tokens are the game's own, copied from src/styles/base.css (the design-language skill §1), so the site
+   and the game read as one product. Fredoka is a byte-for-byte copy of public/fonts/ (#479); a rail holds the
+   two copies equal. */
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/fredoka-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/fredoka-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --ink: #0d1226; --panel: rgba(16, 22, 48, .78); --panel-2: rgba(28, 36, 74, .9); --line: rgba(255,255,255,.12);
+  --text: #f4f6ff; --muted: #9aa5cf; --accent: #ffb020; --accent-2: #3ec9ff; --good: #66e07d; --bad: #ff5f6d;
+  --glow: #3ec9ff; --font: "Fredoka", "Baloo 2", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 22px;
+  /* the site's own: the night sky the game's map sits in (its theme-color), the reading measure, the gutter */
+  --sky: #131a33; --measure: 38rem; --gutter: 16px; --tap: 44px;
+}
+@media (min-width: 720px) { :root { --gutter: 32px; } }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--ink); color: var(--text); font-family: var(--font);
+  font-size: 1.0625rem; line-height: 1.6; font-weight: 400;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--accent-2); text-underline-offset: .18em; text-decoration-thickness: .08em; }
+a:hover { text-decoration-thickness: .14em; }
+h1, h2, h3 { line-height: 1.15; font-weight: 600; margin: 0 0 .5em; text-wrap: balance; }
+h1 { font-size: clamp(2.25rem, 8.5vw, 4.25rem); font-weight: 700; letter-spacing: -.01em; }
+h2 { font-size: clamp(1.6rem, 5vw, 2.4rem); }
+h3 { font-size: 1.25rem; }
+p { margin: 0 0 1em; max-width: var(--measure); }
+
+/* Focus is always visible (2.4.7) and the header is not sticky, so nothing can cover it (2.4.11). */
+:focus-visible { outline: 3px solid var(--glow); outline-offset: 3px; border-radius: 8px; }
+main:focus { outline: none; }   /* the skip link's target: focus lands there, the ring would only frame the page */
+
+.wrap { width: 100%; max-width: 72rem; margin: 0 auto; padding: 0 var(--gutter); }
+
+.skip {
+  position: absolute; left: var(--gutter); top: -100px; z-index: 10;
+  background: var(--accent); color: var(--ink); font-weight: 600; padding: 10px 16px; border-radius: 12px;
+  min-height: var(--tap); display: inline-flex; align-items: center; text-decoration: none;
+}
+.skip:focus { top: 12px; }
+
+/* Header: brand and Play now share the first row on a phone, the navigation takes the second; one row from 900px. */
+.site-header { border-bottom: 1px solid var(--line); background: var(--sky); }
+.site-header .wrap {
+  display: grid; grid-template-columns: 1fr auto; grid-template-areas: "brand play" "nav nav";
+  align-items: center; column-gap: 16px; padding-top: 10px; padding-bottom: 4px;
+}
+.brand {
+  grid-area: brand; display: inline-flex; align-items: center; gap: 10px; min-height: var(--tap);
+  color: var(--text); text-decoration: none; font-weight: 700; font-size: 1.4rem; justify-self: start;
+}
+.brand img { width: 40px; height: 40px; border-radius: 12px; }
+.site-nav { grid-area: nav; }
+.site-nav ul, .site-footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; }
+.site-nav ul { justify-content: space-between; margin: 0 -6px; }
+.site-nav a, .site-footer a {
+  display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 8px;
+  color: var(--text); text-decoration: none; font-weight: 500;
+}
+.site-nav a { padding: 0 6px; font-size: 1rem; }   /* five links fit one row at 360px */
+.site-nav a:hover, .site-footer a:hover { color: var(--accent-2); }
+.site-nav a[aria-current="page"] { color: var(--accent); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 8px; }
+@media (min-width: 900px) {
+  .site-header .wrap { grid-template-columns: auto 1fr auto; grid-template-areas: "brand nav play"; padding-bottom: 10px; }
+  .site-nav ul { justify-content: center; gap: 4px; margin: 0; }
+  .site-nav a { padding: 0 12px; font-size: 1.0625rem; }
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap);
+  padding: 0 20px; border-radius: 999px; font-weight: 600; text-decoration: none; line-height: 1.2;
+  background: var(--accent); color: var(--ink);
+}
+.btn:hover { background: #ffc24d; }
+.btn.play { grid-area: play; }
+.btn.big { min-height: 56px; padding: 0 30px; font-size: 1.2rem; }
+
+/* Footer: the Support link sits in the same place on every page (3.2.6). */
+.site-footer { border-top: 1px solid var(--line); background: var(--sky); margin-top: 72px; padding: 24px 0 32px; }
+.site-footer ul { margin: 0 -8px 8px; gap: 4px 16px; }
+.site-footer p { color: var(--muted); font-size: .95rem; margin: 0; }
+
+/* ---- Home page ---- */
+section { padding: 56px 0 0; }
+.lede { font-size: clamp(1.125rem, 3.6vw, 1.35rem); color: var(--text); }
+.note { color: var(--muted); font-size: .95rem; margin-top: 12px; }
+
+/* The one bold move: a single blade-cut across the sky behind the phone, the game's slice in one stroke. */
+.hero { position: relative; overflow: hidden; padding: 40px 0 56px;
+  background: radial-gradient(120% 80% at 80% 10%, #1d2a5c 0%, var(--sky) 45%, var(--ink) 100%); }
+.hero .wrap { display: grid; gap: 40px; align-items: center; position: relative; }   /* painted above the cut */
+.hero h1 { max-width: 16ch; }
+.hero .cut {
+  position: absolute; left: -10%; right: -10%; top: 62%; height: 6px; transform: rotate(-14deg);
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 30%, #fff3d6 50%, var(--accent-2) 72%, transparent 100%);
+  box-shadow: 0 0 24px rgba(255, 176, 32, .55); pointer-events: none;
+}
+@media (min-width: 900px) {
+  .hero { padding: 72px 0 88px; }
+  .hero .wrap { grid-template-columns: 1.15fr .85fr; }
+  .hero .cut { top: 46%; left: 52%; }   /* it crosses behind the phone, never under the words */
+}
+
+.phone { margin: 0; justify-self: center; position: relative; }
+.phone img {
+  width: min(280px, 72vw); border-radius: 34px; border: 10px solid #1c2448;
+  box-shadow: 0 0 0 1px var(--line), 0 24px 60px rgba(0, 0, 0, .5), 0 0 60px rgba(62, 201, 255, .18);
+  background: var(--sky);
+}
+.phone.small img { width: min(240px, 64vw); border-width: 8px; border-radius: 28px; }
+figcaption { color: var(--muted); font-size: .95rem; margin-top: 14px; max-width: 30ch; }
+
+/* At a glance: plain-text facts for people and for search alike. A two-column list from 720px. */
+.facts { margin: 24px 0 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.facts div { display: grid; gap: 2px 24px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.facts dt { font-weight: 600; color: var(--accent); }
+.facts dd { margin: 0; max-width: var(--measure); }
+@media (min-width: 720px) { .facts div { grid-template-columns: 11rem 1fr; } }
+
+.split { display: grid; gap: 40px; align-items: start; }
+@media (min-width: 720px) { .split { grid-template-columns: 1fr auto; } }
+.steps { margin: 16px 0 0; padding: 0; list-style: none; counter-reset: step; max-width: var(--measure); }
+.steps li { counter-increment: step; position: relative; padding: 0 0 20px 56px; }
+.steps li::before {
+  content: counter(step); position: absolute; left: 0; top: -2px; width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; color: var(--ink); background: var(--accent-2);
+}
+
+/* Reception to Year 6: a sequence, so an ordered list; each year a row on a thin rail. */
+.years { list-style: none; margin: 24px 0 16px; padding: 0; border-left: 3px solid var(--line); }
+.years li { position: relative; padding: 10px 0 14px 24px; }
+.years li::before {
+  content: ""; position: absolute; left: -9px; top: 19px; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--ink); border: 3px solid var(--accent-2);
+}
+.years h3 { margin: 0; display: inline; }
+.years .age { color: var(--muted); margin-left: 10px; }
+.years p { margin: 2px 0 0; }
+
+.gallery { display: grid; gap: 40px; margin-top: 24px; justify-items: center; }
+@media (min-width: 600px) { .gallery { grid-template-columns: 1fr 1fr; align-items: start; } }
+
+.cta { text-align: left; }
+.cta .btn { margin-top: 8px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  a, .btn { transition: color .15s ease, background-color .15s ease, text-decoration-thickness .15s ease; }
+}

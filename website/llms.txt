@@ -1,0 +1,13 @@
+# Sharpwise
+
+> Sharpwise is a free maths and English game for children in Reception to Year 6 (ages 4 to 11) in England. A question appears, answers float up in bubbles, and the child slices the right one. Reception topics follow the EYFS Early Learning Goals; Years 1 to 6 follow the National Curriculum for England.
+
+- Free, with no adverts and no tracking. There is no account; progress is saved on the device.
+- Plays in any modern web browser on a phone, tablet or computer, and works offline after the first visit.
+- Made by Inobil Technology Ltd.
+
+## Pages
+
+- [Home](https://sharpwise.co.uk/): what Sharpwise is, who it is for and the years it covers
+- [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
+- [Features](https://sharpwise.co.uk/features/): what the game does today, and what is planned

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { precacheList } from '../../scripts/build-sw.mjs';
 
 /** #1933: the game is served from `/play/` on GitHub Pages. These rails hold the pieces that make that safe. */
@@ -40,11 +40,71 @@ describe('GitHub Pages deployment (#1933)', () => {
     expect(read('src/pwa.ts')).toContain("register('sw.js', { scope: './' })");
     expect(precacheList(['index.html', 'assets/a.js']).every((f: string) => !f.startsWith('/'))).toBe(true);
   });
-  it('the custom domain, .nojekyll and a script-free holding page ship from website/', () => {
+  it('the custom domain, .nojekyll and a home page that links to the game ship from website/', () => {
     expect(read('website/CNAME').trim()).toBe('sharpwise.co.uk');
     expect(read('website/.nojekyll')).toBe('');
-    const page = read('website/index.html');
-    expect(page).toContain('href="/play/"');
-    expect(page).not.toMatch(/<script|https?:\/\//i);
+    expect(read('website/index.html')).toContain('href="/play/"');
+  });
+  // #2088: the deploy makes the pictures the pages show; nothing under website/img/ is committed.
+  it('runs the screenshot script into site/img after the site is assembled and the browser installed (#1935)', () => {
+    const assemble = wf.indexOf('cp -a website/. site/');
+    const install = wf.indexOf('npx playwright install --with-deps chromium');
+    const shots = wf.indexOf('node scripts/site-shots.mjs http://localhost:4173/play/ site/img');
+    const upload = wf.indexOf('uses: actions/upload-pages-artifact');
+    expect(assemble, 'the step that copies website/ into site/').toBeGreaterThan(-1);
+    expect(install, 'Chromium for the screenshots').toBeGreaterThan(assemble);
+    expect(shots, 'the screenshots, from the assembled site, into site/img').toBeGreaterThan(install);
+    expect(upload, 'and all of it before the upload').toBeGreaterThan(shots);
+    expect(wf.slice(install, shots)).toContain('python3 -m http.server 4173 --directory site');
+    expect(wf.slice(install, shots), 'a server that never starts says so').toContain('the local server never answered');
+    // #2099 brings the script. Red until it is on main, so this cannot merge first and break every deploy.
+    expect(existsSync(new URL('../../scripts/site-shots.mjs', import.meta.url)), 'scripts/site-shots.mjs (#2088) is on this branch').toBe(true);
   });
 });
+
+/**
+ * #1935: website/ is script-free and loads nothing from anyone else. Before the site shell this rail forbade any
+ * `https?://` at all; canonical, Open Graph and JSON-LD need absolute URLs, so the rule is now "no origin but
+ * sharpwise.co.uk", plus the two store badge links and JSON-LD's own `@context` (a vocabulary name, never fetched).
+ * The one script allowed is a JSON-LD data block, which no browser runs. Owner-approved on #1925.
+ * #2087/#2105: the stores are allowed as the `href` of a link only, never as a source. Google's own badge snippet
+ * hot-links its picture from play.google.com, which would load a file from Google on every visit.
+ */
+const SITE_ORIGINS = ['https://sharpwise.co.uk'];
+const STORE_LINK = /(<a\b[^>]*?\shref=)(["'])https:\/\/(?:play\.google\.com|apps\.apple\.com)\/[^"']*\2/gi;
+function offSite(html: string): string[] {
+  const bad: string[] = [];
+  for (const m of html.matchAll(/<script\b([^>]*)>/gi)) if (!/^\s*type="application\/ld\+json"\s*$/.test(m[1])) bad.push(`<script${m[1]}>`);
+  const urls = html.replace(STORE_LINK, '$1$2$2').replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
+  for (const [u] of urls) if (!SITE_ORIGINS.some(o => u === o || u.startsWith(`${o}/`))) bad.push(u);
+  return bad;
+}
+const sitePages = (dir = 'website'): string[] => readdirSync(new URL(`../../${dir}`, import.meta.url), { withFileTypes: true })
+  .flatMap(e => e.isDirectory() ? sitePages(`${dir}/${e.name}`) : /\.(html|css)$|^llms\.txt$/.test(e.name) ? [`${dir}/${e.name}`] : []);   // not fonts/OFL.txt: the font licence, which no page loads
+
+describe('website/ loads nothing from another origin and runs no script (#1933, #1935)', () => {
+  it('flags a script, a foreign or plain-http origin and a protocol-relative URL, and passes the allowed ones', () => {
+    expect(offSite('<script src="/a.js"></script> <script>x()</script>')).toEqual(['<script src="/a.js">', '<script>']);
+    expect(offSite('<link href="https://fonts.googleapis.com/css"> <a href="http://sharpwise.co.uk/">')).toEqual(['https://fonts.googleapis.com/css', 'http://sharpwise.co.uk/']);
+    expect(offSite('<img src="//cdn.example.com/x.png"> <a href="https://sharpwise.co.uk.evil.com/">')).toEqual(['//cdn.example.com/x.png', 'https://sharpwise.co.uk.evil.com/']);
+    expect(offSite('<a href="https://schema.org/VideoGame">')).toEqual(['https://schema.org/VideoGame']);   // only as @context
+    expect(offSite('<script type="application/ld+json">{"@context": "https://schema.org", "url": "https://sharpwise.co.uk/"}</script>' +
+      '<a href="https://play.google.com/store/apps/details?id=x"></a><a href="https://apps.apple.com/gb/app/id1">')).toEqual([]);
+  });
+  it('allows a store only as a link, so its badge picture cannot be hot-linked (#2105)', () => {
+    const google = "<a href='https://play.google.com/store/apps/details?id=uk.co.sharpwise'><img alt='Get it on Google Play' " +
+      "src='https://play.google.com/intl/en_gb/badges/static/images/badges/en_badge_web_generic.png'/></a>";
+    expect(offSite(google)).toEqual(['https://play.google.com/intl/en_gb/badges/static/images/badges/en_badge_web_generic.png']);
+    expect(offSite('<link rel="preconnect" href="https://apps.apple.com"> <a data-x href="https://apps.apple.com/gb/app/id1">'))
+      .toEqual(['https://apps.apple.com']);
+    expect(offSite('<a class="badge" href="https://apps.apple.com/gb/app/id1"><img src="/badges/app-store.svg" alt="Download on the App Store"></a>')).toEqual([]);
+  });
+  it('every page, the stylesheet and llms.txt under website/ pass', () => {
+    const files = sitePages();
+    expect(files, 'the files it reads').toContain('website/index.html');
+    expect(files).toContain('website/site.css');
+    expect(files).toContain('website/llms.txt');
+    for (const f of files) expect(offSite(read(f)), f).toEqual([]);
+  });
+});
+
