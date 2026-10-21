@@ -164,6 +164,17 @@ figcaption { color: var(--muted); font-size: .95rem; margin-top: 14px; max-width
 .cta { text-align: left; }
 .cta .btn { margin-top: 8px; }
 
+/* Tables (#2089): the curriculum page has the site's first, and every later table page uses these. Headers read
+   left to right like the text around them, a thin rule separates rows, and an area heading row is in the accent.
+   Cells wrap, so a table is never wider than the screen at 360px. */
+table { width: 100%; max-width: 56rem; border-collapse: collapse; margin: 24px 0 40px; }
+caption { text-align: left; font-weight: 600; font-size: 1.25rem; line-height: 1.3; padding-bottom: 8px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 16px 10px 0; border-bottom: 1px solid var(--line); }
+th:last-child, td:last-child { padding-right: 0; }
+thead th { color: var(--muted); font-weight: 500; font-size: .95rem; }
+th[scope="row"] { font-weight: 600; width: 40%; }
+th[scope="rowgroup"] { color: var(--accent); padding-top: 22px; }
+
 @media (prefers-reduced-motion: no-preference) {
   a, .btn { transition: color .15s ease, background-color .15s ease, text-decoration-thickness .15s ease; }
 }
