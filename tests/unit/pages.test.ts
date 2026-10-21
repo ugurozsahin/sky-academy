@@ -72,16 +72,22 @@ describe('GitHub Pages deployment (#1933)', () => {
  * #1935: website/ is script-free and loads nothing from anyone else. Before the site shell this rail forbade any
  * `https?://` at all; canonical, Open Graph and JSON-LD need absolute URLs, so the rule is now "no origin but
  * sharpwise.co.uk", plus the two store badge links and JSON-LD's own `@context` (a vocabulary name, never fetched).
- * The one script allowed is a JSON-LD data block, which no browser runs. Owner-approved on #1925.
+ * The scripts allowed: a JSON-LD data block, which no browser runs (owner-approved on #1925), and, since #2174, exactly
+ * `<script src="/nav.js" defer></script>`, the first-party file that closes the Curriculum menu, with nothing inline
+ * (owner-approved in session on 2026-10-21, recorded on #2174). site-nav-script.test.ts holds what nav.js may do.
  * #2087/#2105: the stores are allowed as the `href` of a link only, never as a source. Google's own badge snippet
  * hot-links its picture from play.google.com, which would load a file from Google on every visit. A store URL in
  * JSON-LD (`sameAs`, `installUrl`) fails this rail too, deliberately: it needs its own allow-list entry (#2113).
  */
 const SITE_ORIGINS = ['https://sharpwise.co.uk'];
 const STORE_LINK = /(<a\b[^>]*?\shref=)(["'])https:\/\/(?:play\.google\.com|apps\.apple\.com)\/[^"']*\2/gi;
+const NAV_SCRIPT = '<script src="/nav.js" defer></script>';
 function offSite(html: string): string[] {
   const bad: string[] = [];
-  for (const m of html.matchAll(/<script\b([^>]*)>/gi)) if (!/^\s*type="application\/ld\+json"\s*$/.test(m[1])) bad.push(`<script${m[1]}>`);
+  for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
+    if (/^\s*type="application\/ld\+json"\s*$/.test(m[1]) || html.startsWith(NAV_SCRIPT, m.index)) continue;
+    bad.push(`<script${m[1]}>`);
+  }
   for (const [tag] of html.matchAll(/<[a-z][^>]*>/gi)) for (const [h] of tag.matchAll(/(?<=\s)on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi)) bad.push(h);   // an inline handler is script by another name (#2105)
   for (const [j] of html.matchAll(/javascript:[^"'\s>]*/gi)) bad.push(j);
   const urls = html.replace(STORE_LINK, '$1$2$2').replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
@@ -103,9 +109,21 @@ describe('the screenshot-step rail sees a non-fatal step (#2105)', () => {
   });
 });
 
-describe('website/ loads nothing from another origin and runs no script (#1933, #1935)', () => {
-  it('flags a script, a foreign or plain-http origin and a protocol-relative URL, and passes the allowed ones', () => {
+describe('website/ loads nothing from another origin and runs no script but /nav.js (#1933, #1935, #2174)', () => {
+  it('flags any other script, from a file or inline', () => {
     expect(offSite('<script src="/a.js"></script> <script>x()</script>')).toEqual(['<script src="/a.js">', '<script>']);
+  });
+  it('allows /nav.js only as the exact deferred, empty tag (#2174)', () => {
+    expect(offSite(NAV_SCRIPT)).toEqual([]);
+    expect(offSite('<script src="/nav.js" defer>x()</script>')).toEqual(['<script src="/nav.js" defer>']);
+    expect(offSite('<script src="/nav.js"></script>')).toEqual(['<script src="/nav.js">']);
+    expect(offSite('<script src="/nav.js" async></script>')).toEqual(['<script src="/nav.js" async>']);
+    expect(offSite('<script defer src="/nav.js"></script>')).toEqual(['<script defer src="/nav.js">']);
+    expect(offSite('<script src="/nav.js" defer type="module"></script>')).toEqual(['<script src="/nav.js" defer type="module">']);
+    expect(offSite('<script src="/menu.js" defer></script>')).toEqual(['<script src="/menu.js" defer>']);
+    expect(offSite(`${NAV_SCRIPT}<script>x()</script>`)).toEqual(['<script>']);
+  });
+  it('flags a foreign or plain-http origin and a protocol-relative URL, and passes the allowed ones', () => {
     expect(offSite('<link href="https://fonts.googleapis.com/css"> <a href="http://sharpwise.co.uk/">')).toEqual(['https://fonts.googleapis.com/css', 'http://sharpwise.co.uk/']);
     expect(offSite('<img src="//cdn.example.com/x.png"> <a href="https://sharpwise.co.uk.evil.com/">')).toEqual(['//cdn.example.com/x.png', 'https://sharpwise.co.uk.evil.com/']);
     expect(offSite('<a href="https://schema.org/VideoGame">')).toEqual(['https://schema.org/VideoGame']);   // only as @context
