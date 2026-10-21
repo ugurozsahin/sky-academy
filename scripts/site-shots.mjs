@@ -55,13 +55,14 @@ export function gateProduct(q) {
   return a * b;
 }
 
-/** The shot list: `name` becomes `<name>-<size>.webp`. A website page may only reference a file made from here. */
+/** The shot list: `name` becomes `<name>-<size>.webp`. A website page may only reference a file made from here.
+ *  `year` and `topic` are the data `run` reads, so a guide's alt text can be railed to them (#2146). */
 export const SHOTS = [
   { name: 'sky-map', run: async () => {} },
-  { name: 'slice', run: page => openTopic(page, 'year1', 'y1-add') },
-  { name: 'ten-frame', run: page => openTopic(page, 'reception', 'r-bonds') },
-  { name: 'results', run: async page => {
-    await openTopic(page, 'reception', 'r-count');
+  { name: 'slice', year: 'year1', topic: 'y1-add', run: (page, s) => openTopic(page, s.year, s.topic) },
+  { name: 'ten-frame', year: 'reception', topic: 'r-bonds', run: (page, s) => openTopic(page, s.year, s.topic) },
+  { name: 'results', year: 'reception', topic: 'r-count', run: async (page, s) => {
+    await openTopic(page, s.year, s.topic);
     for (let i = 0; i < 3; i++) {                                // a few real answers, then the mission ends as a win
       await waitTarget(page);
       await page.evaluate(() => window.__sna.answer());
@@ -89,7 +90,7 @@ export const SHOTS = [
     await page.click('#rewards');
     await page.waitForSelector('.rewards .sticker.got', { timeout: ACTION_TIMEOUT });
   } },
-  { name: 'island', run: async page => { await page.click('.island[data-year="year1"]'); await page.waitForSelector('.island-screen'); } },
+  { name: 'island', year: 'year1', run: async (page, s) => { await page.click(`.island[data-year="${s.year}"]`); await page.waitForSelector('.island-screen'); } },
 ];
 /** The files over MAX_BYTES, as the lines the failure names: `[{ file, bytes }]` in, `["file (n bytes)"]` out. */
 export const oversized = files => files.filter(f => f.bytes > MAX_BYTES).map(f => `${f.file} (${f.bytes} bytes)`);
@@ -130,7 +131,7 @@ async function main([base, out]) {
         }, [SEED]);
         await page.goto(base, { waitUntil: 'networkidle' });
         await page.waitForSelector('.home', { timeout: ACTION_TIMEOUT });
-        try { await shot.run(page); } catch (e) {                    // Playwright's timeout names neither the shot nor the size, and the page errors that likely caused it would be dropped
+        try { await shot.run(page, shot); } catch (e) {                    // Playwright's timeout names neither the shot nor the size, and the page errors that likely caused it would be dropped
           throw new Error(`${shot.name}-${size}: ${e.message.split('\n')[0]}${errors.length ? ` (page errors: ${errors.join('; ')})` : ''}`);
         }
         await page.waitForTimeout(500);
