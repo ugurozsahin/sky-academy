@@ -3,19 +3,21 @@ import { readFileSync } from 'node:fs';
 import { shotFiles } from '../../scripts/site-shots.mjs';
 import { YEARS } from '../../src/curriculum';
 import { starsForAccuracy } from '../../src/game/session';
-import { MODES } from '../../src/game/modes';
-import { ACHIEVEMENTS, STICKER_COST } from '../../src/storage/stickers';
+import { MODES, type EndCtx } from '../../src/game/modes';
+import { buy } from '../../src/game/shop';
+import { ACHIEVEMENTS, STICKER_COST, stickersFor } from '../../src/storage/stickers';
 
 /** #2094: /guide/play/, How to play for children. Short sentences, one picture per card, and every fact true of the game. */
-const page = readFileSync(new URL('../../website/guide/play/index.html', import.meta.url), 'utf8');
-const main = page.slice(page.indexOf('<main'), page.indexOf('</main>')).replace(/<!--[\s\S]*?-->/g, '');
+const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
+const page = read('website/guide/play/index.html').replace(/<!--[\s\S]*?-->/g, '');   // comments first: one may quote a tag
+const main = page.slice(page.indexOf('<main id="main"'), page.indexOf('</main>'));
 const text = main.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const MAX_WORDS = 12;
 
 /** Each sentence of the visible text and of every alt text: block boundaries and . ! ? end one. */
 function sentences(html: string): string[] {
   const alts = [...html.matchAll(/\balt="([^"]*)"/g)].map(m => m[1]);
-  const blocks = html.replace(/<(?:\/?(?:p|h[1-6]|li|figcaption|div|section|figure|a)\b)[^>]*>/g, '\n').replace(/<[^>]+>/g, ' ').split('\n');
+  const blocks = html.replace(/<(?:\/?(?:p|h[1-6]|li|figcaption|div|section|figure)\b)[^>]*>/g, '\n').replace(/<[^>]+>/g, ' ').split('\n');
   return [...blocks, ...alts].flatMap(b => b.split(/(?<=[.!?])\s+/)).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 const words = (s: string) => s.split(' ').filter(w => /[\p{L}\p{N}]/u.test(w)).length;
@@ -28,14 +30,22 @@ describe('/guide/play/ (#2094)', () => {
     expect(tooLong(`<p>Short. ${long}</p>`)).toEqual([long]);
     expect(tooLong(`<img src="/x" alt="${long}">`)).toEqual([long]);
     expect(tooLong(`<h2>${long.slice(0, -1)}</h2>`)).toEqual([long.slice(0, -1)]);
+    expect(tooLong('<p>One two three four five six <a href="/">seven eight nine ten eleven twelve</a> thirteen.</p>'), 'a link is part of its sentence')
+      .toHaveLength(1);
   });
   it('keeps every sentence on the page to 12 words or fewer', () => {
-    expect(sentences(main).length, 'the sentences it reads').toBeGreaterThan(25);
+    expect(sentences(main).length, 'the sentences it reads').toBeGreaterThan(50);
     expect(tooLong(main)).toEqual([]);
   });
   it('has a card for slicing, hearts, stars, coins, stickers and the Sky Map', () => {
     const h2 = [...main.matchAll(/<h2 id="[^"]+">([^<]+)<\/h2>/g)].map(m => m[1]);
     expect(h2).toEqual(['Slice the right answer', 'Hearts', 'Stars', 'Coins', 'Stickers', 'The Sky Map', 'Ready to play?']);
+  });
+  it('uses only classes site.css styles, so it adds no look of its own', () => {
+    const css = read('website/site.css');
+    const classes = new Set([...main.matchAll(/\bclass="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/)));
+    expect(classes.size).toBeGreaterThan(5);
+    for (const c of classes) expect(css, c).toMatch(new RegExp(`\\.${c}\\b`));
   });
   it('shows only deploy-time screenshots, each with an alt text', () => {
     const imgs = [...main.matchAll(/<img\b[^>]*>/g)].map(m => m[0]);
@@ -66,15 +76,25 @@ describe('/guide/play/ says only what the game does (#2094)', () => {
     expect(text).toContain('Get every answer right to win three stars.');
   });
   it('coins: one a right answer, more for stars and for finishing a mission', () => {
-    const ctx = { won: false, score: 0, correct: 1, accuracy: 1, stageStarsTotal: 0, stages: 5, stars: 0, year: YEARS[0] };
+    const ctx = { won: false, score: 0, correct: 1, accuracy: 1, stageStarsTotal: 0, stages: 5, stars: 0, year: YEARS[0] } satisfies EndCtx;
     expect(MODES.mission.coins(ctx)).toBe(1);
     expect(MODES.mission.coins({ ...ctx, stageStarsTotal: 1 })).toBeGreaterThan(1);
     expect(MODES.mission.coins({ ...ctx, won: true })).toBeGreaterThan(1);
+    expect(text).toContain('Every right answer earns a coin.');
+    expect(text).toContain('Stars earn more coins, and so does finishing a mission.');
+  });
+  it('stars: a stage gives one, two or three', () => {
+    expect(new Set([0, 0.5, 0.7, 0.9, 0.95, 1].map(starsForAccuracy))).toEqual(new Set([1, 2, 3]));
+    expect(text).toContain('Each stage gives you one, two or three stars.');
   });
   it('stickers: the first three at 30, 70 and 120 coins; Hammer Man and a three-day streak earn others', () => {
     expect(STICKER_COST).toEqual([30, 70, 120]);
     expect(text).toContain('Collect 30 coins for your first sticker.');
     expect(text).toContain('Two more come at 70 and 120 coins.');
     expect(ACHIEVEMENTS.map(a => a.title)).toEqual(expect.arrayContaining(['Beat Hammer Man once', '3-day streak']));
+    // Stickers read the coins ever earned; buying in the shop adds to `spent` and leaves that total alone.
+    const spent = buy({ coins: 200, spent: 0, owned: [], equipped: {} }, 'trail-gold');
+    expect([spent.ok, spent.wallet.coins, stickersFor(spent.wallet.coins)]).toEqual([true, 200, stickersFor(200)]);
+    expect(text).toContain('Spending coins never takes a sticker away.');
   });
 });
