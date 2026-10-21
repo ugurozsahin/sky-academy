@@ -5,6 +5,8 @@ import { precacheList } from '../../scripts/build-sw.mjs';
 /** #1933: the game is served from `/play/` on GitHub Pages. These rails hold the pieces that make that safe. */
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const wf = read('.github/workflows/pages.yml');
+/** A step is fatal when nothing in it can swallow a failure. */
+const fatal = (step: string) => !/continue-on-error|^\s+if:|\|\|\s*(true|:)|\bset \+e\b/m.test(step);
 
 describe('GitHub Pages deployment (#1933)', () => {
   it('builds the game with base /play/ and deploys with the official actions', () => {
@@ -57,6 +59,10 @@ describe('GitHub Pages deployment (#1933)', () => {
     expect(upload, 'and all of it before the upload').toBeGreaterThan(shots);
     expect(wf.slice(install, shots)).toContain('python3 -m http.server 4173 --directory site');
     expect(wf.slice(install, shots), 'a server that never starts says so').toContain('the local server never answered');
+    // #2105: a non-fatal step would deploy pages whose /img/ pictures are missing, and stay green.
+    const step = wf.slice(wf.indexOf('- name: Screenshots into site/img'), upload);
+    expect(step, 'the screenshot step').toContain('site-shots.mjs');
+    expect(fatal(step), 'must fail the deploy when a shot fails').toBe(true);
     // #2099 brings the script. Red until it is on main, so this cannot merge first and break every deploy.
     expect(existsSync(new URL('../../scripts/site-shots.mjs', import.meta.url)), 'scripts/site-shots.mjs (#2088) is on this branch').toBe(true);
   });
@@ -79,12 +85,26 @@ const OFFICIAL_LINK = new RegExp(`<a\\b(?=[^>]*\\srel=(["'])noopener\\1)([^>]*?\
 function offSite(html: string): string[] {
   const bad: string[] = [];
   for (const m of html.matchAll(/<script\b([^>]*)>/gi)) if (!/^\s*type="application\/ld\+json"\s*$/.test(m[1])) bad.push(`<script${m[1]}>`);
+  for (const [tag] of html.matchAll(/<[a-z][^>]*>/gi)) for (const [h] of tag.matchAll(/(?<=\s)on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi)) bad.push(h);   // an inline handler is script by another name (#2105)
+  for (const [j] of html.matchAll(/javascript:[^"'\s>]*/gi)) bad.push(j);
   const urls = html.replace(STORE_LINK, '$1$2$2').replace(OFFICIAL_LINK, '<a$2$3$3').replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
   for (const [u] of urls) if (!SITE_ORIGINS.some(o => u === o || u.startsWith(`${o}/`))) bad.push(u);
   return bad;
 }
 const sitePages = (dir = 'website'): string[] => readdirSync(new URL(`../../${dir}`, import.meta.url), { withFileTypes: true })
   .flatMap(e => e.isDirectory() ? sitePages(`${dir}/${e.name}`) : /\.(html|css)$|^llms\.txt$/.test(e.name) ? [`${dir}/${e.name}`] : []);   // not fonts/OFL.txt: the font licence, which no page loads
+
+describe('the screenshot-step rail sees a non-fatal step (#2105)', () => {
+  it('flags continue-on-error, an if:, || true and set +e', () => {
+    const ok = '      - name: Screenshots into site/img\n        run: |\n          node scripts/site-shots.mjs a b\n';
+    expect(fatal(ok)).toBe(true);
+    expect(fatal(ok.replace('        run:', '        continue-on-error: true\n        run:'))).toBe(false);
+    expect(fatal(ok.replace('        run:', "        if: always()\n        run:"))).toBe(false);
+    expect(fatal(ok.replace('a b\n', 'a b || true\n'))).toBe(false);
+    expect(fatal(ok.replace('a b\n', 'a b || :\n'))).toBe(false);
+    expect(fatal('set +e\n' + ok)).toBe(false);
+  });
+});
 
 describe('website/ loads nothing from another origin and runs no script (#1933, #1935)', () => {
   it('flags a script, a foreign or plain-http origin and a protocol-relative URL, and passes the allowed ones', () => {
@@ -112,6 +132,14 @@ describe('website/ loads nothing from another origin and runs no script (#1933, 
     expect(offSite('<a rel="noopener" href="https://www.bbc.co.uk/bitesize">BBC</a>')).toEqual(['https://www.bbc.co.uk/bitesize']);
     expect(offSite('<a rel="noopener" href="https://gov.uk.evil.com/">x</a><a rel="noopener" href="https://sub.ico.org.uk/">y</a>'))
       .toEqual(['https://gov.uk.evil.com/', 'https://sub.ico.org.uk/']);
+  });
+  it('flags an inline event handler and a javascript: URL, however the attribute is spelled (#2105)', () => {
+    expect(offSite('<button onclick="menu()">')).toEqual(['onclick="menu()"']);
+    expect(offSite("<img src='/a.png' onerror='x()'>")).toEqual(["onerror='x()'"]);
+    expect(offSite('<body\nONLOAD=go()>')).toEqual(['ONLOAD=go()']);
+    expect(offSite('<a href="javascript:void(0)">')).toEqual(['javascript:void(0)']);
+    expect(offSite('<a href=" JavaScript:x()">')).toEqual(['JavaScript:x()']);
+    expect(offSite('<p>one online shop, a button that says on=ready</p> <a data-on="x" href="/a/">')).toEqual([]);
   });
   it('every page, the stylesheet and llms.txt under website/ pass', () => {
     const files = sitePages();
