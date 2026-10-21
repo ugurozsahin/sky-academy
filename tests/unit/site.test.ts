@@ -21,7 +21,7 @@ const noindex = (html: string) => /<meta name="robots" content="[^"]*\bnoindex\b
 /** Every address a page points at on this site: `href`/`src` attributes, CSS `url()`, and every absolute
  *  sharpwise.co.uk URL anywhere in the file (Open Graph, JSON-LD). Other origins are pages.test.ts's business. */
 function links(text: string): string[] {
-  const out = [...text.matchAll(/\s(?:href|src)="([^"]*)"|url\(\s*["']?([^"')]+)["']?\s*\)/gi)].map(m => m[1] ?? m[2]);
+  const out = [...text.matchAll(/\s(?:href|src)=(["'])(.*?)\1|url\(\s*["']?([^"')]+)["']?\s*\)/gi)].map(m => m[2] ?? m[3]);
   for (const [u] of text.matchAll(/https:\/\/sharpwise\.co\.uk(?=[/"'\s<)]|$)[^\s"'<>)]*/g)) out.push(u);
   return out.filter(u => !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(u) || u.startsWith(`${ORIGIN}/`) || u === ORIGIN);
 }
@@ -39,7 +39,7 @@ function dead(link: string, from: string): string {
   const file = `website${path.endsWith('/') ? `${path}index.html` : path}`;
   if (!existsSync(new URL(file, root)) || !statSync(new URL(file, root)).isFile()) return `${link}: no ${file}`;
   // A fragment on a page must name an id there. JSON-LD's "@id": ".../#organization" is a name, never a jump.
-  if (!abs && url.hash && file.endsWith('.html') && !read(file).includes(`id="${decodeURIComponent(url.hash.slice(1))}"`)) {
+  if (!abs && url.hash && file.endsWith('.html') && !read(file).includes(` id="${decodeURIComponent(url.hash.slice(1))}"`)) {
     return `${link}: no id="${url.hash.slice(1)}" in ${file}`;
   }
   return '';
@@ -73,10 +73,11 @@ describe('every page under website/ (#2087)', () => {
   });
   it('flags a dead page, file, fragment and screenshot, and passes the ones that resolve', () => {
     const page = '<a href="/nope/"> <link href="/gone.css"> <a href="#top"> <img src="/img/nope-phone.webp"> <a href="/play/x.html">' +
-      ` <meta content="${ORIGIN}/missing.jpg"> <a href="about/">`;
+      ` <meta content="${ORIGIN}/missing.jpg"> <a href="about/"> <a href='/single/'> <a href="#skip">`;
     expect(deadLinks('website/index.html', page)).toEqual([
       '/nope/: no website/nope/index.html', '/gone.css: no website/gone.css', '#top: no id="top" in website/index.html',
       '/img/nope-phone.webp: not in the site-shots.mjs shot list (#2088)', '/play/x.html: only /play/ itself is known to exist',
+      "/single/: no website/single/index.html", '#skip: no id="skip" in website/index.html',
       `${ORIGIN}/missing.jpg: no website/missing.jpg`,
     ]);
     expect(deadLinks('website/about/index.html', '<a href="../curriculum/"> <a href="/#main"> <img src="/img/slice-desktop.webp">' +
