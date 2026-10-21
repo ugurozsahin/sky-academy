@@ -24,6 +24,10 @@ const words = (s: string) => s.split(' ').filter(w => /[\p{L}\p{N}]/u.test(w)).l
 const tooLong = (html: string) => sentences(html).filter(s => words(s) > MAX_WORDS);
 
 describe('/guides/play/ (#2094)', () => {
+  it('reads the real <main>, not a quote of it', () => {
+    expect(page.indexOf('<main id="main"')).toBeGreaterThan(page.indexOf('</header>'));
+    expect(page.indexOf('</main>')).toBeGreaterThan(page.indexOf('<main id="main"'));
+  });
   it('flags a sentence over 12 words, in the text or in an alt text, and passes a short one', () => {
     expect(tooLong('<p>Slice it. Then slice the next one.</p><img alt="A short alt.">')).toEqual([]);
     const long = 'One two three four five six seven eight nine ten eleven twelve thirteen.';
@@ -45,7 +49,7 @@ describe('/guides/play/ (#2094)', () => {
     const css = read('website/site.css');
     const classes = new Set([...main.matchAll(/\bclass="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/)));
     expect(classes.size).toBeGreaterThan(5);
-    for (const c of classes) expect(css, c).toMatch(new RegExp(`\\.${c}\\b`));
+    for (const c of classes) expect(css, c).toMatch(new RegExp(`\\.${c}(?![\\w-])`));
   });
   it('shows only deploy-time screenshots, each with an alt text', () => {
     const imgs = [...main.matchAll(/<img\b[^>]*>/g)].map(m => m[0]);
