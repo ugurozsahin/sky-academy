@@ -36,7 +36,7 @@ function links(text: string): string[] {
 /** An address attribute written without quotes: the link rail cannot read it, so it is a failure, not a skip. */
 const unquoted = (text: string) => [...uncommented(text).matchAll(/\s(?:href|src|srcset|imagesrcset|poster)\s*=\s*[^\s"'>]/gi)].map(m => m[0].trim());
 
-const hasId = (html: string, id: string) => new RegExp(`\\sid=(["'])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1`).test(uncommented(html));
+const hasId = (html: string, id: string) => new RegExp(`\\sid\\s*=\\s*(["'])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1`).test(uncommented(html));
 
 /** Why `link`, found in `from` (a path under website/), would not load once deployed; '' when it would. */
 function dead(link: string, from: string): string {
@@ -107,6 +107,10 @@ describe('every page under website/ (#2087)', () => {
       '/gone.png: no website/gone.png', '/img/nope2.webp: not in the site-shots.mjs shot list (#2088)',
       '#ghost: no id="ghost" in website/index.html', '/about: no website/about (add the trailing slash)',
     ]);
+    expect(hasId("<p id='faq'>", 'faq')).toBe(true);
+    expect(hasId('<p id = "faq">', 'faq')).toBe(true);
+    expect(hasId('<!-- <p id="ghost"> -->', 'ghost')).toBe(false);
+    expect(hasId('<p data-id="x">', 'x')).toBe(false);
     expect(unquoted('<a href=/x/> <img src = y.png> <a href="/ok/">')).toEqual(['href=/', 'src = y']);
     expect(deadLinks('website/about/index.html', '<a href="../curriculum/"> <a href="/#main"> <img src="/img/slice-desktop.webp">' +
       ` <a href="mailto:a@b.c"> <a href="https://play.google.com/store"> "@id": "${ORIGIN}/#organization"`)).toEqual([]);
