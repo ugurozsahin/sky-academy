@@ -10,3 +10,5 @@
 
 - [Home](https://sharpwise.co.uk/): what Sharpwise is, who it is for and the years it covers
 - [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
+- [Guides](https://sharpwise.co.uk/guides/): the guides to Sharpwise, starting with the parents' guide
+- [Parents' guide](https://sharpwise.co.uk/guides/parents/): installing Sharpwise like an app, the grown-ups' area, a ninja for each child, moving a save to another device, starting again, settings, Ninja Duel and offline play
