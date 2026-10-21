@@ -1,6 +1,6 @@
 /** `source`: a file under src/ or tests/ that exists (`featureProblems` checks it). */
 export interface FeatureToday { title: string; blurb: string; source: string }
-/** `issue`: a positive whole number, the open issue that tracks the plan (`featureProblems` checks it). */
+/** `issue`: a positive whole number, the issue that tracks the plan. `featureProblems` checks only that it is a number; the reviewer checks it is still open. */
 export interface FeatureLater { title: string; blurb: string; issue: number }
 export interface FeaturesData { today: FeatureToday[]; later: FeatureLater[] }
 /** Every rule the data breaks, as readable lines; empty when it is sound. `exists` answers for a repo path. */
