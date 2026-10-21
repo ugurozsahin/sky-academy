@@ -57,6 +57,14 @@ describe('the About page (#2091)', () => {
     expect(said.length).toBeGreaterThan(3);
     for (const t of said) expect(t.match(PROMISE_WORDS)?.[0], t).toBeUndefined();
   });
+  it('JSON-LD in <head> makes no promise either: every string value is held to the same words', () => {
+    const head = page.slice(0, page.indexOf('</head>')).replace(/<!--[\s\S]*?-->/g, '');
+    const strings = (v: unknown): string[] => typeof v === 'string' ? [v]
+      : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
+    const said = [...head.matchAll(/<script\b[^>]*\btype=["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script\s*>/gi)]
+      .flatMap(m => strings(JSON.parse(m[1])));
+    for (const t of said) expect(t.match(PROMISE_WORDS)?.[0], t).toBeUndefined();
+  });
   it('every promise on the page appears, word for word, in aboutLines()', () => {
     const game = aboutLines();
     for (const p of promises) expect(game, p).toContain(p);
