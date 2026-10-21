@@ -210,7 +210,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
     <p class="p-note">Everything above is read from this device, and the code never leaves it — nothing is uploaded and there are no accounts. (Time-on-task isn't recorded yet.)</p>
 
     <div class="p-reset">
-      <p class="p-reset-say">Handing the tablet to a different child, or want a fresh start? This clears everything on this device.</p>
+      <p class="p-reset-say">Handing the tablet to a different child, or want a fresh start? This clears this ninja’s progress. Other ninjas on the device keep theirs.</p>
       <button class="btn bad" id="start-again">Start again</button>
     </div>`;
 }
@@ -220,7 +220,7 @@ function resetConfirmHTML(): string {
   return `
       <div class="modal reset-modal">
         <h2>Start again?</h2>
-        <p>This clears everything on this device: progress, stars, coins, stickers, streak, name and ninja. It cannot be undone once you leave this screen.</p>
+        <p>This clears everything saved for this ninja: progress, stars, coins, stickers, streak, name and ninja. Other ninjas on this device are not touched. It cannot be undone once you leave this screen.</p>
         <label class="reset-label" for="reset-word">Type ${RESET_WORD} to confirm</label>
         <input id="reset-word" class="gate-input reset-input" type="text" autocomplete="off" autocapitalize="characters" aria-label="Type ${RESET_WORD} to confirm">
         <div class="reset-actions">
@@ -235,7 +235,7 @@ function resetDoneHTML(): string {
   return `
       <div class="modal reset-modal">
         <h2>All cleared</h2>
-        <p>This device is back to a fresh start. You can undo this until you leave this screen — after that it is gone.</p>
+        <p>This ninja is back to a fresh start. You can undo this until you leave this screen — after that it is gone.</p>
         <div class="reset-actions">
           <button class="btn" id="reset-undo">Undo</button>
           <button class="btn primary" id="reset-continue">Continue</button>
