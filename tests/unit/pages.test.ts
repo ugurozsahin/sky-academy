@@ -67,12 +67,15 @@ describe('GitHub Pages deployment (#1933)', () => {
  * `https?://` at all; canonical, Open Graph and JSON-LD need absolute URLs, so the rule is now "no origin but
  * sharpwise.co.uk", plus the two store badge links and JSON-LD's own `@context` (a vocabulary name, never fetched).
  * The one script allowed is a JSON-LD data block, which no browser runs. Owner-approved on #1925.
+ * #2087/#2105: the stores are allowed as the `href` of a link only, never as a source. Google's own badge snippet
+ * hot-links its picture from play.google.com, which would load a file from Google on every visit.
  */
-const SITE_ORIGINS = ['https://sharpwise.co.uk', 'https://play.google.com', 'https://apps.apple.com'];
+const SITE_ORIGINS = ['https://sharpwise.co.uk'];
+const STORE_LINK = /(<a\b[^>]*?\shref=)(["'])https:\/\/(?:play\.google\.com|apps\.apple\.com)\/[^"']*\2/gi;
 function offSite(html: string): string[] {
   const bad: string[] = [];
   for (const m of html.matchAll(/<script\b([^>]*)>/gi)) if (!/^\s*type="application\/ld\+json"\s*$/.test(m[1])) bad.push(`<script${m[1]}>`);
-  const urls = html.replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
+  const urls = html.replace(STORE_LINK, '$1$2$2').replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
   for (const [u] of urls) if (!SITE_ORIGINS.some(o => u === o || u.startsWith(`${o}/`))) bad.push(u);
   return bad;
 }
@@ -87,6 +90,14 @@ describe('website/ loads nothing from another origin and runs no script (#1933, 
     expect(offSite('<a href="https://schema.org/VideoGame">')).toEqual(['https://schema.org/VideoGame']);   // only as @context
     expect(offSite('<script type="application/ld+json">{"@context": "https://schema.org", "url": "https://sharpwise.co.uk/"}</script>' +
       '<a href="https://play.google.com/store/apps/details?id=x"></a><a href="https://apps.apple.com/gb/app/id1">')).toEqual([]);
+  });
+  it('allows a store only as a link, so its badge picture cannot be hot-linked (#2105)', () => {
+    const google = "<a href='https://play.google.com/store/apps/details?id=uk.co.sharpwise'><img alt='Get it on Google Play' " +
+      "src='https://play.google.com/intl/en_gb/badges/static/images/badges/en_badge_web_generic.png'/></a>";
+    expect(offSite(google)).toEqual(['https://play.google.com/intl/en_gb/badges/static/images/badges/en_badge_web_generic.png']);
+    expect(offSite('<link rel="preconnect" href="https://apps.apple.com"> <a data-x href="https://apps.apple.com/gb/app/id1">'))
+      .toEqual(['https://apps.apple.com']);
+    expect(offSite('<a class="badge" href="https://apps.apple.com/gb/app/id1"><img src="/badges/app-store.svg" alt="Download on the App Store"></a>')).toEqual([]);
   });
   it('every page, the stylesheet and llms.txt under website/ pass', () => {
     const files = sitePages();
