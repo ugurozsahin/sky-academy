@@ -112,7 +112,7 @@ export function renderCurriculumPage(map, home) {
     '  <div class="wrap">',
     '    <h1 id="page-title">What Sharpwise covers</h1>',
     `    <p class="lede">Sharpwise has ${map.topicCount} maths and English topics, from Reception to Year 6. Each one is listed below under its school year, with the part of the curriculum it practises.</p>`,
-    '    <p>Reception topics follow the EYFS Early Learning Goals. Years 1 to 6 follow the National Curriculum for England. This page is made from the game\'s own list of topics, so it changes when the game does.</p>',
+    '    <p>Reception topics follow the EYFS Early Learning Goals. Years 1 to 6 follow the <a href="https://www.gov.uk/government/collections/national-curriculum" rel="noopener">National Curriculum for England</a>. This page is made from the game\'s own list of topics, so it changes when the game does.</p>',
     `    <p>${covered} of the ${map.coverage.length} parts of the curriculum we track have at least one topic. Each year ends with the parts that are not covered yet.</p>`,
     indent(yearIndex(map), 4),
     '  </div>',

@@ -65,17 +65,21 @@ describe('GitHub Pages deployment (#1933)', () => {
 /**
  * #1935: website/ is script-free and loads nothing from anyone else. Before the site shell this rail forbade any
  * `https?://` at all; canonical, Open Graph and JSON-LD need absolute URLs, so the rule is now "no origin but
- * sharpwise.co.uk", plus the two store badge links and JSON-LD's own `@context` (a vocabulary name, never fetched).
+ * sharpwise.co.uk", plus the two store badge links, two official-site links (#2132) and JSON-LD's own `@context` (a vocabulary name, never fetched).
  * The one script allowed is a JSON-LD data block, which no browser runs. Owner-approved on #1925.
  * #2087/#2105: the stores are allowed as the `href` of a link only, never as a source. Google's own badge snippet
  * hot-links its picture from play.google.com, which would load a file from Google on every visit.
  */
 const SITE_ORIGINS = ['https://sharpwise.co.uk'];
 const STORE_LINK = /(<a\b[^>]*?\shref=)(["'])https:\/\/(?:play\.google\.com|apps\.apple\.com)\/[^"']*\2/gi;
+/** #2132: plain outbound links to two official sites (owner, 2026-10-21): an exact, explicit list of hosts, as the `href`
+ *  of an `<a>` that also carries `rel="noopener"`, never a source, `srcset`, `<link>`, CSS or JSON-LD. A new host is a new owner decision. */
+const OFFICIAL_HOSTS = ['ico.org.uk', 'www.gov.uk'];
+const OFFICIAL_LINK = new RegExp(`<a\\b(?=[^>]*\\srel=(["'])noopener\\1)([^>]*?\\shref=)(["'])https://(?:${OFFICIAL_HOSTS.map(h => h.replace(/\./g, '\\.')).join('|')})/[^"']*\\3`, 'gi');
 function offSite(html: string): string[] {
   const bad: string[] = [];
   for (const m of html.matchAll(/<script\b([^>]*)>/gi)) if (!/^\s*type="application\/ld\+json"\s*$/.test(m[1])) bad.push(`<script${m[1]}>`);
-  const urls = html.replace(STORE_LINK, '$1$2$2').replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
+  const urls = html.replace(STORE_LINK, '$1$2$2').replace(OFFICIAL_LINK, '<a$2$3$3').replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
   for (const [u] of urls) if (!SITE_ORIGINS.some(o => u === o || u.startsWith(`${o}/`))) bad.push(u);
   return bad;
 }
@@ -98,6 +102,16 @@ describe('website/ loads nothing from another origin and runs no script (#1933, 
     expect(offSite('<link rel="preconnect" href="https://apps.apple.com"> <a data-x href="https://apps.apple.com/gb/app/id1">'))
       .toEqual(['https://apps.apple.com']);
     expect(offSite('<a class="badge" href="https://apps.apple.com/gb/app/id1"><img src="/badges/app-store.svg" alt="Download on the App Store"></a>')).toEqual([]);
+  });
+  it('allows ico.org.uk and www.gov.uk only as a noopener link, never as a source or from another host (#2132)', () => {
+    expect(offSite('<a href="https://ico.org.uk/make-a-complaint/" rel="noopener">ICO</a>' +
+      '<a rel="noopener" href=\'https://www.gov.uk/government/collections/national-curriculum\'>NC</a>')).toEqual([]);
+    expect(offSite('<img src="https://www.gov.uk/logo.png" alt="">')).toEqual(['https://www.gov.uk/logo.png']);
+    expect(offSite('<link rel="stylesheet" href="https://ico.org.uk/a.css">')).toEqual(['https://ico.org.uk/a.css']);
+    expect(offSite('<a href="https://ico.org.uk/x">no rel</a>')).toEqual(['https://ico.org.uk/x']);
+    expect(offSite('<a rel="noopener" href="https://www.bbc.co.uk/bitesize">BBC</a>')).toEqual(['https://www.bbc.co.uk/bitesize']);
+    expect(offSite('<a rel="noopener" href="https://gov.uk.evil.com/">x</a><a rel="noopener" href="https://sub.ico.org.uk/">y</a>'))
+      .toEqual(['https://gov.uk.evil.com/', 'https://sub.ico.org.uk/']);
   });
   it('every page, the stylesheet and llms.txt under website/ pass', () => {
     const files = sitePages();
