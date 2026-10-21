@@ -118,6 +118,9 @@ const ldString = (s) => JSON.stringify(s).replaceAll('<', '\\u003c');
 const ldList = (type, head, items) => ['  <script type="application/ld+json">', '  {', '    "@context": "https://schema.org",',
   `    "@type": "${type}",`, ...head, '    "itemListElement": [', items.join(',\n'), '    ]', '  }', '  </script>', ''].join('\n');
 
+/** What a year page says a topic practises: its objective in plain words, or its area's name when only a code is left. */
+export const topicWords = (map, t) => plainObjective(t.nc) || areaName(map.coverage.find(c => c.id === t.strands[0]).name);
+
 /**
  * A one-line taste of a year (#2161): the first topic of its first two maths areas and of its first English area,
  * in the year page's plain words. Only the first clause of each, so a `;` inside one never reads as a separator.
@@ -125,8 +128,7 @@ const ldList = (type, head, items) => ['  <script type="application/ld+json">', 
 export function tasteOf(map, year) {
   const firsts = (subject) => map.coverage.filter(c => c.subject === subject && c.years.includes(year.year))
     .map(c => map.topics.find(t => t.year === year.year && t.subject === subject && t.strands[0] === c.id)).filter(Boolean);
-  const words = (t) => plainObjective(t.nc) || areaName(map.coverage.find(c => c.id === t.strands[0]).name);
-  return [...firsts('maths').slice(0, 2), ...firsts('writing').slice(0, 1)].map(t => words(t).split(';')[0].trim());
+  return [...firsts('maths').slice(0, 2), ...firsts('writing').slice(0, 1)].map(t => topicWords(map, t).split(';')[0].trim());
 }
 
 /** One year's card on /curriculum/: its name as the link to its page, its two counts, and the taste. */
@@ -188,12 +190,12 @@ export function plainObjective(nc) {
 }
 
 /** One curriculum area on a year page: its topics in plain words, then each distinct home tip once. */
-function areaBlock(area, topics) {
+function areaBlock(map, area, topics) {
   const tips = [...new Set(topics.map(t => t.tip).filter(Boolean))];
   return [
     `<h3>${esc(areaName(area.name))}</h3>`,
     '<dl class="facts">',
-    ...topics.map(t => `  <div><dt>${esc(t.title)}</dt><dd>${esc(plainObjective(t.nc) || areaName(area.name))}</dd></div>`),
+    ...topics.map(t => `  <div><dt>${esc(t.title)}</dt><dd>${esc(topicWords(map, t))}</dd></div>`),
     '</dl>',
     ...(tips.length ? ['<p class="note">Try at home:</p>', '<ul>', ...tips.map(tip => `  <li>${esc(tip)}</li>`), '</ul>'] : []),
   ];
@@ -209,7 +211,7 @@ function subjectSection(map, year, subject) {
     `<p>${topicWord(rows.length)}, grouped by the part of the curriculum each one practises.</p>`];
   for (const area of map.coverage.filter(c => c.subject === subject && c.years.includes(year.year))) {
     const inArea = rows.filter(t => t.strands[0] === area.id);
-    if (inArea.length) body.push(...areaBlock(area, inArea));
+    if (inArea.length) body.push(...areaBlock(map, area, inArea));
   }
   return section(id, body);
 }

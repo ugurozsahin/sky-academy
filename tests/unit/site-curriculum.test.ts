@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TOPICS, YEARS } from '../../src/curriculum';
-import { esc, plainObjective, renderCurriculumPage, tasteOf, yearPath, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
+import { esc, renderCurriculumPage, tasteOf, topicWords, yearPath, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 const map: ContentMap = JSON.parse(read('docs/content-map.json'));
@@ -83,11 +83,12 @@ describe('each card gives a taste of its year in plain words (#2161)', () => {
       const taste = tasteOf(map, y);
       expect(taste, y.year).toHaveLength(3);
       const said = (subject: string) => map.topics.filter(t => t.year === y.year && t.subject === subject)
-        .map(t => (plainObjective(t.nc) || '').split(';')[0].trim());
+        .map(t => topicWords(map, t).split(';')[0].trim());
       expect(said('maths'), `${y.year}: ${taste[0]}`).toContain(taste[0]);
       expect(said('maths'), `${y.year}: ${taste[1]}`).toContain(taste[1]);
       expect(said('writing'), `${y.year}: ${taste[2]}`).toContain(taste[2]);
       expect(new Set(taste).size, `${y.year}: three different topics`).toBe(3);
+      expect(taste.every(w => w !== ''), `${y.year}: no empty item`).toBe(true);
       expect(cards().find(c => c.href === yearPath(y.year))!.body, y.year).toContain(`<p>For example: ${taste.map(esc).join('; ')}.</p>`);
     }
   });
