@@ -1,6 +1,6 @@
 # Website and hosting (#1925, #1933)
 
-`https://sharpwise.co.uk/` is the site (today a one-line holding page, `website/index.html`); `https://sharpwise.co.uk/play/` is the game.
+`https://sharpwise.co.uk/` is the site (`website/`, #1935); `https://sharpwise.co.uk/play/` is the game.
 `.github/workflows/pages.yml` builds both on every push to `main` and deploys with GitHub's official `actions/deploy-pages`.
 The game is built with `--base=/play/` into `site/play/`. `npm run build` is unchanged, so Android still embeds a root-based `dist/`.
 The manifest (`start_url`, `scope`, `id` are `./`), the worker registration and the precache are all relative, so the PWA is scoped to `/play/`.
@@ -52,7 +52,9 @@ Never measured yet: whether Pages serves the extensionless `apple-app-site-assoc
 
 - The service worker's cache name is derived from the build's contents, so each deployment replaces the previous cache.
 - If custom headers are ever needed, Cloudflare Pages is the free fallback ([headers](https://developers.cloudflare.com/pages/configuration/headers/)).
-- The holding page has no script and no third party (#1937). The promotional page (#1925) replaces `website/index.html`.
+- The site (#1935) has no script and no third party: every page under `website/` shares one header, navigation and footer and links `website/site.css`; fonts and the icon are copies of the game's. The only absolute URLs are `https://sharpwise.co.uk/` and the store badge links (`tests/unit/pages.test.ts`).
+- The deploy installs Chromium, serves the assembled `site/` on port 4173 and runs `scripts/site-shots.mjs` into `site/img/`, which the pages show as `/img/<name>.webp` (#2088). Nothing under `website/img/` is committed.
+- Pages not built yet (curriculum, features, guides, about, privacy, support) are one-line `noindex` placeholders on the shell, so no navigation link is dead; each one's issue replaces it.
 
 ## Screenshots (#2088)
 

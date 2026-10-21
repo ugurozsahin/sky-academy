@@ -28,6 +28,17 @@ jobs:
         run: node scripts/app-links.mjs site
         env:
           ANDROID_APP_LINKS_SHA256: ${{ vars.ANDROID_APP_LINKS_SHA256 }}
+      # #2088/#1935: the pages' screenshots are made here, from the site just assembled, and never committed.
+      - name: Drop the apt sources we do not use (#85)
+        run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
+      - name: Install Chromium for the screenshots
+        run: npx playwright install --with-deps chromium
+      - name: Screenshots into site/img (#2088)
+        run: |
+          python3 -m http.server 4173 --directory site >"$RUNNER_TEMP/http.log" 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:4173/play/ >/dev/null && break; sleep 1; done
+          curl -sf http://localhost:4173/play/ >/dev/null || { cat "$RUNNER_TEMP/http.log"; echo "the local server never answered"; exit 1; }
+          node scripts/site-shots.mjs http://localhost:4173/play/ site/img
       - uses: actions/upload-pages-artifact@v5
         # v4 dropped every dotfile with no way back, so .well-known/assetlinks.json never shipped (#2085)
         with: { path: site, include-hidden-files: true }
