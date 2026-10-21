@@ -1,26 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { shotFiles } from '../../scripts/site-shots.mjs';
-import { YEARS } from '../../src/curriculum';
-import { starsForAccuracy } from '../../src/game/session';
+import { YEARS, topicById, type YearInfo } from '../../src/curriculum';
+import { Session, starsForAccuracy, type SessionEvents } from '../../src/game/session';
 import { MODES, type EndCtx } from '../../src/game/modes';
-import { buy } from '../../src/game/shop';
-import { ACHIEVEMENTS, STICKER_COST, stickersFor } from '../../src/storage/stickers';
+import { DEFAULT } from '../../src/storage/shape';
+import { ACHIEVEMENTS, STICKER_COST, evaluateStickers, stickersFor } from '../../src/storage/stickers';
+import { decodeEntities } from './helpers/html-entities';
 
 /** #2094: /guides/play/, How to play for children. Short sentences, one picture per card, and every fact true of the game. */
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const page = read('website/guides/play/index.html').replace(/<!--[\s\S]*?-->/g, '');   // comments first: one may quote a tag
 const main = page.slice(page.indexOf('<main id="main"'), page.indexOf('</main>'));
-const text = main.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+const text = decodeEntities(main.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ');
 const MAX_WORDS = 12;
 
 /** Each sentence of the visible text and of every alt text: block boundaries and . ! ? end one. */
 function sentences(html: string): string[] {
-  const alts = [...html.matchAll(/\balt="([^"]*)"/g)].map(m => m[1]);
-  const blocks = html.replace(/<(?:\/?(?:p|h[1-6]|li|figcaption|div|section|figure)\b)[^>]*>/g, '\n').replace(/<[^>]+>/g, ' ').split('\n');
+  const alts = [...html.matchAll(/\balt=(["'])(.*?)\1/g)].map(m => decodeEntities(m[2]));
+  const blocks = decodeEntities(html.replace(/<(?:\/?(?:p|h[1-6]|li|figcaption|div|section|figure)\b)[^>]*>/g, '\n').replace(/<[^>]+>/g, ' ')).split('\n');
   return [...blocks, ...alts].flatMap(b => b.split(/(?<=[.!?])\s+/)).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
-const words = (s: string) => s.split(' ').filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+const words = (s: string) => s.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
 const tooLong = (html: string) => sentences(html).filter(s => words(s) > MAX_WORDS);
 
 describe('/guides/play/ (#2094)', () => {
@@ -35,6 +36,9 @@ describe('/guides/play/ (#2094)', () => {
     expect(tooLong(`<img src="/x" alt="${long}">`)).toEqual([long]);
     expect(tooLong(`<h2>${long.slice(0, -1)}</h2>`)).toEqual([long.slice(0, -1)]);
     expect(tooLong('<p>One two three four five six <a href="/">seven eight nine ten eleven twelve</a> thirteen.</p>'), 'a link is part of its sentence')
+      .toHaveLength(1);
+    expect(tooLong(`<img alt='${long}'>`), 'a single-quoted alt').toEqual([long]);
+    expect(tooLong('<p>One two three four five six seven&nbsp;eight nine&#160;ten eleven twelve thirteen.</p>'), 'a no-break space parts two words')
       .toHaveLength(1);
   });
   it('keeps every sentence on the page to 12 words or fewer', () => {
@@ -64,11 +68,46 @@ describe('/guides/play/ (#2094)', () => {
 /** The page quotes numbers and rules from the game. If the game changes, this fails and the page is rewritten. */
 describe('/guides/play/ says only what the game does (#2094)', () => {
   const reception = YEARS.find(y => y.id === 'reception')!, rest = YEARS.filter(y => y.id !== 'reception');
-  it('hearts: Reception has four and a miss is free; every other year has three and a miss costs one', () => {
+  it('hearts: Reception has four and every other year three; only Reception keeps its gentle rule', () => {
     expect([reception.lives, reception.gentle]).toEqual([4, true]);
     for (const y of rest) expect([y.id, y.lives, y.gentle]).toEqual([y.id, 3, false]);
     expect(text).toContain('Reception has four hearts. Year 1 and up have three.');
-    expect(text).toContain('From Year 1, letting the right bubble float away loses one too.');
+  });
+  /** A mission in `year`, started: its first question is up and nothing is answered yet. */
+  const mission = (year: YearInfo, topic: string) => {
+    const ev = new Proxy({}, { get: () => () => {} }) as SessionEvents;
+    const s = new Session({ mode: 'mission', year, topic: topicById(topic)!, rng: () => 0.42 }, ev);
+    s.start();
+    return s;
+  };
+  const Y1 = YEARS.find(y => y.id === 'year1')!;
+  const cases = [[reception, 'r-count'], [Y1, 'y1-add']] as const;
+  it('hearts: a wrong slice costs one in every year', () => {
+    for (const [y, t] of cases) {
+      const s = mission(y, t);
+      expect(s.hit('not the answer'), y.id).toBe('wrong');
+      expect(s.lives, y.id).toBe(y.lives - 1);
+    }
+    expect(text).toContain('A wrong slice loses one heart.');
+  });
+  it('hearts: the right bubble falling off the bottom costs one from Year 1, and nothing in Reception', () => {
+    for (const [y, t] of cases) {
+      const s = mission(y, t);
+      s.fall(s.current!.answer);
+      expect(s.lives, y.id).toBe(y.gentle ? y.lives : y.lives - 1);
+    }
+    expect(text).toContain('From Year 1, missing the right bubble costs one too. A missed bubble falls off the bottom of the screen.');
+  });
+  it('hearts: clearing a stage gives a lost heart back', () => {
+    for (const [y, t] of cases) {
+      const s = mission(y, t);
+      s.hit('not the answer'); s.advance();
+      for (let i = 1; i < y.perStage; i++) { s.hit(s.current!.answer); s.advance(); }
+      expect([s.stage, s.lives], y.id).toEqual([1, y.lives - 1]);
+      s.nextStage();
+      expect([s.stage, s.lives], y.id).toEqual([2, y.lives]);
+    }
+    expect(text).toContain('Lost a heart? Clear the stage to get one back.');
   });
   it('stars: five stages a mission, and three stars only when every answer in a stage is right', () => {
     for (const y of YEARS) {
@@ -93,12 +132,16 @@ describe('/guides/play/ says only what the game does (#2094)', () => {
   });
   it('stickers: the first three at 30, 70 and 120 coins; Hammer Man and a three-day streak earn others', () => {
     expect(STICKER_COST).toEqual([30, 70, 120]);
+    expect([29, 30, 70, 120].map(c => stickersFor(c).length)).toEqual([0, 1, 2, 3]);
     expect(text).toContain('Collect 30 coins for your first sticker.');
     expect(text).toContain('Two more come at 70 and 120 coins.');
     expect(ACHIEVEMENTS.map(a => a.title)).toEqual(expect.arrayContaining(['Beat Hammer Man once', '3-day streak']));
-    // Stickers read the coins ever earned; buying in the shop adds to `spent` and leaves that total alone.
-    const spent = buy({ coins: 200, spent: 0, owned: [], equipped: {} }, 'trail-gold');
-    expect([spent.ok, spent.wallet.coins, stickersFor(spent.wallet.coins)]).toEqual([true, 200, stickersFor(200)]);
     expect(text).toContain('Spending coins never takes a sticker away.');
+  });
+  it('stickers: spending every coin keeps every sticker already held', () => {
+    const earned = evaluateStickers({ ...DEFAULT, coins: 120 });
+    expect(earned).toEqual(stickersFor(120));
+    expect(evaluateStickers({ ...DEFAULT, coins: 120, spent: 120, stickers: earned })).toEqual(earned);
+    expect(evaluateStickers({ ...DEFAULT, coins: 0, spent: 0, stickers: earned }), 'held even if the coins behind them were gone').toEqual(earned);
   });
 });
