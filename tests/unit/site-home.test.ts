@@ -50,7 +50,8 @@ describe('the site shell is the same on every page (#1935)', () => {
   });
   it('on every page, each navigation link to that page, and no other, is marked as the current page', () => {
     for (const p of all) {
-      const html = read(p), path = p.replace(/^website/, '').replace(/index\.html$/, '');
+      // The shell only: a page's own navigation in main (the year switcher, #2160) has its own rail.
+      const html = read(p).replace(/<main\b[\s\S]*<\/main>/, ''), path = p.replace(/^website/, '').replace(/index\.html$/, '');
       const nav = [...html.matchAll(/<li><a href="([^"]+)"( aria-current="page")?>/g)];
       expect(nav.length, p).toBe(8);
       for (const [, href, current] of nav) expect(Boolean(current), `${p}: ${href}`).toBe(href === path);
