@@ -172,17 +172,27 @@ ${map.byYear.map(y => indent(renderYear(map, y), 4)).join('\n\n')}` });
 }
 
 /**
+ * A spelling pattern opens the objective (`ff, ll`, `ai/ay`, `ch (Greek/French)`, `a before l`, `ough;`), so a
+ * capital would misspell it: one or two letters before a comma, slash or bracket, one letter alone, or up to four
+ * before a semicolon. `up to 4 digits`, `co-ordination` and `mass/weight` are words and still take the capital.
+ */
+const LETTER_PATTERN = /^(?:[a-z]{1,2}(?=[,/]| \()|[a-z] |[a-z]{1,4};)/;
+
+/**
  * An objective without the curriculum's shorthand (#2090): the leading `Y3 NPV:`, `ELG Number:` or bare `Y1 `
- * code and any `(3M4)`, `(Appendix 2)` or `(Development Matters …)` reference go; the words are the map's own.
+ * code and any `(3M4)`, `(Appendix 2)`, bare `Appendix 1` or `(Development Matters …)` reference go; the words are
+ * the map's own.
  * Returns '' when only a code is left (`E56-25 (App. 1 Y5–6)` gives `E56-25`), so the caller falls back to the area.
  */
 export function plainObjective(nc) {
   const words = nc
-    .replace(/^(?:ELG|EYFS|Development Matters|Y\d)[^:]*:\s*/, '')
+    .replace(/^(?:ELG|EYFS|Development Matters|Y\d)[^:]{0,30}:\s*/, '')
     .replace(/^Y\d\S*\s+/, '')
     .replace(/\s*\((?:\d+M\d[^)]*|App(?:endix|\.)[^)]*|Development Matters[^)]*)\)/g, '')
+    .replace(/\bAppendix \d+\s*/g, '')
     .trim();
-  return words && !/^[A-Z]+\d/.test(words) ? words[0].toUpperCase() + words.slice(1) : '';
+  if (!words || /^[A-Z]+\d/.test(words)) return '';
+  return LETTER_PATTERN.test(words) ? words : words[0].toUpperCase() + words.slice(1);
 }
 
 /** One curriculum area on a year page: its topics in plain words, then each distinct home tip once. */
@@ -223,7 +233,7 @@ const section = (id, body) => [
 /** Home › Curriculum › this year, for search results (the guides carry the same shape, #1936). */
 function breadcrumbs(year) {
   const crumbs = [['Home', '/'], ['Curriculum', '/curriculum/'], [year.title, yearPath(year.year)]];
-  const items = crumbs.map(([name, path], i) => `      { "@type": "ListItem", "position": ${i + 1}, "name": ${JSON.stringify(name)}, "item": "${ORIGIN}${path}" }`);
+  const items = crumbs.map(([name, path], i) => `      { "@type": "ListItem", "position": ${i + 1}, "name": ${JSON.stringify(name).replaceAll('<', '\\u003c')}, "item": "${ORIGIN}${path}" }`);
   return ['  <script type="application/ld+json">', '  {', '    "@context": "https://schema.org",', '    "@type": "BreadcrumbList",',
     '    "itemListElement": [', items.join(',\n'), '    ]', '  }', '  </script>', ''].join('\n');
 }

@@ -54,7 +54,7 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
     for (const y of map.byYear) {
       for (const { dt, dd } of terms(read(fileOf(y.year)))) {
         expect(dd, `${y.year}: ${dt}`).not.toMatch(/^(?:Y\d|ELG\b|EYFS\b|Development Matters\b|E\d)/);
-        expect(dd, `${y.year}: ${dt}`).not.toMatch(/\(\d+M\d|\(App(?:endix|\.)/);
+        expect(dd, `${y.year}: ${dt}`).not.toMatch(/\d+M\d|\bApp(?:endix|\.)/);
         expect(dd.trim(), `${y.year}: ${dt}`).not.toBe('');
       }
     }
@@ -65,13 +65,31 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
       for (const t of map.topics.filter(x => x.year === y.year && x.tip)) {
         const at = html.indexOf(`<dt>${esc(t.title)}</dt>`);
         const areaEnd = html.indexOf('<h3>', at) === -1 ? html.indexOf('</section>', at) : Math.min(html.indexOf('<h3>', at), html.indexOf('</section>', at));
-        expect(html.slice(at, areaEnd), `${y.year}: ${t.title}`).toContain(`<li>${esc(t.tip!)}</li>`);
+        const area = html.slice(at, areaEnd);
+        expect(area, `${y.year}: ${t.title}`).toContain(`<li>${esc(t.tip!)}</li>`);
+        expect(area.split(`<li>${esc(t.tip!)}</li>`), `${y.year}: ${t.title}: a tip shows once per area`).toHaveLength(2);
       }
     }
   });
   it('falls back to the area name only for the one objective that is nothing but a code', () => {
     const fellBack = map.topics.filter(t => !plainObjective(t.nc)).map(t => `${t.year} ${t.title}`);
     expect(fellBack, 'give a new one real words in its nc, or add it here on purpose').toEqual(['year6 Spell the missing word']);
+    const y6 = read(fileOf('year6'));
+    expect(y6, 'it shows its area\'s name').toContain('<div><dt>Spell the missing word</dt><dd>Writing: transcription (spelling)</dd></div>');
+  });
+  it('keeps a spelling pattern that opens an objective in lower case, and only those (#2140 review)', () => {
+    const lower = map.topics.map(t => plainObjective(t.nc)).filter(p => /^[a-z]/.test(p));
+    expect(lower, 'every objective the map opens with a letter pattern, driven from the shipped map').toEqual([
+      'ff, ll, ss, zz, ck; n before k; -tch; -ve',
+      'ai/ay, oi/oy, -y endings, k before e/i/y, ph, wh',
+      'a before l, o for /ʌ/, -ey, a after w and qu, or and ar after w, s for /ʒ/',
+      'a or an according to whether the next word begins with a consonant or a vowel',
+      'ch (Greek/French), -gue/-que, sc, ei/eigh/ey',
+      'ough; ei after c',
+    ]);
+    expect(plainObjective('Y4 M&D: up to 4 digits × 1 or 2 digits'), 'a two-letter word is a word').toBe('Up to 4 digits × 1 or 2 digits');
+    expect(plainObjective('Y3 Grammar: co-ordination (and, or, but)')).toBe('Co-ordination (and, or, but)');
+    expect(plainObjective('Y1 Measurement: mass/weight')).toBe('Mass/weight');
   });
   it('plainObjective drops the code and the reference and keeps the map\'s words', () => {
     expect(plainObjective('Y3 NPV: identify, represent and estimate numbers (3M4)')).toBe('Identify, represent and estimate numbers');
@@ -81,6 +99,8 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
     expect(plainObjective('Y6 Punctuation: hyphens to avoid ambiguity (Appendix 1, Appendix 2)')).toBe('Hyphens to avoid ambiguity');
     expect(plainObjective('Y1 Spelling: contractions (I\'m, I\'ll, we\'ll)'), 'a plain bracket stays').toBe('Contractions (I\'m, I\'ll, we\'ll)');
     expect(plainObjective('E56-25 (App. 1 Y5–6)'), 'only a code left: the caller falls back').toBe('');
+    expect(plainObjective('Y3–4 Spelling: words often misspelt, Appendix 1 words 1–50'), 'a bare reference goes too').toBe('Words often misspelt, words 1–50');
+    expect(plainObjective('ELG Number: count to 10: then back'), 'only the code before the first colon goes').toBe('Count to 10: then back');
   });
   it('escapes what it prints: markup in a title, an objective or a tip comes out as text', () => {
     const odd = { ...map, topics: map.topics.map((t, i) => (i ? t : { ...t, title: '<b>Odd</b>', nc: 'Y1 X: <i>x</i>', tip: '<u>tip</u>' })) };
