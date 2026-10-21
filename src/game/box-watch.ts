@@ -19,7 +19,10 @@ export function watchBox(el: HTMLElement, onChange: () => void): () => void {
     });
   }) : null;
   measure();
+  // #2184: and the visual viewport, which a phone's toolbar can resize with no window `resize` on some browsers.
+  const vv = (window as { visualViewport?: EventTarget | null }).visualViewport ?? null;
   window.addEventListener('resize', fire);
+  vv?.addEventListener('resize', fire);
   ro?.observe(el);
-  return () => { window.removeEventListener('resize', fire); ro?.disconnect(); if (raf) cancelAnimationFrame(raf); raf = 0; };
+  return () => { window.removeEventListener('resize', fire); vv?.removeEventListener('resize', fire); ro?.disconnect(); if (raf) cancelAnimationFrame(raf); raf = 0; };
 }

@@ -3267,6 +3267,39 @@ test.describe('Sharpwise', () => {
     expect(inBox, 'a bubble was left outside the resized arena').toMatchObject({ risingOutside: 0, offSide: 0 });
   });
 
+  // #2184: a KS2 card taller than a landscape phone put `topInset` below the arena floor, so `layoutWave` had a
+  // negative rise to work with and gave every bubble negative gravity — y6-pie's bubbles crept upwards and never
+  // came down (measured at 667×375 on y4-coords, y5-transform, y6-coords, y6-pie, y6-transform and y4-area).
+  // Read off the running arena, not recomputed: the first wave's bubbles must pull down, and one of them must
+  // be seen rising above the floor, turning over inside the box, and falling back towards it.
+  test('guard rail: a landscape KS2 card cannot give a wave negative gravity — y6-pie at 667×375 rises and falls (#2184)', async ({ page }) => {
+    await page.setViewportSize({ width: 667, height: 375 });
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year6', 'y6-pie');
+    await page.waitForFunction(() => (window.__sna.arena?.bubbles.length ?? 0) > 0);
+    const wave = await page.evaluate(() => {
+      const a = window.__sna.arena!;
+      return { H: a.H, top: a.topInset, cardBottom: document.querySelector('.qcard')!.getBoundingClientRect().bottom, g: a.bubbles.map(b => b.g) };
+    });
+    console.log(`[guard rail #2184] H=${wave.H} topInset=${wave.top} cardBottom=${wave.cardBottom.toFixed(1)} g=${wave.g.map(g => g.toFixed(1)).join(',')}`);
+    for (const g of wave.g) expect(g, 'a bubble of the first wave was given zero or upward gravity').toBeGreaterThan(0);
+    const flight = await (await page.waitForFunction(() => {
+      const w = window as unknown as { __flight2184?: Record<number, { minY: number; r: number; turned: boolean; fell: boolean }> };
+      const seen = w.__flight2184 ??= {}, a = window.__sna.arena!;
+      for (const b of a.bubbles) {
+        if (!b.launched || b.dead || b.hit) continue;
+        const f = seen[b.id] ??= { minY: b.y, r: b.r, turned: false, fell: false };
+        if (b.vy > 0) { if (!f.turned) f.turned = true; else if (b.y > f.minY + 1) f.fell = true; }
+        f.minY = Math.min(f.minY, b.y);
+      }
+      const done = Object.values(seen).find(f => f.fell && f.minY + f.r < a.H);
+      return done ? { ...done, H: a.H } : false;
+    }, null, { polling: 'raf', timeout: 15_000 })).jsonValue();
+    expect(flight.minY, 'the apex is off the top of the arena').toBeGreaterThanOrEqual(0);
+    expect(flight.minY + flight.r, 'the bubble never rose clear of the floor').toBeLessThan(flight.H);
+  });
+
   /**
    * #328: `@media (max-height: 640px)` in `src/style.css` hid `.hint` outright to buy the play card vertical
    * space, and a phone held sideways is ~390px tall — squarely in that band. For the seven measure topics

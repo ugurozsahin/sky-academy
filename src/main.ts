@@ -260,4 +260,4 @@ relaunch();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.
 const setVH = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
-setVH(); window.addEventListener('resize', setVH);
+setVH(); window.addEventListener('resize', setVH); window.visualViewport?.addEventListener('resize', setVH);   // #2184: registered before any arena's own listener, so --vh is current when it measures
