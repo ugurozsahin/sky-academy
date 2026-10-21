@@ -78,13 +78,13 @@ concurrency:
 jobs:
   test:
     # #1538: the nightly's e2e outgrew one runner (40-42 min of a 45 min ceiling, cancelled on 2026-10-03), so the
-    # full arm is split in two `--shard`s on two runners; a pull request and a push to main stay one shard (`1/1`).
+    # full arm is split in three `--shard`s on three runners (#2128: shard 2/2 reached 37 min on 2026-10-20 and hit the ceiling on 2026-10-21); a pull request and a push to main stay one shard (`1/1`).
     # The ceiling below is NOT raised: each shard needs about half of what the single job did.
     name: ${{ matrix.shard == '1/1' && 'test' || format('test ({0})', matrix.shard) }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/2","2/2"]' || '["1/1"]') }}
+        shard: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/3","2/3","3/3"]' || '["1/1"]') }}
     runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     # 45, raised from 30 on 2026-09-25 (#718) as a STOP-GAP, on the owner's decision in session. The nightly
     # full-matrix job had grown 899s -> 1816s in eight days and crossed the old ceiling, so the 2026-09-25 run
