@@ -12,7 +12,7 @@ import type { Question } from '../curriculum';
 import type { Arena } from '../game/arena';
 import type { DojoOutcome } from '../game/dojo';
 import { Session, type SessionEvents, type SessionOpts, type SessionResult } from '../game/session';
-import { scaled } from '../game/speed';   // #32: test-only time compression
+import { scaled } from '../game/speed'; import { cardInset } from '../game/wave-bounds';   // #32: test-only time compression; #2184: the card line
 import { waveOptsFor } from './wave-opts';
 import { canHear, haptic, hush, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate'; import { firstQuestionLine, type ResultCandidate } from './results';   // #897; one line: at its #714 cap
@@ -263,7 +263,7 @@ function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: stri
     if (!storyLine) say(firstLine); session.armQuestionClock(scaled); const a = opts.practice && correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true });
     requestAnimationFrame(() => {
       if (st.waveId !== myWave) return;
-      arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
+      arena.topInset = cardInset(els.qcard);
       arena.spawnWave({ ...waveOpts, labels });
     });
   };
