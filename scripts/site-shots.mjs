@@ -2,7 +2,7 @@
 // Captures every screenshot the website and the store listing need, from fixed seeds, through the same
 // `window.__sna` hooks the e2e drives. It runs during the Pages deploy, so no image is ever committed.
 // The Chromium path comes from PW_CHROMIUM, else Playwright's own download. Exits non-zero on any failure,
-// and on any file over MAX_BYTES.
+// on any failed request or response of 400 or above (a missing asset), and on any file over MAX_BYTES.
 import { chromium } from '@playwright/test';
 import { launchSilent } from '../tests/e2e/mute.mjs';
 import { mkdirSync, writeFileSync, statSync } from 'node:fs';
@@ -107,6 +107,8 @@ async function main([base, out]) {
         const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: size === 'phone', isMobile: size === 'phone', reducedMotion: 'reduce' });
         const page = await ctx.newPage();
         page.on('pageerror', e => errors.push(`${shot.name}-${size}: ${e.message}`));   // thrown after the loop: a throw here would be Playwright's emitter's, not main()'s
+        page.on('requestfailed', r => errors.push(`${shot.name}-${size}: request failed ${r.url()}`));
+        page.on('response', r => { if (r.status() >= 400) errors.push(`${shot.name}-${size}: ${r.status()} ${r.url()}`); });
         await page.clock.setFixedTime(new Date('2026-10-21T10:00:00Z'));
         await page.addInitScript(([seed]) => {
           let a = seed;                                              // mulberry32: the same stream on every run
