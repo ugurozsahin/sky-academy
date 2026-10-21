@@ -13,7 +13,7 @@ const section = (id: string) => {
   return at < 0 ? '' : page.slice(at, page.indexOf('</section>', at));
 };
 const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, "'").replace(/\s+/g, ' ').trim();
-const promises = [...section('promises-title').matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)].map(m => text(m[1]));
+const promises = [...section('promises-title').matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(m => text(m[1]));
 /** Words a promise is made of. Outside the promises list, none may appear, so a claim cannot slip in as prose. */
 const PROMISE_WORDS = /\b(advert|account|track|analytic|offline|cookie|free|collect|privacy|safe|secure)/i;
 
@@ -22,13 +22,15 @@ describe('the About page (#2091)', () => {
     expect(section('promises-title'), 'the section the rail reads').not.toBe('');
     expect(promises.length).toBeGreaterThan(0);
   });
-  it('the promises section holds its fixed intro and one list, and every item is read', () => {
+  it('the promises section holds its heading, its fixed intro and its items, and nothing else', () => {
     const sec = section('promises-title');
-    expect(sec.match(/<li\b/g)?.length, 'an item the regex skipped').toBe(promises.length);
-    expect(sec.match(/<ul\b/g)?.length).toBe(1);
-    expect([...sec.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/g)].map(m => text(m[1]))).toEqual([
+    expect(sec.match(/<li\b/gi)?.length, 'an item the regex skipped').toBe(promises.length);
+    expect(sec.match(/<ul\b/gi)?.length).toBe(1);
+    expect(text(sec)).toBe([
+      'Our promises',
       "The game shows the same promises in its grown-ups' area, so this page never says more than the game does.",
-    ]);
+      ...promises,
+    ].join(' '));
   });
   it('no promise is made anywhere else: not in <main> outside the list, the title or a meta tag (the shared shell aside)', () => {
     const main = page.slice(page.indexOf('<main'), page.indexOf('</main>'));
