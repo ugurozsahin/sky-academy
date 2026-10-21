@@ -1,5 +1,5 @@
 import { test as base, expect } from '@playwright/test';
-import { muteSpeech } from './mute';
+import { muteSpeech } from './mute.mjs';
 
 /** `test` whose every page has its speech engine at volume 0 (#1460). A test's own `captureSpeech` stub registers later and wins. */
 export const test = base.extend({
