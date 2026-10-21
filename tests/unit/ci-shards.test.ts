@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { workflow } from './helpers/sources';
 
-// #1538: the nightly's full e2e is split over two runners. Each of these is a way the split goes green while
+// #1538: the nightly's full e2e is split over three runners (#2128; two until 2026-10-21). Each of these is a way the split goes green while
 // being wrong, so each is pinned: dropping any one of them used to pass every other rail.
 describe("ci.yml's nightly e2e shard wiring (#1538)", () => {
   const ci = workflow('ci.yml');
@@ -13,13 +13,13 @@ describe("ci.yml's nightly e2e shard wiring (#1538)", () => {
     expect(jobs.indexOf('\n  branch-name:'), 'branch-name bounds the slice').toBeGreaterThan(jobs.indexOf('\n  test:'));
   });
 
-  it('gives the two-shard list to schedule and workflow_dispatch, and the one-shard list to everything else', () => {
+  it('gives the three-shard list to schedule and workflow_dispatch, and the one-shard list to everything else', () => {
     const list = test.match(/shard: \$\{\{ fromJSON\((.*)\) \}\}/)?.[1] ?? '';
     expect(list, 'the matrix must be a fromJSON of one expression').toBeTruthy();
     // The whole expression, not "each string appears somewhere": swapping the two lists passed the looser
     // rail and sent the nightly back to one runner and every pull request to two (round-2 review of #1539).
     expect(list).toBe(
-      `(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/2","2/2"]' || '["1/1"]'`,
+      `(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/3","2/3","3/3"]' || '["1/1"]'`,
     );
   });
 

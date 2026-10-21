@@ -19,7 +19,7 @@ const shell = (html: string) => ({
 });
 const meta = (html: string, key: string) => html.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`))?.[1];
 /** Heading levels in document order, so a skipped level (h2 straight to h4) can be found. */
-const headings = (html: string) => [...html.matchAll(/<h([1-6])\b/g)].map(m => Number(m[1]));
+const headings = (html: string) => [...html.matchAll(/<h([1-6])\b/gi)].map(m => Number(m[1]));
 /** JPEG size from its first start-of-frame marker. */
 function jpegSize(b: Buffer): [number, number] {
   for (let i = 2; i < b.length;) {
@@ -81,6 +81,16 @@ describe('the site shell is the same on every page (#1935)', () => {
       expect(img, p).toMatch(/\bwidth="\d+"/);
       expect(img, p).toMatch(/\bheight="\d+"/);
     }
+  });
+  it('on every page only the first picture in main loads at once, the rest lazily (#2105)', () => {
+    for (const p of all) {
+      const html = read(p);
+      const imgs = [...html.slice(Math.max(html.indexOf('<main'), 0)).matchAll(/<img\b[^>]*>/gi)].map(m => m[0]);
+      for (const img of imgs.slice(1)) expect(img, p).toMatch(/\bloading="lazy"/i);
+    }
+  });
+  it('the heading rail reads upper-case tags too (#2105)', () => {
+    expect(headings('<H1>a</H1><H3>b</H3>')).toEqual([1, 3]);
   });
   it('the fonts and the icon are byte-for-byte copies of the game\'s, and the main font is preloaded', () => {
     for (const f of ['fonts/fredoka-latin.woff2', 'fonts/fredoka-latin-ext.woff2', 'fonts/OFL.txt', 'icons/icon-192.webp']) {
@@ -144,13 +154,18 @@ describe('the home page (#1935)', () => {
 
 describe('/llms.txt (#1935)', () => {
   const txt = read('website/llms.txt');
+  it('links every page by its absolute address, so a relative link is a mistake (#2105)', () => {
+    const targets = [...txt.matchAll(/\]\(([^)]*)\)/g)].map(m => m[1]);
+    expect(targets.length).toBeGreaterThan(3);
+    for (const t of targets) expect(t, 'relative link').toMatch(/^https:\/\/sharpwise\.co\.uk(\/|$)/);
+  });
   it('has the llmstxt.org shape: a title, a summary and a list of pages', () => {
     expect(txt.startsWith('# Sharpwise\n')).toBe(true);
     expect(txt).toMatch(/^> .+/m);
     expect(txt).toMatch(/^## Pages$/m);
   });
   it('lists only pages that exist: the game, or a page under website/ that is not a placeholder', () => {
-    const links = [...txt.matchAll(/\]\((https:\/\/sharpwise\.co\.uk(\/[^)]*))\)/g)].map(m => m[2]);
+    const links = [...txt.matchAll(/\]\(((?:https:\/\/sharpwise\.co\.uk)?(\/[^)]*))\)/g)].map(m => m[2]);
     expect(links).toContain('/');
     for (const l of links) {
       if (l === '/play/') continue;
