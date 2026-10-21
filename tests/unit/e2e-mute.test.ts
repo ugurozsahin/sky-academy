@@ -6,10 +6,15 @@ import { launchSilent, muteSpeech, MUTE_ARGS } from '../e2e/mute.mjs';
 // straight from Playwright skips the fixture that silences the speech engine, and a script that calls
 // `chromium.launch` itself skips both switches, so the rail is on those two doors, not on the sound.
 const config = readFileSync('playwright.config.ts', 'utf8');
-const testDirs = [...config.matchAll(/testDir: '([^']+)'/g)].map(m => m[1]);
+const testDirs = [...new Set([...config.matchAll(/testDir: (['"`])([^'"`]+)\1/g)].map(m => m[2]))];
 // Recursive, as Playwright's own discovery is: a spec in a subfolder runs, so it is checked too.
 const specs = testDirs.flatMap(dir => readdirSync(dir, { recursive: true, encoding: 'utf8' })
-  .filter(f => /\.spec\.ts$/.test(f)).map(f => `${dir}/${f}`));
+  .filter(f => /\.(spec|test)\.[cm]?[jt]sx?$/.test(f)).map(f => `${dir}/${f}`));
+// Every file under a test directory, helpers included: a helper can open a browser as surely as a spec can.
+const testFiles = testDirs.flatMap(dir => readdirSync(dir, { recursive: true, encoding: 'utf8' })
+  .filter(f => /\.[cm]?[jt]sx?$/.test(f) && !f.endsWith('.d.mts')).map(f => `${dir}/${f}`));
+const OPENS_BROWSER = /\b(chromium|firefox|webkit)\s*\.\s*(launch\w*|connect\w*)\s*\(/;
+const NEW_CONTEXT = /\.\s*newContext\s*\(/;
 // Every file under scripts/, whatever its extension, and every browser type Playwright can launch.
 const scriptFiles = readdirSync('scripts', { recursive: true, encoding: 'utf8' }).map(f => `scripts/${f}`)
   .filter(f => /\.[cm]?[jt]s$/.test(f) && !f.endsWith('.d.mts'));
@@ -25,12 +30,38 @@ describe('every Playwright run is silent (#1460, #2148)', () => {
     const src = readFileSync(spec, 'utf8');
     expect(src).toMatch(/import \{ test, expect \} from '(\.\/|\.\.\/e2e\/)fixtures';/);
     expect(src).not.toMatch(/import \{[^}]*\btest\b[^}]*\} from '@playwright\/test'/);
-    // The `browser` fixture opens contexts the fixture never sees.
+    // A namespace import hands `test` over too.
+    expect(src).not.toMatch(/import \*\s+as\s+\w+\s+from '@playwright\/test'/);
+    // The `browser` fixture opens contexts the fixture never sees, under any name it is destructured to.
     expect(src).not.toMatch(/\bbrowser\.new(Context|Page)\(/);
   });
 
+  it('finds the files under the test directories, helpers included', () => {
+    expect(testFiles).toEqual(expect.arrayContaining(['tests/e2e/viewport.ts', 'tests/e2e/back-button.ts', 'tests/e2e/fixtures.ts']));
+  });
+
+  it.each(testFiles)('%s opens no browser of its own and no context outside the fixture', file => {
+    const src = readFileSync(file, 'utf8');
+    // mute.mjs is the one launcher: it is handed the browser type and wraps it.
+    if (!file.endsWith('/mute.mjs')) expect(src).not.toMatch(OPENS_BROWSER);
+    if (!/\/(fixtures\.ts|mute\.mjs)$/.test(file)) expect(src).not.toMatch(NEW_CONTEXT);
+  });
+
+  it('the checks above fire on the shapes they exist for', () => {
+    expect(/\.(spec|test)\.[cm]?[jt]sx?$/.test('foo.test.ts')).toBe(true);
+    expect(/\.(spec|test)\.[cm]?[jt]sx?$/.test('foo.spec.mjs')).toBe(true);
+    expect(OPENS_BROWSER.test("const b = await chromium.launch({})")).toBe(true);
+    expect(OPENS_BROWSER.test('webkit.connectOverCDP(url)')).toBe(true);
+    expect(NEW_CONTEXT.test('page.context().browser()!.newContext()')).toBe(true);
+    expect(NEW_CONTEXT.test('({ browser: b }) => b.newContext()')).toBe(true);
+    // Spelt in two halves: a unit test must not itself read as importing Playwright (scripts.test.ts).
+    expect(/import \*\s+as\s+\w+\s+from '@playwright\/test'/.test(`import * as pw from '@play${'wright'}/test'`)).toBe(true);
+  });
+
   it('the fixture runs muteSpeech in every context', () => {
-    expect(readFileSync('tests/e2e/fixtures.ts', 'utf8')).toContain('context.addInitScript(muteSpeech)');
+    // Code, not a comment that quotes it: the comments are cut before the shape is read.
+    const code = readFileSync('tests/e2e/fixtures.ts', 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
+    expect(code).toMatch(/base\.extend\(\{[\s\S]*context:[\s\S]*context\.addInitScript\(muteSpeech\)/);
   });
 
   it('the config launches Chromium with --mute-audio for every project, so a headed run is silent too', () => {
@@ -54,6 +85,11 @@ describe('every Playwright run is silent (#1460, #2148)', () => {
   it('no script launches any browser type itself', () => {
     const direct = scriptFiles.filter(f => /\b(chromium|firefox|webkit)\.launch\w*\(/.test(readFileSync(f, 'utf8')));
     expect(direct).toEqual([]);
+  });
+
+  it('no script launches or connects through an aliased browser type either', () => {
+    const aliased = scriptFiles.filter(f => /\b(chromium|firefox|webkit)\s*:\s*\w+/.test(readFileSync(f, 'utf8')));
+    expect(aliased).toEqual([]);
   });
 
   describe('muteSpeech', () => {
