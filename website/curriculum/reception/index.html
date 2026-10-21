@@ -46,7 +46,21 @@
       <nav class="site-nav" aria-label="Main">
         <ul>
           <li><a href="/">Home</a></li>
-          <li><a href="/curriculum/">Curriculum</a></li>
+          <li>
+            <details class="nav-years">
+              <summary>Curriculum</summary>
+              <ul>
+                <li><a href="/curriculum/">All years</a></li>
+                <li><a href="/curriculum/reception/" aria-current="page">Reception</a></li>
+                <li><a href="/curriculum/year-1/">Year 1</a></li>
+                <li><a href="/curriculum/year-2/">Year 2</a></li>
+                <li><a href="/curriculum/year-3/">Year 3</a></li>
+                <li><a href="/curriculum/year-4/">Year 4</a></li>
+                <li><a href="/curriculum/year-5/">Year 5</a></li>
+                <li><a href="/curriculum/year-6/">Year 6</a></li>
+              </ul>
+            </details>
+          </li>
           <li><a href="/features/">Features</a></li>
           <li><a href="/guides/">Guides</a></li>
           <li><a href="/about/">About</a></li>
@@ -164,17 +178,90 @@
       </div>
     </section>
 
-    <section id="not-covered" aria-labelledby="not-covered-title">
+    <section id="for-teachers" aria-label="For teachers">
       <div class="wrap">
-        <h2 id="not-covered-title">Not covered yet in Reception</h2>
-        <p>Every part of the curriculum listed for this year has at least one topic.</p>
+        <details>
+          <summary>For teachers: National Curriculum references and gaps</summary>
+          <p>Each Reception topic with the objective it practises from the EYFS Early Learning Goals, grouped by curriculum area.</p>
+          <table>
+            <caption>Reception maths: 17 topics</caption>
+            <thead><tr><th scope="col">Topic</th><th scope="col">Curriculum objective</th></tr></thead>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">EYFS Mathematics: Number (ELG)</th></tr>
+              <tr><th scope="row">Count It</th><td>ELG Number: count objects to 10</td></tr>
+              <tr><th scope="row">Match the Number</th><td>ELG Number: link the numeral with its cardinal value</td></tr>
+              <tr><th scope="row">Quick Dots</th><td>ELG Number: subitise to 5</td></tr>
+              <tr><th scope="row">One More, One Less</th><td>ELG Number: composition to 10</td></tr>
+              <tr><th scope="row">Number Bonds</th><td>ELG Number: bonds to 5 and 10</td></tr>
+              <tr><th scope="row">Adding</th><td>ELG Number: composition, addition to 10</td></tr>
+              <tr><th scope="row">Taking Away</th><td>ELG Number: subtraction facts</td></tr>
+              <tr><th scope="row">Balance the Scales</th><td>ELG Number: composition, equal amounts</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">EYFS Mathematics: Numerical Patterns (ELG)</th></tr>
+              <tr><th scope="row">More or Fewer</th><td>ELG Patterns: compare quantities</td></tr>
+              <tr><th scope="row">Taller, Heavier, Holds More</th><td>ELG Patterns: compare length, weight and capacity</td></tr>
+              <tr><th scope="row">What Comes Next?</th><td>ELG Patterns: count beyond 20</td></tr>
+              <tr><th scope="row">Order Up!</th><td>ELG Patterns: compare and order to 10</td></tr>
+              <tr><th scope="row">Pattern Party</th><td>Development Matters: continue repeating patterns</td></tr>
+              <tr><th scope="row">Doubles</th><td>ELG Patterns: double facts within 10</td></tr>
+              <tr><th scope="row">Share It Out</th><td>ELG Patterns: distribute equally between two</td></tr>
+              <tr><th scope="row">Partners</th><td>ELG Patterns: evens and odds</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">EYFS Development Matters: Spatial reasoning</th></tr>
+              <tr><th scope="row">Shape Spotter</th><td>EYFS Spatial reasoning: circle, square, triangle, rectangle</td></tr>
+            </tbody>
+          </table>
+          <table>
+            <caption>Reception English: 13 topics</caption>
+            <thead><tr><th scope="col">Topic</th><th scope="col">Curriculum objective</th></tr></thead>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">EYFS Literacy: Comprehension (ELG)</th></tr>
+              <tr><th scope="row">Story Time</th><td>ELG Comprehension: understanding what has been read to them</td></tr>
+              <tr><th scope="row">Story Order</th><td>ELG Comprehension: anticipate key events in stories</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">EYFS Literacy: Word Reading (ELG)</th></tr>
+              <tr><th scope="row">Rhyme Time</th><td>ELG Word Reading: spot and suggest rhymes (Development Matters phonological awareness)</td></tr>
+              <tr><th scope="row">How Many Beats?</th><td>ELG Word Reading: count or clap syllables in a word</td></tr>
+              <tr><th scope="row">Sound Hunt</th><td>ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear</td></tr>
+              <tr><th scope="row">Big &amp; Small Letters</th><td>ELG Word Reading: letters</td></tr>
+              <tr><th scope="row">Tricky Words</th><td>ELG Word Reading: common exception words</td></tr>
+              <tr><th scope="row">Read It!</th><td>ELG Word Reading: read words by sound-blending</td></tr>
+              <tr><th scope="row">Starts Like</th><td>ELG Word Reading: words with the same initial sound (Development Matters)</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">EYFS Literacy: Writing (ELG)</th></tr>
+              <tr><th scope="row">Letter Sounds</th><td>ELG Writing: sounds to letters</td></tr>
+              <tr><th scope="row">Build a Word</th><td>ELG Writing: spell by sounds (CVC)</td></tr>
+              <tr><th scope="row">Story Sentences</th><td>ELG Writing: simple sentences</td></tr>
+              <tr><th scope="row">Trace Letters</th><td>ELG Writing: form letters</td></tr>
+            </tbody>
+          </table>
+          <h2 id="not-covered-title">Not covered yet in Reception</h2>
+          <p>Every part of the curriculum listed for this year has at least one topic.</p>
+        </details>
       </div>
     </section>
 
-    <section id="more" aria-labelledby="more-title">
+    <section id="years" aria-labelledby="years-title">
       <div class="wrap">
-        <h2 id="more-title">Other years</h2>
-        <p><a href="/curriculum/year-1/">Year 1</a> · <a href="/curriculum/year-2/">Year 2</a> · <a href="/curriculum/year-3/">Year 3</a> · <a href="/curriculum/year-4/">Year 4</a> · <a href="/curriculum/year-5/">Year 5</a> · <a href="/curriculum/year-6/">Year 6</a></p>
+        <h2 id="years-title">Reception to Year 6</h2>
+        <nav class="switcher" aria-label="School years">
+          <ul>
+            <li><a href="/curriculum/reception/" aria-current="page">Reception</a></li>
+            <li><a href="/curriculum/year-1/">Year 1</a></li>
+            <li><a href="/curriculum/year-2/">Year 2</a></li>
+            <li><a href="/curriculum/year-3/">Year 3</a></li>
+            <li><a href="/curriculum/year-4/">Year 4</a></li>
+            <li><a href="/curriculum/year-5/">Year 5</a></li>
+            <li><a href="/curriculum/year-6/">Year 6</a></li>
+          </ul>
+          <ul>
+            <li><a href="/curriculum/year-1/" rel="next">Next: Year 1</a></li>
+          </ul>
+        </nav>
         <p>Every year on one page, with the curriculum objective for each topic: <a href="/curriculum/">the curriculum page</a>.</p>
       </div>
     </section>

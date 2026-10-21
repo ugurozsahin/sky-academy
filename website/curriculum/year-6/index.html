@@ -46,7 +46,21 @@
       <nav class="site-nav" aria-label="Main">
         <ul>
           <li><a href="/">Home</a></li>
-          <li><a href="/curriculum/">Curriculum</a></li>
+          <li>
+            <details class="nav-years">
+              <summary>Curriculum</summary>
+              <ul>
+                <li><a href="/curriculum/">All years</a></li>
+                <li><a href="/curriculum/reception/">Reception</a></li>
+                <li><a href="/curriculum/year-1/">Year 1</a></li>
+                <li><a href="/curriculum/year-2/">Year 2</a></li>
+                <li><a href="/curriculum/year-3/">Year 3</a></li>
+                <li><a href="/curriculum/year-4/">Year 4</a></li>
+                <li><a href="/curriculum/year-5/">Year 5</a></li>
+                <li><a href="/curriculum/year-6/" aria-current="page">Year 6</a></li>
+              </ul>
+            </details>
+          </li>
           <li><a href="/features/">Features</a></li>
           <li><a href="/guides/">Guides</a></li>
           <li><a href="/about/">About</a></li>
@@ -232,22 +246,137 @@
       </div>
     </section>
 
-    <section id="not-covered" aria-labelledby="not-covered-title">
+    <section id="for-teachers" aria-label="For teachers">
       <div class="wrap">
-        <h2 id="not-covered-title">Not covered yet in Year 6</h2>
-        <p>These parts of the curriculum have no topic in this year yet.</p>
-        <ul>
-          <li>Reading: word reading (English)</li>
-          <li>Writing: transcription (handwriting) (English)</li>
-          <li>Spoken language (English)</li>
-        </ul>
+        <details>
+          <summary>For teachers: National Curriculum references and gaps</summary>
+          <p>Each Year 6 topic with the objective it practises from the National Curriculum for England, grouped by curriculum area.</p>
+          <table>
+            <caption>Year 6 maths: 35 topics</caption>
+            <thead><tr><th scope="col">Topic</th><th scope="col">Curriculum objective</th></tr></thead>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Number: number and place value</th></tr>
+              <tr><th scope="row">Place value to 10 million</th><td>Y6 NPV: numbers to 10,000,000</td></tr>
+              <tr><th scope="row">Round to a required accuracy</th><td>Y6 NPV: round to a required degree of accuracy</td></tr>
+              <tr><th scope="row">Negative numbers</th><td>Y6 NPV: negative numbers, intervals across 0</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Number: addition, subtraction, multiplication and division</th></tr>
+              <tr><th scope="row">Long multiplication</th><td>Y6 MD: long multiplication, up to 4 digits × 2 digits (6M5)</td></tr>
+              <tr><th scope="row">Long and Short Division</th><td>Y6 M&amp;D: long and short division, interpreting remainders (6M6–7)</td></tr>
+              <tr><th scope="row">Mental calculation</th><td>Y6 ASMD: mental, mixed operations, large numbers</td></tr>
+              <tr><th scope="row">Factors, multiples and primes</th><td>Y6 MD: common factors, common multiples, primes (6M9)</td></tr>
+              <tr><th scope="row">Order of Operations</th><td>Y6 M&amp;D: order of operations and brackets (6M10)</td></tr>
+              <tr><th scope="row">Multi-step Problems</th><td>Y6 ASMD: multi-step problems, estimating to check (6M11–13)</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Number: fractions (including decimals and percentages)</th></tr>
+              <tr><th scope="row">Simplify and compare fractions</th><td>Y6 F: simplify, common denominators, compare &gt;1</td></tr>
+              <tr><th scope="row">Adding and subtracting fractions</th><td>Y6 F: add/subtract, different denominators, mixed numbers</td></tr>
+              <tr><th scope="row">Multiplying fractions</th><td>Y6 F: multiply proper fractions, simplest form</td></tr>
+              <tr><th scope="row">Dividing fractions</th><td>Y6 F: proper fraction ÷ whole number</td></tr>
+              <tr><th scope="row">Fractions, decimals and percentages</th><td>Y6 F: fraction as division; FDP equivalences</td></tr>
+              <tr><th scope="row">Decimals to 3 places</th><td>Y6 F: 3 dp place value; ×÷ 10, 100, 1,000</td></tr>
+              <tr><th scope="row">Multiplying decimals</th><td>Y6 F: decimals (≤2 dp) × whole numbers</td></tr>
+              <tr><th scope="row">Dividing to decimals</th><td>Y6 F: division with a 2 dp answer</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Ratio and proportion</th></tr>
+              <tr><th scope="row">Ratio and scale</th><td>Y6 R&amp;P: relative sizes, unequal sharing, scale factor</td></tr>
+              <tr><th scope="row">Percentages of amounts</th><td>Y6 R&amp;P: percentages of amounts, comparison</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Algebra</th></tr>
+              <tr><th scope="row">Using formulae</th><td>Y6 Alg: simple formulae</td></tr>
+              <tr><th scope="row">Linear sequences</th><td>Y6 Alg: linear number sequences</td></tr>
+              <tr><th scope="row">Missing numbers with letters</th><td>Y6 Alg: missing numbers algebraically</td></tr>
+              <tr><th scope="row">Two unknowns</th><td>Y6 Alg: two unknowns; combinations</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Measurement</th></tr>
+              <tr><th scope="row">Converting Units and Miles</th><td>Y6 Measurement: convert units to 3 dp, miles and kilometres (6M34–36)</td></tr>
+              <tr><th scope="row">Same Area, Different Perimeter</th><td>Y6 Measurement: same area, different perimeter; when formulae apply (6M37–38)</td></tr>
+              <tr><th scope="row">Area of Triangles and Parallelograms</th><td>Y6 Measurement: area of parallelograms and triangles (6M39)</td></tr>
+              <tr><th scope="row">Volume of Cuboids</th><td>Y6 Measurement: volume of cubes and cuboids (6M40)</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Geometry: properties of shapes</th></tr>
+              <tr><th scope="row">Nets of 3-D Shapes</th><td>Y6 Geometry: describe 3-D shapes and their nets (6M42)</td></tr>
+              <tr><th scope="row">Missing Angles</th><td>Y6 Geometry: missing angles in shapes, on lines, vertically opposite (6M43, 6M45)</td></tr>
+              <tr><th scope="row">Parts of a Circle</th><td>Y6 Geometry: radius, diameter and circumference (6M44)</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Geometry: position and direction</th></tr>
+              <tr><th scope="row">Four-Quadrant Coordinates</th><td>Y6 Geometry: describe positions on the full coordinate grid, all four quadrants (6M46)</td></tr>
+              <tr><th scope="row">Reflect in the Axes</th><td>Y6 Geometry: translate and reflect in the axes (6M47)</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Statistics</th></tr>
+              <tr><th scope="row">Pie Charts</th><td>Y6 Statistics: interpret pie charts and use them to solve problems (6M48)</td></tr>
+              <tr><th scope="row">Line and Conversion Graphs</th><td>Y6 Statistics: interpret line graphs and conversion graphs (6M48)</td></tr>
+              <tr><th scope="row">The Mean</th><td>Y6 Statistics: calculate and interpret the mean as an average (6M49)</td></tr>
+            </tbody>
+          </table>
+          <table>
+            <caption>Year 6 English: 16 topics</caption>
+            <thead><tr><th scope="col">Topic</th><th scope="col">Curriculum objective</th></tr></thead>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Reading: comprehension</th></tr>
+              <tr><th scope="row">Inference</th><td>Y5–6 Comprehension: inferring feelings, thoughts and motives, justified with evidence</td></tr>
+              <tr><th scope="row">Figurative Language</th><td>Y5–6 Comprehension: figurative language</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Writing: transcription (spelling)</th></tr>
+              <tr><th scope="row">ough and ei Spellings</th><td>Y5/6 Spelling: ough; ei after c (Appendix 1)</td></tr>
+              <tr><th scope="row">Often-Confused Words</th><td>Y5/6 Spelling: homophones and often-confused words (Appendix 1)</td></tr>
+              <tr><th scope="row">Year 5–6 Word List (51–100)</th><td>Y5/6 statutory word list, words 51–100 (Appendix 1)</td></tr>
+              <tr><th scope="row">Spell the missing word</th><td>E56-25 (App. 1 Y5–6)</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Writing: composition</th></tr>
+              <tr><th scope="row">Tense and Agreement</th><td>Y5/6 Writing: consistent tense and subject–verb agreement</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="rowgroup" colspan="2">Writing: vocabulary, grammar and punctuation</th></tr>
+              <tr><th scope="row">Formal or Informal</th><td>Y6 Grammar: formal and informal vocabulary and structures (Appendix 2)</td></tr>
+              <tr><th scope="row">Synonyms and Antonyms</th><td>Y6 Vocabulary: synonyms and antonyms (Appendix 2)</td></tr>
+              <tr><th scope="row">Active and Passive</th><td>Y6 Grammar: active and passive (Appendix 2)</td></tr>
+              <tr><th scope="row">The Subjunctive</th><td>Y6 Grammar: subjunctive forms in formal writing (Appendix 2)</td></tr>
+              <tr><th scope="row">Linking Paragraphs</th><td>Y6 Cohesion: linking adverbials and ellipsis (Appendix 2)</td></tr>
+              <tr><th scope="row">Semicolons, Colons, Dashes</th><td>Y6 Punctuation: semi-colon, colon and dash between independent clauses (Appendix 2)</td></tr>
+              <tr><th scope="row">Lists and Bullet Points</th><td>Y6 Punctuation: colon before a list, semi-colons in lists, bullet points (Appendix 2)</td></tr>
+              <tr><th scope="row">Hyphens</th><td>Y6 Punctuation: hyphens to avoid ambiguity (Appendix 1, Appendix 2)</td></tr>
+              <tr><th scope="row">Subject and Object</th><td>Y6 Grammar terms: subject and object (Appendix 2)</td></tr>
+            </tbody>
+          </table>
+          <h2 id="not-covered-title">Not covered yet in Year 6</h2>
+          <p>These parts of the curriculum have no topic in this year yet.</p>
+          <ul>
+            <li>Reading: word reading (English)</li>
+            <li>Writing: transcription (handwriting) (English)</li>
+            <li>Spoken language (English)</li>
+          </ul>
+        </details>
       </div>
     </section>
 
-    <section id="more" aria-labelledby="more-title">
+    <section id="years" aria-labelledby="years-title">
       <div class="wrap">
-        <h2 id="more-title">Other years</h2>
-        <p><a href="/curriculum/reception/">Reception</a> · <a href="/curriculum/year-1/">Year 1</a> · <a href="/curriculum/year-2/">Year 2</a> · <a href="/curriculum/year-3/">Year 3</a> · <a href="/curriculum/year-4/">Year 4</a> · <a href="/curriculum/year-5/">Year 5</a></p>
+        <h2 id="years-title">Reception to Year 6</h2>
+        <nav class="switcher" aria-label="School years">
+          <ul>
+            <li><a href="/curriculum/reception/">Reception</a></li>
+            <li><a href="/curriculum/year-1/">Year 1</a></li>
+            <li><a href="/curriculum/year-2/">Year 2</a></li>
+            <li><a href="/curriculum/year-3/">Year 3</a></li>
+            <li><a href="/curriculum/year-4/">Year 4</a></li>
+            <li><a href="/curriculum/year-5/">Year 5</a></li>
+            <li><a href="/curriculum/year-6/" aria-current="page">Year 6</a></li>
+          </ul>
+          <ul>
+            <li><a href="/curriculum/year-5/" rel="prev">Previous: Year 5</a></li>
+          </ul>
+        </nav>
         <p>Every year on one page, with the curriculum objective for each topic: <a href="/curriculum/">the curriculum page</a>.</p>
       </div>
     </section>
