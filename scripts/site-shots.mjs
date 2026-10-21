@@ -117,7 +117,9 @@ async function main([base, out]) {
         }, [SEED]);
         await page.goto(base, { waitUntil: 'networkidle' });
         await page.waitForSelector('.home', { timeout: ACTION_TIMEOUT });
-        await shot.run(page);
+        try { await shot.run(page); } catch (e) {                    // Playwright's timeout names neither the shot nor the size, and the page errors that likely caused it would be dropped
+          throw new Error(`${shot.name}-${size}: ${e.message.split('\n')[0]}${errors.length ? ` (page errors: ${errors.join('; ')})` : ''}`);
+        }
         await page.waitForTimeout(500);
         await freeze(page);                                          // a wave that spawned after the shot's own steps (the results' backdrop) goes on the grid too
         await page.evaluate(() => {                                  // the bubbles' sway is driven by frame time: pin it, then hold
