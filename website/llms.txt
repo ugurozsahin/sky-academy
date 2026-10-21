@@ -10,3 +10,5 @@
 
 - [Home](https://sharpwise.co.uk/): what Sharpwise is, who it is for and the years it covers
 - [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
+- [Privacy](https://sharpwise.co.uk/privacy/): Sharpwise collects nothing about a child; what the game keeps on the device, and what can leave it
+- [Support](https://sharpwise.co.uk/support/): how to contact us, move a save to another device, or start again

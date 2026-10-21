@@ -1,0 +1,102 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { SOURCES } from './helpers/sources';
+import { ABOUT_LINES } from '../../src/ui/about';
+import { voiceScore } from '../../src/voice-score';
+import { MAX_PROFILES } from '../../src/storage/profile-index';
+
+/**
+ * #1934: the /privacy/ and /support/ pages state facts about the game, and the stores read them. Each fact is
+ * pinned here to the code that makes it true, so a change to the game that breaks a sentence goes red until the
+ * page changes with it. "Collects nothing" is pinned to the #1937 rail (policy #1926) and to the game's own code.
+ */
+const root = new URL('../../', import.meta.url);
+const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
+/** A page's visible words in <main>, tags dropped and whitespace folded, so a sentence can wrap across lines. */
+const words = (p: string) => {
+  const html = read(p);
+  return html.slice(html.indexOf('<main'), html.indexOf('</main>')).replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+};
+const privacy = words('website/privacy/index.html');
+const support = words('website/support/index.html');
+
+/** Ways the game's own code could send something off the device or set a cookie. */
+const NETWORK: [string, RegExp][] = [
+  ['fetch(', /\bfetch\s*\(/], ['XMLHttpRequest', /XMLHttpRequest/], ['WebSocket', /WebSocket/], ['sendBeacon', /sendBeacon/],
+  ['EventSource', /EventSource/], ['RTCPeerConnection', /RTCPeerConnection/], ['document.cookie', /document\.cookie/],
+];
+/** Absolute URLs the game's code may name: the SVG namespace, its own origin, and hosts that cannot resolve. */
+const OWN = [/^http:\/\/www\.w3\.org\/2000\/svg$/, /^https:\/\/sharpwise\.co\.uk(\/|$)/, /^https:\/\/[a-z.]+\.invalid$/, /^https:\/\/localhost$/];
+function leaks(files: Record<string, string>): string[] {
+  return Object.entries(files).flatMap(([path, text]) => [
+    ...NETWORK.filter(([, re]) => re.test(text)).map(([name]) => `${path}: ${name}`),
+    ...[...text.matchAll(/https?:\/\/[^\s'"`)<>…]+/g)].map(m => m[0]).filter(u => !OWN.some(re => re.test(u))).map(u => `${path}: ${u}`),
+  ]);
+}
+
+describe('the privacy page: "collects nothing" is held to the code (#1934)', () => {
+  it('says the game collects nothing and sets no cookie, on the page and in the at-a-glance list', () => {
+    expect(privacy).toContain('Sharpwise collects nothing about your child.');
+    expect(privacy).toContain('no accounts, no analytics, no adverts and no cookies, in the game or on this website');
+    expect(privacy).toContain('Neither the game nor this website sets a cookie.');
+  });
+  it('rests on the #1937 no-tracking rail, which still scans the built game and package.json', () => {
+    const rail = read('tests/unit/guardrails-no-tracking.test.ts');
+    for (const t of ['the built game reaches no tracking domain or SDK', 'package.json holds no analytics or ads package']) expect(rail, t).toContain(`it('${t}'`);
+  });
+  it('the game\'s own code opens no connection, sets no cookie and names no other company\'s host', () => {
+    expect(Object.keys(SOURCES).length, 'the src/ files it reads').toBeGreaterThan(100);
+    expect(leaks(SOURCES)).toEqual([]);
+  });
+  it('goes red on each way of sending something, and on a third-party URL', () => {
+    for (const [name, probe] of [['fetch(', 'await fetch (u)'], ['XMLHttpRequest', 'new XMLHttpRequest()'], ['WebSocket', 'new WebSocket(u)'], ['sendBeacon', 'navigator.sendBeacon(u)'], ['EventSource', 'new EventSource(u)'], ['RTCPeerConnection', 'new RTCPeerConnection()'], ['document.cookie', 'document.cookie = "a=1"']]) {
+      expect(leaks({ 'x.ts': probe }), name).toEqual([`x.ts: ${name}`]);
+    }
+    expect(leaks({ 'x.ts': 'const u = "https://www.google-analytics.com/collect"' })).toEqual(['x.ts: https://www.google-analytics.com/collect']);
+    expect(leaks({ 'x.ts': '"https://sharpwise.co.uk.evil.com/"' })).toEqual(['x.ts: https://sharpwise.co.uk.evil.com/']);
+    expect(leaks({ 'x.ts': 'xmlns="http://www.w3.org/2000/svg" new URL(p, "https://deeplink.invalid")' })).toEqual([]);
+  });
+  it('the grown-ups\' area in the game makes the same promise', () => {
+    expect(ABOUT_LINES).toContain('No tracking — no analytics, and nothing about your child is collected.');
+    expect(ABOUT_LINES).toContain('No account — progress is kept on this device.');
+  });
+});
+
+describe('the privacy page\'s other facts (#1934)', () => {
+  it('names the controller, the contact address and the ICO complaint route', () => {
+    expect(privacy).toContain('Inobil Technology Ltd, the data controller');
+    expect(privacy).toContain('support@sharpwise.co.uk');
+    expect(privacy).toContain('Information Commissioner\'s Office (ICO)');
+    expect(privacy).toContain('ico.org.uk/make-a-complaint');
+  });
+  it('"up to four children" is the number of profile slots', () => {
+    expect(MAX_PROFILES).toBe(4);
+    expect(privacy).toContain('Up to four children');
+  });
+  it('"prefers online voices" is what the voice ranking does, and the read-aloud switch it names exists', () => {
+    expect(voiceScore({ name: 'A', lang: 'en-GB', localService: false })).toBeGreaterThan(voiceScore({ name: 'A', lang: 'en-GB', localService: true }));
+    expect(privacy).toContain('The game prefers those voices');
+    expect(SOURCES['/src/ui/home.ts']).toContain('aria-label="Read aloud');
+  });
+  it('the save code and the challenge code are only offered in the grown-ups\' area', () => {
+    const parents = SOURCES['/src/ui/parents.ts'];
+    expect(parents).toContain('id="save-code"');
+    expect(parents).toContain('challengeHTML()');
+    expect(SOURCES['/src/ui/parents-challenge.ts']).toContain('The code holds no name');
+  });
+});
+
+describe('the support page names the game\'s real controls (#1934)', () => {
+  const ui = Object.entries(SOURCES).filter(([p]) => p.startsWith('/src/ui/')).map(([, t]) => t).join('\n');
+  it('every bold control name on the page is a label in src/ui', () => {
+    const html = read('website/support/index.html');
+    const names = [...new Set([...html.matchAll(/<strong>([^<]+)<\/strong>/g)].map(m => m[1]))];
+    expect(names).toEqual(expect.arrayContaining(['For grown-ups', 'Move to another device', 'Copy the code', 'Restore', 'Who is playing?', 'Start again', 'Undo', 'Remove']));
+    for (const n of names) expect(ui, n).toMatch(new RegExp(`>[^<]*${n.replace(/[?]/g, '\\?')}\\s*<`));
+  });
+  it('the word to type is the game\'s own, and the contact address is a mailto link', () => {
+    expect(SOURCES['/src/ui/parents.ts']).toContain("const RESET_WORD = 'RESET';");
+    expect(support).toContain('Type RESET in the box');
+    expect(read('website/support/index.html')).toContain('<a href="mailto:support@sharpwise.co.uk">support@sharpwise.co.uk</a>');
+  });
+});
