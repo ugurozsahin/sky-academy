@@ -15,7 +15,10 @@ const home = read('website/index.html');
 const fileOf = (id: YearId) => `website/curriculum/${yearSlug(id)}/index.html`;
 const REGEN = 'run `npm run content-map` and commit website/curriculum/';
 /** The teachers' section's details element (#2160), or '' when the page has none. */
-const teachers = (html: string) => { const at = html.indexOf('<details>'); return at < 0 ? '' : html.slice(at, html.indexOf('</details>', at)); };
+const teachers = (html: string) => {
+  const at = html.indexOf('<details>'), end = html.indexOf('</details>', at);
+  return at < 0 || end < 0 ? '' : html.slice(at, end);
+};
 const terms = (html: string) => [...html.matchAll(/<div><dt>([^<]*)<\/dt><dd>([^<]*)<\/dd><\/div>/g)].map(m => ({ dt: m[1], dd: m[2] }));
 
 describe('one page per school year, generated from the content map (#2090)', () => {
@@ -180,9 +183,10 @@ describe('the year pages carry the teachers\' detail, collapsed (#2160)', () => 
       expect(html.match(/<details\b[^>]*>/g), y.year).toEqual(['<details>']);
       expect(html, y.year).toContain('<details>\n          <summary>For teachers: National Curriculum references and gaps</summary>');
       const open = html.indexOf('<details>');
-      for (const id of ['maths', 'english']) {
+      for (const [id, n] of [['maths', y.maths], ['english', y.writing]] as const) {
         const at = html.indexOf(`<section id="${id}"`);
-        if (at > -1) expect(html.indexOf('</section>', at), `${y.year}: ${id} comes first`).toBeLessThan(open);
+        expect(at > -1, `${y.year}: a ${id} section when the year has ${id} topics`).toBe(n > 0);
+        if (n) expect(html.indexOf('</section>', at), `${y.year}: ${id} comes first`).toBeLessThan(open);
       }
       expect(rows(html).length, `${y.year}: every table row is inside the details`).toBe(rows(teachers(html)).length);
     }
@@ -193,6 +197,7 @@ describe('the year pages carry the teachers\' detail, collapsed (#2160)', () => 
     expect(new Set(onPages).size, 'no row twice').toBe(onPages.length);
     expect(onPages.sort()).toEqual(inMap.sort());
     expect(onPages, 'and the registry has as many topics').toHaveLength(TOPICS.length);
+    expect(onPages, 'escaped once, read against a known row rather than esc()').toContain('year3 | Mental Adding and Subtracting | Y3 A&amp;S: 3-digit number and 1s, 10s, 100s mentally (3M7)');
   });
   it('gives each table a caption first, column headers, and a row header on every data row', () => {
     for (const y of map.byYear) {
@@ -221,6 +226,8 @@ describe('every year page has a year switcher (#2160)', () => {
       const current = all.filter(l => l.attrs.includes('aria-current="page"'));
       expect(current.map(l => l.href), y.year).toEqual([yearPath(y.year)]);
       expect(all.every(l => l.attrs === '' || l.attrs === ' aria-current="page"'), y.year).toBe(true);
+      const main = read(fileOf(y.year)).match(/<main\b[\s\S]*<\/main>/)![0];
+      expect(main.match(/aria-current=/g), `${y.year}: one current-page mark in main, the switcher's`).toHaveLength(1);
     }
   });
   it('links the years either side as Previous and Next, and Reception has no Previous, Year 6 no Next', () => {
