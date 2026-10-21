@@ -74,7 +74,8 @@ describe('GitHub Pages deployment (#1933)', () => {
  * sharpwise.co.uk", plus the two store badge links and JSON-LD's own `@context` (a vocabulary name, never fetched).
  * The one script allowed is a JSON-LD data block, which no browser runs. Owner-approved on #1925.
  * #2087/#2105: the stores are allowed as the `href` of a link only, never as a source. Google's own badge snippet
- * hot-links its picture from play.google.com, which would load a file from Google on every visit.
+ * hot-links its picture from play.google.com, which would load a file from Google on every visit. A store URL in
+ * JSON-LD (`sameAs`, `installUrl`) fails this rail too, deliberately: it needs its own allow-list entry (#2113).
  */
 const SITE_ORIGINS = ['https://sharpwise.co.uk'];
 const STORE_LINK = /(<a\b[^>]*?\shref=)(["'])https:\/\/(?:play\.google\.com|apps\.apple\.com)\/[^"']*\2/gi;
