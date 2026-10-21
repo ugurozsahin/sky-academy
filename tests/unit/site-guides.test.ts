@@ -19,21 +19,33 @@ const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&(#?\w+);/g
 /** Every `<q>` and `<kbd>` in a page, as the words a reader sees. */
 const quoted = (html: string) => [...html.matchAll(/<(q|kbd)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(m => text(m[2]));
 
-/** The text of every string and template literal in a source file; comments are not literals. */
+/** The text of every string and template literal in a source file. Comments are not literals, and neither is the
+ *  operand of a comparison or a `case`: `e.key === 'Enter'` is a key name, not the Enter button. */
 function literals(source: string, name = 'x.ts'): string[] {
   const out: string[] = [];
+  const COMPARE = new Set([ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken]);
+  const compared = (n: ts.Node) => (ts.isBinaryExpression(n.parent) && COMPARE.has(n.parent.operatorToken.kind)) || ts.isCaseClause(n.parent);
   const walk = (n: ts.Node) => {
-    if (ts.isStringLiteralLike(n) || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n)) out.push(n.text);
+    if ((ts.isStringLiteralLike(n) || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n)) && !compared(n)) out.push(n.text);
     ts.forEachChild(n, walk);
   };
   walk(ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true));
   return out;
 }
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** The quoted labels no literal holds as whole words ("On" must not pass on "Once"). */
+/**
+ * The pieces of text a literal can put on screen whole: the literal itself when it holds no markup, else the text
+ * between two tags and the value of a placeholder, aria-label or title. A leading emoji ("👥 Who is playing?") is
+ * dropped. A label must equal one piece, so "Restore" inside a sentence, or "Start again" inside "Start again?",
+ * does not stand in for a button that was renamed.
+ */
+function pieces(lit: string): string[] {
+  const raw = /[<>]/.test(lit) ? [...lit.split(/<[^>]*>|>/), ...[...lit.matchAll(/\b(?:placeholder|aria-label|title)="([^"]*)"/g)].map(m => m[1])] : [lit];
+  return raw.map(s => text(s).replace(/^[^\p{L}\p{N}]+/u, '')).filter(Boolean);
+}
+/** The quoted labels that are not, whole, a piece of on-screen text in any literal. */
 function missing(labels: string[], lits: string[]): string[] {
-  const all = lits.flatMap(l => [l, text(l)]).join('\n');   // raw too: a placeholder or aria-label lives inside a tag
-  return labels.filter(l => !new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(l)}($|[^\\p{L}\\p{N}])`, 'mu').test(all));
+  const shown = new Set(lits.flatMap(pieces));
+  return labels.filter(l => !shown.has(l));
 }
 const uiLiterals = () => files('src/ui', '.ts').flatMap(f => literals(read(f), f));
 const guides = () => files('website/guides', '.html');
@@ -44,9 +56,12 @@ describe('the guides quote only labels the game shows (#2092)', () => {
       .toEqual(['Start again', 'RESET', "Who's here?"]);
     expect(literals("// 'In a comment'\nconst a = 'Plain', b = `<b>Tem ${a} plate</b>`; /* \"Block\" */")).toEqual(['Plain', '<b>Tem ', ' plate</b>']);
   });
-  it('flags a label no literal holds, one found only in a comment, and a partial word', () => {
-    const lits = literals("// 'Hidden label'\nconst x = '<button>Copy the code</button>', y = 'Once upon';");
-    expect(missing(['Copy the code', 'Hidden label', 'Renamed button', 'On', 'Once'], lits)).toEqual(['Hidden label', 'Renamed button', 'On']);
+  it('flags a label no literal holds, one only in a comment, one inside a sentence, and a key name in a comparison', () => {
+    const lits = literals("// 'Hidden label'\nconst x = '<button>Copy the code</button>', y = 'Once upon', s = 'Paste it into <b>Restore</b> later';\n" +
+      "if (e.key === 'Enter') go(); const h = '<h2>Start again?</h2>', w = `<button>👥 Who is playing?</button>`, p = '<textarea placeholder=\"Paste here\">';" +
+      "const r = `<li>${a}\">Save name</button>`;");
+    expect(missing(['Copy the code', 'Hidden label', 'Renamed button', 'On', 'Once', 'Paste it into', 'Restore', 'Enter', 'Start again', 'Who is playing?', 'Paste here', 'Once upon', 'Save name'], lits))
+      .toEqual(['Hidden label', 'Renamed button', 'On', 'Once', 'Enter', 'Start again']);
   });
   it('every <q> and <kbd> in every guide is a string the game has in src/ui/', () => {
     const pages = guides();
