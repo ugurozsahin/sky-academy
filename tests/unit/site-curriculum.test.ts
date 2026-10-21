@@ -1,82 +1,103 @@
-// The /curriculum/ page rail (#2089): website/curriculum/index.html is generated from docs/content-map.json by
-// scripts/site-curriculum.mjs, so it cannot say anything the content map does not. This regenerates it in memory
-// and fails on drift, and holds its topic count to the registry (content-map.test.ts holds the map itself).
-import { readFileSync } from 'node:fs';
+// The /curriculum/ hub rail (#2089, a hub since #2161): website/curriculum/index.html is generated from
+// docs/content-map.json by scripts/site-curriculum.mjs, so it cannot say anything the content map does not. This
+// regenerates it in memory and fails on drift, holds every count on it to the game's own registry rather than to
+// the map it was made from, and checks the seven year links. The tables the hub used to carry live on the year pages
+// now: `no row is lost or doubled` in site-curriculum-years.test.ts holds every (year, topic, objective) row there.
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TOPICS, YEARS } from '../../src/curriculum';
-import type { YearId } from '../../src/curriculum/types';
-import { esc, renderCurriculumPage, renderYear, yearSlug, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
+import { esc, plainObjective, renderCurriculumPage, tasteOf, yearPath, type ContentMap } from '../../scripts/site-curriculum-lib.mjs';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 const map: ContentMap = JSON.parse(read('docs/content-map.json'));
+const home = read('website/index.html');
 const page = read('website/curriculum/index.html');
 const REGEN = 'run `npm run content-map` and commit website/curriculum/index.html';
-const text = (html: string) => html.replace(/<head>[\s\S]*<\/head>/, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-const sectionOf = (id: string) => { const at = page.indexOf(`<section id="${yearSlug(id as YearId)}"`); return page.slice(at, page.indexOf('</section>', at)); };
-const rowHeads = (html: string) => [...html.matchAll(/<th scope="row">([^<]*)<\/th>/g)].map(m => m[1]);
+const main = page.match(/<main\b[\s\S]*<\/main>/)![0];
+const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+const topics = (year?: string, subject?: string) => TOPICS.filter(t => (!year || t.year === year) && (!subject || t.subject === subject));
+const word = (n: number) => `${n} ${n === 1 ? 'topic' : 'topics'}`;
+/** The year cards: one `<li>` each in the `.years` list, with its link, its name and its text. */
+const cards = () => {
+  const list = main.match(/<ul class="years">([\s\S]*?)<\/ul>/)![1];
+  return [...list.matchAll(/<li><h3><a href="([^"]+)">([^<]+)<\/a><\/h3>([\s\S]*?)<\/li>/g)].map(m => ({ href: m[1], name: m[2], body: m[3] }));
+};
 
-describe('the curriculum page is generated, never hand-kept (#2089)', () => {
+describe('the curriculum hub is generated, never hand-kept (#2089, #2161)', () => {
   it('website/curriculum/index.html equals a fresh render of the content map and the home page shell', () => {
-    expect(page, REGEN).toBe(renderCurriculumPage(map, read('website/index.html')));
+    expect(page, REGEN).toBe(renderCurriculumPage(map, home));
   });
-  it('lists every registry topic exactly once and says how many there are', () => {
-    const onPage = YEARS.flatMap(y => rowHeads(sectionOf(y.id)).map(title => `${y.id} ${title}`));
-    expect(onPage.sort(), 'each topic under its own year').toEqual(TOPICS.map(t => `${t.year} ${esc(t.title)}`).sort());
-    expect(rowHeads(page)).toHaveLength(TOPICS.length);
-    expect(text(page)).toContain(`Sharpwise has ${TOPICS.length} maths and English topics`);
+  it('is at most 10 KB of HTML', () => {
+    expect(Buffer.byteLength(page, 'utf8')).toBeLessThanOrEqual(10 * 1024);
   });
-  it('gives each year a section with its anchor, its index link, and a maths and an English table', () => {
-    for (const y of YEARS) {
-      const slug = yearSlug(y.id);
-      expect(page, y.id).toContain(`<section id="${slug}" aria-labelledby="${slug}-title">`);
-      expect(page, y.id).toContain(`<a href="#${slug}">${y.title}</a>`);
-      expect(page, y.id).toContain(`<caption>${y.title} maths: `);
-      expect(page, y.id).toContain(`<caption>${y.title} English: `);
-    }
+  it('shows no objective and no table: the year pages carry those, so no curriculum code can reach the hub (#2123)', () => {
+    expect(main).not.toMatch(/<table\b/);
+    expect(text(main)).not.toMatch(/\b(?:Y\d\S*|ELG|EYFS) [^.:]{0,20}:|\(\d+M\d|\bApp(?:endix|\.)/);
   });
-  it('every in-page link lands on an id the page has', () => {
-    const ids = new Set([...page.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
-    for (const [, id] of page.matchAll(/href="#([^"]+)"/g)) expect(ids.has(id), `#${id}`).toBe(true);
+});
+
+describe('the hub\'s numbers are the game\'s own (#2161)', () => {
+  it('says how many topics there are, and how many in maths and in English, in plain text', () => {
+    const lede = text(main.match(/<p class="lede">[\s\S]*?<\/p>/)![0]).trim();
+    expect(lede).toBe(`Sharpwise has ${TOPICS.length} maths and English topics, from Reception to Year 6: ${topics('', 'maths').length} in maths and ${topics('', 'writing').length} in English.`);
   });
-  it('every table has a caption first and column headers, and every data row a row header', () => {
-    const tables = [...page.matchAll(/<table>([\s\S]*?)<\/table>/g)].map(m => m[1]);
-    expect(tables).toHaveLength(YEARS.length * 2);
-    for (const t of tables) {
-      expect(t.trimStart().startsWith('<caption>'), 'caption first').toBe(true);
-      expect(t).toContain('<thead><tr><th scope="col">Topic</th><th scope="col">Curriculum objective</th></tr></thead>');
-      for (const [row] of t.matchAll(/<tr>(?!<th scope="(?:col|rowgroup)")[\s\S]*?<\/tr>/g)) expect(row).toMatch(/^<tr><th scope="row">/);
-    }
+  it('gives each year card its own maths and English counts', () => {
+    const got = cards();
+    expect(got).toHaveLength(YEARS.length);
+    YEARS.forEach((y, i) => {
+      expect(got[i].body, y.id).toContain(`<p>${word(topics(y.id, 'maths').length)} in maths and ${word(topics(y.id, 'writing').length)} in English.</p>`);
+    });
   });
-  it('lists under each year exactly the strands of that year that no topic of that year names', () => {
-    const area = (name: string) => esc(name.replace(/^Years? [\d–-]+ /, ''));
+  it('puts the same counts in the description, for search results', () => {
+    const description = page.match(/<meta name="description" content="([^"]+)">/)![1];
+    expect(description).toContain(`${TOPICS.length} maths and English topics`);
+    expect(description).toContain(`${topics('', 'maths').length} in maths and ${topics('', 'writing').length} in English`);
+  });
+});
+
+describe('the hub links the seven year pages (#2161)', () => {
+  it('as a list of seven cards, in school order, each named for its year and linking its page', () => {
+    expect(cards().map(c => [c.href, c.name])).toEqual(YEARS.map(y => [yearPath(y.id), esc(y.title)]));
+    for (const { href } of cards()) expect(existsSync(`website${href}index.html`), href).toBe(true);
+  });
+  it('carries a JSON-LD ItemList of the same seven pages, in the same order', () => {
+    const ld = JSON.parse(page.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]);
+    expect(ld['@type']).toBe('ItemList');
+    expect(ld.numberOfItems).toBe(7);
+    expect(ld.itemListElement.map((i: { position: number; name: string; url: string }) => [i.position, i.name, i.url]))
+      .toEqual(YEARS.map((y, i) => [i + 1, y.title, `https://sharpwise.co.uk${yearPath(y.id)}`]));
+  });
+  it('links the game, and keeps its heading levels in order: one h1, then h2, then h3', () => {
+    expect(main).toContain('<a class="btn" href="/play/">Play Sharpwise</a>');
+    expect([...main.matchAll(/<h(\d)\b/g)].map(m => Number(m[1]))).toEqual([1, 2, ...YEARS.map(() => 3)]);
+  });
+  it('uses only classes website/site.css defines', () => {
+    const css = read('website/site.css');
+    for (const [, list] of main.matchAll(/class="([^"]+)"/g)) for (const c of list.split(/\s+/)) expect(css, `.${c}`).toMatch(new RegExp(`\\.${c}\\b`));
+  });
+});
+
+describe('each card gives a taste of its year in plain words (#2161)', () => {
+  it('names three topics of that year, two in maths and one in English, each as the year page words it', () => {
     for (const y of map.byYear) {
-      const named = new Set(map.topics.filter(t => t.year === y.year).flatMap(t => t.strands));
-      const expected = map.coverage.filter(c => c.years.includes(y.year) && !named.has(c.id)).map(c => area(c.name));
-      const section = sectionOf(y.year);
-      const listed = [...section.slice(section.indexOf('<h3>Not covered yet')).matchAll(/<li>([^<]*) \((?:maths|English)\)<\/li>/g)].map(m => m[1]);
-      expect(listed, y.year).toEqual(expected);
-    }
-    expect(sectionOf('year3'), 'a strand shared with Year 4 is a gap in Year 3 when only Year 4 has topics').toContain('<li>Reading: comprehension (English)</li>');
-  });
-  it('puts every topic under the curriculum area of its first strand', () => {
-    for (const y of map.byYear) {
-      for (const [, group] of sectionOf(y.year).matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)) {
-        const heading = group.match(/<th scope="rowgroup" colspan="2">([^<]*)<\/th>/)![1];
-        for (const title of rowHeads(group)) {
-          const homes = map.topics.filter(t => t.year === y.year && esc(t.title) === title)
-            .map(t => esc(map.coverage.find(c => c.id === t.strands[0])!.name.replace(/^Years? [\d–-]+ /, '')));
-          expect(homes, `${y.year}: ${title}`).toContain(heading);
-        }
-      }
+      const taste = tasteOf(map, y);
+      expect(taste, y.year).toHaveLength(3);
+      const said = (subject: string) => map.topics.filter(t => t.year === y.year && t.subject === subject)
+        .map(t => (plainObjective(t.nc) || '').split(';')[0].trim());
+      expect(said('maths'), `${y.year}: ${taste[0]}`).toContain(taste[0]);
+      expect(said('maths'), `${y.year}: ${taste[1]}`).toContain(taste[1]);
+      expect(said('writing'), `${y.year}: ${taste[2]}`).toContain(taste[2]);
+      expect(new Set(taste).size, `${y.year}: three different topics`).toBe(3);
+      expect(cards().find(c => c.href === yearPath(y.year))!.body, y.year).toContain(`<p>For example: ${taste.map(esc).join('; ')}.</p>`);
     }
   });
-  it('escapes what it prints: markup in a title, an objective or an area name comes out as text', () => {
-    const odd = { ...map, topics: map.topics.map((t, i) => (i ? t : { ...t, title: '<b>Odd</b> & "co"', nc: 'A<i>&</i>B' })),
-      coverage: map.coverage.map((c, i) => (i ? c : { ...c, name: 'Area <u>x</u>' })) };
-    const y = renderYear(odd, odd.byYear[0]);
-    expect(y).toContain('&lt;b&gt;Odd&lt;/b&gt; &amp; &quot;co&quot;');
-    expect(y).toContain('A&lt;i&gt;&amp;&lt;/i&gt;B');
-    expect(y).toContain('Area &lt;u&gt;x&lt;/u&gt;');
-    expect(y).not.toMatch(/<[biu]>/);
+  it('escapes what it prints: markup in a year title or an objective comes out as text', () => {
+    const odd = { ...map, byYear: map.byYear.map((y, i) => (i ? y : { ...y, title: '<b>R</b>' })),
+      topics: map.topics.map((t, i) => (i ? t : { ...t, nc: 'ELG Number: <i>x</i> & y' })) };
+    const html = renderCurriculumPage(odd, home);
+    expect(html).toContain('&lt;b&gt;R&lt;/b&gt;');
+    expect(html).toContain('&lt;i&gt;x&lt;/i&gt; &amp; y');
+    expect(html).toContain('"name": "\\u003cb>R\\u003c/b>"');
+    expect(html.match(/<main\b[\s\S]*<\/main>/)![0]).not.toMatch(/<[bi]>/);
   });
 });

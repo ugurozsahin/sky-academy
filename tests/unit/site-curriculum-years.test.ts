@@ -155,13 +155,11 @@ describe('the year pages agree with /curriculum/ (#2090)', () => {
 
 describe('the year pages and /curriculum/ link to each other (#2090)', () => {
   const index = read('website/curriculum/index.html');
-  it('/curriculum/ links to every year page from its year index and from the year\'s section', () => {
-    const nav = index.slice(index.indexOf('<nav aria-labelledby="index-title">'), index.indexOf('</nav>', index.indexOf('index-title')));
+  it('/curriculum/ links to every year page from its year cards (#2161)', () => {
+    const list = index.slice(index.indexOf('<ul class="years">'), index.indexOf('</ul>', index.indexOf('<ul class="years">')));
     for (const y of map.byYear) {
       expect(existsSync(fileOf(y.year))).toBe(true);
-      expect(nav, y.year).toContain(`<a href="${yearPath(y.year)}">${y.title} in plain words</a>`);
-      const at = index.indexOf(`<section id="${yearSlug(y.year)}"`);
-      expect(index.slice(at, index.indexOf('</section>', at)), y.year).toContain(`<a href="${yearPath(y.year)}">`);
+      expect(list, y.year).toContain(`<h3><a href="${yearPath(y.year)}">${y.title}</a></h3>`);
     }
   });
   it('each year page links back to /curriculum/, to the game and to every other year', () => {
