@@ -8,7 +8,8 @@ import { yearPath } from '../../scripts/site-curriculum-lib.mjs';
  * #2159: the main menu's Curriculum item is a <details> disclosure listing All years and the seven school years,
  * on every page. The years come from the game's registry, not from the header, so a year added to the game and
  * not to the menu fails here. site-home.test.ts holds the header byte-identical and the current-page marks.
- * #2174: website/nav.js turns it into a button and an overlay at run time; the markup on disk stays this <details>. * #2178: All years first, on its own, then the years in two lists by key stage, each named by its visible label.
+ * #2174: website/nav.js turns it into a button and an overlay at run time; the markup on disk stays this <details>.
+ * #2178: All years first, on its own, then the years in two lists by key stage, each named by its visible label.
  */
 const root = new URL('../../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');

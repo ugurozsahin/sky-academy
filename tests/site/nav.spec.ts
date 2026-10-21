@@ -85,6 +85,11 @@ for (const width of [360, 1280]) {
       const ks2 = list(page).getByRole('list', { name: 'Key Stage 2', exact: true });
       await expect(ks1.getByRole('link')).toHaveText(['Reception', 'Year 1', 'Year 2']);
       await expect(ks2.getByRole('link')).toHaveText(['Year 3', 'Year 4', 'Year 5', 'Year 6']);
+      for (const label of ['Reception and Key Stage 1', 'Key Stage 2']) await expect(list(page).getByText(label, { exact: true }), 'a visible label').toBeVisible();
+      // Inside a group: two years to a row on a phone, one to a row from 900 px.
+      const [y3, y4] = [(await ks2.getByRole('link').nth(0).boundingBox())!, (await ks2.getByRole('link').nth(1).boundingBox())!];
+      if (width < 900) expect([y4.y, y4.x > y3.x], 'Year 4 beside Year 3').toEqual([y3.y, true]);
+      else expect(y4.y, 'Year 4 under Year 3').toBeGreaterThanOrEqual(y3.y + y3.height);
       const all = (await list(page).getByRole('link', { name: 'All years' }).boundingBox())!;
       const [a, b] = [(await ks1.boundingBox())!, (await ks2.boundingBox())!];
       expect(a.y, 'All years sits above both groups').toBeGreaterThan(all.y + all.height - 1);
@@ -184,5 +189,12 @@ test.describe('without JavaScript', () => {
     await details.locator('summary').click();
     await expect(details.locator('a')).toHaveCount(8);
     await expect(details.locator('a').first()).toBeVisible();
+    // #2178: the two named lists, their labels shown, each year under the one before.
+    for (const label of ['Reception and Key Stage 1', 'Key Stage 2']) {
+      await expect(details.getByText(label, { exact: true })).toBeVisible();
+      await expect(details.getByRole('list', { name: label, exact: true })).toBeVisible();
+    }
+    const [r, y1] = [(await details.getByRole('link', { name: 'Reception' }).boundingBox())!, (await details.getByRole('link', { name: 'Year 1' }).boundingBox())!];
+    expect(y1.y, 'Year 1 under Reception').toBeGreaterThanOrEqual(r.y + r.height);
   });
 });
