@@ -55,7 +55,25 @@ const LEAVES: Record<string, string> = {
   '/src/ui/parents-daily.ts': 'Today\'s Daily Sprint result',
   '/src/ui/parents-words.ts': 'the spelling words still to learn',
 };
-const SENDS = /\bclipboard\b|\.share\s*\(|navigator\.share\b/;
+const SENDS = /clipboard|\.share\s*\??\.?\s*\(|navigator\.share\b|\[['"]share['"]\]|execCommand\s*\(\s*['"]copy/i;
+
+/** Every `say(…, true)`: a line spoken even with read aloud off, because someone tapped to hear it. The page says
+ *  none carries the child's name, so each is listed here; a new one fails until it is read and added. */
+const FORCED: Record<string, string[]> = {
+  '/src/ui/home.ts': ["'Read aloud is on'", 'dojoRowLine(c, Math.min(c.goal, dojoState.progress[c.id] ?? 0))', 'lockedStickerLine(i >= 0 && i < STICKER_COST.length ? STICKER_COST[i] : undefined, ach?.title)'],
+  '/src/ui/shop.ts': ['shopItemLine(it)', '`You bought the ${name}!`'],
+  '/src/ui/play-beats.ts': ['q.say ?? q.prompt'],
+  '/src/ui/duel-beats.ts': ['spokenQuestion(q, duel.round)'],
+  '/src/ui/parents.ts': ["'Paste a code into the box above first.'", "'This replaces all the progress on this device. Tap Restore again to go ahead.'", "'That code is not a Sharpwise save.'"],
+};
+/** The helpers those lines call, by signature: none is handed the child's name. */
+const FORCED_HELPERS = [
+  ['/src/ui/shop.ts', 'export function shopItemLine(item: { name: string; blurb: string }): string'],
+  ['/src/ui/home.ts', 'export function dojoRowLine(c: Challenge, progress: number): string'],
+  ['/src/ui/home.ts', 'export function lockedStickerLine(cost: number | undefined, achievementTitle: string | undefined): string'],
+  ['/src/game/duel.ts', 'export function spokenQuestion(q: Question, round: number): string'],
+];
+const forcedSays = (text: string) => [...text.matchAll(/\bsay\(((?:(?!\bsay\()[^\n])*?),\s*true\s*[,)]/g)].map(m => m[1]);
 
 describe('the privacy page: "collects nothing" is held to the code (#1934)', () => {
   it('says the game collects nothing and sets no cookie, on the page and in the at-a-glance list', () => {
@@ -66,6 +84,7 @@ describe('the privacy page: "collects nothing" is held to the code (#1934)', () 
   it('rests on the #1937 no-tracking rail, which still scans the built game and package.json', () => {
     const rail = read('tests/unit/guardrails-no-tracking.test.ts');
     for (const t of ['the built game reaches no tracking domain or SDK', 'package.json holds no analytics or ads package']) expect(rail, t).toContain(`it('${t}'`);
+    expect(rail, 'a skipped or focused rail no longer proves anything').not.toMatch(/\b(describe|it)\.(skip|only|todo)\b|\bx(it|describe)\(/);
     expect(rail).toContain('expect(trackingHits(built)).toEqual([]);');
     expect(rail).toContain('expect(badPackages(pkg)).toEqual([]);');
   });
@@ -109,7 +128,28 @@ describe('the privacy page\'s other facts (#1934)', () => {
     expect(privacy).toContain('The game prefers those voices');
     expect(SOURCES['/src/ui/home.ts']).toContain('aria-label="Read aloud');
     expect(SOURCES['/src/storage/shape.ts'], 'speech is a field of each save').toMatch(/^\s+speech: boolean;/m);
-    expect(privacy).toContain('do this for each ninja on the device');
+    expect(privacy).toContain('separately for each ninja on the device');
+  });
+  it('read aloud off still speaks a tapped line, and the page says so: every such line is listed and none carries the name', () => {
+    expect(SOURCES['/src/speech.ts'], 'the setting is skipped only when a caller forces the line').toContain('if (!force && !load().speech) return;');
+    const found = Object.fromEntries(Object.entries(SOURCES).filter(([p]) => p !== '/src/speech.ts').map(([p, t]) => [p, forcedSays(t)]).filter(([, a]) => a.length));
+    expect(found).toEqual(FORCED);
+    for (const arg of Object.values(FORCED).flat()) expect(arg, arg).not.toMatch(/praiseLine|\bd\.name\b|load\(\)\.name|childName/);
+    for (const [file, sig] of FORCED_HELPERS) expect(SOURCES[file], sig).toContain(sig);
+    expect(privacy).toContain('With read aloud off, it speaks only when someone taps something to hear it');
+    expect(privacy).toContain('Those lines never include your child\'s name.');
+    expect(privacy).not.toMatch(/switch read aloud off .*avoid|To avoid them/);
+    expect(forcedSays('say(a, true); say(b); say(c, false); say(d, true, { queue: true })')).toEqual(['a', 'd']);
+  });
+  it('Android backup is on in the manifest, and both pages say the save may go to the family\'s Google backup', () => {
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    expect(manifest, 'turned off? then change both pages, which say Android may back the save up').toContain('android:allowBackup="true"');
+    expect(manifest, 'backup rules could exclude the save; the pages would then overstate it').not.toMatch(/fullBackupContent|dataExtractionRules/);
+    expect(privacy).toContain('Android may copy the game\'s save, name included, to a private folder in the Google account the device uses');
+    expect(privacy).not.toContain('and nowhere else');
+    expect(privacy).not.toContain('Nothing leaves the device by itself');
+    expect(support).toContain('Android may put the save back by itself when the app is installed again');
+    expect(support).not.toContain('uninstalling the app clears everything');
   });
 });
 
