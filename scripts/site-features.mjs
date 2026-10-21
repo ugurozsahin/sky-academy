@@ -2,7 +2,7 @@
 // The header and footer are copied from website/index.html (the #1935 shell), so the page never drifts from it.
 // The page is committed; tests/unit/site-features.test.ts regenerates it and fails when the two differ, and holds
 // the data's rules: every `today.source` exists, every `later.issue` is a number, no entry names a date.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /** Words a plan must never carry: a date, a month, a promise of timing (#2101: "Coming later", never a date). */
@@ -10,9 +10,10 @@ const NO_DATES = [
   /\b(?:19|20)\d\d\b/,
   /\b\d{1,2}(?:st|nd|rd|th)\b/,
   /\b\d{1,2}\/\d{1,2}\b/,
-  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\b/,
+  /\b(?:january|february|april|june|july|august|september|october|november|december)\b/i,
+  /\b(?:March|May|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\b/,   // capitalised only: "may" and "march" are verbs
   /\bsoon\b/i,
-  /\bwill be available\b/i,
+  /\bwill\s+be\s+available\b/i,
 ];
 
 /** Every rule the data breaks, as readable lines; empty when it is sound. `exists` answers for a repo path. */
@@ -46,8 +47,10 @@ const PAGE_URL = 'https://sharpwise.co.uk/features/';
 
 /** The whole page, from the data and the home page whose header and footer it reuses byte for byte. */
 export function renderFeaturesPage(data, homeHtml) {
-  const header = cut(homeHtml, '<a class="skip"', '</header>').replace(/ aria-current="page"/g, '')
-    .replace('<a href="/features/">', '<a href="/features/" aria-current="page">');
+  const plain = cut(homeHtml, '<a class="skip"', '</header>').replace(/ aria-current="page"/g, '');
+  const link = '<a href="/features/">';
+  if (!plain.includes(link)) throw new Error(`website/index.html: the header has no ${link}`);
+  const header = plain.replace(link, '<a href="/features/" aria-current="page">');
   const footer = cut(homeHtml, '<footer', '</footer>');
   return `<!doctype html>
 <html lang="en-GB">
@@ -119,7 +122,8 @@ ${facts(data.later)}
 `;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+// realpath: import.meta.url has symlinks resolved and argv[1] does not (macOS /tmp is one), so compare real paths.
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   const root = new URL('../', import.meta.url);
   const data = JSON.parse(readFileSync(new URL('docs/site/features.json', root), 'utf8'));
   const problems = featureProblems(data, p => { try { readFileSync(new URL(p, root)); return true; } catch { return false; } });

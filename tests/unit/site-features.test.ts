@@ -45,10 +45,10 @@ describe('docs/site/features.json (#2101)', () => {
     expect(bad({ later: [{ title: 'L', blurb: 'B.' }] }), 'no issue').toHaveLength(1);
     expect(bad({ later: [{ title: '', blurb: 'B.', issue: 54 }] }), 'no title').toHaveLength(1);
     expect(bad({ later: [] }), 'an empty list').toHaveLength(1);
-    for (const words of ['Ready soon.', 'Out in 2027.', 'From March.', 'In May.', 'On the 3rd.', 'On 12/4.', 'It will be available here.', 'SOON']) {
+    for (const words of ['Ready soon.', 'Out in 2027.', 'From March.', 'In May.', 'On the 3rd.', 'On 12/4.', 'It will be available here.', 'It will  be\navailable.', 'SOON', 'By september.', 'In JUNE.', 'From Sept.']) {
       expect(bad({ later: [{ title: 'L', blurb: words, issue: 54 }] }), words).toHaveLength(1);
     }
-    for (const words of ['Year 3–4 lists.', '25 questions, 6 seconds each.', 'Children may play.', 'Year 6 practice.']) {
+    for (const words of ['Year 3–4 lists.', '25 questions, 6 seconds each.', 'Children may play.', 'Ninjas march on.', 'Year 6 practice.']) {
       expect(bad({ later: [{ title: 'L', blurb: words, issue: 54 }] }), words).toEqual([]);
     }
   });
@@ -92,6 +92,8 @@ describe('website/features/index.html (#2101)', () => {
     const home = read('website/index.html');
     expect(renderFeaturesPage(data, home.replace('>About<', '>About us<'))).not.toBe(page);
     expect(() => renderFeaturesPage(data, home.replace('</header>', ''))).toThrow();
+    expect(() => renderFeaturesPage(data, home.replace('<a href="/features/">', '<a class="x" href="/features/">'))).toThrow(/features/);
+    expect(page).toContain('<li><a href="/features/" aria-current="page">Features</a></li>');
   });
 
   it('uses only classes website/site.css defines', () => {
