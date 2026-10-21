@@ -1,5 +1,5 @@
 {
-  "about": "The /features/ page (#2101). `today`: what the game does on main, each with the repo path that shows it. `later`: what is planned, each with its open issue. `node scripts/site-features.mjs` renders website/features/index.html; tests/unit/site-features.test.ts holds the rules.",
+  "about": "The /features/ page (#2101). `today`: what the game does on main, each with the repo path that shows it. `later`: what is planned, each with the number of the issue that tracks it (the reviewer checks it is still open). `node scripts/site-features.mjs` renders website/features/index.html; tests/unit/site-features.test.ts holds the rules.",
   "today": [
     { "title": "Missions", "blurb": "Every topic is a mission of five waves that get harder as they go, with lives to keep and up to three stars to win.", "source": "src/game/modes.ts" },
     { "title": "Sky Storm", "blurb": "An endless storm of mixed questions that speeds up the longer a child keeps going, with Hammer Man's TNT bubbles to avoid.", "source": "src/game/modes.ts" },
