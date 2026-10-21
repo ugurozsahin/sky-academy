@@ -195,10 +195,10 @@ describe('the service worker, driven (#15)', () => {
     expect(sw.claimed.claim).toBe(1);
   });
 
-  it('keeps the font cache across deployments', async () => {
+  it('retires the font cache an earlier worker kept: the font is self-hosted now (#2125)', async () => {
     await sw.cachesApi.open('sna-fonts-v1');
     await sw.fire('activate', {});
-    expect(await sw.cachesApi.keys()).toContain('sna-fonts-v1');
+    expect(await sw.cachesApi.keys()).not.toContain('sna-fonts-v1');
   });
 
   it('plays the whole build back with the network gone', async () => {
