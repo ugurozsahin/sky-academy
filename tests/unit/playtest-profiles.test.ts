@@ -189,7 +189,10 @@ describe('the playtest skill (#2204)', () => {
     expect(need, 'a recalled fact is free').toContain('**a recalled fact adds 0**');
     expect(need, 'each further step costs a second').toContain('**each further mental step the question needs adds 1 s**');
     expect(need, 'with a worked step').toContain('`0.4 × 3` is recall 4 × 3, then adjust the place value: one step, 1 s');
-    expect(need, 'and a fixed line is told from two waves in the pack, never the source').toContain('`2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2) is the same text');
+    expect(need, 'a fixed question line is read from the pack\'s key (#2250)').toContain('**Read whether the question line is fixed from `metrics.json#promptFixed`**');
+    expect(need, 'which covers a sequence game, so no screenshot comparison and no live read for it').toContain('never compare screenshots or read the line live for it');
+    expect(need, 'the old live two-wave read is gone').not.toMatch(/over two waves live/);
+    expect(need, 'and the instruction under the line is still told from two waves in the pack, never the source').toContain('the same text in `2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2)');
     expect(need, 'the mark shows its working').toContain('Every `physical` `saw` names the steps it counted');
     const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]) as { evidence: { criterion: string; saw: string }[] };
     const physical = row.evidence.filter((e) => e.criterion === 'physical');

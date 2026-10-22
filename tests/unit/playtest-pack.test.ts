@@ -7,7 +7,8 @@ import { MAX_RELAUNCHES, RELAUNCH_DELAY } from '../../src/game/bubbles';
 import { createSim } from './sim/harness';
 import {
   ABOUT, FRAME_CLAMP_MS, KEYPAD_PACKS, buildMetrics, cardShare, countWords, flightMetrics, frameStats, labelReach, newReach,
-  parseArgs, plannedPacks, reachStep, speechMode, type ReachBubble, type ReachRecording, type Recorded, type Sample,
+  parseArgs, plannedPacks, promptKeys, promptStep, reachStep, speechMode, type PromptRow, type ReachBubble, type ReachRecording,
+  type Recorded, type Sample,
 } from '../../scripts/playtest-metrics.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
@@ -286,6 +287,60 @@ describe('the reach recorder on the real Arena (#2251)', () => {
   });
 });
 
+describe('whether the question line is fixed over the stage, on a stub session (#2250)', () => {
+  /** What the page's tick sees, frame by frame: `questionsAsked` and `state()`'s stage and prompt. */
+  const record = (frames: [asked: number, stage: number, prompt: string | undefined][]) => {
+    const rows: PromptRow[] = [];
+    for (const [asked, stage, prompt] of frames) promptStep(rows, asked, { stage, prompt });
+    return rows;
+  };
+  const order = 'Smallest to biggest!';
+
+  it('keeps one row per question, not per frame, and skips the frames with no line', () => {
+    const rows = record([[0, 1, undefined], [1, 1, order], [1, 1, order], [1, 1, order], [2, 1, order], [2, 1, order], [2, 1, undefined], [3, 1, order]]);
+    expect(rows).toEqual([[1, 1, order], [2, 1, order], [3, 1, order]]);
+  });
+
+  it('a sequence game whose line is the same every question is fixed, though the screen hides it once slicing starts', () => {
+    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 1, order], [4, 1, order]]))).toEqual({ promptFixed: true, promptWaves: 4 });
+  });
+
+  it('a line that differs on any question of the stage is not fixed', () => {
+    expect(promptKeys(record([[1, 1, '6 + 1 = ?'], [2, 1, '8 + 0 = ?'], [3, 1, '2 + 5 = ?']]))).toEqual({ promptFixed: false, promptWaves: 3 });
+    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 1, 'Biggest to smallest!']])).promptFixed, 'even only the last').toBe(false);
+  });
+
+  it('a line that changes within one question is not fixed either', () => {
+    expect(promptKeys(record([[1, 1, order], [1, 1, 'Now the next one'], [2, 1, order]]))).toEqual({ promptFixed: false, promptWaves: 2 });
+  });
+
+  it('compares the stage the pack played only, not a stage the result moved on to', () => {
+    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 2, 'Biggest to smallest!']]))).toEqual({ promptFixed: true, promptWaves: 2 });
+  });
+
+  it('fails a pack that read fewer than two questions, rather than write a value nobody compared', () => {
+    expect(() => promptKeys(record([[1, 1, order], [1, 1, order]]))).toThrow(/two questions in one stage; 1 read/);
+    expect(() => promptKeys([])).toThrow(/0 read/);
+  });
+
+  it('is written into every pack, bubbles or not, from the rows the page recorded', () => {
+    const screen = { H, card: null, speakVisible: false, prompt: order, answer: '1', hasLives: true, hint: null, slow: false, wide: false, sequence: false, anyOrder: false, visual: null, lives: 3, mode: 'mission' };
+    const rec: Recorded = { screen, samples: null, frames: [], labels: [], promptAt: null, speech: null, extra: {}, lines: record([[1, 1, order], [2, 1, order]]) };
+    const job = { year: 'year1', game: 'y1-trace', catalogue: true };
+    const m = buildMetrics({ job, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec, shots: [], maxRelaunches: MAX_RELAUNCHES });
+    expect([m.promptFixed, m.promptWaves]).toEqual([true, 2]);
+    expect(() => buildMetrics({ job, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec: { ...rec, lines: [] }, shots: [], maxRelaunches: MAX_RELAUNCHES })).toThrow(/promptFixed/);
+    expect(Object.keys(ABOUT)).toEqual(expect.arrayContaining(['promptFixed', 'promptWaves']));
+  });
+
+  it('the page runs the very recorder tested here, each frame, and hands its rows over after the stage result', () => {
+    const pack = read('scripts/playtest-pack.mjs');
+    expect(pack).toContain('window.__promptStep = ${promptStep};');
+    expect(pack).toContain('window.__promptStep(pk.lines, s.session.questionsAsked, st);');
+    expect(pack.indexOf('played.lines = await page.evaluate(() => window.__pk.lines);'), 'read once play() has reached the result').toBeGreaterThan(pack.indexOf('const played = await play('));
+  });
+});
+
 describe('play-pack words, speech and card (#2205, #2214)', () => {
   it('counts words only: numerals, symbols and the ? placeholder are not words', () => {
     expect(countWords('6 + 1 = ?')).toBe(0);
@@ -317,7 +372,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   };
   const rec: Recorded = {
     screen, samples: fly([{ id: 1, label: '7', launch: 100, vy: -600, g: 250 }, { id: 2, label: '8', launch: 500, vy: -600, g: 250 }], 9000),
-    frames: [0, 16, 33], labels: ['7', '8'], promptAt: 50, extra: {},
+    frames: [0, 16, 33], labels: ['7', '8'], promptAt: 50, extra: {}, lines: [[1, 1, '6 + 1 = ?'], [2, 1, '8 + 0 = ?']],
     speech: { text: 'Adding! 6 plus 1 equals what', at: 60, start: 80, end: 2880, error: null },
   };
   const settings: Record<string, unknown> = { ...resolveGame('y1-add', 'year1').settings };   // what scripts/playtest-pack.mjs passes, so a key the skill cites (#2245: airTime) is the real one
@@ -354,7 +409,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   it('holds the keys the skill lists in prose, #2214 asks for and the #2205 comment names', () => {
     for (const k of ['settings.lives', 'settings.gentle', 'settings.speeds', 'settings.diffs', 'input', 'prompt', 'promptWords', 'speechOffered',
       'answersPerWave', 'bubbleRadiusPx', 'launchToApexMs', 'aboveCardMs.min', 'slowestBubble', 'fastestBubble', 'cardShareOfScreen', 'slow', 'wide',
-      'speech', 'speechAutoplays', 'speechMs']) expect(at(k), k).not.toBeUndefined();
+      'speech', 'speechAutoplays', 'speechMs', 'promptFixed', 'promptWaves']) expect(at(k), k).not.toBeUndefined();
     expect(m.speech).toBe('auto');
     expect(m.speechMs).toBe(2800);
     expect(m.promptWords).toBe(0);
