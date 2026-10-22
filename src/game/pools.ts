@@ -24,7 +24,8 @@ export const subjectTopics = (topics: Topic[], subject: Topic['subject']): Topic
 
 /** The Mixed pool for the open subject tab (#908): `subjectTopics`, or the whole year's bubble topics when the subject
  *  has none (#1325), so a subject that is still empty never hands `Session.pickTopic()` an empty pool — that throws.
- *  Unreachable with today's registry (`tests/unit/curriculum.test.ts` pins every shown year's subjects non-empty). */
+ *  Unreachable with the committed catalogue (`tests/unit/curriculum.test.ts` pins every shown year's subjects non-empty);
+ *  a catalogue that hides every bubble topic of one subject on an island reaches it (#2196). */
 export function subjectPool(topics: Topic[], subject: Topic['subject']): Topic[] {
   const own = subjectTopics(topics, subject);
   if (own.length) return own;
