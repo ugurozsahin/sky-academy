@@ -2546,7 +2546,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Ask what the clock will say in half an hour, then check when the time comes.",
    "strands": [
     "y2-m-measure"

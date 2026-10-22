@@ -57,8 +57,8 @@ describe('emoji floor (#875): three already-found above-floor glyphs cannot retu
    * so a future edit could revert `oil`'s icon, `y1-coins`' icon or the survey row's label/emoji pairing
    * without any test noticing (`pr-test-analyzer` review of #875). These three pin the replacement values.
    */
-  it('the oi-digraph word is oil, with its floor-compliant icon', () => {
-    expect(DIGRAPH_WORDS.find(([w]) => w === 'oil')).toEqual(['oil', 'oi', '🛢️']);
+  it('the oi-digraph word is toilet (not an oil drum), with its floor-compliant icon (#2273)', () => {
+    expect(DIGRAPH_WORDS.find(([, d]) => d === 'oi')).toEqual(['toilet', 'oi', '🚽']);
   });
 
   it('the y1-coins topic icon is 💷, not 🪙', () => {
