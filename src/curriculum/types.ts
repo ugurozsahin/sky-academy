@@ -1,5 +1,7 @@
 // Shared question model for every subject. Generators are pure: (difficulty, rng) => Question.
 import type { Strand } from './strands';
+import { resolveYear } from '../config/resolve';
+import type { DefaultSettings, YearSettings } from '../config/catalogue';   // the year settings live in src/config/catalogue.json (#2194)
 export type Rng = () => number; // [0,1)
 
 /** One category of a chart visual: its label (emoji + name) and the count it stands for. */
@@ -149,7 +151,8 @@ export type Difficulty = 1 | 2 | 3;
 export type Generator = (d: Difficulty, rng: Rng) => Question;
 
 // One string source of truth for every year group. Adding a year (Y3–Y6) means one
-// new YearId member + one YEARS entry — no unions or per-year assets to retype elsewhere.
+// new YearId member + one YEARS entry + its `years` node in src/config/catalogue.json (#2194), which holds
+// its settings — no unions or per-year assets to retype elsewhere.
 export type YearId = 'reception' | 'year1' | 'year2' | 'year3' | 'year4' | 'year5' | 'year6';
 
 export interface Topic {
@@ -159,6 +162,7 @@ export interface Topic {
   subject: 'maths' | 'writing';
   year: YearId;
   nc: string;             // curriculum reference (short)
+  parent?: string;        // the objective in a parent's words, for the site's year pages; set where `nc` is teacher's vocabulary (#2153)
   input?: 'bubbles' | 'tracing' | 'keypad';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
   solo?: true;            // mission only (#1017): never drawn by a mixed mode, Sensei or the Duel
   drill?: true;           // a narrow practice topic (#915): offered by the Sprint chooser only, never counted, mixed or duelled
@@ -184,6 +188,7 @@ export interface YearInfo {
   speeds: number[];       // bubble speed per stage (0 gentle-float … 3 fast); length = number of stages
   diffs: Difficulty[];    // generator difficulty per stage
   sprintStars: { threeStar: number; twoStar: number };   // Ninja Sprint correct-answer thresholds for this year (#700)
+  timing?: DefaultSettings;   // #2198: one game's own air time and stagger; absent = the global `TIMING` (mixed modes, every year row)
 }
 export const STAGE_NAMES = ['Apprentice', 'Warrior', 'Master', 'Grandmaster', 'Legend'];
 
@@ -207,14 +212,23 @@ const ART_RECEPTION = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 const ART_YEAR1 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M16 36h88l-16 28H34z' fill='%234a3a5a'/%3E%3Cpath d='M28 44l20 12 14-9 14 11 16-15' stroke='%23302040' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='36' rx='46' ry='9' fill='%2359b0b8'/%3E%3Cellipse cx='60' cy='33' rx='42' ry='6' fill='%237fe0d8'/%3E%3Cpath d='M40 32l20-22 20 22z' fill='%23b8c4e6'/%3E%3Cpath d='M52 32l8-10 8 10z' fill='%23e8eeff'/%3E%3Crect x='82' y='18' width='4' height='14' fill='%23ffb020'/%3E%3Ccircle cx='84' cy='16' r='4' fill='%23ffe07a'/%3E%3C/svg%3E";
 const ART_YEAR2 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M14 38h92l-18 28H32z' fill='%233a2a4a'/%3E%3Cpath d='M26 46l22 12 14-9 14 11 18-15' stroke='%23261a34' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='38' rx='48' ry='9' fill='%237a5ad6'/%3E%3Cellipse cx='60' cy='35' rx='44' ry='6' fill='%23a98cff'/%3E%3Cpath d='M44 34V14h32v20' fill='%232a1f4a'/%3E%3Cpath d='M38 14h44l-4-6H42z' fill='%23ff3b5c'/%3E%3Cpath d='M48 34V20h8v14zM64 34V20h8v14z' fill='%23ffe07a'/%3E%3Ccircle cx='24' cy='30' r='4' fill='%233ec9ff'/%3E%3Ccircle cx='98' cy='28' r='5' fill='%23ffd54f'/%3E%3C/svg%3E";
 
+/** The eight settings `YEARS` takes from the catalogue (#2194); the rest of a row is display. */
+type YearSettingKey = Exclude<keyof YearSettings, 'airTime' | 'stagger'>;
+/** A `YEARS` row: its display fields here, its settings from `resolveYear` (defaults, then the year's own). */
+function year(id: YearId, display: Omit<YearInfo, 'id' | YearSettingKey>): YearInfo {
+  const s = resolveYear(id);
+  return { id, ...display, maxAnswer: s.maxAnswer, minAnswer: s.minAnswer, perStage: s.perStage, lives: s.lives, gentle: s.gentle,
+    speeds: [...s.speeds], diffs: [...s.diffs], sprintStars: { ...s.sprintStars } };
+}
+
 export const YEARS: YearInfo[] = [
-  { id: 'reception', title: 'Reception', short: 'R', age: 'Ages 4–5', blurb: 'First steps · counting, sounds & letters', art: ART_RECEPTION, tint: '#66c25a55', maxAnswer: 30, perStage: 5, lives: 4, gentle: true, speeds: [0, 0, 0, 1, 1], diffs: [1, 1, 2, 2, 3], sprintStars: { threeStar: 8, twoStar: 4 } },
-  { id: 'year1', title: 'Year 1', short: 'Y1', age: 'Ages 5–6', blurb: 'Number bonds, adding, phonics & spelling', art: ART_YEAR1, tint: '#59b0b855', maxAnswer: 120, perStage: 6, lives: 3, gentle: false, speeds: [1, 2, 2, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
-  { id: 'year2', title: 'Year 2', short: 'Y2', age: 'Ages 6–7', blurb: 'Times tables, money, time & tricky words', art: ART_YEAR2, tint: '#7a5ad655', maxAnswer: 130, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
+  year('reception', { title: 'Reception', short: 'R', age: 'Ages 4–5', blurb: 'First steps · counting, sounds & letters', art: ART_RECEPTION, tint: '#66c25a55' }),
+  year('year1', { title: 'Year 1', short: 'Y1', age: 'Ages 5–6', blurb: 'Number bonds, adding, phonics & spelling', art: ART_YEAR1, tint: '#59b0b855' }),
+  year('year2', { title: 'Year 2', short: 'Y2', age: 'Ages 6–7', blurb: 'Times tables, money, time & tricky words', art: ART_YEAR2, tint: '#7a5ad655' }),
   // #1050: no `art` yet (#1032's placeholder draws instead) — a KS2 island stays hidden by `meetsShowGate`
   // until it has 12 maths + 6 writing topics, so this row exists with no map presence today.
-  { id: 'year3', title: 'Year 3', short: 'Y3', age: 'Ages 7–8', blurb: 'Hundreds, 3, 4 & 8 tables, fractions & Roman numerals', tint: '#ffb02055', maxAnswer: 2000, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
-  { id: 'year4', title: 'Year 4', short: 'Y4', age: 'Ages 8–9', blurb: 'Tables to 12 × 12, decimals, area & coordinates', tint: '#3ec9ff55', maxAnswer: 20000, minAnswer: -50, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
-  { id: 'year5', title: 'Year 5', short: 'Y5', age: 'Ages 9–10', blurb: 'Millions, primes, percentages & angles', tint: '#66e07d55', maxAnswer: 1000000, minAnswer: -100, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
-  { id: 'year6', title: 'Year 6', short: 'Y6', age: 'Ages 10–11', blurb: 'Long division, ratio, algebra & SATs practice', tint: '#9aa5cf55', maxAnswer: 10000000, minAnswer: -1000, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
+  year('year3', { title: 'Year 3', short: 'Y3', age: 'Ages 7–8', blurb: 'Hundreds, 3, 4 & 8 tables, fractions & Roman numerals', tint: '#ffb02055' }),
+  year('year4', { title: 'Year 4', short: 'Y4', age: 'Ages 8–9', blurb: 'Tables to 12 × 12, decimals, area & coordinates', tint: '#3ec9ff55' }),
+  year('year5', { title: 'Year 5', short: 'Y5', age: 'Ages 9–10', blurb: 'Millions, primes, percentages & angles', tint: '#66e07d55' }),
+  year('year6', { title: 'Year 6', short: 'Y6', age: 'Ages 10–11', blurb: 'Long division, ratio, algebra & SATs practice', tint: '#9aa5cf55' }),
 ];

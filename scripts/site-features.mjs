@@ -1,8 +1,8 @@
 // `node scripts/site-features.mjs` (#2101): renders docs/site/features.json into website/features/index.html.
 // The header and footer are copied from website/index.html (the #1935 shell), so the page never drifts from it.
 // The page is committed; tests/unit/site-features.test.ts regenerates it and fails when the two differ, and holds
-// the data's rules: every `today.source` exists, every `later.issue` is a number, no entry names a date.
-import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+// the data's rules: every `today.source` exists, every `later.issue` is a whole number, no entry names a date.
+import { readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /** Words a plan must never carry: a date, a month, a promise of timing (#2101: "Coming later", never a date). */
@@ -11,7 +11,8 @@ const NO_DATES = [
   /\b\d{1,2}(?:st|nd|rd|th)\b/,
   /\b\d{1,2}\/\d{1,2}\b/,
   /\b(?:january|february|april|june|july|august|september|october|november|december)\b/i,
-  /\b(?:March|May|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\b/,   // capitalised only: "may" and "march" are verbs
+  /\b(?:jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\b/i,
+  /\b(?:March|May|MARCH|MAY)\b/,   // capitalised only: "may" and "march" are verbs
   /\bsoon\b/i,
   /\bwill\s+be\s+available\b/i,
 ];
@@ -65,6 +66,7 @@ export function renderFeaturesPage(data, homeHtml) {
   <link rel="icon" href="/icons/icon-192.webp" type="image/webp">
   <link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/site.css">
+  <script src="/nav.js" defer></script>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Sharpwise">
   <meta property="og:locale" content="en_GB">
@@ -130,7 +132,7 @@ ${facts(data.later)}
 if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   const root = new URL('../', import.meta.url);
   const data = JSON.parse(readFileSync(new URL('docs/site/features.json', root), 'utf8'));
-  const problems = featureProblems(data, p => { try { readFileSync(new URL(p, root)); return true; } catch { return false; } });
+  const problems = featureProblems(data, p => { try { return statSync(new URL(p, root)).isFile(); } catch { return false; } });
   if (problems.length) { console.error(problems.join('\n')); process.exit(1); }
   writeFileSync(new URL('website/features/index.html', root), renderFeaturesPage(data, readFileSync(new URL('website/index.html', root), 'utf8')));
   console.log(`website/features/index.html: ${data.today.length} today, ${data.later.length} later`);

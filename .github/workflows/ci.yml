@@ -78,13 +78,13 @@ concurrency:
 jobs:
   test:
     # #1538: the nightly's e2e outgrew one runner (40-42 min of a 45 min ceiling, cancelled on 2026-10-03), so the
-    # full arm is split in two `--shard`s on two runners; a pull request and a push to main stay one shard (`1/1`).
+    # full arm is split in three `--shard`s on three runners (#2128: shard 2/2 reached 37 min on 2026-10-20 and hit the ceiling on 2026-10-21); a pull request and a push to main stay one shard (`1/1`).
     # The ceiling below is NOT raised: each shard needs about half of what the single job did.
     name: ${{ matrix.shard == '1/1' && 'test' || format('test ({0})', matrix.shard) }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/2","2/2"]' || '["1/1"]') }}
+        shard: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/3","2/3","3/3"]' || '["1/1"]') }}
     runs-on: ubuntu-24.04   # pinned, not ubuntu-latest: that label moves to 26.04 from 2026-10-19 (#2085)
     # 45, raised from 30 on 2026-09-25 (#718) as a STOP-GAP, on the owner's decision in session. The nightly
     # full-matrix job had grown 899s -> 1816s in eight days and crossed the old ceiling, so the 2026-09-25 run
@@ -138,12 +138,14 @@ jobs:
           if [ "$EVENT" != 'pull_request' ]; then
             echo "e2e=true" >> "$GITHUB_OUTPUT"
             echo "sketch=false" >> "$GITHUB_OUTPUT"   # the full matrix below already carries the sketchbook project
+            echo "site=false" >> "$GITHUB_OUTPUT"     # …and the website's (#2096)
             echo "### e2e: **running** — \`$EVENT\` is never filtered (#96)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if ! files=$(git diff --name-only "$BASE...$HEAD" 2>&1); then
             echo "e2e=true" >> "$GITHUB_OUTPUT"
             echo "sketch=true" >> "$GITHUB_OUTPUT"    # fails towards running, the same as e2e
+            echo "site=true" >> "$GITHUB_OUTPUT"
             echo "### e2e: **running** — could not diff \`$BASE...$HEAD\`, so e2e is not skipped (#96)" >> "$GITHUB_STEP_SUMMARY"
             echo "$files"
             exit 0
@@ -175,6 +177,18 @@ jobs:
           else
             echo "sketch=false" >> "$GITHUB_OUTPUT"
           fi
+          # #2096: the website. A file here runs the `site` Playwright project (every sitemap page at 360 px: no
+          # sideways scroll, every on-site link 200, nothing leaves the origin) and NOT the game's e2e, which no
+          # page under website/ can reach. Also what the run itself stands on (the project's declaration, the e2e
+          # fixture it imports, Playwright's version, this file), which run the game's e2e as well.
+          SITE_PATHS='^(website/|tests/site/|scripts/site-serve\.|tests/e2e/(fixtures\.ts|mute\.mjs)$|playwright\.config\.|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'
+          if echo "$files" | grep -Eq "$SITE_PATHS"; then
+            echo "site=true" >> "$GITHUB_OUTPUT"
+            { echo "### website: **running** — the diff touches the site (#2096)";
+              echo "$files" | grep -E "$SITE_PATHS" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "site=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Lint (complexity and function length, frozen per file; #1381)
         run: npm run lint
       - name: Unit tests + guard rails
@@ -195,10 +209,10 @@ jobs:
       # push guard. Leaving them unfiltered would install a browser for a run that never opens one — about a
       # minute of the ~2.9 the filter is there to save.
       - name: Drop the apt sources we do not use (#85)
-        if: github.event_name != 'push' && (steps.scope.outputs.e2e == 'true' || steps.scope.outputs.sketch == 'true')
+        if: github.event_name != 'push' && (steps.scope.outputs.e2e == 'true' || steps.scope.outputs.sketch == 'true' || steps.scope.outputs.site == 'true')
         run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
       - name: Install Playwright browsers
-        if: github.event_name != 'push' && (steps.scope.outputs.e2e == 'true' || steps.scope.outputs.sketch == 'true')
+        if: github.event_name != 'push' && (steps.scope.outputs.e2e == 'true' || steps.scope.outputs.sketch == 'true' || steps.scope.outputs.site == 'true')
         run: npx playwright install --with-deps chromium
       # #81: a pull request runs the MOBILE project only; the nightly and workflow_dispatch run the whole
       # matrix. The game is mobile-first and the owner plays it on a phone and a tablet, so a desktop-only
@@ -252,7 +266,7 @@ jobs:
       # pull-request arm to exactly `--project=mobile --grep @smoke` and keeps `--grep` out of the nightly arm.
       - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile @smoke' || 'full matrix' }})
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
-        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile --grep @smoke' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape --project=sketchbook' }} --shard=${{ matrix.shard }}
+        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile --grep @smoke' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape --project=site --project=sketchbook' }} --shard=${{ matrix.shard }}
       # #715: a pull request whose diff touches the sketchbook runs its one spec — the screenshot script — as its
       # own step, on top of e2e when the diff also reaches the game and instead of it when it does not. Seconds,
       # not minutes: one page, a handful of frames. The nightly needs no step of its own: the full matrix above
@@ -260,6 +274,12 @@ jobs:
       - name: Sketchbook screenshots (#715)
         if: github.event_name == 'pull_request' && steps.scope.outputs.sketch == 'true'
         run: npx playwright test --project=sketchbook
+      # #2096: a pull request whose diff touches the website runs the `site` project, on top of e2e or instead of
+      # it, the same shape as the sketchbook step above. Seconds: one page load per sitemap entry, served by
+      # scripts/site-serve.mjs. The nightly carries it through the full matrix.
+      - name: Website pages (#2096)
+        if: github.event_name == 'pull_request' && steps.scope.outputs.site == 'true'
+        run: npx playwright test --project=site
       # #600: a syntax error anywhere under tests/e2e/ was invisible to every pull request whose own diff did
       # not reach the game — `tablet`/`tablet-landscape` are the only projects that load viewport.spec.ts, and
       # they run nightly only (#72), so #598 sat on `main` for hours before a routine happened to notice. This

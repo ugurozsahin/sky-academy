@@ -3267,6 +3267,62 @@ test.describe('Sharpwise', () => {
     expect(inBox, 'a bubble was left outside the resized arena').toMatchObject({ risingOutside: 0, offSide: 0 });
   });
 
+  // #2184: a KS2 card taller than a landscape phone put `topInset` below the arena floor, so `layoutWave` had a
+  // negative rise to work with and gave every bubble negative gravity — y6-pie's bubbles crept upwards and never
+  // came down (measured at 667×375 on y4-coords, y5-transform, y6-coords, y6-pie, y6-transform and y4-area).
+  // Read off the running arena, not recomputed: the first wave's bubbles must pull down, and one of them must
+  // be seen rising above the floor, turning over inside the box, and falling back towards it.
+  test('guard rail: a landscape KS2 card cannot give a wave negative gravity — y6-pie at 667×375 rises and falls (#2184)', async ({ page }) => {
+    await page.setViewportSize({ width: 667, height: 375 });
+    await seedPreview(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year6', 'y6-pie');
+    await page.waitForFunction(() => (window.__sna.arena?.bubbles.length ?? 0) > 0);
+    const wave = await page.evaluate(() => {
+      const a = window.__sna.arena!;
+      return { H: a.H, top: a.topInset, cardBottom: document.querySelector('.qcard')!.getBoundingClientRect().bottom, g: a.bubbles.map(b => b.g) };
+    });
+    console.log(`[guard rail #2184] H=${wave.H} topInset=${wave.top} cardBottom=${wave.cardBottom.toFixed(1)} g=${wave.g.map(g => g.toFixed(1)).join(',')}`);
+    for (const g of wave.g) expect(g, 'a bubble of the first wave was given zero or upward gravity').toBeGreaterThan(0);
+    const flight = await (await page.waitForFunction(() => {
+      const w = window as unknown as { __flight2184?: Record<number, { minY: number; r: number; turned: boolean; fell: boolean }> };
+      const seen = w.__flight2184 ??= {}, a = window.__sna.arena!;
+      for (const b of a.bubbles) {
+        if (!b.launched || b.dead || b.hit) continue;
+        const f = seen[b.id] ??= { minY: b.y, r: b.r, turned: false, fell: false };
+        if (b.vy > 0) { if (!f.turned) f.turned = true; else if (b.y > f.minY + 1) f.fell = true; }
+        f.minY = Math.min(f.minY, b.y);
+      }
+      const done = Object.values(seen).find(f => f.fell && f.minY + f.r < a.H);
+      return done ? { ...done, H: a.H } : false;
+    }, null, { polling: 'raf', timeout: 15_000 })).jsonValue();
+    expect(flight.minY, 'the apex is off the top of the arena').toBeGreaterThanOrEqual(0);
+    expect(flight.minY + flight.r, 'the bubble never rose clear of the floor').toBeLessThan(flight.H);
+  });
+
+  // #2184, the owner's iPhone report: the first wave rose past the card and off the top, as a wave laid out for a
+  // box taller than the one it plays in would. A resize now reads the card live (`measureInset`) instead of scaling
+  // the old line, and every arc still to climb — queued ones included — is held under it.
+  test('guard rail: a wave laid out in a taller box stays under the card when the box shrinks mid-wave (#2184)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-bonds');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 0);
+    await page.setViewportSize({ width: 390, height: 664 });
+    const seen = await (await page.waitForFunction(() => {
+      const a = window.__sna.arena!;
+      if (a.H !== 664) return false;
+      const climbing = a.bubbles.filter(b => !b.dead && b.vy < 0 && b.g > 0);
+      return climbing.length > 0 && {
+        top: a.topInset, card: document.querySelector('.qcard')!.getBoundingClientRect().bottom + 6, H: a.H,
+        past: climbing.filter(b => b.y - (b.vy * b.vy) / (2 * b.g) < a.topInset + b.r - 0.5).map(b => b.label),
+      };
+    })).jsonValue();
+    console.log(`[guard rail #2184 tall→short] topInset=${seen.top.toFixed(1)} card=${seen.card.toFixed(1)}`);
+    expect(seen.top, 'the card line is read live, not scaled from the taller box').toBeCloseTo(Math.min(seen.card, seen.H / 2), 0);
+    expect(seen.past, 'an arc still climbing would rise past the card').toEqual([]);
+  });
+
   /**
    * #328: `@media (max-height: 640px)` in `src/style.css` hid `.hint` outright to buy the play card vertical
    * space, and a phone held sideways is ~390px tall — squarely in that band. For the seven measure topics
@@ -4480,16 +4536,12 @@ test.describe('Sharpwise', () => {
   test('Memory Match Past tense: 16 cards, every word whole, no page overflow (#966)', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="year2"]');
-    for (let tries = 0; tries < 60 && (await page.evaluate(() => window.__sna?.theme)) !== 'past'; tries++) {
-      if (await page.locator('.memory').count()) {
-        await page.click('#back');
-        await page.locator('#memory, .island[data-year="year2"]').first().waitFor();
-        if (!(await page.locator('#memory').count())) await page.click('.island[data-year="year2"]');
-      }
-      await expect(page.locator('#memory')).toBeVisible();
-      await page.click('#memory');
-      await expect(page.locator('.memory')).toBeVisible();
-    }
+    await expect(page.locator('#memory')).toBeVisible();
+    // Rig only the theme draw (the first Math.random call on the Memory screen, src/ui/memory.ts): the stub
+    // restores the real function inside that call, so the deck draw right after it stays random. The
+    // assertion below fails loudly if the theme order drifts or another call takes the draw.
+    await page.evaluate(() => { const real = Math.random; Math.random = () => { Math.random = real; return 5.5 / 7; }; });
+    await page.click('#memory');
     expect(await page.evaluate(() => window.__sna.theme)).toBe('past');
     await expect(page.locator('.card')).toHaveCount(16);
     const vw = page.viewportSize()!.width;

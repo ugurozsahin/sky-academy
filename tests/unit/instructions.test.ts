@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { PLAYTESTERS } from './helpers/playtest';
 
 /**
  * Rails for the agent instruction files themselves (docs/decisions/001-one-home-per-rule.md).
@@ -15,7 +16,12 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 
 // Every skill is one or the other; a new directory fails the test below until it is put in a list, so a
 // project skill cannot go unread here without anyone noticing.
-const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'pick-issue', 'qa-screenshot', 'review-pr', 'three-art'];
+const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'pick-issue', 'playtest', 'qa-screenshot', 'review-pr',
+                    'three-art'];
+// The agents written for this project (#2204): their pointers are read like a skill's. The three vendored review
+// agents point at nothing here. `governance.test.ts`'s `AGENTS` map is the allow-list and marks these `null` from the
+// same `PLAYTESTERS` list; this is only the reading list, so it reads by that name, not by a file-name prefix (#2213).
+const OWN_AGENTS = PLAYTESTERS.map((n) => `.claude/agents/${n}.md`);
 const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven-development', 'using-git-worktrees',
                          'verification-before-completion'];   // pinned upstream; they point at their own siblings
 
@@ -24,6 +30,7 @@ const ADR_FILES = mdIn('docs/decisions');   // the record set, named once: both 
 const INSTRUCTION_FILES = [
   'CLAUDE.md', 'AGENTS.md', 'README.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
   'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md', ...mdIn('.claude/rules'), ...ADR_FILES, ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
+  ...OWN_AGENTS,
 ];
 // The instruction files a session reads to be told what to do. The decision records are excluded because they
 // are the thing pointed *at*: counting them would let ADRs satisfy the rails below by citing one another, and

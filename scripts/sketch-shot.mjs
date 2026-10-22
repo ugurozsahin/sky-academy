@@ -10,6 +10,7 @@ import { spawn, execSync } from 'node:child_process';
 import { existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { launchSilent } from '../tests/e2e/mute.mjs';
 
 export const OUT_DIR = 'docs/sketchbook';
 export const TIERS = ['low', 'high'];
@@ -89,7 +90,7 @@ if (isMain()) {
     await up(`${base}${PAGE}`, () => exited === null);
     const { chromium } = await import('@playwright/test');
     const bundled = '/opt/pw-browsers/chromium';
-    const browser = await chromium.launch(process.env.PW_CHROMIUM || existsSync(bundled) ? { executablePath: process.env.PW_CHROMIUM || bundled } : {});
+    const browser = await launchSilent(chromium, process.env.PW_CHROMIUM || existsSync(bundled) ? { executablePath: process.env.PW_CHROMIUM || bundled } : {});
     try {
       const page = await browser.newPage({ viewport: { width: 600, height: 600 }, deviceScaleFactor: 2 });
       const { shots, blank } = await shoot({ page, base, out });

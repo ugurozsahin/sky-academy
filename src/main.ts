@@ -5,8 +5,8 @@ import { DAILY_TEN_TITLE, dailyTenDeck } from './game/daily-ten';
 import { paperDeck } from './game/arithmetic-paper';
 import { chooseNinjaScreen, changeAvatarScreen, introScreen, nameScreen } from './ui/avatar';
 import { mapScreen, islandScreen, rewardsScreen, type StartPlay, type StartOpts } from './ui/home';
-import { playScreen, type PlayOpts } from './ui/play';
-import { proYear } from './game/modes';
+import { playScreen } from './ui/play';
+import { played } from './game/played';
 import { memoryScreen } from './ui/memory';
 import { duelScreen } from './ui/duel';
 import { shopScreen } from './ui/shop';
@@ -20,7 +20,7 @@ import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
 import { plugin, wireBackButton, type AppPlugin } from './native';
 import { backGuard } from './ui/screen';
-import { topicById, topicsFor, YEARS, type YearInfo } from './curriculum';
+import { shownYears, topicById, topicsFor, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
 import { needsSchoolYear, placementYear } from './school-year';
 import { handleDeepLink, queueLink, stripLinkParams, takeLink, wireDeepLinks } from './deeplink-open';
@@ -66,7 +66,8 @@ const renderIntro = () => introScreen(() => finishWizard(true), () => finishWiza
 /** The first Mission of the ninja's current island: its first Maths topic, never a tracing one. */
 const startFirstMission = (chosen?: YearInfo) => {
   if (openLink()) return;   // #2027: a pending link outranks the default first mission
-  const y = chosen ?? YEARS.find(i => i.id === (placementYear(load()) ?? 'reception')), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
+  const shown = shownYears();   // #2195: an island the catalogue hides is never where a first mission starts
+  const y = chosen ?? shown.find(i => i.id === placementYear(load(), shown)) ?? shown[0], topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
   if (!y || !topic) { nav.map(); return; }
   year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
   nav.play({ year: y, mode: 'mission', topic });
@@ -78,8 +79,6 @@ const openLink = (): boolean => {
   return true;
 };
 const renderName = () => nameScreen(() => { enter('onboard-intro'); renderIntro(); });
-/** #1297: a Pro run plays `proYear(year)`; `o.year` stays canonical for Next topic, Play again and the island Back. */
-const played = (o: StartOpts): PlayOpts => o.pro ? { ...o, year: proYear(o.year) } : o;
 const nav = {
   avatar: () => {
     leave(); fromPop = false;
@@ -260,4 +259,4 @@ relaunch();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.
 const setVH = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
-setVH(); window.addEventListener('resize', setVH);
+setVH(); window.addEventListener('resize', setVH); window.visualViewport?.addEventListener('resize', setVH);   // #2184: registered before any arena's own listener, so --vh is current when it measures

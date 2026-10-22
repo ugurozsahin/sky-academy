@@ -5,7 +5,7 @@
 // every event handler, the physics update and the render loop live here, unmoved.
 import { gentleRelaunchSet } from './gentleRelaunch';   // #742: which bubbles a gentle relaunch brings back together
 import { watchBox } from './box-watch'; import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
-import type { Rng } from '../curriculum/types';
+import type { Rng } from '../curriculum/types'; import { boxMoved, holdUnderCard, nextInset, TOP_INSET_MAX } from './wave-bounds';   // #2184
 import {
   hittable, GOOD, RELAUNCH_DELAY, MAX_RELAUNCHES, COLLIDE,
   layoutWave, reanchorBubble, bubbleRadius, resolveCollisions,
@@ -39,11 +39,13 @@ export interface ArenaOpts {
   /** One square cell of `img`, from `(sx, 0)`, to draw in place of a bubble's label, or null for the label (#684).
    *  The object may be reused by the next call — draw it at once, never keep it. */
   labelArt?: (label: string, color: string, phase: number) => { readonly img: CanvasImageSource; readonly sx: number; readonly size: number } | null;
+  measureInset?: () => number;                 // #2184: the question card's live bottom (`topInset`), read on a resize instead of scaling the old one
 }
 
 export class Arena {
   private ctx: CanvasRenderingContext2D;
-  W = 0; H = 0; dpr = 1; topInset = 120;
+  W = 0; H = 0; dpr = 1; private inset = 120;
+  get topInset() { return Math.min(this.inset, this.H * TOP_INSET_MAX); } set topInset(v: number) { if (Number.isFinite(v)) this.inset = v; holdUnderCard(this.bubbles, this.topInset, this.H); }   // #2184: the card line, at most half the box — no apex rises past topInset + r, even one already up
   bubbles: Bubble[] = [];
   private particles: Particle[] = [];
   shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
@@ -79,7 +81,7 @@ export class Arena {
   }
   /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
   private throwFor?: (b: Bubble) => boolean;
-  private labelArt?: ArenaOpts['labelArt']; private isHazard?: ArenaOpts['isHazard'];
+  private labelArt?: ArenaOpts['labelArt']; private isHazard?: ArenaOpts['isHazard']; private measureInset?: ArenaOpts['measureInset'];
   private reducedMotion = false;   // #900: resolved once in the constructor, never re-read per frame
   time = 0;
 
@@ -89,7 +91,7 @@ export class Arena {
     if (opts.trailCore) this.trailCore = opts.trailCore;
     if (opts.fx) this.fx = opts.fx;
     this.onSwish = opts.onSwish; this.onThrow = opts.onThrow; this.onLand = opts.onLand;
-    this.throwFor = opts.throwFor; this.labelArt = opts.labelArt; this.isHazard = opts.isHazard;
+    this.throwFor = opts.throwFor; this.labelArt = opts.labelArt; this.isHazard = opts.isHazard; this.measureInset = opts.measureInset;
     this.reducedMotion = opts.reducedMotion ?? prefersReducedMotion(window);
     this.resize();
     this.unwatch = watchBox(canvas, this.resize);
@@ -132,13 +134,12 @@ export class Arena {
     for (const t of this.trail) { t.x *= sx; t.y *= sy; }
     // The question card moves too, and its measured bottom is what bounds the next wave's apex
     // (`play-session.ts` re-measures on the next question; this keeps the one in between in the box).
-    this.topInset = Math.min(this.topInset * sy, to.H * 0.5);
+    this.topInset = nextInset(this.measureInset?.(), this.inset, sy, to.H);   // #2184: read live where it can be — the card does not scale with the box
     for (const s of this.strokes.values()) s.stale = true;   // #331/#463: every stroke's `lastPt` is in the OLD,
     // unrescaled box, so each one's next move must re-seat its anchor rather than draw from a stale point
   }
 
-  /** Bubble radius scales with viewport; words get wider bubbles. */
-  radius(wide: boolean) { return bubbleRadius(this.W, this.H, wide); }
+  radius(wide: boolean) { return bubbleRadius(this.W, this.H, wide); }   // bubble radius scales with viewport; words get wider bubbles
 
   /**
    * `shared` is how two arenas put up **the same wave** — the Ninja Duel's two halves (#389). Two of
@@ -153,6 +154,7 @@ export class Arena {
    */
   spawnWave(o: WaveOpts, shared?: { rng: Rng; now: number }) {
     this.bubbles = []; this.shots = []; this.frozen = false;
+    const inset = this.inset; if (boxMoved(this.canvas.getBoundingClientRect(), this.W, this.H)) this.resize(); this.topInset = inset;   // #2184: lay out for the box as it is now, not as the observer last reported it (wave-bounds.ts); the caller's card line is fresh, so not scaled
     this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
     this.orderedLabels = new Set(o.ordered);        // #591: same set, for the fall re-launch below
     this.gentleTarget = o.gentleTarget; this.gentleUsed = false; this.gentleTargetFallen = null; this.gentleDecoys = [];   // #700/#742: a fresh trip for this wave
@@ -205,8 +207,7 @@ export class Arena {
     if (this.gentleTargetFallen) { this.cb.onFall(this.gentleTargetFallen); this.gentleTargetFallen = null; this.gentleDecoys = []; }   // #742: the round ended another way — report it now, don't drop it
     if (this.waveActive) { this.waveActive = false; this.cb.onWaveEnd(); }
   }
-  /** Programmatic hit (tests / accessibility). */
-  hitLabel(label: string) {
+  hitLabel(label: string) {   // programmatic hit (tests / accessibility)
     if (this.frozen) return false;
     const b = this.bubbles.find(x => x.label === label && hittable(x));
     if (b) this.hitBubble(b, false);
@@ -221,8 +222,7 @@ export class Arena {
     this.particles.push({ x, y, vx: 0, vy: 0, life: 0, max: 0.45, color, size: 10, kind: 'ring' });
     if (n >= 12 && !this.reducedMotion) this.emitFx(x, y, 8, 0, 0);
   }
-  /** Element-flavoured particles (trail wake or hit burst). */
-  emitFx(x: number, y: number, n: number, dx: number, dy: number) {
+  emitFx(x: number, y: number, n: number, dx: number, dy: number) {   // element-flavoured particles (trail wake or hit burst)
     for (let i = 0; i < n; i++) {
       const fx = this.fx === 'master' ? ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)] : this.fx;   // the Master mixes every element
       const kind = FX_PARTICLE[fx]; const cols = FX_COLORS[fx];

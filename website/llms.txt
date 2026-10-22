@@ -10,7 +10,19 @@
 
 - [Home](https://sharpwise.co.uk/): what Sharpwise is, who it is for and the years it covers
 - [Play](https://sharpwise.co.uk/play/): the game itself, in the browser
-- [Curriculum](https://sharpwise.co.uk/curriculum/): every topic by school year and subject, with the EYFS or National Curriculum objective it practises and what is not covered yet
+- [Curriculum](https://sharpwise.co.uk/curriculum/): the seven school years, Reception to Year 6, with how many maths and English topics each has and a link to its page
+- [Reception](https://sharpwise.co.uk/curriculum/reception/): what a child practises in Reception, in plain words, with ideas to try at home
+- [Year 1](https://sharpwise.co.uk/curriculum/year-1/): what a child practises in Year 1, in plain words, with ideas to try at home
+- [Year 2](https://sharpwise.co.uk/curriculum/year-2/): what a child practises in Year 2, in plain words, with ideas to try at home
+- [Year 3](https://sharpwise.co.uk/curriculum/year-3/): what a child practises in Year 3, in plain words, with ideas to try at home
+- [Year 4](https://sharpwise.co.uk/curriculum/year-4/): what a child practises in Year 4, in plain words, with ideas to try at home
+- [Year 5](https://sharpwise.co.uk/curriculum/year-5/): what a child practises in Year 5, in plain words, with ideas to try at home
+- [Year 6](https://sharpwise.co.uk/curriculum/year-6/): what a child practises in Year 6, in plain words, with ideas to try at home
 - [Features](https://sharpwise.co.uk/features/): what the game does today, and what is planned
 - [Guides](https://sharpwise.co.uk/guides/): the guides to Sharpwise, starting with the parents' guide
 - [Parents' guide](https://sharpwise.co.uk/guides/parents/): installing Sharpwise like an app, the grown-ups' area, a ninja for each child, moving a save to another device, starting again, settings, Ninja Duel and offline play
+- [How to play](https://sharpwise.co.uk/guides/play/): a picture guide for children on slicing the right answer, hearts, stars, coins, stickers and the Sky Map
+- [About](https://sharpwise.co.uk/about/): who makes Sharpwise (Inobil Technology Ltd), what it teaches and the promises it keeps
+- [Privacy](https://sharpwise.co.uk/privacy/): Sharpwise collects nothing about a child; what the game keeps on the device, and what can leave it
+- [Support](https://sharpwise.co.uk/support/): how to contact us, move a save to another device, or start again
+- [Teachers' guide](https://sharpwise.co.uk/guides/teachers/): using Sharpwise in class: shared devices and a ninja for each child, no accounts and no pupil data, whole-class play, the curriculum it follows and Tables Check practice

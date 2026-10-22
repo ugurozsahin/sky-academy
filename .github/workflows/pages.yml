@@ -39,6 +39,13 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://localhost:4173/play/ >/dev/null && break; sleep 1; done
           curl -sf http://localhost:4173/play/ >/dev/null || { cat "$RUNNER_TEMP/http.log"; echo "the local server never answered"; exit 1; }
           node scripts/site-shots.mjs http://localhost:4173/play/ site/img
+      # #2203: the catalogue's game and island pictures, from the same server, for what the repository catalogue
+      # shows only (scripts/game-media.mjs). Media srcs start with img/, so they land in site/img. 146 s locally.
+      - name: Game and island pictures into site/img (#2203)
+        run: |
+          curl -sf http://localhost:4173/play/ >/dev/null || { echo "the screenshot server from the step above is gone"; exit 1; }
+          ids="$(node scripts/game-media.mjs ids)"
+          node scripts/game-shots.mjs http://localhost:4173/play/ site --only "$ids"
       - uses: actions/upload-pages-artifact@v5
         # v4 dropped every dotfile with no way back, so .well-known/assetlinks.json never shipped (#2085)
         with: { path: site, include-hidden-files: true }
@@ -62,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
-        with: { node-version: 22 }
+        with: { node-version: 22, cache: npm }
       - name: The .well-known files answer as the platforms need (#2029)
         run: |
           for i in 1 2 3 4; do
@@ -72,3 +79,12 @@ jobs:
           exit 1
         env:
           ANDROID_APP_LINKS_SHA256: ${{ vars.ANDROID_APP_LINKS_SHA256 }}
+      - name: Every published game and island picture answers 200 as image/webp (#2203)
+        if: ${{ !cancelled() }}   # runs when the .well-known check failed too, so one failure never hides the other
+        run: |
+          npm ci   # game-media.mjs loads the topic registry through Vite
+          for i in 1 2 3 4; do
+            node scripts/game-media.mjs check https://sharpwise.co.uk && exit 0
+            sleep 30   # the CDN can lag the deploy by a minute, as above
+          done
+          exit 1

@@ -2,23 +2,24 @@
 // Captures every screenshot the website and the store listing need, from fixed seeds, through the same
 // `window.__sna` hooks the e2e drives. It runs during the Pages deploy, so no image is ever committed.
 // The Chromium path comes from PW_CHROMIUM, else Playwright's own download. Exits non-zero on any failure,
-// and on any file over MAX_BYTES.
+// on any failed request or response of 400 or above (a missing asset), and on any file over MAX_BYTES.
 import { chromium } from '@playwright/test';
+import { launchSilent } from '../tests/e2e/mute.mjs';
 import { mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const SIZES = { phone: { width: 390, height: 844 }, desktop: { width: 1280, height: 800 } };
 export const MAX_BYTES = 150 * 1024;
-const SEED = 20261021;
+export const SEED = 20261021;
 
-const ACTION_TIMEOUT = 20000;
+export const ACTION_TIMEOUT = 20000;
 const waitTarget = page => page.waitForFunction(() => {
   const s = window.__sna; if (!s || s.state().waiting) return false;
   const c = s.session.current; const label = c.sequence ? s.session.remaining()[0] : c.answer;
   return s.bubbles().some(b => b.label === label && b.y > 60);
 }, null, { timeout: ACTION_TIMEOUT });
 /** Stop the wave and lay its bubbles out on a fixed grid, so the frame never depends on how fast this machine drew. */
-const freeze = page => page.evaluate(() => {
+export const freeze = page => page.evaluate(() => {
   const a = window.__sna?.arena; if (!a) return;
   const live = a.bubbles.filter(x => !x.dead && !x.hit);
   const cols = Math.min(live.length, a.W > 600 ? 5 : 3), rows = Math.ceil(live.length / cols);
@@ -54,13 +55,14 @@ export function gateProduct(q) {
   return a * b;
 }
 
-/** The shot list: `name` becomes `<name>-<size>.webp`. A website page may only reference a file made from here. */
+/** The shot list: `name` becomes `<name>-<size>.webp`. A website page may only reference a file made from here.
+ *  `year` and `topic` are the data `run` reads, so a guide's alt text can be railed to them (#2146). */
 export const SHOTS = [
   { name: 'sky-map', run: async () => {} },
-  { name: 'slice', run: page => openTopic(page, 'year1', 'y1-add') },
-  { name: 'ten-frame', run: page => openTopic(page, 'reception', 'r-bonds') },
-  { name: 'results', run: async page => {
-    await openTopic(page, 'reception', 'r-count');
+  { name: 'slice', year: 'year1', topic: 'y1-add', run: (page, s) => openTopic(page, s.year, s.topic) },
+  { name: 'ten-frame', year: 'reception', topic: 'r-bonds', run: (page, s) => openTopic(page, s.year, s.topic) },
+  { name: 'results', year: 'reception', topic: 'r-count', run: async (page, s) => {
+    await openTopic(page, s.year, s.topic);
     for (let i = 0; i < 3; i++) {                                // a few real answers, then the mission ends as a win
       await waitTarget(page);
       await page.evaluate(() => window.__sna.answer());
@@ -78,7 +80,17 @@ export const SHOTS = [
     await page.click('#gate-go');
     await page.waitForSelector('.parents-dash', { timeout: ACTION_TIMEOUT });
   } },
-  { name: 'island', run: async page => { await page.click('.island[data-year="year1"]'); await page.waitForSelector('.island-screen'); } },
+  { name: 'rewards', run: async page => {                       // the album with the first sticker won: coins and the sticker are seeded, then the save is read again
+    await page.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('sna:v1')); d.coins = 40; d.stickers = ['volt'];
+      localStorage.setItem('sna:v1', JSON.stringify(d));
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('.home', { timeout: ACTION_TIMEOUT });
+    await page.click('#rewards');
+    await page.waitForSelector('.rewards .sticker.got', { timeout: ACTION_TIMEOUT });
+  } },
+  { name: 'island', year: 'year1', run: async (page, s) => { await page.click(`.island[data-year="${s.year}"]`); await page.waitForSelector('.island-screen'); } },
 ];
 /** The files over MAX_BYTES, as the lines the failure names: `[{ file, bytes }]` in, `["file (n bytes)"]` out. */
 export const oversized = files => files.filter(f => f.bytes > MAX_BYTES).map(f => `${f.file} (${f.bytes} bytes)`);
@@ -97,7 +109,7 @@ const toWebp = (page, png) => page.evaluate(async b64 => {
 async function main([base, out]) {
   if (!base || !out) throw new Error('usage: node scripts/site-shots.mjs <base-url> <out-dir>');
   mkdirSync(out, { recursive: true });
-  const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+  const browser = await launchSilent(chromium, process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const enc = await (await browser.newContext()).newPage();
   const written = [], errors = [];
   try {
@@ -106,6 +118,8 @@ async function main([base, out]) {
         const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: size === 'phone', isMobile: size === 'phone', reducedMotion: 'reduce' });
         const page = await ctx.newPage();
         page.on('pageerror', e => errors.push(`${shot.name}-${size}: ${e.message}`));   // thrown after the loop: a throw here would be Playwright's emitter's, not main()'s
+        page.on('requestfailed', r => errors.push(`${shot.name}-${size}: request failed ${r.url()}`));
+        page.on('response', r => { if (r.status() >= 400) errors.push(`${shot.name}-${size}: ${r.status()} ${r.url()}`); });
         await page.clock.setFixedTime(new Date('2026-10-21T10:00:00Z'));
         await page.addInitScript(([seed]) => {
           let a = seed;                                              // mulberry32: the same stream on every run
@@ -117,7 +131,9 @@ async function main([base, out]) {
         }, [SEED]);
         await page.goto(base, { waitUntil: 'networkidle' });
         await page.waitForSelector('.home', { timeout: ACTION_TIMEOUT });
-        await shot.run(page);
+        try { await shot.run(page, shot); } catch (e) {                    // Playwright's timeout names neither the shot nor the size, and the page errors that likely caused it would be dropped
+          throw new Error(`${shot.name}-${size}: ${e.message.split('\n')[0]}${errors.length ? ` (page errors: ${errors.join('; ')})` : ''}`);
+        }
         await page.waitForTimeout(500);
         await freeze(page);                                          // a wave that spawned after the shot's own steps (the results' backdrop) goes on the grid too
         await page.evaluate(() => {                                  // the bubbles' sway is driven by frame time: pin it, then hold

@@ -208,7 +208,7 @@ describe('the precache list is read from the build, never written down (#15)', (
 /**
  * #15's worker itself, exercised for the first time (#116 item 4). Everything above imports `build-sw.mjs`'s
  * pure helpers directly; nothing ran `scripts/sw-template.js`'s own handlers, because `self`/`caches` do not
- * exist under Node and none of `shell`/`font`/`asset` is exported. Each gap below was proved by a mutation
+ * exist under Node and none of `shell`/`asset` is exported. Each gap below was proved by a mutation
  * that left the rest of the suite green: deleting the `res.ok && res.type === 'basic'` gate, dropping
  * `{ cache: 'reload' }`, or dropping `ignoreVary` all still passed before this.
  *
@@ -338,31 +338,6 @@ describe("the worker's runtime handlers (#116 item 4)", () => {
     const res = await respondWith as Response;
     expect(res.type, 'a network failure with no cached shell must not reject the navigation').toBe('error');
   });
-
-  it('font() never stores a non-ok (opaque) response — today it truly caches nothing, which is the accepted behaviour (#44)', async () => {
-    const req: FakeReq = { method: 'GET', mode: 'no-cors', url: 'https://fonts.gstatic.com/s/fredoka/x.woff2' };
-    const { listeners, named } = runWorker(async () => fakeResponse({ ok: false, type: 'opaque' }));
-    const { respondWith, waitUntil } = dispatch(listeners, req);
-    await respondWith;
-    await waitUntil();
-    expect(named.get('sna-fonts-v1')?.has(req.url) ?? false).toBe(false);
-  });
-
-  it('font() serves a cache hit immediately, without waiting on a slower background refresh', async () => {
-    const req: FakeReq = { method: 'GET', mode: 'no-cors', url: 'https://fonts.gstatic.com/s/fredoka/x.woff2' };
-    let resolveFetch!: () => void;
-    const fetchImpl = () => new Promise<FakeRes>(resolve => { resolveFetch = () => resolve(fakeResponse()); });
-    const { listeners, named } = runWorker(fetchImpl);
-    named.set('sna-fonts-v1', new Map([[req.url, fakeResponse()]]));
-    const { respondWith, waitUntil } = dispatch(listeners, req);
-    // If font() awaited the refresh before checking the cache, this would hang until the timeout: the fetch
-    // above never resolves until `resolveFetch()` is called, below.
-    const res = await respondWith;
-    expect(res, 'a cache hit must not wait on the network').toBeDefined();
-    resolveFetch();
-    await waitUntil();
-    expect(named.get('sna-fonts-v1')!.has(req.url)).toBe(true);
-  });
 });
 
 /**
@@ -380,14 +355,13 @@ describe("the worker's runtime handlers (#116 item 4)", () => {
 describe('the worker degrades to the network and rebuilds an evicted precache (#116 item 5)', () => {
   const NAV: FakeReq = { method: 'GET', mode: 'navigate', url: 'https://example.com/' };
   const ASSET: FakeReq = { method: 'GET', mode: 'cors', url: 'https://example.com/assets/index-ABC.js' };
-  const FONT: FakeReq = { method: 'GET', mode: 'no-cors', url: 'https://fonts.gstatic.com/s/fredoka/x.woff2' };
   const LIST = ['assets/index-ABC.js', 'index.html'];
   const PRINTS = ['assets/index-ABC.js\x003\x00b', 'index.html\x009\x00a'];
   const NAMED_CACHE = cacheName(PRINTS);
   const precached = (named: Map<string, Map<string, FakeRes>>) => [...(named.get(NAMED_CACHE)?.keys() ?? [])].sort();
 
-  it('a storage failure serves the network for the shell, an asset and a font — never an error page', async () => {
-    for (const req of [NAV, ASSET, FONT]) {
+  it('a storage failure serves the network for the shell and an asset — never an error page', async () => {
+    for (const req of [NAV, ASSET]) {
       const net = fakeResponse();
       const { listeners, caches } = runWorker(async () => net);
       caches.open = async () => { throw new Error('QuotaExceededError: storage is unavailable'); };

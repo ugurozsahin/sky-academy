@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
+import { launchSilent } from '../tests/e2e/mute.mjs';
 import onboard from './flow-onboard.mjs';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const b = await launchSilent(chromium, { executablePath: '/opt/pw-browsers/chromium' });
 const p = await (await b.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
 await p.goto('http://localhost:4173/?reset=1'); await onboard(p, 'volt', 'Ada');
 await p.click('.island[data-year="reception"]'); await p.click('.topic[data-id="r-onemore"]');

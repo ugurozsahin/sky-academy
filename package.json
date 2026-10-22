@@ -5,7 +5,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/catalogue-slim.mjs",
     "dev": "vite --host",
+    "prebuild": "node scripts/catalogue-slim.mjs",
     "build": "tsc --noEmit && vite build && vite build -c vite.sketchbook.config.ts && node scripts/build-sw.mjs",
     "preview": "vite preview --host --port 4173",
     "sketch": "vite -c vite.sketchbook.config.ts --host",
@@ -14,11 +16,15 @@
     "hooks": "git config core.hooksPath .githooks",
     "test": "vitest run",
     "content-map": "node scripts/content-map.mjs && node scripts/site-curriculum.mjs",
+    "catalogue:slim": "node scripts/catalogue-slim.mjs",
+    "catalogue:show": "node scripts/catalogue-slim.mjs && node scripts/catalogue-show.mjs",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --project=mobile --grep @smoke",
     "test:sketch": "playwright test --project=sketchbook",
     "test:all": "npm run test && npm run build && npm run test:e2e",
-    "site:shots": "npm run build && { ./node_modules/.bin/vite preview --port 4399 --strictPort & P=$!; until curl -sf http://localhost:4399/ >/dev/null; do kill -0 $P 2>/dev/null || exit 1; sleep 1; done; node scripts/site-shots.mjs http://localhost:4399/ site-shots; rc=$?; kill $P; exit $rc; }"
+    "site:shots": "curl -sf http://localhost:4399/ >/dev/null && { echo 'site:shots: port 4399 is busy'; exit 1; }; npm run build && { ./node_modules/.bin/vite preview --port 4399 --strictPort & P=$!; trap 'kill $P 2>/dev/null' EXIT INT TERM; until curl -sf http://localhost:4399/ >/dev/null; do kill -0 $P 2>/dev/null || exit 1; sleep 1; done; node scripts/site-shots.mjs http://localhost:4399/ site-shots; }",
+    "game:shots": "curl -sf http://localhost:4398/ >/dev/null && { echo 'game:shots: port 4398 is busy'; exit 1; }; npm run build && { ./node_modules/.bin/vite preview --port 4398 --strictPort & P=$!; trap 'kill $P 2>/dev/null' EXIT INT TERM; until curl -sf http://localhost:4398/ >/dev/null; do kill -0 $P 2>/dev/null || exit 1; sleep 1; done; node scripts/game-shots.mjs http://localhost:4398/ game-shots; }",
+    "playtest:pack": "curl -sf http://localhost:4397/ >/dev/null && { echo 'playtest:pack: port 4397 is busy'; exit 1; }; npm run build && sh -c './node_modules/.bin/vite preview --port 4397 --strictPort & P=$!; trap \"kill $P 2>/dev/null\" EXIT INT TERM; until curl -sf http://localhost:4397/ >/dev/null; do kill -0 $P 2>/dev/null || exit 1; sleep 1; done; node scripts/playtest-pack.mjs http://localhost:4397/ playtest-packs \"$@\"' playtest-pack"
   },
   "devDependencies": {
     "@capacitor-community/text-to-speech": "8.0.2",

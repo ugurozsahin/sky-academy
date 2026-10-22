@@ -10,6 +10,7 @@
   <link rel="icon" href="/icons/icon-192.webp" type="image/webp">
   <link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/site.css">
+  <script src="/nav.js" defer></script>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Sharpwise">
   <meta property="og:locale" content="en_GB">
@@ -34,7 +35,31 @@
       <nav class="site-nav" aria-label="Main">
         <ul>
           <li><a href="/">Home</a></li>
-          <li><a href="/curriculum/">Curriculum</a></li>
+          <li>
+            <details class="nav-years">
+              <summary>Curriculum</summary>
+              <ul>
+                <li><a href="/curriculum/">All years</a></li>
+                <li>
+                  <p id="nav-ks1">Reception and Key Stage 1</p>
+                  <ul aria-labelledby="nav-ks1">
+                    <li><a href="/curriculum/reception/">Reception</a></li>
+                    <li><a href="/curriculum/year-1/">Year 1</a></li>
+                    <li><a href="/curriculum/year-2/">Year 2</a></li>
+                  </ul>
+                </li>
+                <li>
+                  <p id="nav-ks2">Key Stage 2</p>
+                  <ul aria-labelledby="nav-ks2">
+                    <li><a href="/curriculum/year-3/">Year 3</a></li>
+                    <li><a href="/curriculum/year-4/">Year 4</a></li>
+                    <li><a href="/curriculum/year-5/">Year 5</a></li>
+                    <li><a href="/curriculum/year-6/">Year 6</a></li>
+                  </ul>
+                </li>
+              </ul>
+            </details>
+          </li>
           <li><a href="/features/">Features</a></li>
           <li><a href="/guides/" aria-current="page">Guides</a></li>
           <li><a href="/about/">About</a></li>
@@ -61,15 +86,15 @@
 
     <section aria-labelledby="teachers-title">
       <div class="wrap">
-        <h2 id="teachers-title">A guide for teachers</h2>
-        <p>Coming later.</p>
+        <h2 id="teachers-title"><a href="/guides/teachers/">A guide for teachers</a></h2>
+        <p>Using Sharpwise in class: shared devices and a ninja for each child, no accounts and no pupil data, whole-class play, the curriculum it follows and Tables Check practice.</p>
       </div>
     </section>
 
     <section aria-labelledby="play-title">
       <div class="wrap">
-        <h2 id="play-title">How to play, for children</h2>
-        <p>Coming later.</p>
+        <h2 id="play-title"><a href="/guides/play/">How to play, for children</a></h2>
+        <p>Slicing the right answer, hearts, stars, coins, stickers and the Sky Map, in big pictures and short sentences a young child can read.</p>
       </div>
     </section>
   </main>

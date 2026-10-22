@@ -103,6 +103,26 @@ describe('watchBox — re-measure when the element\'s own box changes (#678)', (
   });
 });
 
+describe('watchBox also follows the visual viewport (#2184)', () => {
+  it('re-measures when a toolbar resizes the visual viewport and the box moved, not when it did not, and lets go on teardown', () => {
+    const vv: Record<string, Set<() => void>> = {};
+    vi.stubGlobal('window', {
+      addEventListener: (t: string, f: () => void) => (winListeners[t] ??= new Set()).add(f),
+      removeEventListener: (t: string, f: () => void) => winListeners[t]?.delete(f),
+      visualViewport: { addEventListener: (t: string, f: () => void) => (vv[t] ??= new Set()).add(f), removeEventListener: (t: string, f: () => void) => vv[t]?.delete(f) },
+    });
+    const onChange = vi.fn();
+    const stop = watchBox(el, onChange);
+    vv.resize.forEach(f => f());                                        // a pinch-zoom frame: the box is unchanged
+    expect(onChange).not.toHaveBeenCalled();
+    box.h = 40;                                                         // the toolbar came back
+    vv.resize.forEach(f => f());
+    expect(onChange, 'synchronously, so --vh (registered first) is already current').toHaveBeenCalledTimes(1);
+    stop();
+    expect(vv.resize.size).toBe(0);
+  });
+});
+
 describe('Arena and Tracer take the same trigger and release it on teardown (#678)', () => {
   const src = (f: string) => readFileSync(new URL(`../../src/game/${f}`, import.meta.url), 'utf8');
   it.each(['arena.ts', 'tracing.ts'])('%s watches its own canvas and unwatches in destroy()', f => {

@@ -3,14 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy: Sharpwise</title>
-  <meta name="description" content="The Sharpwise privacy page is on its way.">
-  <!-- #1934: a placeholder on the #1935 shell, so the navigation never leads to a missing page. That issue replaces it. -->
-  <meta name="robots" content="noindex">
+  <title>Privacy policy: Sharpwise</title>
+  <meta name="description" content="Sharpwise collects nothing about your child: no accounts, no analytics, no adverts and no cookies. What the game keeps on your device, what can leave it, and who to contact.">
+  <link rel="canonical" href="https://sharpwise.co.uk/privacy/">
   <meta name="theme-color" content="#131a33">
   <link rel="icon" href="/icons/icon-192.webp" type="image/webp">
   <link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/site.css">
+  <script src="/nav.js" defer></script>
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Sharpwise">
+  <meta property="og:locale" content="en_GB">
+  <meta property="og:url" content="https://sharpwise.co.uk/privacy/">
+  <meta property="og:title" content="Sharpwise privacy policy">
+  <meta property="og:description" content="Sharpwise collects nothing about your child: no accounts, no analytics, no adverts and no cookies. What the game keeps on your device, what can leave it, and who to contact.">
+  <meta property="og:image" content="https://sharpwise.co.uk/share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Sharpwise: a ninja ready to slice the right answer. Free maths and English, Reception to Year 6.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sharpwise privacy policy">
+  <meta name="twitter:description" content="Sharpwise collects nothing about your child: no accounts, no analytics, no adverts and no cookies. What the game keeps on your device, what can leave it, and who to contact.">
+  <meta name="twitter:image" content="https://sharpwise.co.uk/share.jpg">
+  <meta name="twitter:image:alt" content="Sharpwise: a ninja ready to slice the right answer. Free maths and English, Reception to Year 6.">
 </head>
 <body>
   <a class="skip" href="#main">Skip to main content</a>
@@ -20,7 +35,31 @@
       <nav class="site-nav" aria-label="Main">
         <ul>
           <li><a href="/">Home</a></li>
-          <li><a href="/curriculum/">Curriculum</a></li>
+          <li>
+            <details class="nav-years">
+              <summary>Curriculum</summary>
+              <ul>
+                <li><a href="/curriculum/">All years</a></li>
+                <li>
+                  <p id="nav-ks1">Reception and Key Stage 1</p>
+                  <ul aria-labelledby="nav-ks1">
+                    <li><a href="/curriculum/reception/">Reception</a></li>
+                    <li><a href="/curriculum/year-1/">Year 1</a></li>
+                    <li><a href="/curriculum/year-2/">Year 2</a></li>
+                  </ul>
+                </li>
+                <li>
+                  <p id="nav-ks2">Key Stage 2</p>
+                  <ul aria-labelledby="nav-ks2">
+                    <li><a href="/curriculum/year-3/">Year 3</a></li>
+                    <li><a href="/curriculum/year-4/">Year 4</a></li>
+                    <li><a href="/curriculum/year-5/">Year 5</a></li>
+                    <li><a href="/curriculum/year-6/">Year 6</a></li>
+                  </ul>
+                </li>
+              </ul>
+            </details>
+          </li>
           <li><a href="/features/">Features</a></li>
           <li><a href="/guides/">Guides</a></li>
           <li><a href="/about/">About</a></li>
@@ -31,10 +70,103 @@
   </header>
 
   <main id="main" tabindex="-1">
-    <section>
+    <!-- #1934: each claim here is held to the code by tests/unit/site-privacy.test.ts. Change the game, change this page. -->
+    <section aria-labelledby="privacy-title">
       <div class="wrap">
-        <h1>Privacy</h1>
-        <p>This page is on its way. Until then, you can <a href="/play/">play Sharpwise in your browser</a>.</p>
+        <h1 id="privacy-title">Privacy policy</h1>
+        <p class="lede">Sharpwise collects nothing about your child. There are no accounts, no analytics, no adverts and no cookies, in the game or on this website.</p>
+        <p>This page explains what the game keeps on your device, the few things that can leave it, and who to contact. It covers the game in a web browser, the Android app and this website.</p>
+        <dl class="facts">
+          <div><dt>What we collect</dt><dd>Nothing. We never see your child's name, progress or answers.</dd></div>
+          <div><dt>Accounts</dt><dd>None. There is nothing to sign up for.</dd></div>
+          <div><dt>Analytics and tracking</dt><dd>None. The game contains no analytics, tracking or advertising code, and every build of it is checked for some.</dd></div>
+          <div><dt>Adverts</dt><dd>None.</dd></div>
+          <div><dt>Cookies</dt><dd>None. Neither the game nor this website sets a cookie.</dd></div>
+          <div><dt>Where progress is kept</dt><dd>On the device the game is played on. On Android, the device's own backup may also copy it to your Google account, as explained below. It never comes to us.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section aria-labelledby="kept-title">
+      <div class="wrap">
+        <h2 id="kept-title">What the game keeps on your device</h2>
+        <p>To remember how a child is getting on, the game saves these in the browser's own storage on the device, or in the app's own storage on Android:</p>
+        <dl class="facts">
+          <div><dt>A name</dt><dd>The first name or nickname your child types in, shown on screen and on certificates.</dd></div>
+          <div><dt>Progress</dt><dd>Stars, scores, coins, stickers, streaks and certificates, plus recent wrong answers and daily play totals, so the grown-ups' area can show where to help.</dd></div>
+          <div><dt>Settings</dt><dd>Choices such as sound, read aloud and the grown-ups' settings.</dd></div>
+        </dl>
+        <p>Up to four children can each have their own ninja on one device, and each has a separate save. None of it is sent to us. In a web browser the game also keeps a copy of its own files, so it works offline; those are the game's files, not your child's.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="leave-title">
+      <div class="wrap">
+        <h2 id="leave-title">What can leave the device, and only when you choose</h2>
+        <p>Apart from Android's backup and spoken words, both explained below, nothing leaves the device unless a grown-up sends it. A grown-up can choose to send any of these, each from the grown-ups' area or after its quick grown-ups' question:</p>
+        <dl class="facts">
+          <div><dt>The save code</dt><dd>A copy of one ninja's save, name included, for moving it to another device.</dd></div>
+          <div><dt>A progress summary</dt><dd>A short summary or picture of how a child is doing, with their name, sent through your device's share menu or copied.</dd></div>
+          <div><dt>A certificate</dt><dd>A certificate picture with your child's name on it, sent through your device's share menu.</dd></div>
+          <div><dt>A challenge code</dt><dd>A short code that lets a friend play the same questions. It holds no name.</dd></div>
+          <div><dt>Results and word lists</dt><dd>Today's Daily Sprint result and the spelling words still to learn, which you can copy to paste elsewhere.</dd></div>
+        </dl>
+        <p>Each one goes only where you send it, such as a message or an email of your own. We never receive it.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="voice-title">
+      <div class="wrap">
+        <h2 id="voice-title">Reading aloud</h2>
+        <p>The game speaks using a voice that your browser or device provides. Some of those voices are online voices run by the company that makes the browser or device. When one of them is used, the words being spoken go to that company to be turned into speech, under its own privacy policy. The game prefers those voices because they sound clearer.</p>
+        <p>With read aloud on, the game speaks by itself: questions, and praise that can include your child's name. With read aloud off, it speaks only when someone taps something to hear it, such as the question card, a shop item, a Daily Dojo challenge or a sticker. Those lines never include your child's name.</p>
+        <p>Read aloud is switched on and off with the speaking-face button at the top of the Sky Map, separately for each ninja on the device.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="backup-title">
+      <div class="wrap">
+        <h2 id="backup-title">Android backups</h2>
+        <p>The Android app lets Android's own backup include its data. If backup is turned on for the phone or tablet, Android may copy the game's save, name included, to a private folder in the Google account the device uses. Android can then put the save back when the app is installed again, or when that account sets up a new device. That copy belongs to your Google account, and we never see it.</p>
+        <p>To stop it, turn backup off in the device's settings (on many devices under Settings, System, Backup; the place varies), or play in a web browser instead.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="host-title">
+      <div class="wrap">
+        <h2 id="host-title">This website, and where the game is hosted</h2>
+        <p>This website and the web game are served by GitHub Pages. Like any web host, GitHub records the IP address of each visit, for security. We do not receive it.</p>
+        <p>The website has no cookies and no analytics, and loads nothing from any other company. One small script of our own opens and closes the Curriculum menu. It sends nothing anywhere and stores nothing.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="email-title">
+      <div class="wrap">
+        <h2 id="email-title">If you email us</h2>
+        <p>If you write to <a href="mailto:support@sharpwise.co.uk">support@sharpwise.co.uk</a>, we receive your email address and what you write. We use them only to answer you, and keep them only as long as we need to help.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="who-title">
+      <div class="wrap">
+        <h2 id="who-title">Who is responsible</h2>
+        <p>Sharpwise is made by Inobil Technology Ltd, the data controller for everything this page covers. You can contact us at <a href="mailto:support@sharpwise.co.uk">support@sharpwise.co.uk</a>.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="rights-title">
+      <div class="wrap">
+        <h2 id="rights-title">Your rights, and how to complain</h2>
+        <p>Apart from any email you send us, we hold nothing about you or your child, so there is nothing for us to show, correct or delete. You can ask us to see or delete your emails at any time. Everything the game keeps is on your device, or on Android perhaps in your own Google backup too, and you can clear it yourself: <a href="/support/">the support page</a> shows how.</p>
+        <p>If you are unhappy with how we have handled personal information, please tell us first. You can also complain to the Information Commissioner's Office (ICO), the UK's data protection regulator, at <a href="https://ico.org.uk/make-a-complaint/" rel="noopener">ico.org.uk/make-a-complaint</a>.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="changes-title">
+      <div class="wrap">
+        <h2 id="changes-title">Changes to this page</h2>
+        <p>When anything on this page changes, we update it and the date below.</p>
+        <p class="note">Last updated on 21 October 2026.</p>
       </div>
     </section>
   </main>

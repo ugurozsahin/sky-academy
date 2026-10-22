@@ -1,8 +1,8 @@
 // Bubble spawn, launch stagger and layout (#559, split out of arena.ts): the data model, the pure wave
 // layout, bubble-to-bubble collision, label fitting, and the offscreen sprite caches drawBubble draws from.
 // Nothing here touches a canvas event or the render loop — `Arena` still owns those.
-import { shuffle } from '../curriculum/util';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
-import type { Rng } from '../curriculum/types';
+import { shuffle } from '../curriculum/util'; import type { Rng } from '../curriculum/types';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
+import { boundedRise, TOP_INSET_MAX } from './wave-bounds'; import { bySpeed, TIMING } from '../config/resolve'; import type { DefaultSettings } from '../config/catalogue';   // #2184: the bounds every arc is held to; #2194: air time and stagger per speed, from src/config/catalogue.json
 
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
@@ -48,7 +48,7 @@ export interface WaveOpts {
   ordered?: string[];   // sequence labels that must be sliced in this order
   // #700: a non-sequence question's correct-answer label, for a gentle year only — it gets one free trip
   // back up if it falls unhit, the same idea as `ordered` above but for a single label and a single trip.
-  gentleTarget?: string;
+  gentleTarget?: string; timing?: DefaultSettings;   // timing (#2198): this game's own; absent = the global `TIMING`
 }
 
 /** Deal a sequence wave: the words that must be sliced in order are spread across the batches IN ORDER
@@ -92,7 +92,7 @@ export function bubbleRadius(W: number, H: number, wide: boolean): number {
   return Math.max(30, Math.min(wide ? 64 : 54, wide ? base * 1.25 : base));
 }
 
-export function waveRadius(W: number, H: number, wide: boolean, n: number): number { return Math.min(Math.max(26, bubbleRadius(W, H, wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1)), ((W - 16) / 3 - 10) / 2); }   // layoutWave's own formula, exported for R-LBL (#1046)
+export function waveRadius(W: number, H: number, wide: boolean, n: number): number { return Math.max(1, Math.min(Math.max(26, bubbleRadius(W, H, wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1)), ((W - 16) / 3 - 10) / 2)); }   // layoutWave's own formula, exported for R-LBL (#1046); #2184: ≥ 1, as arc() throws on a negative radius
 /** The arena's drawable box, in CSS pixels. */
 export interface ArenaBox { W: number; H: number }
 /**
@@ -287,17 +287,17 @@ export interface BubblePlan { label: string; x: number; vx: number; vy: number; 
 /** A laid-out wave: the values the arena keeps for itself, plus one plan per bubble in launch order. */
 export interface WavePlan { r: number; waveT: number; batchSpan: number; perBatch: number; batchGap: number; stagger: number; bubbles: BubblePlan[] }
 
-interface FlightGeom { W: number; H: number; r: number; apexMin: number; usable: number; T: number; speedK: number }
+interface FlightGeom { W: number; H: number; r: number; topInset: number; apexMin: number; usable: number; T: number; speedK: number }
 
 /** One bubble's x, arc and look; the `rng` calls keep the order layoutWave always made them in. */
 function planBubble(p: { label: string; k: number; idx: number; size: number; perBatch: number; launchAt: number }, g: FlightGeom, rng: Rng): BubblePlan {
-  const { W, H, r, apexMin, usable, T, speedK } = g;
+  const { W, H, r, topInset, apexMin, usable, T, speedK } = g;
   const margin = r + 8, span = W - margin * 2;
   // spread x across the width in shuffled slots so bubbles don't overlap; a full row uses the whole span edge to edge
   const full = p.size >= p.perBatch && p.size > 1;
   const slot = full ? p.idx / (p.size - 1) : (p.idx + 0.5) / p.size;
-  const x = margin + span * Math.min(1, Math.max(0, slot + (rng() - 0.5) * ((full ? 0.25 : 0.6) / p.size)));
-  const h = H + r - (apexMin + usable * (0.05 + rng() * 0.45)), tUp = T / 2, grav = 2 * h / (tUp * tUp);
+  const x = span < 0 ? W / 2 : margin + span * Math.min(1, Math.max(0, slot + (rng() - 0.5) * ((full ? 0.25 : 0.6) / p.size)));   // #2184: narrower than a bubble — no slots, so centred and vx 0
+  const h = boundedRise(H + r - (apexMin + usable * (0.05 + rng() * 0.45)), H, topInset), tUp = T / 2, grav = 2 * h / (tUp * tUp);   // #2184: g > 0 in any box
   const vy = -Math.sqrt(2 * grav * h);
   // #138: `* speedK` is what makes fast mode a pure time compression. vx is px/SECOND and the flight lasts
   // T/k seconds, so an unscaled vx drifts the bubble 1/k of the way across — a path no child ever sees.
@@ -315,11 +315,11 @@ function planBubble(p: { label: string; k: number; idx: number; size: number; pe
  * derives from T), never the clock. Bubbles come back in launch order, so `bubbles[k]` is the k-th to rise.
  */
 export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: number, rng: Rng): WavePlan {
-  const { W, H, topInset } = geom;
+  const { W, H } = geom, topInset = Math.min(geom.topInset, H * TOP_INSET_MAX);   // #2184: a card past half the box (KS2, landscape) left a negative rise
   const n = o.labels.length, r = waveRadius(W, H, !!o.wide, n);
-  const T = ([7.5, 5.6, 4.4][o.speed] ?? 3.4) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
+  const T = bySpeed((o.timing ?? TIMING).airTime, o.speed) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
   const apexMin = topInset + r + 10, usable = H - apexMin - r;
-  const stagger = ([500, 420, 330][o.speed] ?? 260) / speedK;
+  const stagger = bySpeed((o.timing ?? TIMING).stagger, o.speed) / speedK;
   // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
   // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
   // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:
@@ -330,7 +330,7 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
   const bubbles: BubblePlan[] = [];
   for (let k = 0; k < n; k++) {
     const batch = Math.floor(k / perBatch), idx = k % perBatch, size = Math.min(perBatch, n - batch * perBatch);
-    bubbles.push(planBubble({ label: o.labels[order[k]], k, idx, size, perBatch, launchAt: now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1) }, { W, H, r, apexMin, usable, T, speedK }, rng));
+    bubbles.push(planBubble({ label: o.labels[order[k]], k, idx, size, perBatch, launchAt: now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1) }, { W, H, r, topInset, apexMin, usable, T, speedK }, rng));
   }
   return { r, waveT: T * 1000, batchSpan: perBatch * stagger, perBatch, batchGap, stagger, bubbles };
 }

@@ -1,6 +1,7 @@
 ---
 paths:
   - "tests/e2e/**"
+  - "tests/site/**"
   - "playwright.config.ts"
 ---
 
@@ -14,6 +15,11 @@ paths:
 - A pull request runs e2e at all only when its diff can reach the game (#96): `src/`, `index.html`, `public/`,
   `tests/e2e/`, `playwright.config.*`, `package*.json`, `tsconfig*.json`, `vite.config.*`, `ci.yml`. Everything else gets a `CI` check with the
   e2e step visibly skipped, never a missing check.
+- The website has its own project, `site` (#2096): every page in `website/sitemap.xml` at 360 px, served by
+  `scripts/site-serve.mjs` — no sideways scroll, every on-site link answers 200, no request leaves the origin.
+  A pull request runs it when its diff touches `website/`, `tests/site/`, `scripts/site-serve.*` or what the run
+  stands on (ci.yml's `SITE_PATHS`); the nightly runs it with every project. Locally:
+  `npm run build`, then `npx playwright test --project=site`.
 - `window.__sna` (`answer()`, `wrong()`, `bubbles()`, `state()`) is how these tests drive the game — keep new
   scenarios going through it rather than clicking through timing-sensitive UI where a hook already exists.
 - A `guard rail:` test here encodes a mistake already made; its name and comment say which incident. Don't

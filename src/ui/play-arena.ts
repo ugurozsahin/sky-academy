@@ -5,7 +5,7 @@ import { calmReduced } from '../device-settings';
 import { haptic, sfx, sliceFx } from '../audio';
 import { load, save } from '../storage';
 import { $ } from './dom';
-import { BOMB, type createPlaySession } from './play-session';
+import { BOMB, type createPlaySession } from './play-session'; import { cardInset } from '../game/wave-bounds';
 
 type TrailSkin = { color?: string; core?: string } | undefined;
 export interface ArenaDeps {
@@ -41,6 +41,7 @@ export function mountArena(a: ArenaDeps): Arena {
     throwFor: b => b.label !== BOMB, isHazard: label => label === BOMB,   // #742: TNT never re-enters play as a "free chance"
     // #684: the rotating solid inside a 3-D Shapes bubble, tinted to the bubble's complement.
     labelArt: (label, colour, phase) => playSession.bubbleArt(label, colour, phase),
+    measureInset: () => { const card = $('#qcard'); return card ? cardInset(card) : NaN; },   // #2184: a resize re-reads the card rather than scaling the old line
   });
   return arena;
 }

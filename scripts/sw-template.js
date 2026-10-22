@@ -10,12 +10,6 @@ const CACHE = '__CACHE_NAME__';
 const PRECACHE = __PRECACHE__;
 /** The one document the game ever serves. Every launch URL is a view of it. */
 const SHELL = 'index.html';
-// Fredoka comes from Google Fonts at runtime (index.html), so it cannot be precached by URL — the CSS names
-// woff2 files whose paths change. It is cached opportunistically instead: whatever the first online launch
-// fetched is replayed offline. If it was never fetched, `src/ui/font.ts` gives up after its deadline and the
-// game starts in the fallback face, which is the existing behaviour and is playable (#44).
-const FONTS = 'sna-fonts-v1';
-const FONT_HOSTS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
 
 /**
  * Fills `cache` with every precached file. `reload` bypasses the HTTP cache: precaching a response the browser
@@ -52,7 +46,7 @@ self.addEventListener('activate', (e) => {
   // registers relatively for — "everything that is not mine" would silently destroy another app's offline
   // cache on this origin, and the symptom would appear in somebody else's project. (Raised in review.)
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k.startsWith('sna-') && k !== CACHE && k !== FONTS).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k.startsWith('sna-') && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -164,28 +158,6 @@ async function sameDeployment(cache) {
 }
 
 /**
- * Stale-while-revalidate, for the one thing that cannot be precached by URL.
- *
- * Honest about its reach: `index.html` loads the Fredoka stylesheet WITHOUT `crossorigin`, so the response is
- * opaque (`status 0`, `ok === false`) and the `res.ok` gate below never stores it. So today this caches
- * nothing and the offline face is the fallback — which is the accepted behaviour (#44) rather than a
- * regression, and `src/ui/font.ts` degrades to it after its 1200 ms deadline. The handler is here because it
- * is the right shape for when #44 settles how the font arrives; it is not doing anything yet.
- * (Raised in review of this PR.)
- */
-async function font(e, req) {
-  const cache = await open(FONTS);
-  if (!cache) return fetch(req);
-  const refresh = fetch(req)
-    .then(res => (res && res.ok ? cache.put(req, res.clone()).then(() => res) : res))
-    .catch(() => undefined);
-  e.waitUntil(refresh);
-  const hit = await cache.match(req);
-  if (hit) return hit;
-  return (await refresh) ?? Response.error();
-}
-
-/**
  * Same-origin assets, cache-first. Everything precached is content-hashed or an avatar that changes only
  * with a deployment, so a hit is always current for this CACHE and is served without touching the network.
  * A miss that cannot be fetched rejects, exactly as it would with no worker installed: a synthetic empty 200
@@ -216,7 +188,6 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   if (req.mode === 'navigate') { e.respondWith(shell(e)); return; }
   const url = new URL(req.url);
-  if (FONT_HOSTS.includes(url.origin)) { e.respondWith(font(e, req)); return; }
   if (url.origin === self.location.origin) { e.respondWith(asset(req)); return; }
-  // Anything else (a third-party the game does not have) is left to the network, untouched.
+  // Anything else (a third party the game does not have, a font host included: the font is self-hosted since #479) is left to the network, untouched.
 });
