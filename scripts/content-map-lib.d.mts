@@ -9,3 +9,8 @@ export declare function curriculumIds(md: string): string[];
 export declare function buildContentMap(input: {
   topics: Topic[]; years: YearInfo[]; strands: StrandTable; tipFor: (id: string) => string | null; banks?: Record<string, number>;
 }): { json: string; md: string };
+/** The topics and years a catalogue shows (#2201): what the website may publish. `shown` is `src/curriculum/catalogue-shown.ts`. */
+export declare function publishedOnly(input: {
+  topics: Topic[]; years: YearInfo[]; catalogue: unknown;
+  shown: { gameOn: (cat: never, id: string, year: never) => boolean; islandShown: (cat: never, year: never, topics: never) => boolean };
+}): { topics: Topic[]; years: YearInfo[] };

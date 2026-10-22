@@ -12,6 +12,8 @@ export interface ContentMap { topicCount: number; byYear: ContentMapYear[]; topi
 export declare function esc(s: unknown): string;
 export declare function yearSlug(id: YearId): string;
 export declare function yearPath(id: YearId): string;
+export declare const ALL_YEARS: YearId[];
+export declare function withoutYearLinks(text: string, id: YearId): string;
 export declare function plainObjective(nc: string): string;
 export declare function shellFrom(home: string, currentPath: string): { header: string; footer: string };
 export declare function subjectTable(map: ContentMap, year: ContentMapYear, subject: Subject): string;
