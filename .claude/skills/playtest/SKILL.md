@@ -22,9 +22,12 @@ A pack is one game played once, for one year, the way a child meets it on a 390�
 - **`metrics.json`**, the measured numbers: the resolved settings (lives, gentle, and the per-stage `speeds`
   and `diffs`), the input kind (bubbles, tracing, keypad), the prompt text and its word count, whether speech is
   offered, answers per wave, the bubble radius in CSS px, the time from launch to apex, the time a bubble stays
-  above the question card, the slowest and fastest bubble, the share of the screen the card covers, and the
-  visual card's needs (`slow`, `wide`). Cite a number as `metrics.json#<key>`, and a nested one by its path
-  (`metrics.json#aboveCardMs.min`).
+  above the question card, for a sequence game each required label's reach over its relaunches (`labelReachMs`),
+  the slowest and fastest bubble, the share of the screen the card covers, and the visual card's needs (`slow`,
+  `wide`). Cite a number as `metrics.json#<key>`, and a nested one by its path (`metrics.json#aboveCardMs.min`).
+- **A sequence game's first question is missed on purpose.** The pack slices nothing until a required label has
+  used every relaunch, to time its whole chance, so `metrics.json#livesAfterLabelsRanOut` and the result shot may
+  show one miss the pack chose. It is not a child's mistake: never mark `feedback` or `again` down for it.
 - **A pack plays stage 1 only.** Judge the later stages from the resolved settings: a higher `speeds` entry is a
   shorter flight, a higher `diffs` entry harder questions. Say so in the evidence (`metrics.json#settings.speeds`);
   §2 has the one way to estimate a later stage's reach.
@@ -65,6 +68,16 @@ maths symbols are read at a glance from Year 1 up, and Reception reads neither.
 
 Compare that need with the bubble's **reach**, its reachable time (`aboveCardMs`, its smallest value,
 in milliseconds: divide by 1000), as a percentage: reach ÷ need, both in seconds.
+
+**A `sequence` game's reach is `labelReachMs.min`, not `aboveCardMs`** (#2251, the product owner's decision).
+- **Why:** a required label that falls unsliced is sent back up, up to `metrics.json#labelReach.maxRelaunches`
+  times. So its reach is its total time below the card over its first flight and every relaunch, until it is sliced
+  or its relaunches run out. `aboveCardMs` times one flight of any bubble, decoys included, so it is not used.
+- **A label cut short** (`endedBy` `wave over` in `metrics.json#labelReach.labels`) was stopped by the pack's own
+  miss, not by the game, so it is information only and never the reach.
+- **Later stages:** it is `reach_1` in the estimate below.
+- **What it does not cover:** waiting for a label to come back is judged under `again` (pace) and `feedback`, not
+  `physical`.
 
 **A later stage's reach** is estimated, never guessed, one way. Stages count from 1, so stage k plays
 `speeds[k-1]`: `reach_k ≈ reach_1 × airTime[speeds[k-1]] / airTime[speeds[0]]`. `airTime` is
