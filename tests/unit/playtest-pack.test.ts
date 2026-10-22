@@ -205,6 +205,29 @@ describe('a sequence label\'s reach over its relaunches, on a stub arena (#2251)
     expect(by.like.reachMs).toBeLessThan(by.Do.reachMs);
   });
 
+  // The review of #2255: the freeze that decides the question ends every other label's reach on that frame, and a label
+  // in the air on its last relaunch then is cut short, not run out, though it has used every relaunch.
+  it('a label in the air on its last relaunch when the question is decided is cut short, and its reach stops at the freeze', () => {
+    const wave = [{ id: 1, label: 'Do', launch: 0, vy, g }, { id: 2, label: 'you', launch: 0, vy: -500, g: 150 }];   // a floatier arc: 'Do' has run out before 'you' starts its last flight
+    const free = flySeq(wave, { need: ['Do', 'you'], until: 40000 });
+    const last = free.samples.filter(x => x[1] === 2 && x[4] === MAX_RELAUNCHES && x[3] < H);   // 'you' on its last flight, in play
+    const freezeAt = last[last.length >> 1][0];
+    const rc = flySeq(wave, { need: ['Do', 'you'], until: freezeAt + 1000, freezeAt });
+    const end = rc.ends[2];
+    expect(end, "'you' has an end: the frozen frame stops its recording").toBeDefined();
+    expect(end.t).toBe(freezeAt);
+    expect([end.launched, end.dead, end.relaunches], 'launched and alive on its last relaunch').toEqual([true, false, MAX_RELAUNCHES]);
+    expect(rc.samples.some(x => x[1] === 2 && x[0] >= freezeAt), 'nothing sampled through the outcome hold').toBe(false);
+    const r = labelReach(rc, opts);
+    const you = r.labelReach.labels.find(l => l.label === 'you')!;
+    expect([you.endedBy, you.flights]).toEqual(['wave over', MAX_RELAUNCHES + 1]);
+    const youFull = labelReach(free, opts).labelReach.labels.find(l => l.label === 'you')!.reachMs;
+    expect(you.reachMs, 'only what it had until the freeze').toBeLessThan(youFull - 500);
+    const Do = r.labelReach.labels.find(l => l.label === 'Do')!;
+    expect(Do.endedBy).toBe('ran out');
+    expect(r.labelReachMs, "kept out of the range: only 'Do', which ran out, is in it").toEqual({ min: Do.reachMs, median: Do.reachMs, max: Do.reachMs });
+  });
+
   it('gives the median of an even count as the middle two\'s mean', () => {
     const rc: ReachRecording = { ids: { 1: 'a', 2: 'b', 3: 'c', 4: 'd' }, samples: [], frames: [0, 16],
       ends: Object.fromEntries([1, 2, 3, 4].map(id => [id, { t: 0, hit: false, dead: true, launched: true, relaunches: MAX_RELAUNCHES }])) };

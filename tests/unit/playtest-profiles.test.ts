@@ -152,8 +152,11 @@ describe('the playtest skill (#2204)', () => {
     expect(rule, 'a label the pack\'s own miss cut short is never the reach').toContain("was stopped by the pack's own miss, not by the game, so it is information only and never the reach");
     expect(rule, 'and it feeds the later-stage estimate').toContain('it is `reach_1` in the estimate below');
     expect(rule, 'the wait for a relaunch is judged elsewhere').toContain('judged under `again` (pace) and `feedback`, not `physical`');
-    expect(SKILL.replace(/\s+/g, ' '), 'the pack\'s own deliberate miss is never held against the game')
-      .toContain("**A sequence game's first question is missed on purpose.**");
+    const flat = SKILL.replace(/\s+/g, ' ');
+    const miss = flat.indexOf("**A sequence game's first question is missed on purpose.**");
+    expect(miss, 'the deliberate-miss line is in the skill').toBeGreaterThan(-1);
+    expect(flat.slice(miss, flat.indexOf('- **A pack plays stage 1 only.**', miss)), 'and tells the scorer never to hold it against the game')
+      .toContain("It is not a child's mistake: never mark `feedback` or `again` down for it.");
   });
 
   it('marks `physical` on a band, not a cliff, and estimates later stages one way (#2245)', () => {
