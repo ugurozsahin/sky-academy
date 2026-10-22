@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { measureCompare } from '../../src/curriculum/util';
+import { y2Temp } from '../../src/curriculum/year2/measure';
 import { barVisual } from '../../src/curriculum/bar-axis';
 import { HEAVIER, LONGER } from '../../src/curriculum/types';
 import type { Difficulty } from '../../src/curriculum/types';
@@ -23,5 +24,19 @@ describe('measure games draw what they compare (#2271)', () => {
     expect(barVisual(['a'], [7])).toMatchObject({ step: 1, max: 7 });
     expect(barVisual(['a'], [99])).toMatchObject({ step: 10, max: 100 });
     expect(barVisual(['a'], [999])).toMatchObject({ step: 100, max: 1000 });
+  });
+  it('y2-temp comparisons draw one bar per place, at its temperature (#2271)', () => {
+    const r = seeded(22710);
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+      const q = y2Temp(d, r);
+      if (!q.hintIsData) continue;
+      seen++;
+      const v = q.visual;
+      if (v?.type !== 'chart' || v.kind !== 'bar') throw new Error('no bar chart');
+      expect(v.rows.map(x => x.label).sort()).toEqual([...q.options].sort());
+      for (const row of v.rows) expect(q.hint).toContain(`${row.label}: ${row.n}°C`);
+    }
+    expect(seen).toBeGreaterThan(100);
   });
 });
