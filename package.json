@@ -18,7 +18,8 @@
     "test:e2e:smoke": "playwright test --project=mobile --grep @smoke",
     "test:sketch": "playwright test --project=sketchbook",
     "test:all": "npm run test && npm run build && npm run test:e2e",
-    "site:shots": "curl -sf http://localhost:4399/ >/dev/null && { echo 'site:shots: port 4399 is busy'; exit 1; }; npm run build && { ./node_modules/.bin/vite preview --port 4399 --strictPort & P=$!; trap 'kill $P 2>/dev/null' EXIT INT TERM; until curl -sf http://localhost:4399/ >/dev/null; do kill -0 $P 2>/dev/null || exit 1; sleep 1; done; node scripts/site-shots.mjs http://localhost:4399/ site-shots; }"
+    "site:shots": "curl -sf http://localhost:4399/ >/dev/null && { echo 'site:shots: port 4399 is busy'; exit 1; }; npm run build && { ./node_modules/.bin/vite preview --port 4399 --strictPort & P=$!; trap 'kill $P 2>/dev/null' EXIT INT TERM; until curl -sf http://localhost:4399/ >/dev/null; do kill -0 $P 2>/dev/null || exit 1; sleep 1; done; node scripts/site-shots.mjs http://localhost:4399/ site-shots; }",
+    "game:shots": "curl -sf http://localhost:4398/ >/dev/null && { echo 'game:shots: port 4398 is busy'; exit 1; }; npm run build && { ./node_modules/.bin/vite preview --port 4398 --strictPort & P=$!; trap 'kill $P 2>/dev/null' EXIT INT TERM; until curl -sf http://localhost:4398/ >/dev/null; do kill -0 $P 2>/dev/null || exit 1; sleep 1; done; node scripts/game-shots.mjs http://localhost:4398/ game-shots; }"
   },
   "devDependencies": {
     "@capacitor-community/text-to-speech": "8.0.2",

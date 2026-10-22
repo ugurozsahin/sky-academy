@@ -8,3 +8,6 @@ export declare const shotFiles: () => string[];
 export declare const isWebp: (buf: Buffer) => boolean;
 export declare function gateProduct(q: string): number;
 export declare const oversized: (files: { file: string; bytes: number }[]) => string[];
+export declare const SEED: number;
+export declare const ACTION_TIMEOUT: number;
+export declare const freeze: (page: Page) => Promise<unknown>;
