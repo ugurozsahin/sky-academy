@@ -177,6 +177,7 @@ const LIST_USE = /\b(?:CORE_)?TOPICS\s*\.\s*(?:filter|find|findIndex|findLast|fi
 const ALLOWED: Record<string, string> = {
   '/src/game/sprint-pools.ts': 'grammarPool looks its ids up with topicById and applies isGameShown itself',
   '/src/deeplink-open.ts': 'a link resolves every registry id so a hidden game gets its notice (#2197); takeLink then applies gameHidden',
+  '/src/ui/parents-catalogue.ts': 'the grown-ups settings list every game of a year, hidden ones too, so a hidden game can be switched back on (#2200)',
 };
 
 describe('guard rail: no list is built from the registry directly (#2196)', () => {
