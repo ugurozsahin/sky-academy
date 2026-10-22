@@ -1,5 +1,6 @@
 // Year 2 words: spelling, contractions, suffixes, homophones, tracing. Split out of year2.ts (#1416); index.ts re-exports every name.
 import { type Generator } from '../types';
+import { spokenGap } from '../spoken-gap';
 import { ri, pick, shuffle, wordQ, gapLetters, gapQ, spellQ, Y1_CEW, Y2_CEW } from '../util';
 
 // ---------- Year 2 writing ----------
@@ -16,10 +17,17 @@ export const y2Contractions: Generator = (d, rng) => {
   if (d === 3 && rng() < 0.5) return wordQ(rng, short, long, shuffle(rng, CONTRACTIONS.filter(c => c[0] !== long)).slice(0, 3).map(c => c[0]), { visual: { type: 'word', text: short }, say: `What does ${short} mean?` });
   return wordQ(rng, long, short, ds, { visual: { type: 'word', text: long }, say: `Which contraction means ${long}?`, hint: 'Slice the short form', hintIsData: false });
 };
-const SUFFIX2: [string, string, string][] = [['care', 'ful', 'Be care___ on the road.'], ['hope', 'less', 'The lost sock was hope___.'], ['kind', 'ness', 'Show kind___ to others.'], ['slow', 'ly', 'The snail moved slow___.'], ['enjoy', 'ment', 'We had lots of enjoy___.'], ['help', 'ful', 'A very help___ friend.'], ['quick', 'ly', 'She ran quick___.'], ['sad', 'ness', 'He felt great sad___.'], ['fear', 'less', 'The fear___ ninja jumped.'], ['pay', 'ment', 'Mum made the pay___.']];
+/** [root, ending, sentence]. */
+export const SUFFIX2: ReadonlyArray<readonly [string, string, string]> = [['care', 'ful', 'Be care___ on the road.'], ['hope', 'less', 'The lost sock was hope___.'], ['kind', 'ness', 'Show kind___ to others.'], ['slow', 'ly', 'The snail moved slow___.'], ['enjoy', 'ment', 'We had lots of enjoy___.'], ['help', 'ful', 'A very help___ friend.'], ['quick', 'ly', 'She ran quick___.'], ['sad', 'ness', 'He felt great sad___.'], ['fear', 'less', 'The fear___ ninja jumped.'], ['pay', 'ment', 'Mum made the pay___.']];
+/** Every real word each root makes with the five endings: a decoy that makes one is never offered, so one option fits (#2272). */
+export const SUFFIX2_REAL: Readonly<Record<string, readonly string[]>> = {
+  care: ['ful', 'less'], hope: ['ful', 'less'], kind: ['ness', 'ly'], slow: ['ly', 'ness'], enjoy: ['ment'],
+  help: ['ful', 'less'], quick: ['ly', 'ness'], sad: ['ness', 'ly'], fear: ['less', 'ful'], pay: ['ment'],
+};
 export const y2Suffix: Generator = (d, rng) => {
-  const [, suf, sent] = pick(rng, SUFFIX2);
-  return wordQ(rng, sent, suf, ['ful', 'less', 'ness', 'ly', 'ment'].filter(x => x !== suf).slice(0, d === 1 ? 2 : 3), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the ending', hintIsData: false });
+  const [root, suf, sent] = pick(rng, SUFFIX2);
+  const decoys = ['ful', 'less', 'ness', 'ly', 'ment'].filter(x => x !== suf && !SUFFIX2_REAL[root].includes(x));
+  return wordQ(rng, sent, suf, decoys.slice(0, d === 1 ? 2 : 3), { visual: { type: 'sentence', text: sent }, say: spokenGap(sent), hint: 'Slice the ending', hintIsData: false });
 };
 /**
  * Endings that change the root (#299 slice 3, NC English Appendix 1 Year 2): `[root, ending, the new word,
