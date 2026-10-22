@@ -3,16 +3,15 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { STAGE_NAMES, TOPICS, YEARS, type YearId } from '../../src/curriculum';
 import { EYFS_KS1 } from '../../src/curriculum/key-stage';
-import { layoutWave } from '../../src/game/bubbles';
-import { CATALOGUE, GROUP_IDS, OVERRIDABLE_KEYS, STAGES, YEAR_ONLY_KEYS, validateCatalogue, type MediaEntry } from '../../src/config/catalogue';
+import { GROUP_IDS, OVERRIDABLE_KEYS, STAGES, YEAR_ONLY_KEYS, validateCatalogue, type MediaEntry } from '../../src/config/catalogue';
+import { CATALOGUE } from './helpers/catalogue-file';
 
 // #2193: the game catalogue file, `src/config/catalogue.json`, written once from today's code by
-// `scripts/catalogue-init.mjs`. Nothing in the game reads it yet; these rails hold it complete, valid and equal
-// to the code until item B (#2194) makes the file the source.
+// `scripts/catalogue-init.mjs`. These rails hold it complete and valid; since #2194 it is the source of the year
+// settings and the bubble timing, and `tests/unit/resolve.test.ts` pins those values to today's.
 //
-// Prove it red: delete a game node or add one; change a year's `lives` in the file; change `[7.5, 5.6, 4.4]` in
-// `layoutWave`; give two games one thumbnail; set a playability score; drop a validator check (its mutation below
-// then passes clean).
+// Prove it red: delete a game node or add one; give a game an override; give two games one thumbnail; set a
+// playability score; drop a validator check (its mutation below then passes clean).
 const FILE = 'src/config/catalogue.json';
 const onDisk = () => JSON.parse(readFileSync(FILE, 'utf8')) as Record<string, any>;
 const years = CATALOGUE.years as Record<string, (typeof CATALOGUE.years)[YearId]>;
@@ -41,18 +40,9 @@ describe('catalogue coverage: one node per game and per year (#2193)', () => {
   });
 });
 
-describe('catalogue equals the code today (#2193; lives until #2194 makes the file the source)', () => {
-  it.each(YEARS.map((y) => [y.id, y] as const))('years.%s.settings equal YEARS', (id, y) => {
-    expect(years[id].settings).toEqual({
-      perStage: y.perStage, lives: y.lives, gentle: y.gentle, speeds: y.speeds, diffs: y.diffs,
-      sprintStars: y.sprintStars, maxAnswer: y.maxAnswer, minAnswer: y.minAnswer ?? 0,
-    });
-    expect(years[id].visible, "every island starts on today's topic-count gate").toBe('auto');
-  });
-
-  it("defaults equal layoutWave's air time and stagger at speeds 0 to 2, read by driving it", () => {
-    const plans = [0, 1, 2].map((speed) => layoutWave({ labels: ['1', '2', '3'], speed }, { W: 390, H: 700, topInset: 0 }, 1, 0, () => 0.5));
-    expect(CATALOGUE.defaults.settings).toEqual({ airTime: plans.map((p) => p.waveT / 1000), stagger: plans.map((p) => p.stagger) });
+describe('catalogue overrides nothing yet (#2193)', () => {
+  it("every island starts on today's topic-count gate", () => {
+    for (const y of YEARS) expect(years[y.id].visible, y.id).toBe('auto');
   });
 
   it('every game and game-year node is visible and inherits everything', () => {
@@ -162,8 +152,10 @@ const MUTATIONS: [string, (c: Doc) => void, string][] = [
   ['an unknown sprintStars key', (c) => { c.years.year1.settings.sprintStars.oneStar = 1; }, 'years.year1.settings.sprintStars.oneStar: unknown key'],
   ['maxAnswer 0', (c) => { c.years.year1.settings.maxAnswer = 0; }, 'years.year1.settings.maxAnswer: must be a whole number above 0'],
   ['minAnswer not below maxAnswer', (c) => { c.years.year1.settings.minAnswer = 120; }, 'years.year1.settings.minAnswer: must be a whole number below maxAnswer'],
-  ['an air time table of the wrong length', (c) => { c.defaults.settings.airTime.pop(); }, 'defaults.settings.airTime: must be 3 positive numbers'],
-  ['a stagger that is not positive', (c) => { c.defaults.settings.stagger[0] = 0; }, 'defaults.settings.stagger: must be 3 positive numbers'],
+  ['an air time table of the wrong length', (c) => { c.defaults.settings.airTime.pop(); }, 'defaults.settings.airTime: must be 4 numbers above 0'],
+  ['a stagger that is not positive', (c) => { c.defaults.settings.stagger[0] = 0; }, 'defaults.settings.stagger: must be 4 numbers above 0'],
+  ['an air time past 15 s', (c) => { c.defaults.settings.airTime[0] = 15.5; }, 'defaults.settings.airTime: must be 4 numbers above 0 and at most 15 s'],
+  ['a stagger past 1000 ms', (c) => { c.years.year1.settings.stagger = [1001, 420, 330, 260]; }, 'years.year1.settings.stagger: must be 4 numbers above 0 and at most 1000 ms'],
   ['a missing default', (c) => { delete c.defaults.settings.stagger; }, 'defaults.settings.stagger: missing'],
   ['a default the year always overrides', (c) => { c.defaults.settings.lives = 3; }, 'defaults.settings.lives: not a setting this level holds'],
   ['a year-only key on a game', (c) => { c.games[GAME].settings.maxAnswer = 50; }, `games.${GAME}.settings.maxAnswer: year-only`],
@@ -171,7 +163,7 @@ const MUTATIONS: [string, (c: Doc) => void, string][] = [
   ['a bad game override', (c) => { c.games[GAME].settings.lives = 9; }, `games.${GAME}.settings.lives: must be a whole number from 1 to 5`],
   ['an unknown group override', (c) => { c.games[GAME].groupSettings.ks3 = {}; }, `games.${GAME}.groupSettings.ks3: not a group`],
   ['a bad group override', (c) => { c.games[GAME].groupSettings.ks1 = { diffs: [1, 2, 3, 4, 3] }; }, `games.${GAME}.groupSettings.ks1.diffs: must be 5 values`],
-  ['a bad year-node override', (c) => { c.games[GAME].years.year1.settings = { airTime: [1, 2] }; }, `games.${GAME}.years.year1.settings.airTime: must be 3`],
+  ['a bad year-node override', (c) => { c.games[GAME].years.year1.settings = { airTime: [1, 2] }; }, `games.${GAME}.years.year1.settings.airTime: must be 4`],
   ['a game visible that is not boolean', (c) => { c.games[GAME].visible = 'auto'; }, `games.${GAME}.visible: must be true or false`],
   ['a game-year visible that is not boolean', (c) => { c.games[GAME].years.year1.visible = 'auto'; }, `games.${GAME}.years.year1.visible: must be true or false`],
   ['a game with two years', (c) => { c.games[GAME].years.year2 = c.games[GAME].years.year1; }, `games.${GAME}.years: must name exactly one year`],
@@ -220,9 +212,9 @@ describe('validateCatalogue catches each kind of error in a seeded bad copy (#21
 
   it('accepts what the shape allows: overrides at each level, a scored node, extra keys on a media entry', () => {
     const copy = onDisk();
-    copy.games[GAME].settings = { perStage: 4, lives: 5, gentle: true, speeds: [0, 0, 1, 1, 2], diffs: [1, 1, 1, 2, 2], airTime: [9, 7, 5], stagger: [600, 500, 400] };
+    copy.games[GAME].settings = { perStage: 4, lives: 5, gentle: true, speeds: [0, 0, 1, 1, 2], diffs: [1, 1, 1, 2, 2], airTime: [15, 7, 5, 4], stagger: [1000, 500, 400, 300] };
     copy.games[GAME].groupSettings = { ks1: { lives: 1 }, eyfs: {} };
-    copy.years.year1.settings.airTime = [8, 6, 4];
+    copy.years.year1.settings.airTime = [8, 6, 4, 3];
     copy.games[GAME].playability = play;
     copy.games[GAME].years.year1 = { visible: false, settings: { speeds: [3, 3, 3, 3, 3] }, playability: { ...play, score: 0 } };
     copy.years.year2.visible = false;

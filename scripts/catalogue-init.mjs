@@ -4,9 +4,12 @@
 // refuses to overwrite an existing file unless given `--force`.
 //
 // The registry is TypeScript, so it is loaded through Vite's own SSR loader, as `content-map.mjs` does. The air
-// time and stagger are read by driving the real `layoutWave` at each speed, not by copying its literals.
+// time and stagger are read by driving the real `layoutWave` at each speed, not by copying its literals. Since
+// #2194 `YEARS` and `layoutWave` read these values from the file itself, so `--force` rewrites the file's own
+// settings, resets its media and playability, and regenerates the runtime copy.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'vite';
+import { writeSlim } from './catalogue-slim.mjs';
 
 const OUT = 'src/config/catalogue.json';
 const GROUPS = { eyfs: ['reception'], ks1: ['year1', 'year2'], lks2: ['year3', 'year4'], uks2: ['year5', 'year6'] };
@@ -16,9 +19,9 @@ if (existsSync(OUT) && !process.argv.includes('--force')) {
   process.exit(1);
 }
 
-/** Air time (s) and stagger (ms) at speeds 0..2, measured from `layoutWave` at `speedK` 1. */
+/** Air time (s) and stagger (ms) at speeds 0..3, measured from `layoutWave` at `speedK` 1. */
 function speedTable(layoutWave) {
-  const plans = [0, 1, 2].map((speed) => layoutWave({ labels: ['1', '2', '3'], speed }, { W: 390, H: 700, topInset: 0 }, 1, 0, () => 0.5));
+  const plans = [0, 1, 2, 3].map((speed) => layoutWave({ labels: ['1', '2', '3'], speed }, { W: 390, H: 700, topInset: 0 }, 1, 0, () => 0.5));
   const table = { airTime: plans.map((p) => p.waveT / 1000), stagger: plans.map((p) => p.stagger) };
   if (![...table.airTime, ...table.stagger].every((n) => Number.isFinite(n) && n > 0)) throw new Error(`catalogue-init: layoutWave no longer reports waveT/stagger: ${JSON.stringify(table)}`);
   return table;
@@ -66,6 +69,7 @@ try {
   };
   mkdirSync('src/config', { recursive: true });
   writeFileSync(OUT, `${JSON.stringify(catalogue, null, 2)}\n`);
+  writeSlim();
   console.log(`catalogue-init: ${TOPICS.length} games and ${YEARS.length} years written to ${OUT}`);
 } finally {
   await server.close();
