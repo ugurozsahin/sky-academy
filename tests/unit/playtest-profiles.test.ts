@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { YEARS } from '../../src/curriculum/types';
+import { CATALOGUE } from '../../src/config/catalogue';
+import { CRITERIA, ROW_KEYS, profilesIn, rowProblems } from '../../scripts/playtest-row.mjs';
 import { PLAYTESTERS } from './helpers/playtest';
 
 /**
@@ -14,7 +16,7 @@ const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 const SKILL = read('.claude/skills/playtest/SKILL.md');
 const CHILD = YEARS.map((y) => `playtester-${y.id}`);   // driven by the registry, so a new year needs a profile
 const PROFILES = [...CHILD, 'playtester-parent'];
-const KEYS = ['understand', 'physical', 'challenge', 'feedback', 'again'];
+const KEYS = CRITERIA;   // the row's one home in code is scripts/playtest-row.mjs, which #2206 applies (#2214)
 const body = (name: string) => read(`.claude/agents/${name}.md`);
 const links = (text: string) => [...new Set([...text.matchAll(/\]\((https:\/\/[^)\s]+)\)/g)].map((m) => m[1]))];
 
@@ -82,6 +84,8 @@ describe('the playtest skill (#2204)', () => {
     expect(json, 'the skill shows one example row').not.toBeNull();
     const row = JSON.parse(json![1]);
     expect(Object.keys(row).sort()).toEqual(['by', 'criteria', 'evidence', 'game', 'note', 'score', 'year']);
+    expect([...ROW_KEYS].sort(), 'the validator #2206 runs names the same seven keys').toEqual(Object.keys(row).sort());
+    expect(rowProblems(row, { catalogue: CATALOGUE, profiles: profilesIn('.claude/agents') }), 'and passes the example as written').toEqual([]);
     expect(Object.keys(row.criteria).sort()).toEqual([...KEYS].sort());
     expect(Object.values<number>(row.criteria).reduce((a, b) => a + b, 0)).toBe(row.score);
     for (const v of Object.values(row.criteria)) expect([0, 1, 2], 'each criterion is a whole mark from 0 to 2').toContain(v);
