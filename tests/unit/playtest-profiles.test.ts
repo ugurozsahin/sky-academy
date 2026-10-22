@@ -29,6 +29,17 @@ const isStudy = (u: string) => {
   return h === 'doi.org' || h === 'pubmed.ncbi.nlm.nih.gov' || h === 'eric.ed.gov' || h === 'files.eric.ed.gov'
     || (AUTHOR_PDF_HOSTS.includes(h) && pathname.endsWith('.pdf'));
 };
+// #2243: the target line under "Your working floors" — its first sub-bullet — names two sizes, each
+// "**N mm (… a R px radius)**"; the one followed by "or more is comfortable" is the comfortable size, the other the floor.
+type Size = { mm: number; radius: number; across?: number };
+const workingFloors = (text: string): { floor: Size; comfortable: Size } | null => {
+  const block = /\*\*Your working floors\*\*[^\n]*\n {2}- ([\s\S]*?)(?=\n {2}- |\n\n|$)/.exec(text);
+  if (!block) return null;
+  const sizes = [...block[1].replace(/\s+/g, ' ').matchAll(/\*\*([\d.]+) mm \((?:about (\d+) CSS px across, )?a (\d+) px radius\)\*\*( or more is comfortable)?/g)]
+    .map((m) => ({ mm: Number(m[1]), radius: Number(m[3]), across: m[2] ? Number(m[2]) : undefined, comfy: !!m[4] }));
+  const comfortable = sizes.filter((s) => s.comfy), floor = sizes.filter((s) => !s.comfy);
+  return sizes.length === 2 && comfortable.length === 1 ? { floor: floor[0], comfortable: comfortable[0] } : null;
+};
 
 describe('playtest profiles (#2204)', () => {
   it('there is exactly one profile per year group, plus the parent', () => {
@@ -60,6 +71,38 @@ describe('playtest profiles (#2204)', () => {
       || u.startsWith('https://explore-education-statistics.service.gov.uk/'));
     expect(gov.length, `${name}: the acceptance criterion is three official sources, linked`).toBeGreaterThanOrEqual(3);
     expect(all.filter(isStudy).length, `${name}: motor and reaction-time norms need a published study (DOI, PubMed, ERIC or an author's PDF)`).toBeGreaterThanOrEqual(1);
+  });
+
+  it.each(CHILD)('%s states a target floor below its comfortable size, each in mm and a matching radius (#2243)', (name) => {
+    const floors = workingFloors(body(name));
+    expect(floors, `${name}: the "Your working floors" target line names a floor and a comfortable size`).not.toBeNull();
+    const { floor, comfortable } = floors!;
+    expect(floor.radius, `${name}: a floor at or above "comfortable" fails every game on \`physical\``).toBeLessThan(comfortable.radius);
+    for (const s of [floor, comfortable]) {
+      expect(s.radius, `${name}: ${s.mm} mm at the profile's own 6 CSS px per mm is a ${s.mm * 3} px radius`).toBe(s.mm * 3);
+      if (s.across !== undefined) expect(s.across, `${name}: ${s.across} px across is not twice a ${s.radius} px radius`).toBe(s.radius * 2);
+    }
+  });
+
+  it('the Reception floor and comfortable size follow the hit rates it quotes (#2243)', () => {
+    // Read from the profile's own Targets line (Hourcade et al., 2004, Table VI): 4-year-olds at three sizes, then
+    // 5-year-olds at the same three. The floor claims "a miss as often as a hit", so it sits within 1 mm of where the
+    // 4-year-olds' rate crosses 50% (straight line between the two quoted points either side). "Comfortable" is the
+    // middle the profile argues for: above the size where 5-year-olds reach 90%, below the one where 4-year-olds do.
+    const text = body('playtester-reception').replace(/\s+/g, ' ');
+    const rates = /4-year-olds hit 16 px \(([\d.]+) mm\) targets (\d+)% of the time, 32 px \(([\d.]+) mm\) (\d+)% and 64 px \(([\d.]+) mm\) (\d+)%; 5-year-olds (\d+)%, (\d+)% and (\d+)%/.exec(text);
+    expect(rates, 'the Targets line quotes 4- and 5-year-olds at all three sizes').not.toBeNull();
+    const mmAt = [1, 3, 5].map((i) => Number(rates![i]));
+    const four = [2, 4, 6].map((i) => Number(rates![i])), five = [7, 8, 9].map((i) => Number(rates![i]));
+    const { floor, comfortable } = workingFloors(body('playtester-reception'))!;
+    expect(text, 'the "miss as often as a hit" claim is the floor\'s own').toContain(`a ${floor.radius} px radius)** is a miss as often as a hit`);
+    const at = four.findIndex((h, i) => i > 0 && four[i - 1] < 50 && h >= 50);
+    expect(at, 'the quoted 4-year-old rates cross 50% somewhere').toBeGreaterThan(0);
+    const half = mmAt[at - 1] + ((50 - four[at - 1]) / (four[at] - four[at - 1])) * (mmAt[at] - mmAt[at - 1]);
+    expect(Math.abs(floor.mm - half), `the floor is ${floor.mm} mm; the quoted rates put 50% at ${half.toFixed(1)} mm`).toBeLessThanOrEqual(1);
+    const ninety = (rs: number[]) => mmAt[rs.findIndex((h) => h >= 90)];
+    expect(comfortable.mm, 'comfortable is above the size where 5-year-olds already reach 90%').toBeGreaterThan(ninety(five));
+    expect(comfortable.mm, 'and below the size where 4-year-olds first do').toBeLessThan(ninety(four));
   });
 
   it('the parent cites at least one published study, by link (#2213)', () => {
