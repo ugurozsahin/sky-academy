@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { validateCatalogue } from '../../src/config/catalogue';
+import { validateCatalogue, type Catalogue } from '../../src/config/catalogue';
 import { CATALOGUE } from './helpers/catalogue-file';
 import { applyRows, checkRows, parseRows, reportProblems } from '../../scripts/playability-apply.mjs';
 import { PARENT, profilesIn, rowProblems, type PlaytestRow } from '../../scripts/playtest-row.mjs';
@@ -27,8 +27,9 @@ type Loose = any;   // a hand-broken catalogue copy, for the rails' failure case
 const FIXTURE = readFileSync(path('tests/unit/fixtures/playability-dry-run.jsonl'), 'utf8');
 const ROWS = FIXTURE.trim().split('\n').map((l) => JSON.parse(l) as PlaytestRow);
 /** The committed catalogue with every `playability` back to null, as it was before the #2207 run scored it. */
-const UNSCORED: Loose = structuredClone(CATALOGUE);
-for (const n of [...Object.values<Doc>(UNSCORED.years), ...Object.values<Doc>(UNSCORED.games).flatMap((g) => [g, ...Object.values<Doc>(g.years)])]) n.playability = null;
+const UNSCORED: Catalogue = structuredClone(CATALOGUE);
+const clearing: Loose = UNSCORED;   // `playability` is readonly on `Catalogue`; only this loop writes it
+for (const n of [...Object.values<Doc>(clearing.years), ...Object.values<Doc>(clearing.games).flatMap((g) => [g, ...Object.values<Doc>(g.years)])]) n.playability = null;
 const ctx = { catalogue: UNSCORED, profiles: profilesIn(AGENTS) };
 const fresh = (i = 0): Doc => structuredClone(ROWS[i]);
 
@@ -103,6 +104,13 @@ describe('playability-apply on the PR #2211 dry-run rows (#2206)', () => {
     expect(again.stderr).toContain(`${REPORT}: already exists`);
     expect(run(dir, 'rows.jsonl', '--date', DATE, '--check').status, '--check reports the clash too').toBe(1);
     expect(run(dir, 'rows.jsonl', '--date', DATE, '--force').status).toBe(0);
+    // A --force rerun of only some of a profile's rows would rewrite the report without the others' scores: refused.
+    writeFileSync(join(dir, 'one.jsonl'), `${JSON.stringify(ROWS[0])}\n`);
+    const part = run(dir, 'one.jsonl', '--date', DATE, '--force'), full = catalogueIn(dir);
+    expect(part.status).toBe(1);
+    expect(part.stderr).toContain(`games.y1-alien.years.year1.playability: ${REPORT} has no row for y1-alien in year1 scoring 4`);
+    expect(catalogueIn(dir), 'the partial rerun writes nothing').toBe(full);
+    expect(reader(dir)(REPORT)).toContain('| y1-alien | year1 | 4 |');
   });
 
   it('one run with a year profile and the parent writes both nodes and both reports, each backing its own score', () => {
@@ -284,11 +292,9 @@ describe('rail: nothing that shows the game reads playability (#2206)', () => {
   });
 });
 
+// The committed catalogue's own check is in `tests/unit/catalogue.test.ts` ("every playability score has a
+// report that lists it"), with a guard that it is not run on an empty set; these are `reportProblems`'s own cases.
 describe('rail: every non-null score has a report that lists it (#2206)', () => {
-  it('holds for the committed catalogue', () => {
-    expect(reportProblems(CATALOGUE, (p) => (existsSync(path(p)) ? readFileSync(path(p), 'utf8') : null))).toEqual([]);
-  });
-
   const scoredCopy = () => {
     const out = applyRows(UNSCORED, ROWS, DATE) as { catalogue: Loose; reports: { path: string; text: string }[] };
     const files = new Map(out.reports.map((r) => [r.path, r.text]));
