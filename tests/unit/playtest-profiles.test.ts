@@ -158,17 +158,23 @@ describe('the playtest skill (#2204)', () => {
   });
 
   it('says what counts toward the need: card text, a fixed line, working time (#2245)', () => {
-    const at = SKILL.indexOf('**The time a bubble needs**');
-    const need = SKILL.slice(at, SKILL.indexOf('\n\n', SKILL.indexOf('\n- ', at))).replace(/\s+/g, ' ');
+    const at = SKILL.indexOf('**The time a bubble needs**'), end = SKILL.indexOf('Compare that need', at);
+    expect(at, 'the need paragraph is where the rules live').toBeGreaterThan(-1);
+    expect(end, 'and the comparison follows it').toBeGreaterThan(at);
+    const need = SKILL.slice(at, end).replace(/\s+/g, ' ');
     expect(need, 'card text counts only when it must be read to choose').toContain('**Card text, only when the child must read it to choose the answer**');
-    expect(need, 'once per wave, and never a picture').toMatch(/Count it once per wave\. A picture does not count/);
+    expect(need, 'once per wave, and never a picture').toMatch(/Count it once per wave\. A picture does not count, nor a card that only repeats the question line/);
     expect(need, 'a fixed line is not in the per-wave need').toContain('**A line that is the same every wave is read once per game, so it is not in the per-wave need**');
     expect(need, 'working time is judged, and says so').toContain('**Working time**, a judgement, not a published norm');
     expect(need, 'a recalled fact is free').toContain('**a recalled fact adds 0**');
     expect(need, 'each further step costs a second').toContain('**each further mental step the question needs adds 1 s**');
+    expect(need, 'with a worked step').toContain('`0.4 × 3` is recall 4 × 3, then adjust the place value: one step, 1 s');
+    expect(need, 'and a fixed line is told from two waves in the pack, never the source').toContain('`2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2) is the same text');
     expect(need, 'the mark shows its working').toContain('Every `physical` `saw` names the steps it counted');
-    const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]);
-    expect(row.evidence.find((e: { criterion: string }) => e.criterion === 'physical').saw, 'the example names its steps').toMatch(/working: \d+ steps?/);
+    const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]) as { evidence: { criterion: string; saw: string }[] };
+    const physical = row.evidence.filter((e) => e.criterion === 'physical');
+    expect(physical.length, 'the example has physical evidence').toBeGreaterThan(0);
+    for (const e of physical) expect(e.saw, 'every physical saw in the example names its steps').toMatch(/working: \d+ steps?/);
   });
 
   it('its example row is a valid row: the five keys, the sum, evidence, and a profile as `by`', () => {

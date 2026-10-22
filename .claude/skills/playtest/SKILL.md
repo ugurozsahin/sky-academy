@@ -53,7 +53,10 @@ maths symbols are read at a glance from Year 1 up, and Reception reads neither.
   count ÷ the profile's words a minute).
 - **The question line**, when the pack shows the wave launching before it could be read. **A line that is the
   same every wave is read once per game, so it is not in the per-wave need** — y1-order's `Smallest to biggest!`
-  is one, and so is a fixed instruction under the question line.
+  is one, and so is a fixed instruction under the question line. Tell it from the pack: the question line in
+  `2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2) is the same text. A sequence game hides the line once
+  slicing starts; there, read `prompt` from `window.__sna.state()` over two waves live (§1) and cite it as `live:`.
+  When the lines differ, or neither shows them, count the line.
 - **Card text, only when the child must read it to choose the answer**, as with y6-lists' gap sentence. Count it
   once per wave. A picture does not count, nor a card that only repeats the question line.
 - **Working time**, a judgement, not a published norm: **a recalled fact adds 0** (a times-table answer, a number
@@ -152,7 +155,7 @@ not describe the game, re-read the criteria, but never adjust the sum to fit a b
 One JSON object per game, one per line (JSON Lines), with exactly these keys:
 
 ```json
-{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs.min","saw":"need 4 s, reach 5.37 s, 134% at stage 1; no words, working: 0 steps, a recalled fact"},{"criterion":"physical","ref":"metrics.json#settings.speeds","saw":"stage 4 at speed 3: 5.37 × 3.4 / 5.6 = 3.26 s, 82% of the need"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
+{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs.min","saw":"need 4 s, reach 5.37 s, 134% at stage 1; no words, working: 0 steps, a recalled fact"},{"criterion":"physical","ref":"metrics.json#settings.speeds","saw":"stage 4 at speed 3: 5.37 × 3.4 / 5.6 = 3.26 s, 82% of the need; working: 0 steps"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
 ```
 
 - **`game`** — the topic id, the pack's folder name. **`year`** — the pack's `YearId`.
