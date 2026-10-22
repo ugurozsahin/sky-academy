@@ -2216,7 +2216,7 @@ describe('a hint is instruction text unless the generator says it is data (#328,
         const q = t.gen(d, r);
         if (!q.hintIsData) continue;
         checked++;
-        expect(q.visual, `${id}: a marked card drew a visual, so the hint is no longer the only source`).toBeUndefined();
+        if (q.visual) expect(q.visual.type === 'chart' && q.visual.kind === 'bar' && q.visual.rows.map(r => r.label).sort().join() === [...q.options].sort().join(), `${id}: only the measure bar chart (#2271), one bar per option, may sit beside a marked hint`).toBe(true);
         // Every number in the hint is absent from the prompt and the options: hide the line and there is
         // nothing left to decide by. That is the whole reason the flag exists.
         for (const n of q.hint!.match(/\d+/g) ?? [])

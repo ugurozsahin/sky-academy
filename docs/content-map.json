@@ -1199,7 +1199,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
    "strands": [
     "y1-m-measure"
@@ -1220,7 +1220,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
    "strands": [
     "y1-m-measure"
@@ -1241,7 +1241,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
    "strands": [
     "y1-m-measure"
@@ -2420,7 +2420,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
    "strands": [
     "y2-m-measure"
@@ -2441,7 +2441,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
    "strands": [
     "y2-m-measure"
@@ -2462,7 +2462,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Compare a cup, a jug and a bowl: which holds more? Use a ruler or shoe-lengths to measure the table.",
    "strands": [
     "y2-m-measure"
