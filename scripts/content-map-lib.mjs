@@ -32,6 +32,17 @@ export function curriculumIds(md) {
   return [...md.matchAll(/^(?:[-|]\s*)`?((?:r|y[1-6])-[a-z0-9-]+)`?/gm)].map(m => m[1]);
 }
 
+/**
+ * What the website may publish (#2201): the topics and years the repository's committed catalogue shows. A topic is
+ * published when its game is on for its year and that year's island shows; a hidden year drops out of `years`.
+ * `shown` is `catalogue-shown.ts`'s `{ gameOn, islandShown }`, passed in so this file stays free of TypeScript.
+ */
+export function publishedOnly({ topics, years, catalogue, shown }) {
+  const live = years.filter(y => shown.islandShown(catalogue, y.id, topics));
+  const ids = new Set(live.map(y => y.id));
+  return { years: live, topics: topics.filter(t => ids.has(t.year) && shown.gameOn(catalogue, t.id, t.year)) };
+}
+
 export function buildContentMap({ topics, years, strands, tipFor, banks = {} }) {
   const unmatched = topics.filter(t => !t.nc.trim() || strandsOf(t, strands).length === 0).map(t => t.id);
   if (unmatched.length) throw new Error(`No programme-of-study strand matches the nc of: ${unmatched.join(', ')}. Extend docs/content-map-strands.json.`);
