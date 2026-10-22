@@ -52,12 +52,12 @@ profile's words a minute), plus the question's reading time when the pack shows 
 could be read. Count the words of the question line only — a fixed instruction under it, the same every wave, is
 read once per game — and words only: numerals and maths symbols are read at a glance from Year 1 up; Reception
 reads neither. Compare that need with the bubble's **reach**, its reachable time (`aboveCardMs`, its smallest
-value), as a percentage: reach ÷ need.
+value, in milliseconds: divide by 1000), as a percentage: reach ÷ need, both in seconds.
 
-**A later stage's reach** is estimated, never guessed, one way:
-`reach_k ≈ reach_1 × airTime[speeds[k]] / airTime[speeds[0]]`. `airTime` is `defaults.settings.airTime` in
-`src/config/catalogue.json`, unless the game overrides it; the pack carries the resolved table as
-`metrics.json#settings.airTime`. A `speeds` value indexes `airTime` from 0, so speed 1 is its second entry. The
+**A later stage's reach** is estimated, never guessed, one way. Stages count from 1, so stage k plays
+`speeds[k-1]`: `reach_k ≈ reach_1 × airTime[speeds[k-1]] / airTime[speeds[0]]`. `airTime` is
+`defaults.settings.airTime` in `src/config/catalogue.json`, unless the game overrides it; the pack carries the
+resolved table as `metrics.json#settings.airTime`. A `speeds` value indexes `airTime` from 0, so speed 1 is its second entry. The
 highest `speeds` entry is the shortest flight, so that stage decides. Cite `metrics.json#settings.speeds` and put
 the arithmetic in `saw`: `stage 3 at speed 3: 5.27 × 3.4 / 5.6 = 3.2 s`.
 
@@ -83,7 +83,7 @@ the arithmetic in `saw`: `stage 3 at speed 3: 5.27 × 3.4 / 5.6 = 3.2 s`.
 is the mark. Each `physical` mark's `saw` states the need, the reach and the percentage.
 - **0** — The stage-1 reach is below **75%** of the need; or the radius is below the profile's floor; or tracing
   needs precision the profile lacks.
-- **1** — The stage-1 reach is 75% to 100% of the need; or stage 1 meets the need but a later stage's estimated
+- **1** — The stage-1 reach is at least 75% but below 100% of the need; or stage 1 meets the need but a later stage's estimated
   reach does not; or the radius is at or above the floor but below the comfortable size; or bubbles overlap so a
   slice catches the wrong one.
 - **2** — Every stage's estimated reach meets the need, and the radius is at or above the profile's comfortable

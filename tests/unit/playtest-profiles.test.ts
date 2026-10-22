@@ -101,10 +101,13 @@ describe('the playtest skill (#2204)', () => {
     const at = SKILL.indexOf('**`physical`**');
     const anchors = SKILL.slice(at, SKILL.indexOf('\n\n', at)).replace(/\s+/g, ' ');
     expect(anchors, 'a clear miss is below 75% of the need').toMatch(/- \*\*0\*\* — The stage-1 reach is below \*\*75%\*\* of the need/);
-    expect(anchors, 'a near miss is a 1').toMatch(/- \*\*1\*\* — The stage-1 reach is 75% to 100% of the need/);
+    expect(anchors, 'a near miss is a 1').toMatch(/- \*\*1\*\* — The stage-1 reach is at least 75% but below 100% of the need/);
+    expect(anchors, 'a radius between floor and comfortable is a 1, not a gap').toContain('at or above the floor but below the comfortable size');
+    expect(anchors, 'the lowest clause decides between anchors').toContain('The lowest anchor any clause reaches is the mark');
     expect(anchors, 'a 2 needs every stage, not only the one the pack played').toMatch(/- \*\*2\*\* — Every stage's estimated reach meets the need/);
     expect(anchors, 'the mark cites its numbers').toContain('`saw` states the need, the reach and the percentage');
-    expect(SKILL, 'the later-stage estimate is one formula').toContain('`reach_k ≈ reach_1 × airTime[speeds[k]] / airTime[speeds[0]]`');
+    expect(SKILL, 'the later-stage estimate is one formula').toContain('`reach_k ≈ reach_1 × airTime[speeds[k-1]] / airTime[speeds[0]]`');
+    expect(SKILL, 'and says the unit of the measured reach').toContain('in milliseconds: divide by 1000');
     expect(SKILL, 'and says how a speed indexes the table').toContain('A `speeds` value indexes `airTime` from 0');
     const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]);
     const saw = row.evidence.filter((e: { criterion: string }) => e.criterion === 'physical').map((e: { saw: string }) => e.saw).join(' ');

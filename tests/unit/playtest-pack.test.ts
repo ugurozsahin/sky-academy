@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { CATALOGUE } from './helpers/catalogue-file';
-import { RUNTIME } from '../../src/config/resolve';
+import { RUNTIME, resolveGame } from '../../src/config/resolve';
 import {
   ABOUT, FRAME_CLAMP_MS, KEYPAD_PACKS, buildMetrics, cardShare, countWords, flightMetrics, frameStats,
   parseArgs, plannedPacks, speechMode, type Recorded, type Sample,
@@ -153,7 +153,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
     frames: [0, 16, 33], labels: ['7', '8'], promptAt: 50, extra: {},
     speech: { text: 'Adding! 6 plus 1 equals what', at: 60, start: 80, end: 2880, error: null },
   };
-  const settings = { lives: 3, gentle: false, speeds: [1, 2], diffs: [1, 2], airTime: [7.5, 5.6, 4.4, 3.4] };   // the resolved settings carry airTime (#2245 cites it)
+  const settings: Record<string, unknown> = { ...resolveGame('y1-add', 'year1').settings };   // what scripts/playtest-pack.mjs passes, so a key the skill cites (#2245: airTime) is the real one
   const m = buildMetrics({ job: { year: 'year1', game: 'y1-add', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec, shots: [] }) as Record<string, unknown>;
   const at = (path: string) => path.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], m);
 
