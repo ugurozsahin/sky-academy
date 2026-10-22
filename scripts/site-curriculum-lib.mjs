@@ -276,7 +276,9 @@ function switcher(map, year) {
 export function renderYearPage(map, year, home) {
   const { header, footer } = shellFrom(home, yearPath(year.year));
   const t = esc(year.title);
-  const framework = year.year === 'reception' ? 'the EYFS Early Learning Goals' : 'the National Curriculum for England';
+  const usesDevMatters = map.topics.some(x => x.year === year.year && x.nc.startsWith('Development Matters'));   // #2154: the sentence follows the map
+  const framework = year.year !== 'reception' ? 'the National Curriculum for England'
+    : usesDevMatters ? 'the EYFS framework: the Early Learning Goals and Development Matters' : 'the EYFS Early Learning Goals';
   const intro = section('', [
     `<nav aria-label="Breadcrumb"><p><a href="/curriculum/">Curriculum</a> › ${t}</p></nav>`,
     `<h1 id="page-title">${t}: what your child practises</h1>`,

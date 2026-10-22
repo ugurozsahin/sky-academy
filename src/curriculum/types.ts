@@ -1,7 +1,7 @@
 // Shared question model for every subject. Generators are pure: (difficulty, rng) => Question.
 import type { Strand } from './strands';
-import { resolveYear } from '../config/resolve';   // the year settings live in src/config/catalogue.json (#2194)
-import type { YearSettings } from '../config/catalogue';
+import { resolveYear } from '../config/resolve';
+import type { DefaultSettings, YearSettings } from '../config/catalogue';   // the year settings live in src/config/catalogue.json (#2194)
 export type Rng = () => number; // [0,1)
 
 /** One category of a chart visual: its label (emoji + name) and the count it stands for. */
@@ -188,6 +188,7 @@ export interface YearInfo {
   speeds: number[];       // bubble speed per stage (0 gentle-float … 3 fast); length = number of stages
   diffs: Difficulty[];    // generator difficulty per stage
   sprintStars: { threeStar: number; twoStar: number };   // Ninja Sprint correct-answer thresholds for this year (#700)
+  timing?: DefaultSettings;   // #2198: one game's own air time and stagger; absent = the global `TIMING` (mixed modes, every year row)
 }
 export const STAGE_NAMES = ['Apprentice', 'Warrior', 'Master', 'Grandmaster', 'Legend'];
 
