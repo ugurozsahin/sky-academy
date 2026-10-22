@@ -32,8 +32,15 @@ export function islandShown(cat: Catalogue, year: YearId, topics: readonly GateT
   return meetsShowGate(true, count('maths'), count('writing'));
 }
 
-/** The islands and the games a catalogue shows, each in file order. A game shows when it is on for a year whose island shows. */
-export function catalogueShown(cat: Catalogue, topics: readonly GateTopic[]): { years: YearId[]; games: string[] } {
+/** What `catalogueShown` returns; scripts/game-media.d.mts and later callers import this one shape. */
+export interface CatalogueShown { readonly years: readonly YearId[]; readonly games: readonly string[] }
+
+/**
+ * The islands and the games a catalogue shows, each in file order. A game shows when it is on for a year whose
+ * island shows. The gate counts `topics` while the games come from `cat.games`; the two agree because
+ * `tests/unit/catalogue.test.ts` holds the catalogue's games equal to `TOPICS`.
+ */
+export function catalogueShown(cat: Catalogue, topics: readonly GateTopic[]): CatalogueShown {
   const years = (Object.keys(cat.years) as YearId[]).filter(y => islandShown(cat, y, topics));
   const games = Object.entries(cat.games)
     .filter(([id, g]) => (Object.keys(g.years) as YearId[]).some(y => years.includes(y) && gameOn(cat, id, y)))

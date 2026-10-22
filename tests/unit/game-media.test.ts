@@ -40,6 +40,14 @@ describe('what the catalogue shows (src/curriculum/catalogue-shown.ts)', () => {
     expect(islandShown(hideAllBut(11, 'global'), 'year3', TOPICS)).toBe(false);
     expect(islandShown(hideAllBut(11, 'year'), 'year3', TOPICS)).toBe(false);
     expect(islandShown(hideAllBut(12, 'global'), 'year3', TOPICS), '12 maths is the KS2 bar').toBe(true);
+    const writing = core('year3', 'writing');
+    const writingOn = (n: number) => copy(c => { for (const t of writing.slice(n)) c.games[t.id].visible = false; });
+    expect(islandShown(writingOn(5), 'year3', TOPICS), 'and 6 writing').toBe(false);
+    expect(islandShown(writingOn(6), 'year3', TOPICS)).toBe(true);
+    const under = hideAllBut(11, 'global'), stillOn = maths[0].id;
+    expect(gameOn(under, stillOn, 'year3')).toBe(true);
+    expect(catalogueShown(under, TOPICS).games, 'a game still on, on an island under its gate, is hidden').not.toContain(stillOn);
+    expect(mediaPlan(under, catalogueShown(under, TOPICS)).withheld).toContain(CATALOGUE.games[stillOn].media.thumbnail.src);
     const drills = TOPICS.filter(t => t.year === 'year3' && t.drill);
     expect(drills.length, 'year 3 has a drill to hide').toBeGreaterThan(0);
     expect(islandShown(copy(c => { for (const t of drills) c.games[t.id].visible = false; }), 'year3', TOPICS)).toBe(true);
@@ -102,16 +110,19 @@ describe('the post-deploy media check', () => {
     expect(await checkMedia(base, { publish: ['img/a.webp'], withheld: ['img/b.webp'] })).toEqual([]);
   });
   it('fails a published file that is missing, redirected or of the wrong type', async () => {
-    mode = { 'img/r.webp': { status: 301 }, 'img/t.webp': { status: 200, type: 'text/html' } };
-    const p = await checkMedia(base, { publish: ['img/m.webp', 'img/r.webp', 'img/t.webp'], withheld: [] });
-    expect(p).toHaveLength(3);
+    mode = { 'img/r.webp': { status: 301 }, 'img/t.webp': { status: 200, type: 'text/html' }, 'img/n.webp': { status: 200 } };
+    const p = await checkMedia(base, { publish: ['img/m.webp', 'img/r.webp', 'img/t.webp', 'img/n.webp'], withheld: [] });
+    expect(p).toHaveLength(4);
+    expect(p.join('\n')).toMatch(/n\.webp: content-type "", want image\/webp/);
     expect(p.join('\n')).toMatch(/m\.webp: status 404, want 200/);
     expect(p.join('\n')).toMatch(/r\.webp: status 301, want 200/);
     expect(p.join('\n')).toMatch(/t\.webp: content-type "text\/html", want image\/webp/);
   });
   it('fails a withheld file that is served', async () => {
-    mode = { 'img/h.webp': webp };
-    expect((await checkMedia(base, { publish: [], withheld: ['img/h.webp'] }))[0]).toMatch(/withheld .* answered 200; want 404/);
+    mode = { 'img/h.webp': webp, 'img/r.webp': { status: 301 } };
+    const p = await checkMedia(base, { publish: [], withheld: ['img/h.webp', 'img/r.webp'] });
+    expect(p.join('\n')).toMatch(/h\.webp: withheld .* answered 200; want 404/);
+    expect(p.join('\n')).toMatch(/r\.webp: withheld .* answered 301; want 404/);
   });
   it('a host that does not answer fails rather than throws', async () => {
     expect((await checkFile('http://127.0.0.1:1', 'img/a.webp', true))[0]).toMatch(/request failed/);
