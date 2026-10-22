@@ -5,6 +5,7 @@
 import { ACTION_TIMEOUT } from './site-shots.mjs';
 
 const FLIGHT_TIMEOUT = 60000;                        // a sequence wave relaunches its letters, so the first wave can run long
+const REACH_TIMEOUT = 120000;                        // a required label's four flights have run 12 s each (#2251)
 const RESULT_TIMEOUT = 240000;                        // the keypad's Tables Check is 28 cards at about 3 s each
 
 /** Turn recording off and take what the page kept since the tap: the prompts, the spoken lines, the frames and bubbles. */
@@ -61,6 +62,7 @@ export async function playBubbles(page, shot, readScreen) {
   }, q0, { timeout: FLIGHT_TIMEOUT, polling: 100 });
   const rec = await collect(page);
   const livesAfterFirstWave = await lives(page);
+  const reach = screen.sequence ? await labelsRunOut(page, q0) : null;
   page.__at = 'the first question resolving';
   // A gentle year sends the answer back up, and a sequence its letters: finish the question now its flight is timed.
   for (let end = Date.now() + FLIGHT_TIMEOUT; (await asked(page)) === q0;) {
@@ -72,7 +74,23 @@ export async function playBubbles(page, shot, readScreen) {
   await page.waitForFunction(k => window.__pk.asked() > k && window.__pk.wrongReady(), q0, { timeout: ACTION_TIMEOUT, polling: 100 });
   const wrong = await wrongOnce(page, shot, () => page.evaluate(() => window.__sna.wrong()), 'just after one deliberate wrong slice');
   const result = await toResult(page, shot);
-  return { screen, ...rec, extra: { firstWave: 'left unanswered, to time its whole flight', livesStart: screen.lives, livesAfterFirstWave, ...wrong, result } };
+  const firstWave = reach ? 'left unanswered, to time its whole flight, then until a required label ran out of relaunches (labelReachMs)' : 'left unanswered, to time its whole flight';
+  return { screen, ...rec, reach: reach?.rc ?? null, extra: { firstWave, livesStart: screen.lives, livesAfterFirstWave, ...(reach ? { livesAfterLabelsRanOut: reach.lives } : {}), ...wrong, result } };
+}
+
+/**
+ * A sequence question's reach (#2251): still slicing nothing, wait until every required label has ended, which
+ * happens once the label the game is waiting for falls on its last flight, so the question is missed. A child who
+ * slices it earlier only ends its reach sooner; this times each label's whole chance, which is what reach means.
+ */
+async function labelsRunOut(page, q0) {
+  page.__at = "the first question's required labels running out of relaunches";
+  await page.waitForFunction(k => {
+    const pk = window.__pk, ids = Object.keys(pk.reach.ids);
+    return pk.asked() > k || (ids.length > 0 && ids.every(id => id in pk.reach.ends));
+  }, q0, { timeout: REACH_TIMEOUT, polling: 100 });
+  const rc = await page.evaluate(() => { const r = window.__pk.reach; r.on = false; return { ids: r.ids, ends: r.ends, samples: r.samples, frames: r.frames }; });
+  return { rc, lives: await lives(page) };
 }
 
 export async function playTracing(page, shot, readScreen) {

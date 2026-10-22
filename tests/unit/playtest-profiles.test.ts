@@ -140,6 +140,25 @@ describe('the playtest skill (#2204)', () => {
     expect(SKILL).toMatch(/more than 40% of one profile's games score 8 or above/);
   });
 
+  it('takes a sequence game\'s reach from labelReachMs.min, over its relaunches, never aboveCardMs (#2251)', () => {
+    const at = SKILL.indexOf("**A `sequence` game's reach is `labelReachMs.min`, not `aboveCardMs`**");
+    const compare = SKILL.indexOf('Compare that need with the bubble\'s **reach**'), later = SKILL.indexOf("**A later stage's reach**");
+    expect(at, 'the rule is stated in §2').toBeGreaterThan(-1);
+    expect(at > compare && at < later, 'beside the reach definition, before the later-stage estimate that uses it').toBe(true);
+    const rule = SKILL.slice(at, later).replace(/\s+/g, ' ');
+    expect(rule, 'the reach spans every relaunch').toContain('its total time below the card over its first flight and every relaunch, until it is sliced or its relaunches run out');
+    expect(rule, 'and cites the limit the pack carries').toContain('`metrics.json#labelReach.maxRelaunches`');
+    expect(rule, 'aboveCardMs is not used for it').toContain('`aboveCardMs` times one flight of any bubble, decoys included, so it is not used');
+    expect(rule, 'a label the pack\'s own miss cut short is never the reach').toContain("was stopped by the pack's own miss, not by the game, so it is information only and never the reach");
+    expect(rule, 'and it feeds the later-stage estimate').toContain('it is `reach_1` in the estimate below');
+    expect(rule, 'the wait for a relaunch is judged elsewhere').toContain('judged under `again` (pace) and `feedback`, not `physical`');
+    const flat = SKILL.replace(/\s+/g, ' ');
+    const miss = flat.indexOf("**A sequence game's first question is missed on purpose.**");
+    expect(miss, 'the deliberate-miss line is in the skill').toBeGreaterThan(-1);
+    expect(flat.slice(miss, flat.indexOf('- **A pack plays stage 1 only.**', miss)), 'and tells the scorer never to hold it against the game')
+      .toContain("It is not a child's mistake: never mark `feedback` or `again` down for it.");
+  });
+
   it('marks `physical` on a band, not a cliff, and estimates later stages one way (#2245)', () => {
     const at = SKILL.indexOf('**`physical`**');
     const anchors = SKILL.slice(at, SKILL.indexOf('\n\n', at)).replace(/\s+/g, ' ');

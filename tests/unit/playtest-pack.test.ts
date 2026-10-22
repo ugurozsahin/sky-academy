@@ -3,9 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { CATALOGUE } from './helpers/catalogue-file';
 import { RUNTIME, resolveGame } from '../../src/config/resolve';
+import { MAX_RELAUNCHES, RELAUNCH_DELAY } from '../../src/game/bubbles';
+import { createSim } from './sim/harness';
 import {
-  ABOUT, FRAME_CLAMP_MS, KEYPAD_PACKS, buildMetrics, cardShare, countWords, flightMetrics, frameStats,
-  parseArgs, plannedPacks, speechMode, type Recorded, type Sample,
+  ABOUT, FRAME_CLAMP_MS, KEYPAD_PACKS, buildMetrics, cardShare, countWords, flightMetrics, frameStats, labelReach, newReach,
+  parseArgs, plannedPacks, reachStep, speechMode, type ReachBubble, type ReachRecording, type Recorded, type Sample,
 } from '../../scripts/playtest-metrics.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
@@ -119,6 +121,171 @@ describe('play-pack flight metrics on a stub arena (#2205)', () => {
   });
 });
 
+/**
+ * #2251: a sequence label's reach over its first flight and its relaunches. `flySeq` flies required bubbles the way
+ * arena.ts does a sequence wave: a fall below the edge sends one back to its launch line, on the same arc, after
+ * RELAUNCH_DELAY, until MAX_RELAUNCHES are used; the next fall kills it. The page's own recorder, `reachStep`, runs
+ * every frame, so this tests the function the pack injects, not a copy of it.
+ */
+interface SeqBubble extends ReachBubble { vy0: number; v: number; g: number; launchAt: number }
+function flySeq(spec: { id: number; label: string; launch: number; vy: number; g: number }[], o: { need: string[]; until: number; slice?: { id: number; at: number }; freezeAt?: number; extra?: ReachBubble[] }) {
+  const rc = newReach();
+  const bs: SeqBubble[] = spec.map(b => ({ id: b.id, label: b.label, y: H + R, vy0: b.vy, v: b.vy, g: b.g, launchAt: b.launch, launched: false, hit: false, dead: false, relaunches: 0 }));
+  const frozen = (t: number) => t >= (o.freezeAt ?? Infinity);
+  for (let t = 0; t <= o.until; t += FRAME) {
+    for (const b of bs) if (!b.dead && !b.hit && !frozen(t)) stepSeq(b, t, o.slice);
+    reachStep(rc, t, [...bs, ...(o.extra ?? [])], frozen(t), o.need);
+  }
+  return rc;
+}
+function stepSeq(b: SeqBubble, t: number, slice?: { id: number; at: number }) {
+  if (slice?.id === b.id && t >= slice.at) { b.hit = true; return; }
+  if (!b.launched) { if (t < b.launchAt) return; b.launched = true; }
+  b.v += b.g * FRAME / 1000; b.y += b.v * FRAME / 1000;
+  if (b.y - R <= H + 10 || b.v <= 0) return;
+  if (b.relaunches < MAX_RELAUNCHES) { b.relaunches++; b.launched = false; b.launchAt = t + RELAUNCH_DELAY; b.y = H + R; b.v = b.vy0; } else b.dead = true;
+}
+
+describe('a sequence label\'s reach over its relaunches, on a stub arena (#2251)', () => {
+  const vy = -600, g = 250, opts = { H, cardBottom: 0, maxRelaunches: MAX_RELAUNCHES };
+  const [up, down] = crossings(vy, g), flight = down - up;   // one flight's reach, continuous
+
+  it('a label left alone is reachable for every flight it gets, then runs out', () => {
+    const rc = flySeq([{ id: 1, label: 'the', launch: 0, vy, g }], { need: ['the'], until: 40000 });
+    const { labelReachMs, labelReach: lr } = labelReach(rc, opts);
+    expect(lr.labels).toEqual([{ label: 'the', reachMs: expect.any(Number), flights: MAX_RELAUNCHES + 1, endedBy: 'ran out' }]);
+    expect(Math.abs(lr.labels[0].reachMs - (MAX_RELAUNCHES + 1) * flight)).toBeLessThan(2 * (MAX_RELAUNCHES + 1) * FRAME);
+    expect(labelReachMs).toEqual({ min: lr.labels[0].reachMs, median: lr.labels[0].reachMs, max: lr.labels[0].reachMs });
+    expect(lr.maxRelaunches).toBe(MAX_RELAUNCHES);
+    expect(lr.frames.clean).toBe(true);
+  });
+
+  it('is many times the first flight\'s aboveCardMs, which is why a sequence game does not use that', () => {
+    const rc = flySeq([{ id: 1, label: 'the', launch: 0, vy, g }], { need: ['the'], until: 40000 });
+    const first = flightMetrics(rc.samples.map(([t, id, label, y]): Sample => [t, id, label, y, R, 0]), { H, cardBottom: 0 });
+    expect(labelReach(rc, opts).labelReachMs!.min).toBeGreaterThan(MAX_RELAUNCHES * flight);
+    expect(first.bubbles[0].reachMs).toBeGreaterThan(0);
+  });
+
+  it('a label sliced on its second flight counts as reachable up to the slice', () => {
+    const at = flight + 2 * up + RELAUNCH_DELAY + 1000;       // a second into its second flight's reach, roughly
+    const rc = flySeq([{ id: 1, label: 'the', launch: 0, vy, g }], { need: ['the'], until: 20000, slice: { id: 1, at } });
+    const l = labelReach(rc, opts).labelReach.labels[0];
+    expect([l.endedBy, l.flights]).toEqual(['sliced', 2]);
+    expect(l.reachMs).toBeGreaterThan(flight);
+    expect(l.reachMs).toBeLessThan(2 * flight);
+  });
+
+  it('does not count time above the question card, on any flight', () => {
+    const card = 300;
+    const [above, below] = crossings(vy, g, card);
+    const rc = flySeq([{ id: 1, label: 'the', launch: 0, vy, g }], { need: ['the'], until: 40000 });
+    const reach = labelReach(rc, { ...opts, cardBottom: card }).labelReachMs!.min;
+    expect(Math.abs(reach - (MAX_RELAUNCHES + 1) * (flight - (below - above)))).toBeLessThan(3 * (MAX_RELAUNCHES + 1) * FRAME);
+  });
+
+  it('records required labels only, each bubble on its own (a word can appear twice), and skips the outcome\'s ghost', () => {
+    const ghost: ReachBubble = { id: 9, label: 'the', y: 300, launched: true, hit: true, dead: false, relaunches: 0 };
+    const rc = flySeq([{ id: 1, label: 'the', launch: 0, vy, g }, { id: 2, label: 'cat', launch: 0, vy, g }, { id: 3, label: 'the', launch: 400, vy, g }],
+      { need: ['the', 'the'], until: 40000, extra: [ghost] });
+    expect(Object.keys(rc.ids).map(Number)).toEqual([1, 3]);
+    expect(labelReach(rc, opts).labelReach.labels.map(l => l.endedBy)).toEqual(['ran out', 'ran out']);
+  });
+
+  it('keeps a label the question\'s end cut short out of the range, whether it had more reach so far or less: the pack\'s miss cut it', () => {
+    const wave = [{ id: 1, label: 'Do', launch: 0, vy, g }, { id: 2, label: 'you', launch: 0, vy: -300, g: 52 }, { id: 3, label: 'like', launch: 2.5 * flight, vy, g }];
+    const freezeAt = (MAX_RELAUNCHES + 1) * (flight + 2 * up + RELAUNCH_DELAY);   // about when 'Do' runs out
+    const r = labelReach(flySeq(wave, { need: ['Do', 'you', 'like'], until: freezeAt + 1000, freezeAt }), opts);
+    const by = Object.fromEntries(r.labelReach.labels.map(l => [l.label, l]));
+    expect(by.Do.endedBy).toBe('ran out');
+    expect(by.you.endedBy, 'a slower arc, still in the air').toBe('wave over');
+    expect(by.like.endedBy, 'launched late, still in the air').toBe('wave over');
+    expect(r.labelReachMs).toEqual({ min: by.Do.reachMs, median: by.Do.reachMs, max: by.Do.reachMs });
+    expect(by.you.reachMs).toBeGreaterThan(by.Do.reachMs);
+    expect(by.like.reachMs).toBeLessThan(by.Do.reachMs);
+  });
+
+  // The review of #2255: the freeze that decides the question ends every other label's reach on that frame, and a label
+  // in the air on its last relaunch then is cut short, not run out, though it has used every relaunch.
+  it('a label in the air on its last relaunch when the question is decided is cut short, and its reach stops at the freeze', () => {
+    const wave = [{ id: 1, label: 'Do', launch: 0, vy, g }, { id: 2, label: 'you', launch: 0, vy: -500, g: 150 }];   // a floatier arc: 'Do' has run out before 'you' starts its last flight
+    const free = flySeq(wave, { need: ['Do', 'you'], until: 40000 });
+    const last = free.samples.filter(x => x[1] === 2 && x[4] === MAX_RELAUNCHES && x[3] < H);   // 'you' on its last flight, in play
+    const freezeAt = last[last.length >> 1][0];
+    const rc = flySeq(wave, { need: ['Do', 'you'], until: freezeAt + 1000, freezeAt });
+    const end = rc.ends[2];
+    expect(end, "'you' has an end: the frozen frame stops its recording").toBeDefined();
+    expect(end.t).toBe(freezeAt);
+    expect([end.launched, end.dead, end.relaunches], 'launched and alive on its last relaunch').toEqual([true, false, MAX_RELAUNCHES]);
+    expect(rc.samples.some(x => x[1] === 2 && x[0] >= freezeAt), 'nothing sampled through the outcome hold').toBe(false);
+    const r = labelReach(rc, opts);
+    const you = r.labelReach.labels.find(l => l.label === 'you')!;
+    expect([you.endedBy, you.flights]).toEqual(['wave over', MAX_RELAUNCHES + 1]);
+    const youFull = labelReach(free, opts).labelReach.labels.find(l => l.label === 'you')!.reachMs;
+    expect(you.reachMs, 'only what it had until the freeze').toBeLessThan(youFull - 500);
+    const Do = r.labelReach.labels.find(l => l.label === 'Do')!;
+    expect(Do.endedBy).toBe('ran out');
+    expect(r.labelReachMs, "kept out of the range: only 'Do', which ran out, is in it").toEqual({ min: Do.reachMs, median: Do.reachMs, max: Do.reachMs });
+  });
+
+  it('gives the median of an even count as the middle two\'s mean', () => {
+    const rc: ReachRecording = { ids: { 1: 'a', 2: 'b', 3: 'c', 4: 'd' }, samples: [], frames: [0, 16],
+      ends: Object.fromEntries([1, 2, 3, 4].map(id => [id, { t: 0, hit: false, dead: true, launched: true, relaunches: MAX_RELAUNCHES }])) };
+    for (const [id, ms] of [[1, 1000], [2, 2000], [3, 3000], [4, 9000]]) rc.samples.push([0, id, 'x', 400, 0], [ms, id, 'x', 900, MAX_RELAUNCHES]);
+    expect(labelReach(rc, opts).labelReachMs).toEqual({ min: 1000, median: 2500, max: 9000 });
+  });
+
+  it('a bubble the outcome removed while it waited to rise again has not run out, even on its last relaunch', () => {
+    const rc: ReachRecording = { ids: { 1: 'a' }, samples: [[0, 1, 'a', 400, 0], [500, 1, 'a', 900, 0]], frames: [0, 500],
+      ends: { 1: { t: 600, hit: false, dead: true, launched: false, relaunches: MAX_RELAUNCHES } } };
+    expect(labelReach(rc, opts).labelReach.labels[0].endedBy).toBe('wave over');
+    expect(labelReach(rc, opts).labelReachMs).toBeNull();
+  });
+
+  it('refuses to classify without the relaunch limit', () => {
+    expect(() => labelReach(newReach(), { H, cardBottom: 0 } as never)).toThrow(/maxRelaunches/);
+  });
+});
+
+describe('the reach recorder on the real Arena (#2251)', () => {
+  it('a lone required label, with nothing to collide with, is reachable for its first flight\'s time on every flight', () => {
+    const sim = createSim({ seed: 3 });
+    try {
+      sim.spawn({ labels: ['Do'], speed: 2, ordered: ['Do'] });
+      const rc = newReach();
+      for (let n = 0; n < 6000 && Object.keys(rc.ends).length === 0; n++) { sim.frame(); reachStep(rc, sim.now(), sim.all(), sim.arena.frozen, ['Do']); }
+      const l = labelReach(rc, { H: sim.arena.H, cardBottom: 0, maxRelaunches: MAX_RELAUNCHES }).labelReach.labels[0];
+      const first = labelReach({ ...rc, samples: rc.samples.filter(x => x[4] === 0), ends: {} }, { H: sim.arena.H, cardBottom: 0, maxRelaunches: MAX_RELAUNCHES }).labelReach.labels[0].reachMs;
+      expect([l.endedBy, l.flights]).toEqual(['ran out', MAX_RELAUNCHES + 1]);
+      expect(first).toBeGreaterThan(1000);
+      expect(Math.abs(l.reachMs - (MAX_RELAUNCHES + 1) * first), 'a relaunch rises on the same arc (#591), and the wait below the floor adds nothing').toBeLessThan(4 * (MAX_RELAUNCHES + 1) * FRAME);
+    } finally { sim.destroy(); }
+  });
+
+  it('sees a required label through every relaunch until it runs out, and the outcome ends the rest', () => {
+    const sim = createSim({ seed: 7 });
+    try {
+      sim.spawn({ labels: ['Do', 'you', 'cat', 'dog'], speed: 2, ordered: ['Do', 'you'] });
+      const rc = newReach();
+      const need = ['Do', 'you'];
+      const ended = (label?: string) => Object.entries(rc.ids).filter(([, l]) => !label || l === label).every(([id]) => id in rc.ends) && Object.keys(rc.ids).length === 2;
+      for (let n = 0; n < 6000 && !ended('Do'); n++) { sim.frame(); reachStep(rc, sim.now(), sim.all(), sim.arena.frozen, need); }
+      expect(ended('Do'), "'Do' ran out within 100 s of game time").toBe(true);
+      expect(sim.events.falls.filter(l => l === 'Do'), "the arena's own fall report: once, after its relaunches").toEqual(['Do']);
+      sim.arena.reveal({ good: 'Do' });                        // what the session's miss does: freeze, and a ghost of the answer if it is off screen
+      for (let n = 0; n < 5; n++) { sim.frame(); reachStep(rc, sim.now(), sim.all(), sim.arena.frozen, need); }   // the page records on after the outcome, until it is read
+      expect(ended(), 'every required label has ended').toBe(true);
+      const r = labelReach(rc, { H: sim.arena.H, cardBottom: 0, maxRelaunches: MAX_RELAUNCHES });
+      const by = Object.fromEntries(r.labelReach.labels.map(l => [l.label, l]));
+      expect(sim.all().some(b => b.label === 'Do' && b.hit && b.mark === 'good'), 'the reveal added its ghost of the answer').toBe(true);
+      expect(Object.values(rc.ids).sort(), 'decoys and the ghost are not recorded').toEqual(['Do', 'you']);
+      expect([by.Do.endedBy, by.Do.flights]).toEqual(['ran out', MAX_RELAUNCHES + 1]);
+      expect(['ran out', 'wave over'], 'nothing sliced it').toContain(by.you.endedBy);
+      expect(r.labelReachMs!.min).toBeGreaterThan(0);
+    } finally { sim.destroy(); }
+  });
+});
+
 describe('play-pack words, speech and card (#2205, #2214)', () => {
   it('counts words only: numerals, symbols and the ? placeholder are not words', () => {
     expect(countWords('6 + 1 = ?')).toBe(0);
@@ -154,14 +321,34 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
     speech: { text: 'Adding! 6 plus 1 equals what', at: 60, start: 80, end: 2880, error: null },
   };
   const settings: Record<string, unknown> = { ...resolveGame('y1-add', 'year1').settings };   // what scripts/playtest-pack.mjs passes, so a key the skill cites (#2245: airTime) is the real one
-  const m = buildMetrics({ job: { year: 'year1', game: 'y1-add', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec, shots: [] }) as Record<string, unknown>;
-  const at = (path: string) => path.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], m);
+  const m = buildMetrics({ job: { year: 'year1', game: 'y1-add', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec, shots: [], maxRelaunches: MAX_RELAUNCHES }) as Record<string, unknown>;
+  const path = (o: unknown, p: string) => p.split('.').reduce<unknown>((x, k) => (x as Record<string, unknown> | undefined)?.[k], o);
+  const at = (p: string) => path(m, p);
+  // #2251: a sequence game's pack, as playBubbles hands it over: the reach recording, and the lives after the miss.
+  const reach = flySeq([{ id: 1, label: 'the', launch: 100, vy: -600, g: 250 }], { need: ['the'], until: 30000 });
+  const seqRec: Recorded = { ...rec, screen: { ...screen, sequence: true }, reach, extra: { livesAfterLabelsRanOut: 2 } };
+  const seq = buildMetrics({ job: { year: 'year2', game: 'y2-sentence', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: seqRec, shots: [], maxRelaunches: MAX_RELAUNCHES });
 
-  it('resolves every `metrics.json#…` reference in the playtest skill and its profiles', () => {
+  it('resolves every `metrics.json#…` reference in the playtest skill and its profiles, in a plain pack or a sequence one', () => {
     const texts = [read('.claude/skills/playtest/SKILL.md'), ...['reception', 'year1', 'year2', 'year3', 'year4', 'year5', 'year6', 'parent'].map(p => read(`.claude/agents/playtester-${p}.md`))];
     const refs = [...new Set(texts.flatMap(t => [...t.matchAll(/metrics\.json#([\w.]+[\w])/g)].map(x => x[1])))].filter(r => r !== 'key' && !r.startsWith('<'));
     expect(refs.length, 'the skill cites at least aboveCardMs.min and settings.speeds').toBeGreaterThanOrEqual(2);
-    for (const r of refs) expect(at(r), `metrics.json#${r}`).not.toBeUndefined();
+    for (const r of refs) expect(at(r) ?? path(seq, r), `metrics.json#${r}`).not.toBeUndefined();
+  });
+
+  it('carries labelReachMs for a sequence game only, measured by labelReach, and the play flow writes the lives it cites (#2251)', () => {
+    expect(seq.labelReachMs).toEqual(labelReach(reach, { H, cardBottom: 187, maxRelaunches: MAX_RELAUNCHES }).labelReachMs);
+    expect(path(seq, 'labelReachMs.min')).toBeGreaterThan(0);
+    expect(path(seq, 'labelReach.maxRelaunches')).toBe(MAX_RELAUNCHES);
+    expect(m, 'a game that is not a sequence has no label reach').not.toHaveProperty('labelReachMs');
+    const build = (r: Recorded) => () => buildMetrics({ job: { year: 'year2', game: 'y2-sentence', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: r, shots: [], maxRelaunches: MAX_RELAUNCHES });
+    const cut = flySeq([{ id: 1, label: 'the', launch: 100, vy: -600, g: 250 }], { need: ['the'], until: 30000, freezeAt: 3000 });
+    expect(build({ ...seqRec, reach: null }), 'a sequence pack with no recording fails').toThrow(/labelReachMs would be empty/);
+    expect(build({ ...seqRec, reach: cut }), 'and so does one where every label was cut short').toThrow(/labelReachMs would be empty/);
+    expect(Object.keys(ABOUT)).toEqual(expect.arrayContaining(['labelReachMs', 'labelReach']));
+    expect(read('scripts/playtest-play.mjs')).toContain('livesAfterLabelsRanOut: reach.lives');
+    expect(read('scripts/playtest-pack.mjs'), 'the page runs the very recorder tested here').toContain('window.__reachStep = ${reachStep};');
+    expect(read('scripts/playtest-pack.mjs'), 'and reads the relaunch limit from the game').toContain('MAX_RELAUNCHES: bubbles.MAX_RELAUNCHES');
   });
 
   it('holds the keys the skill lists in prose, #2214 asks for and the #2205 comment names', () => {
@@ -185,17 +372,17 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   });
 
   it('never lets a play flow\'s own key overwrite a measured one', () => {
-    const x = buildMetrics({ job: { year: 'year1', game: 'y1-add', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, extra: { aboveCardMs: 'forged', livesStart: 3 } }, shots: [] });
+    const x = buildMetrics({ job: { year: 'year1', game: 'y1-add', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, extra: { aboveCardMs: 'forged', livesStart: 3 } }, shots: [], maxRelaunches: MAX_RELAUNCHES });
     expect(x.aboveCardMs).toEqual(m.aboveCardMs);
     expect(x.livesStart).toBe(3);
   });
 
   it('keeps a line the engine never voiced as autoplayed but unmeasured, a cut line as unmeasured, and no line as tap', () => {
-    const never = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: { text: 't', at: 0, start: null, end: null, error: null } }, shots: [] });
+    const never = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: { text: 't', at: 0, start: null, end: null, error: null } }, shots: [], maxRelaunches: MAX_RELAUNCHES });
     expect([never.speech, never.speechAutoplays, never.speechStarted, never.speechMs, never.afterSpeechMs]).toEqual(['auto', true, false, null, null]);
-    const none = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: null }, shots: [] });
+    const none = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: null }, shots: [], maxRelaunches: MAX_RELAUNCHES });
     expect([none.speech, none.speechAutoplays]).toEqual(['tap', false]);
-    const cut = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: { text: 't', at: 0, start: 100, end: null, error: 'interrupted', cut: 1600 } }, shots: [] });
+    const cut = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: { text: 't', at: 0, start: 100, end: null, error: 'interrupted', cut: 1600 } }, shots: [], maxRelaunches: MAX_RELAUNCHES });
     expect([cut.speech, cut.speechMs, cut.speechFinished, cut.speechCutAfterMs, cut.speechHeardMs, cut.speechOutlastedWave]).toEqual(['auto', null, false, 1500, 1500, false]);
     expect(cut.afterSpeechMs, 'cut while the bubbles were up: the reach after it counts from the cut')
       .toEqual(flightMetrics(rec.samples!, { H, cardBottom: 187, speechEnd: 1600 }).afterSpeechMs);
@@ -205,7 +392,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   // it. That is a measured 0, never a null a profile reads as "not observed".
   const lastLeave = Math.max(...flightMetrics(rec.samples!, { H, cardBottom: 187 }).bubbles.map(b => b.leaveMs ?? 0));
   const outlasting = (speech: Recorded['speech'], collectedAt?: number) =>
-    buildMetrics({ job: { year: 'reception', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech, collectedAt }, shots: [] });
+    buildMetrics({ job: { year: 'reception', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech, collectedAt }, shots: [], maxRelaunches: MAX_RELAUNCHES });
   it('a prompt cut off only after every bubble had gone outlasted the wave: no reach after it, and how long it was heard', () => {
     const m2 = outlasting({ text: 't', at: 0, start: 20, end: null, error: 'interrupted', cut: lastLeave + 130 });
     expect([m2.speechMs, m2.speechFinished, m2.speechOutlastedWave, m2.speechHeardMs]).toEqual([null, false, true, Math.round(lastLeave + 110)]);
@@ -221,7 +408,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   });
 
   it('leaves the bubble keys out of a pack with no bubbles, rather than writing a number nobody measured', () => {
-    const trace = buildMetrics({ job: { year: 'year1', game: 'y1-trace', catalogue: true }, input: 'tracing', settings, view, seed: 1, rec, shots: [] });
+    const trace = buildMetrics({ job: { year: 'year1', game: 'y1-trace', catalogue: true }, input: 'tracing', settings, view, seed: 1, rec, shots: [], maxRelaunches: MAX_RELAUNCHES });
     for (const k of ['aboveCardMs', 'launchToApexMs', 'answersPerWave', 'bubbleRadiusPx']) expect(trace, k).not.toHaveProperty(k);
   });
 });

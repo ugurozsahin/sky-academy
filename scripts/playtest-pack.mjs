@@ -3,7 +3,8 @@
 // <out-dir>/<year>/<game>/: up to six WebP screenshots and a metrics.json. The playtest profiles score from these
 // (.claude/skills/playtest/SKILL.md §1 reads every file and key written here). Packs are never committed.
 // The real clock runs, because timing is what is measured: no game speed-up, no fixed clock. The first
-// wave is left alone so its whole flight is timed; the next question gets one deliberate wrong answer, then the
+// wave is left alone so its whole flight is timed; a sequence game's is left alone longer, until a required label
+// has used every relaunch (#2251), so that question is missed. The next one gets one deliberate wrong answer, then the
 // rest are answered until the stage result. Settings come from the resolver (src/config/resolve.ts) via Vite's SSR
 // loader, so the pack states what the catalogue resolves, not a second copy of the order.
 // The Chromium path comes from PW_CHROMIUM, else Playwright's own download. Exits non-zero if any pack failed.
@@ -14,28 +15,31 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { SIZES, SEED, ACTION_TIMEOUT, isWebp } from './site-shots.mjs';
 import { PARALLEL, encode } from './game-shots.mjs';
-import { plannedPacks, parseArgs, buildMetrics } from './playtest-metrics.mjs';
+import { plannedPacks, parseArgs, buildMetrics, reachStep, newReach } from './playtest-metrics.mjs';
 import { playBubbles, playTracing, playKeypad } from './playtest-play.mjs';
 
 const VIEW = SIZES.phone;
 
-/** The resolver and the topic registry, loaded through Vite so the TypeScript runs as the game's own does. */
+/** The resolver, the topic registry and the relaunch limit, loaded through Vite so the TypeScript runs as the game's own does. */
 async function loadApp() {
   const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error', optimizeDeps: { noDiscovery: true, include: [] } });
   try {
-    const [resolve, curriculum] = await Promise.all([vite.ssrLoadModule('/src/config/resolve.ts'), vite.ssrLoadModule('/src/curriculum/index.ts')]);
-    return { RUNTIME: resolve.RUNTIME, resolveGame: resolve.resolveGame, resolveYear: resolve.resolveYear, topicById: curriculum.topicById };
+    const [resolve, curriculum, bubbles] = await Promise.all(['/src/config/resolve.ts', '/src/curriculum/index.ts', '/src/game/bubbles.ts'].map(m => vite.ssrLoadModule(m)));
+    return { RUNTIME: resolve.RUNTIME, resolveGame: resolve.resolveGame, resolveYear: resolve.resolveYear, topicById: curriculum.topicById, MAX_RELAUNCHES: bubbles.MAX_RELAUNCHES };
   } finally { await vite.close(); }
 }
 
-/** Runs in the page before the app: seeds Math.random, then records frames, the first wave's bubbles, prompts and every spoken line. */
-function packProbe([seed]) {
+/**
+ * Runs in the page before the app: seeds Math.random, then records frames, the first wave's bubbles, prompts and every
+ * spoken line, and, for a sequence question, its required labels' reach through `window.__reachStep` (#2251).
+ */
+function packProbe([seed, reach]) {
   let a = seed;                                      // mulberry32, as site-shots.mjs: the same stream on every run
   Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   localStorage.setItem('sna:three', 'off');
   localStorage.setItem('sna:years', 'all');          // a hidden island is packed too
   localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', tutorialSeen: true, onboarded: true }));
-  const pk = window.__pk = { on: false, onAt: 0, frames: [], samples: [], left: {}, seen: {}, prompts: [], speech: [] };
+  const pk = window.__pk = { on: false, onAt: 0, frames: [], samples: [], left: {}, seen: {}, prompts: [], speech: [], reach };
   const proto = globalThis.SpeechSynthesis?.prototype;
   if (proto) {
     const speak = proto.speak;
@@ -81,6 +85,8 @@ function packProbe([seed]) {
         if (b.vy > 0 && b.y >= ar.H) pk.left[b.id] = true;
       }
     }
+    // The first question's required labels, over every flight until each is sliced or runs out (#2251).
+    if (pk.reach.on && ar && s.session.questionsAsked === pk.wave && s.session.current?.sequence) window.__reachStep(pk.reach, t, ar.bubbles, ar.frozen, s.session.current.sequence);
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -119,7 +125,8 @@ async function packOne(browser, enc, base, app, job, out) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  await page.addInitScript(packProbe, [SEED]);
+  await page.addInitScript({ content: `window.__reachStep = ${reachStep};` });   // the one recorder, the same function tests/unit runs
+  await page.addInitScript(packProbe, [SEED, newReach()]);
   const dir = `${out}/${job.year}/${job.game}`;
   rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
   const shots = [];
@@ -132,15 +139,15 @@ async function packOne(browser, enc, base, app, job, out) {
     const tile = await findOnIsland(page, base, job, topic);
     await tile.scrollIntoViewIfNeeded(); await page.waitForTimeout(700);   // the chooser fades in
     await shot('1-island.webp', job.catalogue ? (topic.drill ? 'the Relaxed chooser card for this drill' : 'the game tile on its island') : 'the menu row on the Year 4 island');
-    await page.evaluate(() => { window.__pk.on = true; window.__pk.onAt = performance.now(); });
+    await page.evaluate(() => { window.__pk.on = window.__pk.reach.on = true; window.__pk.onAt = performance.now(); });
     await tile.click();                              // a real tap: it is also what lets the page speak
     await page.waitForFunction(() => window.__sna && 'session' in window.__sna && window.__sna.state().prompt, null, { timeout: ACTION_TIMEOUT });
     const play = input === 'tracing' ? playTracing : input === 'keypad' ? playKeypad : playBubbles;
     const played = await play(page, shot, readScreen);
     if (errors.length) throw new Error(errors.slice(0, 3).join('; '));
     const settings = job.catalogue ? app.resolveGame(job.game, job.year).settings : app.resolveYear(job.year);
-    const metrics = buildMetrics({ job, input, settings, view: VIEW, seed: SEED, rec: played, shots });
-    if (metrics.frames && !metrics.frames.clean) throw new Error(`a ${metrics.frames.maxGapMs} ms frame gap while the wave was timed: its times ran long`);
+    const metrics = buildMetrics({ job, input, settings, view: VIEW, seed: SEED, rec: played, shots, maxRelaunches: app.MAX_RELAUNCHES });
+    for (const f of [metrics.frames, metrics.labelReach?.frames]) if (f && !f.clean) throw new Error(`a ${f.maxGapMs} ms frame gap while the wave was timed: its times ran long`);
     writeFileSync(`${dir}/metrics.json`, `${JSON.stringify(metrics, null, 2)}\n`);
     return metrics;
   } catch (e) {
