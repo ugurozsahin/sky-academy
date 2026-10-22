@@ -108,7 +108,7 @@ jobs:
           # full clone costs a fraction of a second and none of the ambiguity.
           fetch-depth: 0
       - uses: actions/setup-node@v5
-        with: { node-version: 22, cache: npm }
+        with: { node-version-file: .node-version, cache: npm }
       - run: npm ci
       # #96: e2e is ~90% of this repo's Actions bill and much of it is paid on changes that cannot move a
       # pixel — the rails that enforce the documentation live in tests/unit/, so a governance pull request is

@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
-        with: { node-version: 22, cache: npm }
+        with: { node-version-file: .node-version, cache: npm }
       - run: npm ci
       - name: Build the game for /play/
         run: npx tsc --noEmit && npx vite build --base=/play/ --outDir site/play --emptyOutDir && node scripts/build-sw.mjs site/play
@@ -69,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
-        with: { node-version: 22, cache: npm }
+        with: { node-version-file: .node-version, cache: npm }
       - name: The .well-known files answer as the platforms need (#2029)
         run: |
           for i in 1 2 3 4; do
