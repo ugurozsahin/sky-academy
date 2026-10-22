@@ -3,7 +3,9 @@
 // `false` when it ships hidden, and the topic PR that takes it to 12 maths and 6 writing topics flips it to `true`.
 // `island-gate.test.ts` checks every entry against the real gate (`meetsShowGate`) rather than trusting it.
 // `EXPECTED_SHOWN` derives from the catalogue file: a year set to `true` or `false` there takes that value, and a
-// year on `"auto"` takes its `GATE_SHOWN` line.
+// year on `"auto"` takes its `GATE_SHOWN` line. It leaves out one rule: an island with no non-drill game on never
+// shows (#2195). If the file ever switches off every game on a year, `island-gate.test.ts` fails on that year here,
+// not in `GATE_SHOWN`; set the year to `false` in the file, which is what such a file means.
 import type { YearId } from '../../../src/curriculum';
 import { RUNTIME } from '../../../src/config/resolve';
 

@@ -5,9 +5,10 @@ import { YEAR3_TOPICS } from './year3-topics';
 import { YEAR4_TOPICS } from './year4-topics';
 import { YEAR5_TOPICS } from './year5-topics';
 import { YEAR6_TOPICS } from './year6-topics';
-import { islandShown, type Visibility } from './catalogue-shown';
+import { islandShown } from './catalogue-shown';
 import { previewAllYears } from './shown';
 import { RUNTIME } from '../config/resolve';
+import type { RuntimeCatalogue } from '../config/catalogue';
 import { YEARS, type Topic, type YearId, type YearInfo } from './types';
 
 export * from './types';
@@ -26,9 +27,11 @@ export const drillsFor = (year: YearId, subject?: Topic['subject']) => TOPICS.fi
  * Every `YEARS` row the map may show right now, in `YEARS` order (#2195): each island's `years.<id>.visible` in
  * the catalogue, through `islandShown`, the one rule — `false` hides it, `true` shows it, `"auto"` is the
  * topic-count gate (#1032). The preview key shows every row regardless. `cat` is the seam a user's patched
- * catalogue comes through (#2199); every caller passes nothing, so the committed file decides.
+ * catalogue comes through (#2199). Every caller, `listedTopics` included, passes nothing, so the default decides:
+ * the committed file today; swap the default for the active profile's patched copy and every map, reward and
+ * dashboard total follows at once. A whole catalogue, never a bare patch: a year or game it leaves out is hidden.
  */
-export const shownYears = (cat: Visibility = RUNTIME): YearInfo[] =>
+export const shownYears = (cat: Pick<RuntimeCatalogue, 'years' | 'games'> = RUNTIME): YearInfo[] =>
   previewAllYears() ? YEARS : YEARS.filter(y => islandShown(cat, y.id, TOPICS));
 
 /** #1039: `TOPICS` rows on an island the map is showing right now — what a reward or a dashboard total should

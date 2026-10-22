@@ -48,6 +48,15 @@ describe('shownYears follows years.<id>.visible (#2195)', () => {
   it('true never shows an island with no game on: there would be nothing to play', () => {
     const empty = copy(c => { c.years.year1.visible = true; for (const t of TOPICS.filter(t => t.year === 'year1')) c.games[t.id].years.year1.visible = false; });
     expect(ids(empty)).toEqual(ALL.filter(y => y !== 'year1'));
+    const autoEmpty = copy(c => { for (const t of TOPICS.filter(t => t.year === 'year1')) c.games[t.id].years.year1.visible = false; });
+    expect(ids(autoEmpty), 'an "auto" EYFS/KS1 island, which the gate never counts, hides too').toEqual(ALL.filter(y => y !== 'year1'));
+  });
+
+  it('drills alone are not a game on: an island left with only drills hides', () => {
+    const drills = TOPICS.filter(t => t.year === 'year3' && t.drill);
+    expect(drills.length, 'year3 has drills, so this case is real').toBeGreaterThan(0);
+    const onlyDrills = copy(c => { c.years.year3.visible = true; for (const t of TOPICS.filter(t => t.year === 'year3' && !t.drill)) c.games[t.id].visible = false; });
+    expect(ids(onlyDrills)).toEqual(ALL.filter(y => y !== 'year3'));
   });
 
   it('returns YEARS rows in YEARS order, whatever the catalogue\'s key order', () => {
