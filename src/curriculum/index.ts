@@ -7,7 +7,7 @@ import { YEAR5_TOPICS } from './year5-topics';
 import { YEAR6_TOPICS } from './year6-topics';
 import { gameOn, islandShown, type Visibility } from './catalogue-shown';
 import { previewAllYears } from './shown';
-import { RUNTIME } from '../config/resolve';
+import { activeCatalogue } from '../config/active';
 import { YEARS, type Topic, type YearId, type YearInfo } from './types';
 
 export * from './types';
@@ -21,14 +21,7 @@ export const TOPICS: Topic[] = [...RECEPTION_TOPICS, ...YEAR1_TOPICS, ...YEAR2_T
 export const CORE_TOPICS: Topic[] = TOPICS.filter(t => !t.drill);
 export const topicById = (id: string) => TOPICS.find(t => t.id === id);
 
-/**
- * The catalogue every island, game list, pool and total reads its visibility from (#2195, #2196): the committed
- * file. The one seam a user's patched catalogue comes through (#2199): return the active profile's patched copy
- * here and `shownYears`, `isGameShown` and every list below follow at once. A whole catalogue, never a bare patch:
- * a year or game it leaves out is hidden. Lists call it on every read, so a patched copy must be built once per
- * profile and patch, never per call.
- */
-const activeCatalogue = (): Visibility => RUNTIME;
+// Visibility is read from `activeCatalogue()` (#2195, #2196): the committed file with the active profile's patch laid over it (#2199).
 
 /**
  * Every `YEARS` row the map may show right now, in `YEARS` order (#2195): each island's `years.<id>.visible` in

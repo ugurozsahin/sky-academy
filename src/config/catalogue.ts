@@ -97,7 +97,7 @@ const speedTable = (max: number, unit: string): Check => (v) =>
     ? null : `must be ${SPEED_SET.length} numbers above 0 and at most ${max} ${unit}, one per bubble speed 0 to 3`;
 
 /** Keyed by `Overridable` itself, so a key added to the type without a rule fails to compile. */
-const SETTING_RULES: Record<keyof Overridable, Check> = {
+export const SETTING_RULES: Record<keyof Overridable, Check> = {
   perStage: (v) => (isInt(v, 1, PER_STAGE_MAX) ? null : `must be a whole number from 1 to ${PER_STAGE_MAX}`),
   lives: (v) => (isInt(v, LIVES_MIN, LIVES_MAX) ? null : `must be a whole number from ${LIVES_MIN} to ${LIVES_MAX}`),
   gentle: (v) => (typeof v === 'boolean' ? null : 'must be true or false'),
