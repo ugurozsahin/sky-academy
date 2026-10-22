@@ -8,12 +8,15 @@ import { R_STORIES } from '../../src/curriculum/stories-r';
 import { Y1_STORIES } from '../../src/curriculum/stories-y1';
 import { Y2_STORIES } from '../../src/curriculum/stories-y2';
 import { tipFor } from '../../src/game/tips';
-import { buildContentMap, curriculumIds, strandsOf, type StrandTable } from '../../scripts/content-map-lib.mjs';
+import { buildContentMap, curriculumIds, publishedOnly, strandsOf, type StrandTable } from '../../scripts/content-map-lib.mjs';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 const strands: StrandTable = JSON.parse(read('docs/content-map-strands.json'));
 const banks = { 'r-storytime': R_STORIES.length, 'y1-storytime': Y1_STORIES.length, 'y2-storytime': Y2_STORIES.length };
-const input = { topics: TOPICS, years: YEARS, strands, tipFor, banks };
+import catalogueJson from '../../src/config/catalogue.json' with { type: 'json' };
+import * as shown from '../../src/curriculum/catalogue-shown';
+const pub = publishedOnly({ topics: TOPICS, years: YEARS, catalogue: catalogueJson as never, shown });
+const input = { topics: pub.topics, years: pub.years, strands, tipFor, banks };
 const built = buildContentMap(input);
 const REGEN = 'run `npm run content-map` and commit docs/content-map.json and docs/CONTENT-MAP.md';
 
@@ -69,5 +72,29 @@ describe('docs/CURRICULUM.md and the registry agree both ways (#669)', () => {
   });
   it('no topic has two rows', () => {
     expect(ids.filter((id, i) => ids.indexOf(id) !== i), 'duplicate rows').toEqual([]);
+  });
+});
+
+describe('the website publishes only what the catalogue shows (#2201)', () => {
+  const hide = (mut: (c: any) => void) => { const c = JSON.parse(JSON.stringify(catalogueJson)); mut(c); return publishedOnly({ topics: TOPICS, years: YEARS, catalogue: c, shown }); };
+  it('the committed catalogue hides nothing', () => {
+    expect(pub.topics.length).toBe(TOPICS.length);
+    expect(pub.years.map(y => y.id)).toEqual(YEARS.map(y => y.id));
+  });
+  it('a hidden game is absent from the map, and its siblings stay', () => {
+    const gone = TOPICS.find(t => t.year === 'year1' && !t.drill)!;
+    const p = hide(c => { c.games[gone.id].visible = false; });
+    expect(p.topics.map(t => t.id)).not.toContain(gone.id);
+    expect(p.topics.length).toBe(TOPICS.length - 1);
+    const map = JSON.parse(buildContentMap({ ...input, topics: p.topics, years: p.years }).json);
+    expect(map.topics.map((t: { id: string }) => t.id)).not.toContain(gone.id);
+    expect(map.topicCount).toBe(TOPICS.length - 1);
+  });
+  it('a hidden year is absent: no byYear row, so no year page, and none of its topics', () => {
+    const p = hide(c => { c.years.year2.visible = false; });
+    expect(p.years.map(y => y.id)).not.toContain('year2');
+    expect(p.topics.some(t => t.year === 'year2')).toBe(false);
+    const map = JSON.parse(buildContentMap({ ...input, topics: p.topics, years: p.years }).json);
+    expect(map.byYear.map((y: { year: string }) => y.year)).not.toContain('year2');
   });
 });

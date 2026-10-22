@@ -2,12 +2,16 @@
 // docs/content-map.json and the home page's shell. Run by `npm run content-map` after the map itself, so one
 // command keeps them all current. No build step: the pages are committed, and `tests/unit/site-curriculum*.test.ts`
 // regenerate them in memory and fail on drift.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { renderCurriculumPage, renderYearPage, yearSlug } from './site-curriculum-lib.mjs';
 
 const map = JSON.parse(readFileSync('docs/content-map.json', 'utf8'));
 const home = readFileSync('website/index.html', 'utf8');
 writeFileSync('website/curriculum/index.html', renderCurriculumPage(map, home));
+// A year the catalogue hides has no page (#2201): drop one an earlier run wrote, so the sitemap, which lists the folders, follows.
+for (const id of ['reception', 'year1', 'year2', 'year3', 'year4', 'year5', 'year6']) {
+  if (!map.byYear.some(y => y.year === id)) rmSync(`website/curriculum/${yearSlug(id)}`, { recursive: true, force: true });
+}
 for (const year of map.byYear) {
   const dir = `website/curriculum/${yearSlug(year.year)}`;
   mkdirSync(dir, { recursive: true });
