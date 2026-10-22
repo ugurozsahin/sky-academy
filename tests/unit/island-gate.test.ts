@@ -3,7 +3,7 @@
 // one line in `helpers/expected-shown.ts` it flips.
 import { describe, it, expect } from 'vitest';
 import { YEARS, isKs2, shownYears, topicsFor, type YearId } from '../../src/curriculum';
-import { EXPECTED_SHOWN } from './helpers/expected-shown';
+import { EXPECTED_SHOWN, GATE_SHOWN } from './helpers/expected-shown';
 import { agreesWithExpectedShown } from './helpers/island-gate-check';
 
 describe('island gate (#1032, #1040)', () => {
@@ -21,7 +21,7 @@ describe('island gate (#1032, #1040)', () => {
     const expected = EXPECTED_SHOWN[y.id];
     it(`${y.title} shown: ${expected ? 'yes' : 'no'}`, () => {
       const counts = { id: y.id, maths: topicsFor(y.id, 'maths').length, writing: topicsFor(y.id, 'writing').length };
-      expect(agreesWithExpectedShown([counts], EXPECTED_SHOWN), `${y.id}: EXPECTED_SHOWN disagrees with meetsShowGate()`).toBe(true);
+      expect(agreesWithExpectedShown([counts], GATE_SHOWN), `${y.id}: GATE_SHOWN disagrees with meetsShowGate()`).toBe(true);
       expect(shownYears().some(s => s.id === y.id), y.id).toBe(expected);
     });
   }
