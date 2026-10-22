@@ -5,6 +5,8 @@ import { CVC } from '../../src/curriculum/util';
  * #874: `mug`/`rug`/`jam`/`zip` taught the wrong word from their pictures, and `cup`'s ☕ names no cup.
  * #875: `log`'s 🪵 is Emoji 13.0, which draws as an empty box on an Android 10 device — no floor-compliant
  * picture exists for a log, so the word is dropped rather than mismatched.
+ * #2273: `rat`'s 🐀 could be a mouse and `bag`'s 👜 is a handbag, so they became `ram` and `bin`: every picture
+ * here has one name a four-year-old says.
  * This pins the reviewed allowlist so a future `CVC` entry cannot land without the same review: word,
  * emoji, and the emoji's Unicode short name, checked against the actual codepoint rather than eyeballed.
  */
@@ -23,13 +25,13 @@ const REVIEWED: [string, string, string][] = [
   ['pin', '📌', 'pushpin'],
   ['nut', '🥜', 'peanuts'],
   ['cap', '🧢', 'billed cap'],
-  ['rat', '🐀', 'rat'],
+  ['ram', '🐏', 'ram'],
   ['pan', '🍳', 'cooking'],
   ['bus', '🚌', 'bus'],
   ['hat', '🎩', 'top hat'],
   ['bed', '🛏️', 'bed'],
   ['fox', '🦊', 'fox face'],
-  ['bag', '👜', 'handbag'],
+  ['bin', '🗑️', 'wastebasket'],
   ['hen', '🐔', 'chicken'],
   ['box', '📦', 'package'],
   ['bat', '🦇', 'bat'],

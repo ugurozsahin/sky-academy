@@ -355,7 +355,7 @@ const y1Months: Generator = (d, rng) => {
 };
 /** "My Day" (#979): two fixed ordered lists; the answer is the list neighbour, never wrapping. */
 const DAY_PARTS = ['morning', 'afternoon', 'evening'];
-const DAY_PART_EMOJI = ['🌅', '☀️', '🌙'];
+const DAY_PART_EMOJI = ['🌅', '☀️', '🌇'];
 const DAY_WORDS = ['yesterday', 'today', 'tomorrow'];
 const y1When: Generator = (d, rng) => {
   const hint = { hint: 'Slice the word', hintIsData: false };
@@ -390,7 +390,7 @@ const y1Balance: Generator = (d, rng) => {
 
 // ---------- Year 1 writing ----------
 const y1SoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE3, PHASE3, 2) : d === 2 ? soundQ(rng, PHASE5, [...PHASE3, ...PHASE5], 3) : soundQ(rng, [...PHASE5, ...SPLIT], [...PHASE3, ...PHASE5, ...SPLIT], 3);
-const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['oil', 'oi', '🛢️'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
+const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['thumb', 'th', '👍'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['toilet', 'oi', '🚽'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
 /** Exported for the `y1-digraphs` reachable-spelling fixture (#445). */
 export { DIGRAPH_WORDS };
 const y1Digraphs: Generator = (d, rng) => {
