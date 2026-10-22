@@ -11,8 +11,8 @@
 //   `again` to 0.
 import { readdirSync } from 'node:fs';
 
-export const CRITERIA = ['understand', 'physical', 'challenge', 'feedback', 'again'];
-export const ROW_KEYS = ['game', 'year', 'by', 'score', 'criteria', 'evidence', 'note'];
+export const CRITERIA = Object.freeze(['understand', 'physical', 'challenge', 'feedback', 'again']);
+export const ROW_KEYS = Object.freeze(['game', 'year', 'by', 'score', 'criteria', 'evidence', 'note']);
 export const PARENT = 'playtester-parent';
 const EVIDENCE_KEYS = ['criterion', 'ref', 'saw'];
 const NOT_OBSERVED = /^not observed\b/i;
@@ -69,7 +69,7 @@ function entryProblems(e, i) {
   const errs = keyProblems(e, EVIDENCE_KEYS, `evidence[${i}].`);
   if ('criterion' in e && !CRITERIA.includes(e.criterion)) errs.push(`evidence[${i}].criterion: ${JSON.stringify(e.criterion)} is not one of ${CRITERIA.join(', ')}`);
   if ('ref' in e && !(typeof e.ref === 'string' && REF.test(e.ref))) errs.push(`evidence[${i}].ref: ${JSON.stringify(e.ref)} must name a pack screenshot (.webp or .png), metrics.json#<key> or live:<what>`);
-  if ('saw' in e && !isText(e.saw)) errs.push(`evidence[${i}].saw: must say what the ref shows, or "not observed"`);
+  if ('saw' in e && !(isText(e.saw) && !/[\r\n]/.test(e.saw))) errs.push(`evidence[${i}].saw: must say what the ref shows, or "not observed", on one line`);
   return errs;
 }
 

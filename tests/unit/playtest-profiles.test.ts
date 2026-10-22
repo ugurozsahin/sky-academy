@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { YEARS } from '../../src/curriculum/types';
 import { CATALOGUE } from '../../src/config/catalogue';
@@ -85,7 +86,7 @@ describe('the playtest skill (#2204)', () => {
     const row = JSON.parse(json![1]);
     expect(Object.keys(row).sort()).toEqual(['by', 'criteria', 'evidence', 'game', 'note', 'score', 'year']);
     expect([...ROW_KEYS].sort(), 'the validator #2206 runs names the same seven keys').toEqual(Object.keys(row).sort());
-    expect(rowProblems(row, { catalogue: CATALOGUE, profiles: profilesIn('.claude/agents') }), 'and passes the example as written').toEqual([]);
+    expect(rowProblems(row, { catalogue: CATALOGUE, profiles: profilesIn(fileURLToPath(new URL('.claude/agents/', root))) }), 'and passes the example as written').toEqual([]);
     expect(Object.keys(row.criteria).sort()).toEqual([...KEYS].sort());
     expect(Object.values<number>(row.criteria).reduce((a, b) => a + b, 0)).toBe(row.score);
     for (const v of Object.values(row.criteria)) expect([0, 1, 2], 'each criterion is a whole mark from 0 to 2').toContain(v);

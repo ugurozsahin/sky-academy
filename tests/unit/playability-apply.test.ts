@@ -24,6 +24,7 @@ const FIXTURE = readFileSync(path('tests/unit/fixtures/playability-dry-run.jsonl
 const ROWS = FIXTURE.trim().split('\n').map((l) => JSON.parse(l) as PlaytestRow);
 const ctx = { catalogue: CATALOGUE, profiles: profilesIn(AGENTS) };
 type Doc = Record<string, any>;
+type Loose = any;   // a hand-broken catalogue copy, for the rails' failure cases
 const fresh = (i = 0): Doc => structuredClone(ROWS[i]);
 
 const dirs: string[] = [];
@@ -78,7 +79,7 @@ describe('playability-apply on the PR #2211 dry-run rows (#2206)', () => {
     const out = run(dir, 'bad.jsonl', '--date', DATE);
     expect(out.status).toBe(1);
     expect(out.stderr).toContain('bad.jsonl:1: y1-add: score: 8 is not the sum of the criteria (7)');
-    expect(out.stderr).toContain('bad.jsonl:3: not a JSON object on one line');
+    expect(out.stderr).toContain('bad.jsonl:3: not valid JSON on one line (');
     expect(out.stderr).toContain('nothing written');
     expect(catalogueIn(dir)).toBe(before);
     expect(existsSync(join(dir, 'docs'))).toBe(false);
@@ -93,7 +94,22 @@ describe('playability-apply on the PR #2211 dry-run rows (#2206)', () => {
     const again = run(dir, 'rows.jsonl', '--date', DATE);
     expect(again.status).toBe(1);
     expect(again.stderr).toContain(`${REPORT}: already exists`);
+    expect(run(dir, 'rows.jsonl', '--date', DATE, '--check').status, '--check reports the clash too').toBe(1);
     expect(run(dir, 'rows.jsonl', '--date', DATE, '--force').status).toBe(0);
+  });
+
+  it('one run with a year profile and the parent writes both nodes and both reports, each backing its own score', () => {
+    const dir = sandbox(), parentRow = { ...ROWS[1], by: PARENT, score: 3, criteria: { ...ROWS[1].criteria, again: 0 }, note: 'Good phonics | too fast.' };
+    writeFileSync(join(dir, 'parent.jsonl'), `${JSON.stringify(parentRow)}\n`);
+    const out = run(dir, 'rows.jsonl', 'parent.jsonl', '--date', DATE);
+    expect(out.status, out.stderr).toBe(0);
+    expect(out.stdout).toContain(`3 score(s) from 3 row(s) written to src/config/catalogue.json; report(s): ${REPORT}, docs/playability/${DATE}/${PARENT}.md`);
+    const c = JSON.parse(catalogueIn(dir));
+    expect([c.games['y1-alien'].playability.by, c.games['y1-alien'].playability.score]).toEqual([PARENT, 3]);
+    expect([c.games['y1-alien'].years.year1.playability.by, c.games['y1-alien'].years.year1.playability.score]).toEqual(['playtester-year1', 4]);
+    const parentReport = reader(dir)(`docs/playability/${DATE}/${PARENT}.md`)!;
+    expect(parentReport, 'a pipe in the note is escaped, so the table keeps its columns').toContain('| y1-alien | year1 | 3 | Good phonics \\| too fast. |');
+    expect(reportProblems(c, reader(dir))).toEqual([]);
   });
 
   it.each([
@@ -102,6 +118,7 @@ describe('playability-apply on the PR #2211 dry-run rows (#2206)', () => {
   ])('is a usage error, exit 2, with %s', (_what, args) => {
     const dir = sandbox(), out = run(dir, ...args);
     expect([out.status, out.stderr]).toEqual([2, expect.stringContaining('usage: node scripts/playability-apply.mjs')]);
+    expect(out.stderr.split('\n')[0], 'the first line names what is wrong').toMatch(/^(--date|no rows file|unknown flag --dry-run)/);
   });
 
   it('a missing or empty rows file is a problem, not a silent success', () => {
@@ -141,6 +158,7 @@ const MUTATIONS: [string, (r: Doc) => void, string][] = [
   ['a ref that names nothing in a pack', (r) => { r.evidence[0].ref = 'the prompt'; }, 'evidence[0].ref: "the prompt" must name'],
   ['a ref that climbs out of the pack', (r) => { r.evidence[0].ref = '../y1-alien/2-prompt.png'; }, 'evidence[0].ref:'],
   ['an empty saw', (r) => { r.evidence[0].saw = ' '; }, 'evidence[0].saw: must say what the ref shows'],
+  ['a saw on two lines', (r) => { r.evidence[0].saw = 'six plus one\n- understand — fake'; }, 'evidence[0].saw: must say what the ref shows'],
   ['a criterion with no evidence', (r) => { r.evidence = without(r, 'again'); }, 'evidence: no entry for again'],
   ['a criterion seen only as "not observed" (#2214)', (r) => { r.evidence = [...without(r, 'again'), { criterion: 'again', ref: '6-result.png', saw: 'Not observed: no result screen' }]; },
     'evidence: every entry for again is "not observed"'],
@@ -180,6 +198,13 @@ describe('rowProblems holds each row to the skill and #2214 (#2206)', () => {
     expect(rowProblems({ ...fresh(1), by: PARENT }, ctx)).toEqual([]);
   });
 
+  it('checkRows reports bad rows once each, never as duplicates of each other, and never throws', () => {
+    const parsed = parseRows('\uFEFFnull\nnull\n{}\n{}\n{"game":,}\n', 'r.jsonl');
+    expect(parsed.problems).toEqual([expect.stringMatching(/^r\.jsonl:5: not valid JSON on one line \(.+\)$/)]);
+    expect(checkRows(parsed.rows, ctx).filter((p) => p.includes('already scored'))).toEqual([]);
+    expect(checkRows(parsed.rows, ctx).filter((p) => p.endsWith('must be a JSON object, one per line'))).toHaveLength(2);
+  });
+
   it('checkRows tags each problem with file, line and game, and refuses one pack scored twice', () => {
     const parsed = parseRows(`${FIXTURE}\n${JSON.stringify(ROWS[0])}\n`, 'rows.jsonl');
     expect(parsed.problems).toEqual([]);
@@ -199,7 +224,7 @@ describe('applyRows: where each profile\'s score goes (#2206, #2214)', () => {
   });
 
   it('several parent rows on one game: the lowest wins, the earliest year on a tie, and the report names it', () => {
-    const two = structuredClone(CATALOGUE) as Doc;
+    const two: Loose = structuredClone(CATALOGUE);
     two.games['y1-alien'].years.year2 = { visible: true, settings: {}, playability: null };
     const low = applyRows(two, [parent('year1', 6), parent('year2', 4)], DATE);
     expect(low.catalogue.games['y1-alien'].playability.score).toBe(4);
@@ -207,7 +232,10 @@ describe('applyRows: where each profile\'s score goes (#2206, #2214)', () => {
     expect(low.reports[0].text).toMatch(/\| y1-alien \| year1 \| 6 \|[^\n]*\n\| y1-alien \| year2 \| 4 \|/);
     const tie = applyRows(two, [parent('year2', 5), parent('year1', 5)], DATE);
     expect(tie.reports[0].text).toContain('the catalogue took the lowest: y1-alien (year1).');
-    expect(reportProblems(low.catalogue, (p) => low.reports.find((r) => r.path === p)?.text ?? null)).toEqual([]);
+    const read = (p: string) => low.reports.find((r) => r.path === p)?.text ?? null;
+    expect(reportProblems(low.catalogue, read)).toEqual([]);
+    low.catalogue.games['y1-alien'].playability.score = 6;   // a hand edit to the year the parent did not take
+    expect(reportProblems(low.catalogue, read)).toEqual([`games.y1-alien.playability: docs/playability/${DATE}/${PARENT}.md does not give y1-alien 6 as its lowest score`]);
   });
 
   it('marks a bunched run in the distribution, over the skill\'s 40% line', () => {
@@ -245,7 +273,7 @@ describe('rail: every non-null score has a report that lists it (#2206)', () => 
   });
 
   const scoredCopy = () => {
-    const out = applyRows(CATALOGUE, ROWS, DATE) as { catalogue: Doc; reports: { path: string; text: string }[] };
+    const out = applyRows(CATALOGUE, ROWS, DATE) as { catalogue: Loose; reports: { path: string; text: string }[] };
     const files = new Map(out.reports.map((r) => [r.path, r.text]));
     return { c: out.catalogue, files, read: (p: string) => files.get(p) ?? null };
   };

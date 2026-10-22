@@ -8,6 +8,8 @@
 // - **Several parent rows for one game** (a game in more than one year, scored from each year's pack): the game
 //   takes the lowest score, the earliest year on a tie; the report lists every row and names the year applied.
 //   A parent judges whether a game is worth the child's time, and the weakest year is the one that decides that.
+//   The rule holds within one run: a later run's score replaces the game's, as a rescore does, so a parent run
+//   passes all of a game's years together. (Every game sits in one year today, so it cannot fire yet.)
 // - All or nothing: any bad row, a pack scored twice, or a report that already exists (without `--force`) stops
 //   the run before anything is written, with every problem listed. `--check` validates and writes nothing.
 // - Paths are relative to the working directory (the repository root), as in `catalogue-init.mjs`.
@@ -33,7 +35,8 @@ export function parseRows(text, file) {
   const rows = [], problems = [];
   text.split('\n').forEach((line, i) => {
     if (!line.trim()) return;
-    try { rows.push({ row: JSON.parse(line), where: `${file}:${i + 1}` }); } catch { problems.push(`${file}:${i + 1}: not a JSON object on one line`); }
+    const text = i === 0 ? line.replace(/^\uFEFF/, '') : line;   // a byte-order mark some editors write
+    try { rows.push({ row: JSON.parse(text), where: `${file}:${i + 1}` }); } catch (e) { problems.push(`${file}:${i + 1}: not valid JSON on one line (${e.message})`); }
   });
   if (!rows.length && !problems.length) problems.push(`${file}: no rows`);
   return { rows, problems };
@@ -43,8 +46,9 @@ export function parseRows(text, file) {
 export function checkRows(parsed, ctx) {
   const problems = [], seen = new Map();
   for (const { row, where } of parsed) {
-    const tag = `${where}: ${row?.game ?? '?'}`;
-    problems.push(...rowProblems(row, ctx).map((p) => `${tag}: ${p}`));
+    const tag = `${where}: ${row?.game ?? '?'}`, own = rowProblems(row, ctx);
+    problems.push(...own.map((p) => `${tag}: ${p}`));
+    if (own.length) continue;   // only a valid row can be a duplicate
     const key = `${row?.by}|${row?.game}|${row?.year}`;
     if (seen.has(key)) problems.push(`${tag}: ${row.by} already scored ${row.game} for ${row.year} at ${seen.get(key)}`);
     else seen.set(key, where);
@@ -103,7 +107,7 @@ export function renderReport(profile, date, rows, chosen) {
 
 /**
  * Applies validated rows to a copy of `catalogue`: returns the new catalogue, `{ path, text }` per report and
- * the number of nodes written. The rows must have passed `checkRows` first.
+ * the number of nodes written. Precondition: the rows passed `checkRows` with no problem; it is not re-checked.
  */
 export function applyRows(catalogue, rows, date) {
   const next = structuredClone(catalogue), reports = [];
@@ -136,8 +140,8 @@ function scored(catalogue) {
 
 /**
  * The rail behind "every score has a report": each non-null playability names `docs/playability/<at>/<by>.md`,
- * that file exists (`read` returns its text, or null), and its table lists the game, its year when the node has
- * one, and the same score. `[]` means every score is backed.
+ * that file exists (`read` returns its text, or null), and its table backs the score: a game-year node's row
+ * (game, year, score), or for a game's own score the lowest of its rows there. `[]` means every score is backed.
  */
 export function reportProblems(catalogue, read) {
   const problems = [];
@@ -145,8 +149,12 @@ export function reportProblems(catalogue, read) {
     if (p.report !== reportPath(p.at, p.by)) problems.push(`${where}.playability.report: ${p.report} is not ${reportPath(p.at, p.by)}`);
     const text = read(p.report);
     if (text === null) { problems.push(`${where}.playability.report: ${p.report} does not exist`); continue; }
-    const row = new RegExp(`^\\| ${game ?? '[^|]+'} \\| ${year ?? '[a-z0-9]+'} \\| ${p.score} \\|`, 'm');
-    if (game && !row.test(text)) problems.push(`${where}.playability: ${p.report} has no row for ${game}${year ? ` in ${year}` : ''} scoring ${p.score}`);
+    if (!game) continue;
+    const listed = [...text.matchAll(new RegExp(`^\\| ${game} \\| ([a-z0-9]+) \\| (\\d+) \\|`, 'gm'))].map((m) => ({ year: m[1], score: Number(m[2]) }));
+    if (year && !listed.some((r) => r.year === year && r.score === p.score)) problems.push(`${where}.playability: ${p.report} has no row for ${game} in ${year} scoring ${p.score}`);
+    // A game's own score is the parent's lowest across the years it scored (the rule in the header).
+    if (!year && (!listed.length || Math.min(...listed.map((r) => r.score)) !== p.score))
+      problems.push(`${where}.playability: ${p.report} does not give ${game} ${p.score} as its lowest score`);
   }
   return problems;
 }
@@ -158,7 +166,10 @@ export function main(argv, log = console.log, warn = console.error) {
   const at = argv.indexOf('--date'), date = at >= 0 ? argv[at + 1] : undefined;
   const files = argv.filter((a, i) => !a.startsWith('--') && !(at >= 0 && i === at + 1));
   const unknown = argv.filter((a) => a.startsWith('--') && !['--date', '--check', '--force'].includes(a));
-  if (!files.length || !date || !isDate(date) || unknown.length) {
+  const wrong = [...unknown.map((a) => `unknown flag ${a}`), ...(!date || isDate(date) ? [] : [`--date ${JSON.stringify(date)} is not a real YYYY-MM-DD`]),
+    ...(date ? [] : ['--date YYYY-MM-DD is required']), ...(files.length ? [] : ['no rows file given'])];
+  if (wrong.length) {
+    for (const w of wrong) warn(w);
     warn('usage: node scripts/playability-apply.mjs <rows.jsonl…> --date YYYY-MM-DD [--check] [--force]');
     return 2;
   }
