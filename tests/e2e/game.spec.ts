@@ -4534,14 +4534,15 @@ test.describe('Sharpwise', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
   test('Memory Match Past tense: 16 cards, every word whole, no page overflow (#966)', async ({ page }) => {
-    // The deck is picked with Math.random over Year 2's seven themes; 0.8 lands on index 5, 'past', so this
-    // needs one click rather than a 60-try retry loop that timed out on a busy nightly shard.
-    await page.addInitScript(() => { Math.random = () => 0.8; });
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="year2"]');
     await expect(page.locator('#memory')).toBeVisible();
+    // Rig only the deck choice (the theme draw, src/ui/memory.ts) onto 'past', then restore real randomness so
+    // the eight pairs stay random; the assertion below fails loudly if the theme order drifts.
+    await page.evaluate(() => { const w = window as any; w.__realRandom = Math.random; Math.random = () => 5.5 / 7; });
     await page.click('#memory');
-    await expect(page.locator('.memory')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.theme);
+    await page.evaluate(() => { const w = window as any; Math.random = w.__realRandom; delete w.__realRandom; });
     expect(await page.evaluate(() => window.__sna.theme)).toBe('past');
     await expect(page.locator('.card')).toHaveCount(16);
     const vw = page.viewportSize()!.width;
