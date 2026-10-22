@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import { TOPICS, YEARS } from '../../src/curriculum';
-import { CATALOGUE } from '../../src/config/catalogue';
+import { CATALOGUE } from './helpers/catalogue-file';
 
 // Owner rule (issue #47): every word a child sees or hears follows British / National Curriculum usage.
 const AMERICAN: Record<string, string> = {
