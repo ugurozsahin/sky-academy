@@ -83,6 +83,16 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
     const y6 = read(fileOf('year6'));
     expect(y6, 'it shows its area\'s name').toContain('<div><dt>Spell the missing word</dt><dd>Writing: transcription (spelling)</dd></div>');
   });
+  it('keeps teacher jargon out of what a parent reads unless the topic carries a parent line (#2153)', () => {
+    const jargon = /\b(subitis\w*|composition|inverse|derive[ds]?|partition\w*)\b/i;
+    const flagged = map.topics.filter(t => jargon.test(plainObjective(t.nc)) && !t.parent).map(t => `${t.year} ${t.id}`);
+    expect(flagged, 'give the topic a `parent` line in the registry').toEqual([]);
+    for (const t of map.topics.filter(t => t.parent)) expect(t.parent, `${t.id}: a parent line is in plain words`).not.toMatch(jargon);
+    for (const y of map.byYear) {
+      for (const { dt, dd } of terms(read(fileOf(y.year)))) expect(dd, `${y.year}: ${dt}`).not.toMatch(jargon);
+    }
+    expect(terms(read(fileOf('reception'))).find(x => x.dt === 'Quick Dots')?.dd).toBe('Tell how many dots there are at a glance, up to 5');
+  });
   it('keeps a spelling pattern that opens an objective in lower case, and only those (#2140 review)', () => {
     const lower = map.topics.map(t => plainObjective(t.nc)).filter(p => /^[a-z]/.test(p));
     expect(lower, 'every objective the map opens with a letter pattern, driven from the shipped map').toEqual([

@@ -159,6 +159,7 @@ export interface Topic {
   subject: 'maths' | 'writing';
   year: YearId;
   nc: string;             // curriculum reference (short)
+  parent?: string;        // the objective in a parent's words, for the site's year pages; set where `nc` is teacher's vocabulary (#2153)
   input?: 'bubbles' | 'tracing' | 'keypad';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
   solo?: true;            // mission only (#1017): never drawn by a mixed mode, Sensei or the Duel
   drill?: true;           // a narrow practice topic (#915): offered by the Sprint chooser only, never counted, mixed or duelled
