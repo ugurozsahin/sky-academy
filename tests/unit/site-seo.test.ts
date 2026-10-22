@@ -100,4 +100,10 @@ describe('website/llms.txt stays in step with the sitemap (#1936)', () => {
     expect(linked.length).toBeGreaterThan(1);
     for (const u of linked) expect(sitemapUrls(), u).toContain(u);
   });
+  it('lists every sitemap page, so a page cannot drop out of it unseen (#2155)', () => {
+    const linked = new Set([...read('website/llms.txt').matchAll(/\]\((https:\/\/sharpwise\.co\.uk[^)\s]*)\)/g)].map(m => m[1]));
+    // Pages deliberately left out of llms.txt, each with its reason. Empty today: every sitemap page is listed.
+    const leftOut: string[] = [];
+    for (const u of sitemapUrls()) if (!leftOut.includes(u)) expect(linked, u).toContain(u);
+  });
 });
