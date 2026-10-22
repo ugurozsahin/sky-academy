@@ -115,6 +115,7 @@ interface QuestionCore {
   anyOrder?: true;
   visual?: Visual;
   wide?: boolean;         // options are words → bigger bubbles
+  colours?: Record<string, string>;   // #2269: option label → bubble colour, for options that name a colour (the word and the bubble must agree)
   listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off
   peek?: boolean;         // no-voice sequence: show `listen` briefly, then hide it before the bubbles launch (#65)
   peekHint?: string;      // the hint once a no-voice peek hides (default 'Slice the words in order'), for a letter or chunk build (#1102)
