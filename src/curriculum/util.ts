@@ -162,8 +162,9 @@ export const SHAPES_3D: readonly [string, string, Shape3DProps][] = [
 /** A cube *is* a cuboid, and a square *is* a rectangle (Y1 NC: "cuboids including cubes", "rectangles (including squares)"), so neither pair may be answer and decoy together (#299, #872) — sameShape() checks both. */
 export const SAME_SOLID = new Set(['cube', 'cuboid']), SAME_FLAT = new Set(['square', 'rectangle']);
 export function sameShape(a: string, b: string): boolean { return a === b || (SAME_SOLID.has(a) && SAME_SOLID.has(b)) || (SAME_FLAT.has(a) && SAME_FLAT.has(b)); }
-/** A "?" that stands for a missing value: after an operator, "=" or opening bracket, before a digit or operator, or alone as a token. A "?" ending a worded question is not one (#2275). */ const GAP_MARK = /(?<=[+×÷=−(\[-]\s*)\?|\?(?=\s*[\d+×÷=−-])|(?<=^|\s)\?(?=\s|$)/g;
-export function symSay(s: string): string { return s.replace(GAP_MARK, '¿').replace(/×/g, ' times ').replace(/÷/g, ' divided by ').replace(/\+/g, ' plus ').replace(/[−-]/g, ' minus ').replace(/=/g, ' equals ').replace(/¿/g, ' what').replace(/\s+/g, ' ').trim(); }
+/** A "?" ends a worded question when a letter, digit or closing mark sits right before it and a space or the end follows; any other "?" is a missing value and is read "what" (#2275). */
+const GAP_MARK = /([A-Za-z0-9)'"’])?\?(?=\s|$)|\?/g;
+export function symSay(s: string): string { return s.replace(GAP_MARK, (m, pre) => (pre ? m : ` ${m.slice(0, -1)} what `)).replace(/×/g, ' times ').replace(/÷/g, ' divided by ').replace(/\+/g, ' plus ').replace(/[−-]/g, ' minus ').replace(/=/g, ' equals ').replace(/\s+/g, ' ').trim(); }
 
 // ---------- Generators shared across two or more years (#325 stage 4) ----------
 // The curriculum is split reception.ts/year1.ts/year2.ts by year; a helper used by more than one of them

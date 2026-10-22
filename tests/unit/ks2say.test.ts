@@ -277,7 +277,7 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   it('sayIsSafe and ks2Say treat a spaced fraction separator the same as a tight one', () => {
     expect(ks2Say('3 / 4')).toBe('three quarters');
     expect(sayIsSafe('3 / 4')).toBe(false);
-    expect(ks2Say('Is 3 / 4 bigger than 1 / 2?')).toBe('Is three quarters bigger than one half what');
+    expect(ks2Say('Is 3 / 4 bigger than 1 / 2?')).toBe('Is three quarters bigger than one half');
     expect(sayIsSafe('Is 3 / 4 bigger than 1 / 2?')).toBe(false);
     expect(ks2Say('2 1 / 2 kg')).toBe('two and one half kilograms');
     expect(sayIsSafe('2 1 / 2 kg')).toBe(false);
@@ -295,14 +295,14 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   // text is therefore plain, unconverted text here — never converted, and never flagged either way — until
   // #1463 gives it a proper, structural fix.
   it('Roman-numeral text passes through unconverted and unflagged — out of scope, tracked in #1463', () => {
-    expect(ks2Say('What does XIV mean?')).toBe('What does XIV mean what');
+    expect(ks2Say('What does XIV mean?')).toBe('What does XIV mean');
     expect(ks2Say('Choose V or X')).toBe('Choose V or X');
     expect(ks2Say('I have 3 apples')).toBe('I have 3 apples');
     expect(sayIsSafe('What does XIV mean?')).toBe(true);
     expect(sayIsSafe('Choose V or X')).toBe(true);
     // the exact round-10 collision: this is real, raw, unconverted KS2 prose that happens to use the same
     // words ks2Say's own (now-removed) Roman-numeral rendering did — both functions treat it as ordinary text
-    expect(ks2Say('The Roman numeral V equals which number?')).toBe('The Roman numeral V equals which number what');
+    expect(ks2Say('The Roman numeral V equals which number?')).toBe('The Roman numeral V equals which number');
     expect(sayIsSafe('The Roman numeral V equals which number?')).toBe(true);
   });
 
@@ -369,13 +369,13 @@ describe('ks2say.ts: declared Roman numerals (#1057, #1463)', () => {
 
   it('speaks a declared numeral as letters, never as its value', () => {
     expect(say('XIV', 'XIV')).toBe('Roman numeral X, I, V');
-    expect(say('What does XIV mean?', 'XIV')).toBe('What does Roman numeral X, I, V mean what');
+    expect(say('What does XIV mean?', 'XIV')).toBe('What does Roman numeral X, I, V mean');
     expect(say('What does XIV mean?', 'XIV')).not.toMatch(/fourteen/);
   });
 
   it('is never guessed: undeclared text is untouched, so prose and variables are safe', () => {
     expect(ks2Say('XIV')).toBe('XIV');
-    expect(ks2Say('The Roman numeral V equals which number?')).toBe('The Roman numeral V equals which number what');
+    expect(ks2Say('The Roman numeral V equals which number?')).toBe('The Roman numeral V equals which number');
     expect(say('Add V and X', 'XIV')).toBe('Add V and X');
     expect(say('Xavier lives in Cambridge', 'X')).toBe('Xavier lives in Cambridge');
   });
@@ -458,7 +458,7 @@ describe('ks2say.ts: misreadings swept from the #1430 review (#1465)', () => {
     ['0/4', 'zero quarters'],
     // the comparison signs, and an area in mm² / km² (neither had a spoken form)
     ['3 > 2', '3 greater than 2'],
-    ['Is 3 < 5?', 'Is 3 less than 5 what'],
+    ['Is 3 < 5?', 'Is 3 less than 5'],
     ['12 mm²', '12 square millimetres'],
   ] as const)('ks2Say(%j) is %j, and that is safe to speak', (input, expected) => {
     expect(ks2Say(input)).toBe(expected);
