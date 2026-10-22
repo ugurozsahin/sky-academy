@@ -1,6 +1,7 @@
 // #2027: the web wiring for `parseDeepLink`. A link waits here as `pending` until the router reaches the sky
 // map of a child who has finished onboarding; `takeLink` hands it over once and clears it, so back never replays it.
-import { listedTopics, shownYears, topicById, YEARS, type Topic, type YearInfo } from './curriculum';
+import { CORE_TOPICS, shownYears, topicById, YEARS, type Topic, type YearInfo } from './curriculum';
+import { gameHidden, HIDDEN_LINE, landingFor } from './game/hidden-game';
 import { parseDeepLink, type DeepLink } from './deeplink';
 
 let pending: Exclude<DeepLink, { to: 'home' }> | null = null;
@@ -8,8 +9,9 @@ export type LinkGate = 'go' | 'keep' | 'drop';
 let reroute: (() => void) | null = null;
 let gate: () => LinkGate = () => 'go';
 
+/** #2197: every registry game's id is believed, hidden ones too, so `takeLink` can say why a hidden one does not open. */
 const resolve = (href: string): DeepLink =>
-  parseDeepLink(href, { topics: new Set(listedTopics().map(t => t.id)), years: new Set(shownYears().map(y => y.id)) });
+  parseDeepLink(href, { topics: new Set(CORE_TOPICS.map(t => t.id)), years: new Set(shownYears().map(y => y.id)) });
 
 /** Remember a link for the next sky map. A `home` result (unknown, hidden, malformed) clears any earlier one. */
 export function queueLink(href: string): void { const l = resolve(href); pending = l.to === 'home' ? null : l; }
@@ -23,13 +25,15 @@ export function stripLinkParams(): boolean {
   } catch { return false; }   // a restricted history API must not stop the game starting; the caller learns the bar kept its link
 }
 
-/** What the pending link opens, cleared as it is read. */
-export function takeLink(): { year: YearInfo; topic?: Topic } | null {
+/** What the pending link opens, cleared as it is read. A link to a hidden game opens its island with `notice` (#2197), or nothing when that island is hidden too. */
+export function takeLink(): { year: YearInfo; topic?: Topic; notice?: string } | null {
   const p = pending; pending = null;
   if (!p) return null;
   const topic = p.to === 'topic' ? topicById(p.id) : undefined;
   const year = YEARS.find(y => y.id === (p.to === 'topic' ? topic?.year : p.year));
-  return year ? { year, topic } : null;
+  if (!year) return null;
+  if (gameHidden(topic)) { const land = landingFor(year); return land ? { year: land, notice: HIDDEN_LINE } : null; }
+  return { year, topic };
 }
 
 /**

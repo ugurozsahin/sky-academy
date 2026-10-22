@@ -38,7 +38,7 @@ import type { PlayOpts } from './play';
 export type StartOpts = PlayOpts & { pro?: boolean };   // #1297: `pro` is applied by main.ts, so every `year` handed around stays canonical
 export type StartPlay = (o: StartOpts) => void;
 export type Nav = {
-  avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
+  avatar: () => void; map: () => void; island: (year: YearInfo, notice?: string) => void; play: StartPlay;
   memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string, labels?: 'players' | 'teams') => void; rewards: () => void; shop: () => void; parents: () => void;
   pickYear: (year: YearInfo) => void;   // #1055: the school-year tap on a new child's map (a mission after "Let's go!", else the island)
   profiles: () => void;   // #20 slice 2: "Who is playing?"
@@ -335,7 +335,7 @@ export function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Reco
 }
 
 /** Island: topics for one year group + its Sky Storm. */
-export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths') {
+export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths', notice?: string) {
   const d = load();
   let subject = subjectInit;
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
@@ -359,6 +359,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       ).join('\n      ')}
     </div>
     <div class="overlay" id="island-overlay" hidden></div>
+    ${notice ? `<div class="toast show" id="island-notice" role="status">${notice}</div>` : ''}
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
