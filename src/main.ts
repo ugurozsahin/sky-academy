@@ -20,7 +20,7 @@ import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
 import { plugin, wireBackButton, type AppPlugin } from './native';
 import { backGuard } from './ui/screen';
-import { topicById, topicsFor, YEARS, type YearInfo } from './curriculum';
+import { shownYears, topicById, topicsFor, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
 import { needsSchoolYear, placementYear } from './school-year';
 import { handleDeepLink, queueLink, stripLinkParams, takeLink, wireDeepLinks } from './deeplink-open';
@@ -66,7 +66,8 @@ const renderIntro = () => introScreen(() => finishWizard(true), () => finishWiza
 /** The first Mission of the ninja's current island: its first Maths topic, never a tracing one. */
 const startFirstMission = (chosen?: YearInfo) => {
   if (openLink()) return;   // #2027: a pending link outranks the default first mission
-  const y = chosen ?? YEARS.find(i => i.id === (placementYear(load()) ?? 'reception')), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
+  const shown = shownYears();   // #2195: an island the catalogue hides is never where a first mission starts
+  const y = chosen ?? shown.find(i => i.id === placementYear(load(), shown)) ?? shown[0], topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
   if (!y || !topic) { nav.map(); return; }
   year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
   nav.play({ year: y, mode: 'mission', topic });
