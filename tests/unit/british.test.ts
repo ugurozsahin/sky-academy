@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
-import { TOPICS } from '../../src/curriculum';
+import { TOPICS, YEARS } from '../../src/curriculum';
+import { CATALOGUE } from '../../src/config/catalogue';
 
 // Owner rule (issue #47): every word a child sees or hears follows British / National Curriculum usage.
 const AMERICAN: Record<string, string> = {
@@ -69,5 +70,16 @@ describe('British English (National Curriculum usage)', () => {
       for (const str of strings) { if (API_LITERALS.has(str)) continue; for (const w of offenders(childText(str))) bad.push(`${file}: "${str.slice(0, 70)}" (${w} → ${AMERICAN[w]})`); }
     }
     expect(bad).toEqual([]);
+  });
+  it("no American spellings in the game catalogue's alt text (#2193), which is JSON and so outside the scan above", () => {
+    const alts: string[] = [];
+    const walk = (v: unknown): void => {
+      if (Array.isArray(v)) { v.forEach(walk); return; }
+      if (typeof v !== 'object' || v === null) return;
+      for (const [k, x] of Object.entries(v)) { if (k === 'alt' && typeof x === 'string') alts.push(x); else walk(x); }
+    };
+    walk(CATALOGUE);
+    expect(alts.length, 'two pictures per game and per island at least').toBeGreaterThanOrEqual(2 * (TOPICS.length + YEARS.length));
+    expect(alts.flatMap(a => offenders(a).map(w => `"${a}" (${w} → ${AMERICAN[w]})`))).toEqual([]);
   });
 });
