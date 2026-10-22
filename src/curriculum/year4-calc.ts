@@ -11,7 +11,7 @@ import { y4StoryMD } from './year4-story-md';
 import type { Topic } from './types';
 
 export const Y4_CALC: Topic[] = [
-  { id: 'y4-column', title: 'Column Add & Subtract', icon: '🗒️', subject: 'maths', year: 'year4', nc: 'Y4 A&S: column addition and subtraction to 4 digits; inverse to check', sequenceFrom: 1, gen: y4Column },
+  { id: 'y4-column', title: 'Column Add & Subtract', icon: '🗒️', subject: 'maths', year: 'year4', nc: 'Y4 A&S: column addition and subtraction to 4 digits; inverse to check', parent: 'Add and subtract big numbers in columns, then check by working backwards', sequenceFrom: 1, gen: y4Column },
   { id: 'y4-mistake', title: 'Spot the mistake', icon: '🔎', subject: 'maths', year: 'year4', strand: 'calc', nc: 'Y4 A&S: find the column with the mistake in a worked addition or subtraction (4M10, 4M11)', gen: y4Mistake },
   { id: 'y4-story', title: 'Two-Step Problems', icon: '📝', subject: 'maths', year: 'year4', nc: 'Y4 A&S: two-step problems in contexts, deciding which operations to use', gen: y4Story },
   { id: 'y4-whichop', title: 'Which operation?', icon: '➕', subject: 'maths', year: 'year4', nc: 'Y4 A&S/M&D: decide which operation solves a one-step problem, and why (4M12)', gen: y4WhichOp },
@@ -21,7 +21,7 @@ export const Y4_CALC: Topic[] = [
   { id: 'y4-tables-9', title: '9× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 9 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 9) },
   { id: 'y4-tables-11', title: '11× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 11 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 11) },
   { id: 'y4-tables-12', title: '12× table', icon: '✖️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 12 times table (4M13)', drill: true, gen: (d, rng) => y4TablesQ(d, rng, 12) },
-  { id: 'y4-mental', title: 'Mental Multiplying', icon: '💡', subject: 'maths', year: 'year4', nc: 'Y4 M&D: × 0, × 1, ÷ 1, derived facts, three numbers', gen: y4Mental },
+  { id: 'y4-mental', title: 'Mental Multiplying', icon: '💡', subject: 'maths', year: 'year4', nc: 'Y4 M&D: × 0, × 1, ÷ 1, derived facts, three numbers', parent: 'Multiply in your head, using facts you already know', gen: y4Mental },
   { id: 'y4-factorpairs', title: 'Factor Pairs', icon: '🔗', subject: 'maths', year: 'year4', nc: 'Y4 M&D: factor pairs and commutativity in mental calculations (4M15)', gen: y4FactorPairs },
   { id: 'y4-shortmult', title: 'Short Multiplication', icon: '✏️', subject: 'maths', year: 'year4', nc: 'Y4 M&D: 2- and 3-digit × 1-digit, formal written method', sequenceFrom: 2, gen: y4ShortMult },
   { id: 'y4-story-md', title: 'Multiply & Scale Problems', icon: '📋', subject: 'maths', year: 'year4', nc: 'Y4 M&D: distributive law, scaling and correspondence problems', gen: y4StoryMD },

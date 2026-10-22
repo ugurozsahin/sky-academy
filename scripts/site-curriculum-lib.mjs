@@ -119,8 +119,8 @@ const ldString = (s) => JSON.stringify(s).replaceAll('<', '\\u003c');
 const ldList = (type, head, items) => ['  <script type="application/ld+json">', '  {', '    "@context": "https://schema.org",',
   `    "@type": "${type}",`, ...head, '    "itemListElement": [', items.join(',\n'), '    ]', '  }', '  </script>', ''].join('\n');
 
-/** What a year page says a topic practises: its objective in plain words, or its area's name when only a code is left. */
-export const topicWords = (map, t) => plainObjective(t.nc) || areaName(map.coverage.find(c => c.id === t.strands[0]).name);
+/** What a year page says a topic practises: the topic's own parent-facing line (#2153), else its objective in plain words, or its area's name when only a code is left. */
+export const topicWords = (map, t) => t.parent || plainObjective(t.nc) || areaName(map.coverage.find(c => c.id === t.strands[0]).name);
 
 /**
  * A one-line taste of a year (#2161): the first topic of its first two maths areas and of its first English area,
