@@ -4536,16 +4536,12 @@ test.describe('Sharpwise', () => {
   test('Memory Match Past tense: 16 cards, every word whole, no page overflow (#966)', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="year2"]');
-    for (let tries = 0; tries < 60 && (await page.evaluate(() => window.__sna?.theme)) !== 'past'; tries++) {
-      if (await page.locator('.memory').count()) {
-        await page.click('#back');
-        await page.locator('#memory, .island[data-year="year2"]').first().waitFor();
-        if (!(await page.locator('#memory').count())) await page.click('.island[data-year="year2"]');
-      }
-      await expect(page.locator('#memory')).toBeVisible();
-      await page.click('#memory');
-      await expect(page.locator('.memory')).toBeVisible();
-    }
+    await expect(page.locator('#memory')).toBeVisible();
+    // Rig only the theme draw (the first Math.random call on the Memory screen, src/ui/memory.ts): the stub
+    // restores the real function inside that call, so the deck draw right after it stays random. The
+    // assertion below fails loudly if the theme order drifts or another call takes the draw.
+    await page.evaluate(() => { const real = Math.random; Math.random = () => { Math.random = real; return 5.5 / 7; }; });
+    await page.click('#memory');
     expect(await page.evaluate(() => window.__sna.theme)).toBe('past');
     await expect(page.locator('.card')).toHaveCount(16);
     const vw = page.viewportSize()!.width;
