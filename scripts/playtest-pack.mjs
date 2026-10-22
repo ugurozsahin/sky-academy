@@ -15,7 +15,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { SIZES, SEED, ACTION_TIMEOUT, isWebp } from './site-shots.mjs';
 import { PARALLEL, encode } from './game-shots.mjs';
-import { plannedPacks, parseArgs, buildMetrics, reachStep, newReach } from './playtest-metrics.mjs';
+import { plannedPacks, parseArgs, buildMetrics, reachStep, newReach, promptStep } from './playtest-metrics.mjs';
 import { playBubbles, playTracing, playKeypad } from './playtest-play.mjs';
 
 const VIEW = SIZES.phone;
@@ -31,7 +31,8 @@ async function loadApp() {
 
 /**
  * Runs in the page before the app: seeds Math.random, then records frames, the first wave's bubbles, prompts and every
- * spoken line, and, for a sequence question, its required labels' reach through `window.__reachStep` (#2251).
+ * spoken line, every question's line through `window.__promptStep` (#2250), and, for a sequence question, its
+ * required labels' reach through `window.__reachStep` (#2251).
  */
 function packProbe([seed, reach]) {
   let a = seed;                                      // mulberry32, as site-shots.mjs: the same stream on every run
@@ -39,7 +40,7 @@ function packProbe([seed, reach]) {
   localStorage.setItem('sna:three', 'off');
   localStorage.setItem('sna:years', 'all');          // a hidden island is packed too
   localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', tutorialSeen: true, onboarded: true }));
-  const pk = window.__pk = { on: false, onAt: 0, frames: [], samples: [], left: {}, seen: {}, prompts: [], speech: [], reach };
+  const pk = window.__pk = { on: false, onAt: 0, frames: [], samples: [], left: {}, seen: {}, prompts: [], lines: [], speech: [], reach };
   const proto = globalThis.SpeechSynthesis?.prototype;
   if (proto) {
     const speak = proto.speak;
@@ -73,6 +74,7 @@ function packProbe([seed, reach]) {
     const s = window.__sna;
     const st = s && 'session' in s ? s.state() : null;
     if (st && st.prompt !== lastPrompt) { lastPrompt = st.prompt; if (st.prompt) pk.prompts.push({ t, prompt: st.prompt, index: st.index, stage: st.stage }); }
+    if (st) window.__promptStep(pk.lines, s.session.questionsAsked, st, s.session.current?.listen);   // every question's line, shown or hidden (#2250)
     const ar = s && 'session' in s ? s.arena : null;
     if (pk.on && st?.prompt && pk.wave === undefined) pk.wave = s.session.questionsAsked;   // the first question's wave is the one timed
     if (pk.on && ar && s.session.questionsAsked === pk.wave) {
@@ -125,7 +127,7 @@ async function packOne(browser, enc, base, app, job, out) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  await page.addInitScript({ content: `window.__reachStep = ${reachStep};` });   // the one recorder, the same function tests/unit runs
+  await page.addInitScript({ content: `window.__reachStep = ${reachStep}; window.__promptStep = ${promptStep};` });   // the one recorder each, the same functions tests/unit runs
   await page.addInitScript(packProbe, [SEED, newReach()]);
   const dir = `${out}/${job.year}/${job.game}`;
   rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
@@ -144,6 +146,7 @@ async function packOne(browser, enc, base, app, job, out) {
     await page.waitForFunction(() => window.__sna && 'session' in window.__sna && window.__sna.state().prompt, null, { timeout: ACTION_TIMEOUT });
     const play = input === 'tracing' ? playTracing : input === 'keypad' ? playKeypad : playBubbles;
     const played = await play(page, shot, readScreen);
+    played.lines = await page.evaluate(() => window.__pk.lines);   // the whole stage's lines, read after its result (#2250)
     if (errors.length) throw new Error(errors.slice(0, 3).join('; '));
     const settings = job.catalogue ? app.resolveGame(job.game, job.year).settings : app.resolveYear(job.year);
     const metrics = buildMetrics({ job, input, settings, view: VIEW, seed: SEED, rec: played, shots, maxRelaunches: app.MAX_RELAUNCHES });
