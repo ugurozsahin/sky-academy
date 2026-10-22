@@ -176,6 +176,7 @@ describe('a pool the catalogue empties hides its entry point (#2196)', () => {
 const LIST_USE = /\b(?:CORE_)?TOPICS\s*\.\s*(?:filter|find|findIndex|findLast|findLastIndex|some|every|map|flatMap|forEach|reduce)\b|\bof\s+(?:CORE_)?TOPICS\b|\.\.\.\s*(?:CORE_)?TOPICS\b|\.map\(\s*topicById\s*\)/g;
 const ALLOWED: Record<string, string> = {
   '/src/game/sprint-pools.ts': 'grammarPool looks its ids up with topicById and applies isGameShown itself',
+  '/src/deeplink-open.ts': 'a link resolves every registry id so a hidden game gets its notice (#2197); takeLink then applies gameHidden',
 };
 
 describe('guard rail: no list is built from the registry directly (#2196)', () => {
