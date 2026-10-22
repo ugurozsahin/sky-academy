@@ -126,8 +126,8 @@ const median = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 
  * A sequence game's reach (#2251, the product owner's option 2): for each required bubble, its total time inside
  * the play area (below `cardBottom`, above `H`) over its first flight and every relaunch, until it was sliced or
  * its relaunches ran out. `labelReachMs` is the min, median and max over the bubbles that ended either way. One
- * the wave cut short (`wave over`) is listed but kept out, as `aboveCardMs` keeps a cut flight out; when its
- * reach so far was still below that min, `cutShortBelowMin` counts it, because the true min could then be lower.
+ * the question's end cut short (`wave over`) is listed for information only: the pack's own miss ended it, so its
+ * reach so far says nothing about the game, as `aboveCardMs` keeps a cut flight out.
  */
 export function labelReach(rc, { H, cardBottom, maxRelaunches }) {
   if (!Number.isInteger(maxRelaunches)) throw new Error('labelReach needs maxRelaunches, from src/game/bubbles.ts');
@@ -146,8 +146,7 @@ export function labelReach(rc, { H, cardBottom, maxRelaunches }) {
   });
   const ended = labels.filter(l => l.endedBy !== 'wave over').map(l => l.reachMs);
   const stats = ended.length ? { min: Math.min(...ended), median: ms(median(ended)), max: Math.max(...ended) } : null;
-  const cutShortBelowMin = labels.filter(l => l.endedBy === 'wave over' && (!stats || l.reachMs < stats.min)).length;
-  return { labelReachMs: stats, labelReach: { maxRelaunches, labels, cutShortBelowMin, frames: frameStats(rc.frames) } };
+  return { labelReachMs: stats, labelReach: { maxRelaunches, labels, frames: frameStats(rc.frames) } };
 }
 
 /** `auto` when the game spoke the prompt by itself, `tap` when only the speaker button would, `none` with neither. */
@@ -205,6 +204,14 @@ function flightKeys(p, sp) {
   };
 }
 
+/** A sequence game's reach keys (#2251). A sequence pack with no label that ran out or was sliced has no reach to score: it fails, never a silent null. */
+function reachKeys(p, maxRelaunches) {
+  if (!p.screen.sequence) return {};
+  const r = p.reach ? labelReach(p.reach, { H: p.screen.H, cardBottom: p.screen.card?.bottom ?? 0, maxRelaunches }) : null;
+  if (!r?.labelReachMs) throw new Error('a sequence game with no required label that ran out or was sliced: labelReachMs would be empty');
+  return r;
+}
+
 /** What each timing key means, written into every pack so a profile reads the definition beside the number. */
 export const ABOUT = {
   aboveCardMs: "over the first-wave bubbles that fell out of reach on their first flight: the time each one's centre spent below the question card and above the screen's bottom edge",
@@ -222,7 +229,7 @@ export const ABOUT = {
   promptWords: 'words only: numerals, symbols and the ? placeholder are read at a glance',
   demoShown: "the animated first-ever-play demo is skipped: the pack plays as a child who has played any game before",
   labelReachMs: "sequence games only: over the first question's required labels, each one's total time below the question card and above the screen's bottom edge, across its first flight and its relaunches, until it was sliced or its relaunches ran out. The pack slices none of them while timing, so each one's whole chance is measured; a label the wave cut short is left out",
-  labelReach: "per required label: its reachMs, how many flights it had, and endedBy: 'ran out' (it fell on its last flight), 'sliced', or 'wave over' (the question was decided first, so its reach is only what it had so far). cutShortBelowMin counts the labels cut short with less reach than labelReachMs.min; frames is the longest frame gap while it was timed",
+  labelReach: "per required label: its reachMs, how many flights it had, and endedBy: 'ran out' (it fell on its last flight), 'sliced', or 'wave over' (the pack's own miss decided the question first: information only, never the reach); frames is the longest frame gap while it was timed",
 };
 
 /**
@@ -240,7 +247,7 @@ export function buildMetrics({ job, input, settings, view, seed, rec: p, shots, 
     prompt: screen.prompt, promptWords: countWords(screen.prompt), hint: screen.hint, hintWords: countWords(screen.hint),
     ...speechKeys(p.speech, screen.speakVisible, p.promptAt, p.collectedAt), speechVoices: p.voices ?? null,
     ...(input === 'bubbles' ? flightKeys(p, p.speech) : {}),
-    ...(input === 'bubbles' && p.reach ? labelReach(p.reach, { H: screen.H, cardBottom: screen.card?.bottom ?? 0, maxRelaunches }) : {}),
+    ...(input === 'bubbles' ? reachKeys(p, maxRelaunches) : {}),
     cardShareOfScreen: screen.card ? cardShare(screen.card, view) : null, cardBottomPx: screen.card ? Math.round(screen.card.bottom) : null,
     slow: screen.slow, wide: screen.wide, sequence: screen.sequence, anyOrder: screen.anyOrder, visual: screen.visual,
     demoShown: false,

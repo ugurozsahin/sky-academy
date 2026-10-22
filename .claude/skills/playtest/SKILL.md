@@ -73,9 +73,8 @@ in milliseconds: divide by 1000), as a percentage: reach ÷ need, both in second
 - **Why:** a required label that falls unsliced is sent back up, up to `metrics.json#labelReach.maxRelaunches`
   times. So its reach is its total time below the card over its first flight and every relaunch, until it is sliced
   or its relaunches run out. `aboveCardMs` times one flight of any bubble, decoys included, so it is not used.
-- **A label cut short:** when `metrics.json#labelReach.cutShortBelowMin` is above 0, a label the question's end cut
-  short had had less reach than `labelReachMs.min`. Take the smallest such `reachMs` in `labelReach.labels` as the
-  reach instead, the cautious end, and say so in `saw`.
+- **A label cut short** (`endedBy` `wave over` in `metrics.json#labelReach.labels`) was stopped by the pack's own
+  miss, not by the game, so it is information only and never the reach.
 - **Later stages:** it is `reach_1` in the estimate below.
 - **What it does not cover:** waiting for a label to come back is judged under `again` (pace) and `feedback`, not
   `physical`.

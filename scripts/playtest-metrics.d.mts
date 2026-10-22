@@ -38,19 +38,22 @@ export declare function parseArgs(argv: string[]): { base?: string; out?: string
 export declare function countWords(text: string | null | undefined): number;
 export declare function flightMetrics(samples: Sample[], o: { H: number; cardBottom: number; answer?: string | null; speechEnd?: number | null }): FlightSummary;
 export declare const FRAME_CLAMP_MS: number;
-export declare function frameStats(times: number[]): { count: number; maxGapMs: number; clean: boolean };
+export interface FrameStats { count: number; maxGapMs: number; clean: boolean }
+export declare function frameStats(times: number[]): FrameStats;
 /** The bubble fields the reach recorder reads: a real `Bubble` from src/game/bubbles.ts has them all. */
 export interface ReachBubble { id: number; label: string; y: number; launched: boolean; hit: boolean; dead: boolean; fade?: boolean; relaunches: number }
 export declare function reachStep(rc: ReachRecording, t: number, bubbles: ReachBubble[], frozen: boolean, need: string[]): void;
 export declare const newReach: () => Required<ReachRecording>;
 export declare function labelReach(rc: ReachRecording, o: { H: number; cardBottom: number; maxRelaunches: number }): {
   labelReachMs: { min: number; median: number; max: number } | null;
-  labelReach: { maxRelaunches: number; labels: LabelReach[]; cutShortBelowMin: number; frames: { count: number; maxGapMs: number; clean: boolean } };
+  labelReach: { maxRelaunches: number; labels: LabelReach[]; frames: FrameStats };
 };
 export declare const speechMode: (o: { autoplays: boolean; offered: boolean }) => 'auto' | 'tap' | 'none';
 export declare const cardShare: (rect: { width: number; height: number }, view: { width: number; height: number }) => number;
 export declare const ABOUT: Record<string, string>;
 export declare function buildMetrics(o: {
   job: PackJob; input: 'bubbles' | 'tracing' | 'keypad'; settings: Record<string, unknown>; view: { width: number; height: number };
-  seed: number; rec: Recorded; shots: { file: string; moment: string }[]; maxRelaunches?: number;
+  seed: number; rec: Recorded; shots: { file: string; moment: string }[];
+  /** `MAX_RELAUNCHES` from src/game/bubbles.ts; a sequence pack's reach cannot be read without it (#2251). */
+  maxRelaunches: number;
 }): Record<string, unknown>;

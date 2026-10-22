@@ -149,7 +149,7 @@ describe('the playtest skill (#2204)', () => {
     expect(rule, 'the reach spans every relaunch').toContain('its total time below the card over its first flight and every relaunch, until it is sliced or its relaunches run out');
     expect(rule, 'and cites the limit the pack carries').toContain('`metrics.json#labelReach.maxRelaunches`');
     expect(rule, 'aboveCardMs is not used for it').toContain('`aboveCardMs` times one flight of any bubble, decoys included, so it is not used');
-    expect(rule, 'a label cut short below the min lowers the reach').toContain('`metrics.json#labelReach.cutShortBelowMin` is above 0');
+    expect(rule, 'a label the pack\'s own miss cut short is never the reach').toContain("was stopped by the pack's own miss, not by the game, so it is information only and never the reach");
     expect(rule, 'and it feeds the later-stage estimate').toContain('it is `reach_1` in the estimate below');
     expect(rule, 'the wait for a relaunch is judged elsewhere').toContain('judged under `again` (pace) and `feedback`, not `physical`');
     expect(SKILL.replace(/\s+/g, ' '), 'the pack\'s own deliberate miss is never held against the game')
