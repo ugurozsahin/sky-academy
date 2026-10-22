@@ -6,7 +6,8 @@ import { gameRefusal, gamesOn, islandRefusal, islandsShown, withGame, withIsland
 
 // #2200, the owner's rule on the issue: the grown-ups' settings never leave the map with no island, and never switch
 // off a year's last game. Prove it red: make `islandRefusal` return null (the last-island cases fail); drop the
-// `gamesOn(...).length === 1` line (the last-game case fails); drop the `t.drill` check (the drill case fails).
+// `gamesOn(...).length === 1` line (the last-game case fails); drop the `t.drill` check (the drill case fails); make
+// `gameRefusal`'s last line return null (the KS2 gate case fails).
 const core = (y: YearId) => TOPICS.filter(t => t.year === y && !t.drill);
 const onlyIsland = (keep: YearId): Visibility => YEARS.filter(y => y.id !== keep).reduce<Visibility>((c, y) => withIsland(c, y.id, false), RUNTIME);
 const onlyGame = (year: YearId, keep: string, cat: Visibility = RUNTIME): Visibility =>
@@ -55,6 +56,25 @@ describe('a year\'s last game', () => {
   it('the last game is held even on a hidden island, so Show always has something to show', () => {
     const keep = core('year2')[0].id, cat = withIsland(onlyGame('year2', keep), 'year2', false);
     expect(gameRefusal(cat, keep, 'year2', TOPICS)).toBe('last-game');
+  });
+});
+
+describe('a KS2 island under its topic-count gate (#1032)', () => {
+  // Year 3 alone, on Automatic: it shows while 12 maths games are on. The 13th switch-off is fine; the next would
+  // take it under the gate and empty the map, which only the last-island branch of `gameRefusal` stops.
+  const maths = core('year3').filter(t => t.subject === 'maths');
+  const at12 = maths.slice(12).reduce((c, t) => withGame(c, t.id, 'year3', false), onlyIsland('year3'));
+  it('the switch that would take it under the gate is held, though many games are still on', () => {
+    expect(maths.length).toBeGreaterThan(12);
+    expect(islandsShown(at12, TOPICS)).toEqual(['year3']);
+    expect(gamesOn(at12, 'year3', TOPICS).length).toBeGreaterThan(1);
+    expect(gameRefusal(at12, maths[0].id, 'year3', TOPICS)).toBe('last-island');
+  });
+  it('set to Show, it stays on under the gate; going back to Automatic would empty the map', () => {
+    const shown = withGame(withIsland(at12, 'year3', true), maths[0].id, 'year3', false);
+    expect(islandsShown(shown, TOPICS)).toEqual(['year3']);
+    expect(islandRefusal(shown, 'year3', 'auto', TOPICS)).toBe('last-island');
+    expect(islandRefusal(withIsland(shown, 'year1', true), 'year3', 'auto', TOPICS)).toBeNull();
   });
 });
 

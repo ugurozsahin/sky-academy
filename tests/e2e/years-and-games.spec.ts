@@ -29,7 +29,7 @@ async function openSettings(page: Page) {
 }
 
 test.describe('Years and games settings (#2200)', () => {
-  test('a game switched off leaves its island; the change is announced', async ({ page }) => {
+  test('a game switched off leaves its island, and switched on comes back; each change is announced', async ({ page }) => {
     await seed(page);
     const game = core('year1').find(t => t.subject === 'maths')!;
     await page.click('.island[data-year="year1"]');
@@ -48,6 +48,17 @@ test.describe('Years and games settings (#2200)', () => {
     await page.click('.island[data-year="year1"]');
     await expect(page.locator('#topics .topic').first()).toBeVisible();
     await expect(page.locator(`.topic[data-id="${game.id}"]`)).toHaveCount(0);
+    // and back on: the switch undoes itself without a reset
+    await page.click('#back');
+    await openSettings(page);
+    await page.selectOption('#cat-year', 'year1');
+    await expect(sw).toHaveAttribute('aria-checked', 'false');
+    await sw.click();
+    await expect(sw).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#cat-msg')).toHaveText(`${game.title} is on for Year 1.`);
+    await page.click('#back');
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator(`.topic[data-id="${game.id}"]`)).toHaveCount(1);
   });
 
   test('an island set to Hide leaves the map', async ({ page }) => {

@@ -4,8 +4,8 @@
 import { gameOn, islandShown, type GateTopic, type Visibility } from './catalogue-shown';
 import type { YearId } from './types';
 
-/** An island's three choices: `"auto"` is the topic-count gate, `true` Show, `false` Hide. */
-export type IslandChoice = 'auto' | boolean;
+/** An island's three choices: `"auto"` is the topic-count gate, `true` Show, `false` Hide. Derived, so it follows `Visibility`. */
+export type IslandChoice = NonNullable<Visibility['years'][YearId]>['visible'];
 /** Why a control is disabled: the map would be left with no island, or the year with no game. */
 export type Refusal = 'last-island' | 'last-game';
 

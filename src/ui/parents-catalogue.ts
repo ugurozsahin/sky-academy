@@ -22,12 +22,12 @@ const NOT_SAVED = 'This device would not save that, so nothing changed.';
 let picked: YearId | null = null;
 const pickedYear = (cat: Visibility): YearId => (picked ??= islandsShown(cat, TOPICS)[0] ?? YEARS[0].id);
 
-/** Why a control is disabled, in a grown-up's words. */
-function why(r: Refusal, year: YearId): string {
-  return r === 'last-island'
-    ? `${yearTitle(year)} is the only island left on the map, so it stays.`
-    : `This is the last ${yearTitle(year)} game switched on. To take ${yearTitle(year)} off the map, hide its island instead.`;
-}
+/** Why a control is disabled, in a grown-up's words: one sentence per refusal, so a new one cannot fall into another's. */
+const WHY: Record<Refusal, (year: string, hidden: boolean) => string> = {
+  'last-island': y => `${y} is the only island left on the map, so it stays.`,
+  'last-game': (y, hidden) => `This is the last ${y} game switched on.${hidden ? '' : ` To take ${y} off the map, hide its island instead.`}`,
+};
+const why = (r: Refusal, year: YearId, cat: Visibility = activeCatalogue()) => WHY[r](yearTitle(year), cat.years[year]?.visible === false);
 
 function islandRow(cat: Visibility, year: YearId): string {
   const now = cat.years[year]?.visible ?? 'auto', auto = islandsShown(withIsland(cat, year, 'auto'), TOPICS).includes(year);
@@ -35,15 +35,15 @@ function islandRow(cat: Visibility, year: YearId): string {
   const note = refused.find(Boolean);
   return `
       <p class="p-three-say" id="cat-isl-${year}"><b>${esc(yearTitle(year))}</b></p>
-      <div class="tabs p-three-pick p-cat-pick" role="radiogroup" aria-labelledby="cat-isl-${year}">${CHOICES.map((c, i) =>
+      <div class="tabs p-cat-pick" role="radiogroup" aria-labelledby="cat-isl-${year}">${CHOICES.map((c, i) =>
         `<button class="tab${c.v === now ? ' on' : ''}" data-isl="${year}" data-v="${c.key}" role="radio" aria-checked="${c.v === now}"${refused[i] ? ` disabled aria-describedby="cat-isl-why-${year}"` : ''}>${c.v === 'auto' ? `Automatic (${auto ? 'shown' : 'hidden'})` : c.label}</button>`).join('')}</div>${note ? `
-      <p class="p-three-say" id="cat-isl-why-${year}">${esc(why(note, year))}</p>` : ''}`;
+      <p class="p-three-say" id="cat-isl-why-${year}">${esc(why(note, year, cat))}</p>` : ''}`;
 }
 
 function gameRow(cat: Visibility, t: Topic, year: YearId): string {
   const on = gameOn(cat, t.id, year), refused = on ? gameRefusal(cat, t.id, year, TOPICS) : null;
   return `
-        <li class="p-topic"><span class="ic" aria-hidden="true">${t.icon}</span><span class="p-topic-t"><b id="cat-g-${t.id}">${esc(t.title)}</b>${refused ? `<small id="cat-gw-${t.id}">${esc(why(refused, year))}</small>` : ''}</span>
+        <li class="p-topic"><span class="ic" aria-hidden="true">${t.icon}</span><span class="p-topic-t"><b id="cat-g-${t.id}">${esc(t.title)}</b>${refused ? `<small id="cat-gw-${t.id}">${esc(why(refused, year, cat))}</small>` : ''}</span>
           <button class="tab p-cat-sw${on ? ' on' : ''}" data-game="${t.id}" role="switch" aria-checked="${on}" aria-labelledby="cat-g-${t.id}"${refused ? ` disabled aria-describedby="cat-gw-${t.id}"` : ''}>${on ? 'On' : 'Off'}</button></li>`;
 }
 
@@ -95,21 +95,30 @@ function redraw(focus: string | null, text: string, bad = false): void {
   $('#cat-body').innerHTML = catalogueBodyHTML();
   if (focus) ($(focus) ?? $('#cat-year'))?.focus();
   const msg = $('#cat-msg');
+  msg.textContent = '';   // cleared first, so the same sentence twice is announced twice
   msg.textContent = text; msg.classList.toggle('bad', bad);
-  if (bad) sfx.wrong();
+  if (bad) { sfx.wrong(); msg.scrollIntoView({ block: 'nearest' }); }   // the line sits below a long list; a failure must be seen
 }
 
+// Both handlers check the rule again against the store before writing: the control was drawn from the store as it
+// was then, and another tab on the device may have changed it since.
 function onIsland(b: HTMLElement): void {
-  const year = b.dataset.isl as YearId, c = CHOICES.find(x => x.key === b.dataset.v)!;
+  const year = b.dataset.isl as YearId, c = CHOICES.find(x => x.key === b.dataset.v)!, sel = `button[data-isl="${year}"][data-v="${c.key}"]`;
+  const refused = islandRefusal(activeCatalogue(), year, c.v, TOPICS);
+  if (refused) return redraw(sel, why(refused, year), true);
   const ok = setYearVisible(sessionProfile(), year, c.v);
   const shown = islandsShown(activeCatalogue(), TOPICS).includes(year) ? 'shown on' : 'hidden from';
-  redraw(`button[data-isl="${year}"][data-v="${c.key}"]`, ok ? `${yearTitle(year)}: ${c.label}. It is ${shown} the map.` : NOT_SAVED, !ok);
+  redraw(sel, ok ? `${yearTitle(year)}: ${c.label}. It is ${shown} the map.` : NOT_SAVED, !ok);
 }
 
 function onGame(b: HTMLElement, year: YearId): void {
-  const id = b.dataset.game!, t = TOPICS.find(x => x.id === id)!, on = b.getAttribute('aria-checked') !== 'true', p = sessionProfile();
-  const ok = (!on || activeCatalogue().games[id]?.visible !== false || setGameVisible(p, id, null, true)) && setGameVisible(p, id, year, on);
-  redraw(`button[data-game="${id}"]`, ok ? `${t.title} is ${on ? 'on' : 'off'} for ${yearTitle(year)}.` : NOT_SAVED, !ok);
+  const id = b.dataset.game!, t = TOPICS.find(x => x.id === id)!, cat = activeCatalogue(), on = !gameOn(cat, id, year), p = sessionProfile();
+  const sel = `button[data-game="${id}"]`, refused = on ? null : gameRefusal(cat, id, year, TOPICS), before = islandsShown(cat, TOPICS).includes(year);
+  if (refused) return redraw(sel, why(refused, year, cat), true);
+  const ok = (!on || cat.games[id]?.visible !== false || setGameVisible(p, id, null, true)) && setGameVisible(p, id, year, on);
+  const after = islandsShown(activeCatalogue(), TOPICS).includes(year);
+  const island = before === after ? '' : ` ${yearTitle(year)} is now ${after ? 'shown on' : 'hidden from'} the map.`;
+  redraw(sel, ok ? `${t.title} is ${on ? 'on' : 'off'} for ${yearTitle(year)}.${island}` : NOT_SAVED, !ok);
 }
 
 function bindReset(): void {
