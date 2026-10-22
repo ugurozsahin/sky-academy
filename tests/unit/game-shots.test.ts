@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { CATALOGUE } from '../../src/config/catalogue';
+import { CATALOGUE } from './helpers/catalogue-file';
 import { MAX_BYTES } from '../../scripts/site-shots.mjs';
 import { plannedJobs, plannedFiles, overCap, parseArgs, SHOT_BYTES, THUMB_BYTES, THUMB_CROP, THUMB_SIZE, PARALLEL } from '../../scripts/game-shots.mjs';
 
