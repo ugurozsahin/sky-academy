@@ -84,19 +84,25 @@ describe('playtest profiles (#2204)', () => {
     }
   });
 
-  it('the Reception floor sits where the hit rates it quotes cross 50% (#2243)', () => {
-    // The floor claims "a miss as often as a hit", so it must lie between the two sizes whose 4-year-old hit rates
-    // straddle 50%, read from the profile's own Targets line (Hourcade et al., 2004, Table VI).
+  it('the Reception floor and comfortable size follow the hit rates it quotes (#2243)', () => {
+    // Read from the profile's own Targets line (Hourcade et al., 2004, Table VI): 4-year-olds at three sizes, then
+    // 5-year-olds at the same three. The floor claims "a miss as often as a hit", so it sits within 1 mm of where the
+    // 4-year-olds' rate crosses 50% (straight line between the two quoted points either side). "Comfortable" is the
+    // middle the profile argues for: above the size where 5-year-olds reach 90%, below the one where 4-year-olds do.
     const text = body('playtester-reception').replace(/\s+/g, ' ');
-    expect(text).toContain('is a miss as often as a hit');
-    const rates = /4-year-olds hit 16 px \(([\d.]+) mm\) targets (\d+)% of the time, 32 px \(([\d.]+) mm\) (\d+)% and 64 px \(([\d.]+) mm\) (\d+)%/.exec(text);
-    expect(rates, 'the Targets line quotes the 4-year-olds at all three sizes').not.toBeNull();
-    const pts = [1, 3, 5].map((i) => ({ mm: Number(rates![i]), hit: Number(rates![i + 1]) }));
-    const at = pts.findIndex((p, i) => i > 0 && pts[i - 1].hit < 50 && p.hit >= 50);
-    expect(at, 'the quoted rates cross 50% somewhere').toBeGreaterThan(0);
-    const { mm } = workingFloors(body('playtester-reception'))!.floor;
-    expect(mm, 'the floor is above the size still hit less than half the time').toBeGreaterThan(pts[at - 1].mm);
-    expect(mm, 'and below the size already hit more often than not').toBeLessThan(pts[at].mm);
+    const rates = /4-year-olds hit 16 px \(([\d.]+) mm\) targets (\d+)% of the time, 32 px \(([\d.]+) mm\) (\d+)% and 64 px \(([\d.]+) mm\) (\d+)%; 5-year-olds (\d+)%, (\d+)% and (\d+)%/.exec(text);
+    expect(rates, 'the Targets line quotes 4- and 5-year-olds at all three sizes').not.toBeNull();
+    const mmAt = [1, 3, 5].map((i) => Number(rates![i]));
+    const four = [2, 4, 6].map((i) => Number(rates![i])), five = [7, 8, 9].map((i) => Number(rates![i]));
+    const { floor, comfortable } = workingFloors(body('playtester-reception'))!;
+    expect(text, 'the "miss as often as a hit" claim is the floor\'s own').toContain(`a ${floor.radius} px radius)** is a miss as often as a hit`);
+    const at = four.findIndex((h, i) => i > 0 && four[i - 1] < 50 && h >= 50);
+    expect(at, 'the quoted 4-year-old rates cross 50% somewhere').toBeGreaterThan(0);
+    const half = mmAt[at - 1] + ((50 - four[at - 1]) / (four[at] - four[at - 1])) * (mmAt[at] - mmAt[at - 1]);
+    expect(Math.abs(floor.mm - half), `the floor is ${floor.mm} mm; the quoted rates put 50% at ${half.toFixed(1)} mm`).toBeLessThanOrEqual(1);
+    const ninety = (rs: number[]) => mmAt[rs.findIndex((h) => h >= 90)];
+    expect(comfortable.mm, 'comfortable is above the size where 5-year-olds already reach 90%').toBeGreaterThan(ninety(five));
+    expect(comfortable.mm, 'and below the size where 4-year-olds first do').toBeLessThan(ninety(four));
   });
 
   it('the parent cites at least one published study, by link (#2213)', () => {
