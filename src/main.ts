@@ -5,8 +5,8 @@ import { DAILY_TEN_TITLE, dailyTenDeck } from './game/daily-ten';
 import { paperDeck } from './game/arithmetic-paper';
 import { chooseNinjaScreen, changeAvatarScreen, introScreen, nameScreen } from './ui/avatar';
 import { mapScreen, islandScreen, rewardsScreen, type StartPlay, type StartOpts } from './ui/home';
-import { playScreen, type PlayOpts } from './ui/play';
-import { proYear } from './game/modes';
+import { playScreen } from './ui/play';
+import { played } from './game/played';
 import { memoryScreen } from './ui/memory';
 import { duelScreen } from './ui/duel';
 import { shopScreen } from './ui/shop';
@@ -79,8 +79,6 @@ const openLink = (): boolean => {
   return true;
 };
 const renderName = () => nameScreen(() => { enter('onboard-intro'); renderIntro(); });
-/** #1297: a Pro run plays `proYear(year)`; `o.year` stays canonical for Next topic, Play again and the island Back. */
-const played = (o: StartOpts): PlayOpts => o.pro ? { ...o, year: proYear(o.year) } : o;
 const nav = {
   avatar: () => {
     leave(); fromPop = false;
