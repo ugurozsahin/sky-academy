@@ -23,6 +23,7 @@ const twins: [string, string][] = [
   ['scripts/game-shots.mjs', 'scripts/game-shots.d.mts'],
   ['scripts/playtest-row.mjs', 'scripts/playtest-row.d.mts'],
   ['scripts/playability-apply.mjs', 'scripts/playability-apply.d.mts'],
+  ['scripts/game-media.mjs', 'scripts/game-media.d.mts'],
   ['tests/e2e/mute.mjs', 'tests/e2e/mute.d.mts'],
   ...hooks.filter((f) => f !== 'io.mjs').map((f): [string, string] => [`.claude/hooks/${f}`, `.claude/hooks/${f.replace(/\.mjs$/, '.d.mts')}`]),
 ];
