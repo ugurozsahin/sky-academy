@@ -46,20 +46,29 @@ measured as `live:<what>`, for example `live:bubble above card 2.9 s at stage 3`
 Mark each criterion for **this profile's child**, using the profile's own numbers (reading level, number
 range, reaction time, target size, attention).
 
-**The time a bubble needs**, for `physical`: the profile's reaction floor, plus the reading time of any words on
-the bubbles (all of them, at the cautious end: a child reads them in turn until one fits; word count ÷ the
-profile's words a minute), plus the question's reading time when the pack shows the wave launching before it
-could be read. Count the words of the question line only — a fixed instruction under it, the same every wave, is
-read once per game — and words only: numerals and maths symbols are read at a glance from Year 1 up; Reception
-reads neither. Compare that need with the bubble's **reach**, its reachable time (`aboveCardMs`, its smallest
-value, in milliseconds: divide by 1000), as a percentage: reach ÷ need, both in seconds.
+**The time a bubble needs**, for `physical`, is the sum of these parts, in seconds. Count words only: numerals and
+maths symbols are read at a glance from Year 1 up, and Reception reads neither.
+- **The profile's reaction floor.**
+- **The words on the bubbles**, all of them, at the cautious end: a child reads them in turn until one fits (word
+  count ÷ the profile's words a minute).
+- **The question line**, when the pack shows the wave launching before it could be read. **A line that is the
+  same every wave is read once per game, so it is not in the per-wave need** — y1-order's `Smallest to biggest!`
+  is one, and so is a fixed instruction under the question line.
+- **Card text, only when the child must read it to choose the answer**, as with y6-lists' gap sentence. Count it
+  once per wave. A picture does not count, nor a card that only repeats the question line.
+- **Working time**, a judgement, not a published norm: **a recalled fact adds 0** (a times-table answer, a number
+  bond), and **each further mental step the question needs adds 1 s**. `0.4 × 3` is recall 4 × 3, then adjust the
+  place value: one step, 1 s. Every `physical` `saw` names the steps it counted.
+
+Compare that need with the bubble's **reach**, its reachable time (`aboveCardMs`, its smallest value,
+in milliseconds: divide by 1000), as a percentage: reach ÷ need, both in seconds.
 
 **A later stage's reach** is estimated, never guessed, one way. Stages count from 1, so stage k plays
 `speeds[k-1]`: `reach_k ≈ reach_1 × airTime[speeds[k-1]] / airTime[speeds[0]]`. `airTime` is
 `defaults.settings.airTime` in `src/config/catalogue.json`, unless the game overrides it; the pack carries the
-resolved table as `metrics.json#settings.airTime`. A `speeds` value indexes `airTime` from 0, so speed 1 is its second entry. The
-highest `speeds` entry is the shortest flight, so that stage decides. Cite `metrics.json#settings.speeds` and put
-the arithmetic in `saw`: `stage 3 at speed 3: 5.27 × 3.4 / 5.6 = 3.2 s`.
+resolved table as `metrics.json#settings.airTime`. A `speeds` value indexes `airTime` from 0, so speed 1 is its
+second entry. The highest `speeds` entry is the shortest flight, so that stage decides. Cite
+`metrics.json#settings.speeds` and put the arithmetic in `saw`: `stage 3 at speed 3: 5.27 × 3.4 / 5.6 = 3.2 s`.
 
 | Key | Criterion | The question |
 |---|---|---|
@@ -143,7 +152,7 @@ not describe the game, re-read the criteria, but never adjust the sum to fit a b
 One JSON object per game, one per line (JSON Lines), with exactly these keys:
 
 ```json
-{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs.min","saw":"need 4 s, reach 5.37 s, 134% at stage 1"},{"criterion":"physical","ref":"metrics.json#settings.speeds","saw":"stage 4 at speed 3: 5.37 × 3.4 / 5.6 = 3.26 s, 82% of the need"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
+{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs.min","saw":"need 4 s, reach 5.37 s, 134% at stage 1; no words, working: 0 steps, a recalled fact"},{"criterion":"physical","ref":"metrics.json#settings.speeds","saw":"stage 4 at speed 3: 5.37 × 3.4 / 5.6 = 3.26 s, 82% of the need"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
 ```
 
 - **`game`** — the topic id, the pack's folder name. **`year`** — the pack's `YearId`.
