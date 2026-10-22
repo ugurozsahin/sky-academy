@@ -140,6 +140,44 @@ describe('the playtest skill (#2204)', () => {
     expect(SKILL).toMatch(/more than 40% of one profile's games score 8 or above/);
   });
 
+  it('marks `physical` on a band, not a cliff, and estimates later stages one way (#2245)', () => {
+    const at = SKILL.indexOf('**`physical`**');
+    const anchors = SKILL.slice(at, SKILL.indexOf('\n\n', at)).replace(/\s+/g, ' ');
+    expect(anchors, 'a clear miss is below 75% of the need').toMatch(/- \*\*0\*\* — The stage-1 reach is below \*\*75%\*\* of the need/);
+    expect(anchors, 'a near miss is a 1').toMatch(/- \*\*1\*\* — The stage-1 reach is at least 75% but below 100% of the need/);
+    expect(anchors, 'a radius between floor and comfortable is a 1, not a gap').toContain('at or above the floor but below the comfortable size');
+    expect(anchors, 'the lowest clause decides between anchors').toContain('The lowest anchor any clause reaches is the mark');
+    expect(anchors, 'a 2 needs every stage, not only the one the pack played').toMatch(/- \*\*2\*\* — Every stage's estimated reach meets the need/);
+    expect(anchors, 'the mark cites its numbers').toContain('`saw` states the need, the reach and the percentage');
+    expect(SKILL, 'the later-stage estimate is one formula').toContain('`reach_k ≈ reach_1 × airTime[speeds[k-1]] / airTime[speeds[0]]`');
+    expect(SKILL, 'and says the unit of the measured reach').toContain('in milliseconds: divide by 1000');
+    expect(SKILL, 'and says how a speed indexes the table').toContain('A `speeds` value indexes `airTime` from 0');
+    expect(SKILL.replace(/\s+/g, ' '), 'a sequence or slow game flies one speed lower, as eased() plays it').toContain('**Ease the speed before indexing:** a `sequence` game (`metrics.json#sequence`) or a `slow` one (`metrics.json#slow`) flies one speed lower at every stage, never below 1, or below 0 in a gentle year');
+    const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]);
+    const saw = row.evidence.filter((e: { criterion: string }) => e.criterion === 'physical').map((e: { saw: string }) => e.saw).join(' ');
+    expect(saw, 'the example row shows the evidence wording it asks for').toMatch(/need [\d.]+ s, reach [\d.]+ s, \d+%/);
+  });
+
+  it('says what counts toward the need: card text, a fixed line, working time (#2245)', () => {
+    const at = SKILL.indexOf('**The time a bubble needs**'), end = SKILL.indexOf('Compare that need', at);
+    expect(at, 'the need paragraph is where the rules live').toBeGreaterThan(-1);
+    expect(end, 'and the comparison follows it').toBeGreaterThan(at);
+    const need = SKILL.slice(at, end).replace(/\s+/g, ' ');
+    expect(need, 'card text counts only when it must be read to choose').toContain('**Card text, only when the child must read it to choose the answer**');
+    expect(need, 'once per wave, and never a picture').toMatch(/Count it once per wave\. A picture does not count, nor a card that only repeats the question line/);
+    expect(need, 'a fixed line is not in the per-wave need').toContain('**A line that is the same every wave is read once per game, so it is not in the per-wave need**');
+    expect(need, 'working time is judged, and says so').toContain('**Working time**, a judgement, not a published norm');
+    expect(need, 'a recalled fact is free').toContain('**a recalled fact adds 0**');
+    expect(need, 'each further step costs a second').toContain('**each further mental step the question needs adds 1 s**');
+    expect(need, 'with a worked step').toContain('`0.4 × 3` is recall 4 × 3, then adjust the place value: one step, 1 s');
+    expect(need, 'and a fixed line is told from two waves in the pack, never the source').toContain('`2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2) is the same text');
+    expect(need, 'the mark shows its working').toContain('Every `physical` `saw` names the steps it counted');
+    const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]) as { evidence: { criterion: string; saw: string }[] };
+    const physical = row.evidence.filter((e) => e.criterion === 'physical');
+    expect(physical.length, 'the example has physical evidence').toBeGreaterThan(0);
+    for (const e of physical) expect(e.saw, 'every physical saw in the example names its steps').toMatch(/working: \d+ steps?/);
+  });
+
   it('its example row is a valid row: the five keys, the sum, evidence, and a profile as `by`', () => {
     const json = /```json\n(\{.*\})\n```/.exec(SKILL);
     expect(json, 'the skill shows one example row').not.toBeNull();
