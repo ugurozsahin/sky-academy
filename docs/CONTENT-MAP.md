@@ -155,7 +155,7 @@ Generated from the registry: 343 topics. A strand counts as covered only when a 
 | Compare Measures < > = (`y2-measure-compare`) | Y2 Measurement: compare measures and record using >, < and = | mixed | Slices the answer | generated | no |
 | Temperature (`y2-temp`) | Y2 Measurement: temperature (°C) | mixed | Slices the answer | generated | no |
 | Read the Scale (`y2-scales`) | Y2 Measurement: read a ruler, scale, thermometer or jug | mixed | Slices the answer | generated | yes |
-| Time & Durations (`y2-duration`) | Y2 Measurement: compare and sequence intervals of time | mixed | Slices the answer | generated | no |
+| Time & Durations (`y2-duration`) | Y2 Measurement: compare and sequence intervals of time | mixed | Slices the answer | generated | yes |
 | Balance the Scales (`y2-balance`) | Y2 A&S: equivalence, inverse, tables | mixed | Slices the answer | generated | yes |
 | Charts & Tallies (`y2-stats`) | Y2 Statistics: pictograms, tally charts, block diagrams | mixed | Slices the answer | generated | yes |
 | Most to Least (`y2-stats-order`) | Y2 Statistics: sort the categories by quantity | mixed | Slices the answer | generated | yes |
