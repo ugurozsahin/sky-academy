@@ -20,11 +20,12 @@ A pack is one game played once, for one year, the way a child meets it on a 390�
   wave at its apex, just after one deliberate wrong slice, and the stage result. Tracing and keypad games have
   their own equivalent moments. List the folder and open each image with `Read`; cite each by its file name.
 - **`metrics.json`**, the measured numbers: the resolved settings (lives, gentle, and the per-stage `speeds`
-  and `diffs`), the input kind (bubbles, tracing, keypad), the prompt text and its word count, whether speech is
-  offered, answers per wave, the bubble radius in CSS px, the time from launch to apex, the time a bubble stays
-  above the question card, for a sequence game each required label's reach over its relaunches (`labelReachMs`),
-  the slowest and fastest bubble, the share of the screen the card covers, and the visual card's needs (`slow`,
-  `wide`). Cite a number as `metrics.json#<key>`, and a nested one by its path (`metrics.json#aboveCardMs.min`).
+  and `diffs`), the input kind (bubbles, tracing, keypad), the prompt text and its word count, whether that line
+  is the same on every question of the stage (`promptFixed`), whether speech is offered, answers per wave, the
+  bubble radius in CSS px, the time from launch to apex, the time a bubble stays above the question card, for a
+  sequence game each required label's reach over its relaunches (`labelReachMs`), the slowest and fastest bubble,
+  the share of the screen the card covers, and the visual card's needs (`slow`, `wide`). Cite a number as
+  `metrics.json#<key>`, and a nested one by its path (`metrics.json#aboveCardMs.min`).
 - **A sequence game's first question is missed on purpose.** The pack slices nothing until a required label has
   used every relaunch, to time its whole chance, so `metrics.json#livesAfterLabelsRanOut` and the result shot may
   show one miss the pack chose. It is not a child's mistake: never mark `feedback` or `again` down for it.
@@ -56,10 +57,12 @@ maths symbols are read at a glance from Year 1 up, and Reception reads neither.
   count ÷ the profile's words a minute).
 - **The question line**, when the pack shows the wave launching before it could be read. **A line that is the
   same every wave is read once per game, so it is not in the per-wave need** — y1-order's `Smallest to biggest!`
-  is one, and so is a fixed instruction under the question line. Tell it from the pack: the question line in
-  `2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2) is the same text. A sequence game hides the line once
-  slicing starts; there, read `prompt` from `window.__sna.state()` over two waves live (§1) and cite it as `live:`.
-  When the lines differ, or neither shows them, count the line.
+  is one, and so is a fixed instruction under the question line. **Read whether the question line is fixed from
+  `metrics.json#promptFixed`** (#2250): `true` when the pack read the same line from the game's state on every
+  question of the stage it played. It covers a sequence game too, which hides the line once slicing starts, so
+  never compare screenshots or read the line live for it. When it is `false` or missing, count the line. Tell the
+  instruction under the line from the pack: the same text in `2-prompt.webp` (wave 1) and in `5-wrong.webp`
+  (wave 2). When it differs, or neither shows it, count it.
 - **Card text, only when the child must read it to choose the answer**, as with y6-lists' gap sentence. Count it
   once per wave. A picture does not count, nor a card that only repeats the question line.
 - **Working time**, a judgement, not a published norm: **a recalled fact adds 0** (a times-table answer, a number
