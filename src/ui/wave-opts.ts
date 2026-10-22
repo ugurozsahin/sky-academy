@@ -14,9 +14,9 @@ import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow
  * function otherwise has no reason to take: it only ever affects a non-sequence question's single
  * `gentleTarget`, so a scenario that does not care about it can go on calling this with three arguments.
  * `remaining` (#919) defaults to the whole sequence: omitted means "nothing sliced yet", not "nothing left". */
-export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean): WaveOpts {
+export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean, timing?: WaveOpts['timing']): WaveOpts {
   return {
     labels: info.labels, speed: info.speed, wide: !!q.wide || wideFor(info.labels),
-    ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined,
+    ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined, timing,
   };
 }
