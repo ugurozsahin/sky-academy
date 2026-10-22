@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { pinSentence } from './helpers/pin-sentence';
 import { flatten, sliceSkill } from './helpers/slice-skill';
+import { PLAYTESTERS, PLAYTEST_EXTRA_KEYS, PLAYTEST_PINS } from './helpers/playtest';
 import { reviewPr, section, ROUND_CAP_ESCAPES, REVIEW_PR_HEADINGS, REVIEW_PR_UNNUMBERED } from './helpers/review-pr';
 
 /**
@@ -1554,7 +1555,6 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
   });
 });
 
-
 /**
  * #195 — a merge swallowed a bullet onto the line above, and nothing could see it.
  *
@@ -1617,7 +1617,6 @@ describe('a bullet is never swallowed onto the line above it (#195)', () => {
   });
 });
 
-
 /**
  * #180 — the agent skills and review agents this repository carries.
  *
@@ -1649,6 +1648,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'frontend-design': { ...MARKETPLACE, path: 'plugins/frontend-design/skills/frontend-design' },
     'open-pr': null,
     'pick-issue': null,
+    'playtest': null,
     'qa-screenshot': null,
     'review-pr': null,
     'three-art': null,
@@ -1657,11 +1657,12 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
     'test-driven-development': { ...SUPERPOWERS, path: 'skills/test-driven-development' },
   };
-  /** Every agent definition that may exist. All three are vendored review agents (#180). */
-  const AGENTS: Record<string, { repo: string; sha: string; path: string }> = {
+  /** Every agent definition that may exist (`null` = written here): three vendored review agents (#180), eight playtest profiles (#2204). */
+  const AGENTS: Record<string, { repo: string; sha: string; path: string } | null> = {
     'pr-test-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/pr-test-analyzer.md' },
     'silent-failure-hunter': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/silent-failure-hunter.md' },
     'type-design-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/type-design-analyzer.md' },
+    ...Object.fromEntries(PLAYTESTERS.map((n) => [n, null])),
   };
   /** Vendored files kept byte-for-byte, with no header: a comment would have to go inside code or a licence. */
   const VERBATIM = [
@@ -1768,6 +1769,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'pr-test-analyzer': ['model', 'color'],
     'silent-failure-hunter': ['model', 'color'],
     'type-design-analyzer': ['model', 'color'],
+    ...Object.fromEntries(PLAYTESTERS.map((n) => [n, PLAYTEST_EXTRA_KEYS])),
   };
   const EXPECTED_KEYS = (name: string) => ['name', 'description', ...(EXTRA_KEYS[name] ?? [])].sort();
   /**
@@ -1911,8 +1913,9 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'pr-test-analyzer': /^Use this agent when you need to review a pull request for test coverage quality and completeness/,
     'silent-failure-hunter': /^Use this agent when reviewing code changes in a pull request to identify silent failures/,
     'type-design-analyzer': /^Use this agent when you need expert analysis of type design/,
+    ...PLAYTEST_PINS,
   };
-  const PROJECT_SKILLS = Object.entries(SKILLS).filter(([, v]) => !v).map(([n]) => n);
+  const PROJECT_SKILLS = [...Object.entries(SKILLS), ...Object.entries(AGENTS)].filter(([, v]) => !v).map(([n]) => n);
   /** The one upstream clause each of two files is exempt from the negation check for — the whole clause, so it cannot be re-purposed, and not the file. */
   const NEGATION_EXEMPT: Record<string, RegExp> = { 'frontend-design': /don't read as templated defaults/, 'silent-failure-hunter': /don't introduce silent failures/ };
   /**
@@ -2045,7 +2048,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
 
   it.each([
     ...Object.entries(SKILLS).filter(([, v]) => v).map(([n, v]) => [`.claude/skills/${n}/SKILL.md`, v!] as const),
-    ...Object.entries(AGENTS).map(([n, v]) => [`.claude/agents/${n}.md`, v!] as const),
+    ...Object.entries(AGENTS).filter(([, v]) => v).map(([n, v]) => [`.claude/agents/${n}.md`, v!] as const),
   ])('%s carries the source and the pin it was copied from', (file, src) => {
     const header = /<!-- vendored: (\S+) (\S+) @ ([0-9a-f]{12}) —/.exec(read(file));
     expect(header, `${file} is vendored, so it must say where from and at which commit (#180)`).not.toBeNull();
@@ -2072,6 +2075,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
         }
       }
     }
+    for (const [name, src] of Object.entries(AGENTS)) if (!src) expect(read(`.claude/agents/${name}.md`), `.claude/agents/${name}.md carries a vendored header but is listed as written for this project (#2204)`).not.toContain('<!-- vendored:');
   });
 
   // #130 item 3: the rail used to match only `.md|.ts|.sh` targets with no `#` or `:` in them, against a set
@@ -2102,10 +2106,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   });
 });
 
-
 // `sliceSkill` and `flatten` live in `./helpers/slice-skill` (#307/#395): the review-pr rails above reach them too.
-
-
 
 /**
  * The text between one rule's own heading and the next one's, with the non-vacuity floor applied **here**
@@ -2486,7 +2487,6 @@ describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (
       .not.toMatch(/recheck|has not finished computing/i);
   });
 });
-
 
 /**
  * The `add-guard-rail` skill's load-bearing lines (#180).
