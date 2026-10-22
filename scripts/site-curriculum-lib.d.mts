@@ -1,7 +1,7 @@
 import type { Topic, YearId } from '../src/curriculum/types';
 
 type Subject = Topic['subject'];
-export interface ContentMapTopic { title: string; year: YearId; subject: Subject; nc: string; tip: string | null; strands: string[] }
+export interface ContentMapTopic { title: string; year: YearId; subject: Subject; nc: string; id?: string; parent?: string; tip: string | null; strands: string[] }
 export interface ContentMapYear { year: YearId; title: string; maths: number; writing: number }
 export interface ContentMapStrand { id: string; name: string; subject: Subject; years: YearId[]; topics: string[] }
 /**
