@@ -56,4 +56,14 @@ test.describe('hidden games (#2196)', () => {
     expect(await page.evaluate(() => { const s = window.__sna.session; while (!s.ended) s.nextStage(); return s.ended; })).toBe(true);
     await expect(page.locator('.results')).toBeVisible();
   });
+
+  test('a deep link to a hidden game lands on its island with the notice (#2197)', async ({ page }) => {
+    await hideGames(page);
+    await page.addInitScript(save => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save); },
+      JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', onboarded: true, progress: { 'r-count': { stars: 1 } } }));
+    await page.goto('/?topic=y4-tables');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expect(page.locator('#island-notice')).toHaveText('This game is switched off in the grown-ups settings.');
+    await expect(page.locator('.play')).toHaveCount(0);
+  });
 });
