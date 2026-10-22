@@ -1,7 +1,7 @@
 // The catalogue resolver (#2194): what a year island, or a game played on one, actually gets. It reads the
 // generated runtime copy (`catalogue.runtime.json`, written by `scripts/catalogue-slim.mjs`), never the full file,
-// so `media` and `playability` stay out of the game bundle. Pure: no storage, no DOM. The user's own patch is
-// item E's (#2199); it arrives here as the `patch` argument.
+// so `media` and `playability` stay out of the game bundle. Pure: no storage, no DOM. The user's own patch (#2199) is
+// built by `patch.ts` and arrives here as the `patch` argument, applied last.
 import type { YearId, YearInfo } from '../curriculum/types';
 import { OVERRIDABLE_KEYS, type DefaultSettings, type GroupId, type Overridable, type RuntimeCatalogue, type YearSettings } from './catalogue';
 import runtime from './catalogue.runtime.json' with { type: 'json' };   // the attribute lets Playwright's Node loader import it (tests/e2e)
@@ -60,8 +60,8 @@ export function resolveGame(id: string, year: YearId, patch?: Overridable, cat: 
  * own calls this; the mixed modes (Sensei, Legend, mixed, Daily, Duel) keep their mode table and the year's
  * settings. A topic the catalogue does not list plays as the year does.
  */
-export function gameYear(year: YearInfo, id: string, cat: RuntimeCatalogue = RUNTIME): YearInfo {
+export function gameYear(year: YearInfo, id: string, cat: RuntimeCatalogue = RUNTIME, patch?: Overridable): YearInfo {
   if (!own(cat.games, id)) return year;
-  const s = resolveGame(id, year.id, undefined, cat).settings;
+  const s = resolveGame(id, year.id, patch, cat).settings;
   return { ...year, perStage: s.perStage, lives: s.lives, gentle: s.gentle, speeds: [...s.speeds], diffs: [...s.diffs], timing: { airTime: s.airTime, stagger: s.stagger } };
 }
