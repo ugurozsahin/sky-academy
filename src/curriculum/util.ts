@@ -1,4 +1,5 @@
 import type { Compare, Difficulty, Generator, HintOpt, Question, Rng } from './types';
+import { barVisual } from './bar-axis';
 
 export const ri = (rng: Rng, min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
 export const pick = <T>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
@@ -231,10 +232,9 @@ export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: stri
   const spoken = cols.map((c, i) => `the ${c} ${noun} ${verb} ${vals[i]} ${UNIT_WORD[unit]}`).join(', ');
   return wordQ(rng, n === 2 ? `Which ${verb} ${adj}?` : `Which ${verb} the ${adj}?`, cols[idx], cols.filter((_, i) => i !== idx), {
     // The options are the colours, so this hint is the only place the sizes being compared appear — it is
-    // data, not the instruction line `hint` usually carries, and the play screen must keep it on a short
-    // screen (#328). `unitChoice` below deliberately does NOT set it: there the units are the bubbles.
+    // data, not the instruction line `hint` usually carries, and the play screen must keep it on a short screen (#328). `unitChoice` below deliberately does NOT set it: there the units are the bubbles.
     hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,
-    say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
+    visual: barVisual(cols, vals), say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
   });
 }
 /** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */

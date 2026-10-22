@@ -81,9 +81,9 @@ Generated from the registry: 343 topics. A strand counts as covered only when a 
 | 2-D Shapes (`y1-shapes`) | Y1 Geometry: 2-D shapes | mixed | Slices the answer | generated | yes |
 | 3-D Shapes (`y1-shapes3d`) | Y1 Geometry: name common 3-D shapes | mixed | Slices the answer | generated | yes |
 | Left, Right & Turns (`y1-position`) | Y1 Geometry: position (between, next to, first, last), direction, turns | mixed | Slices the answer | generated | yes |
-| Long & Tall (`y1-length`) | Y1 Measurement: length & height | mixed | Slices the answer | generated | no |
-| Heavy & Light (`y1-mass`) | Y1 Measurement: mass/weight | mixed | Slices the answer | generated | no |
-| Full & Empty (`y1-capacity`) | Y1 Measurement: capacity & volume | mixed | Slices the answer | generated | no |
+| Long & Tall (`y1-length`) | Y1 Measurement: length & height | mixed | Slices the answer | generated | yes |
+| Heavy & Light (`y1-mass`) | Y1 Measurement: mass/weight | mixed | Slices the answer | generated | yes |
+| Full & Empty (`y1-capacity`) | Y1 Measurement: capacity & volume | mixed | Slices the answer | generated | yes |
 | Days & Months (`y1-months`) | Y1 Measurement: time (days, weeks, months) | mixed | Slices the answer | generated | no |
 | My Day (`y1-when`) | Y1 Measurement: sequence events (morning, afternoon, evening; yesterday, today, tomorrow; before, after) | mixed | Slices the answer | generated | yes |
 | Balance the Scales (`y1-balance`) | Y1 A&S: equals sign, missing number | mixed | Slices the answer | generated | yes |
@@ -149,9 +149,9 @@ Generated from the registry: 343 topics. A strand counts as covered only when a 
 | Mirror Lines (`y2-symmetry`) | Y2 Geometry: line symmetry in a vertical line | mixed | Slices the answer | generated | yes |
 | What Comes Next? (`y2-patterns`) | Y2 Geometry: order and arrange objects in patterns and sequences | mixed | Slices the answer | generated | yes |
 | Turns & Right Angles (`y2-position`) | Y2 Geometry: position, direction, rotation as right angles | mixed | Slices the answer | generated | no |
-| Length: cm & m (`y2-length`) | Y2 Measurement: length (cm/m) | mixed | Slices the answer | generated | no |
-| Mass: g & kg (`y2-mass`) | Y2 Measurement: mass (g/kg) | mixed | Slices the answer | generated | no |
-| Capacity: ml & l (`y2-capacity`) | Y2 Measurement: capacity (ml/l) | mixed | Slices the answer | generated | no |
+| Length: cm & m (`y2-length`) | Y2 Measurement: length (cm/m) | mixed | Slices the answer | generated | yes |
+| Mass: g & kg (`y2-mass`) | Y2 Measurement: mass (g/kg) | mixed | Slices the answer | generated | yes |
+| Capacity: ml & l (`y2-capacity`) | Y2 Measurement: capacity (ml/l) | mixed | Slices the answer | generated | yes |
 | Compare Measures < > = (`y2-measure-compare`) | Y2 Measurement: compare measures and record using >, < and = | mixed | Slices the answer | generated | no |
 | Temperature (`y2-temp`) | Y2 Measurement: temperature (°C) | mixed | Slices the answer | generated | no |
 | Read the Scale (`y2-scales`) | Y2 Measurement: read a ruler, scale, thermometer or jug | mixed | Slices the answer | generated | yes |
