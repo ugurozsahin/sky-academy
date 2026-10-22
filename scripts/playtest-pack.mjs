@@ -143,6 +143,8 @@ async function packOne(browser, enc, base, app, job, out) {
     if (metrics.frames && !metrics.frames.clean) throw new Error(`a ${metrics.frames.maxGapMs} ms frame gap while the wave was timed: its times ran long`);
     writeFileSync(`${dir}/metrics.json`, `${JSON.stringify(metrics, null, 2)}\n`);
     return metrics;
+  } catch (e) {
+    throw new Error(`${page.__at ? `at ${page.__at}: ` : ''}${e.message.split('\n')[0]}`);
   } finally { await ctx.close(); }
 }
 

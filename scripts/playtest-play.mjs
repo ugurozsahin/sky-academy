@@ -20,6 +20,7 @@ const waitNext = (page, n) => page.waitForFunction(k => window.__pk.asked() > k 
 
 /** Answer every question correctly until the stage result shows, then let its celebration settle and take the last shot. */
 async function toResult(page, shot) {
+  page.__at = 'answering to the stage result';
   const end = Date.now() + RESULT_TIMEOUT;
   for (;;) {
     if (Date.now() > end) throw new Error('no stage result in time');
@@ -46,21 +47,28 @@ export async function playBubbles(page, shot, readScreen) {
   await shot('2-prompt.webp', 'the first question as it appears');
   const screen = await readScreen(page);
   const q0 = await asked(page);
+  page.__at = 'the first wave rising';
   await page.waitForFunction(() => window.__sna.bubbles().some(b => b.vy < 0 && b.y < window.__sna.arena.H * 0.8), null, { timeout: ACTION_TIMEOUT, polling: 'raf' });
   await shot('3-rising.webp', 'the first wave rising');
+  page.__at = 'the first wave at its apex';
   await page.waitForFunction(() => window.__sna.bubbles().some(b => b.vy >= 0), null, { timeout: ACTION_TIMEOUT, polling: 'raf' });
   await shot('4-apex.webp', 'the first wave at the top of its arc');
   // Left alone until every bubble of the wave has risen and fallen out of reach once, or the game moved on.
+  page.__at = 'the first wave falling out of reach';
   await page.waitForFunction(k => {
     const pk = window.__pk, a = window.__sna.arena, ids = Object.keys(pk.seen);
     return pk.asked() > k || (ids.length > 0 && !a.bubbles.some(b => !b.launched && !b.dead && !b.hit) && ids.every(id => pk.left[id]));
   }, q0, { timeout: FLIGHT_TIMEOUT, polling: 100 });
   const rec = await collect(page);
   const livesAfterFirstWave = await lives(page);
-  if ((await asked(page)) === q0) {                  // a gentle year sends the answer back up: take it now the flight is timed
+  page.__at = 'the first question resolving';
+  // A gentle year sends the answer back up, and a sequence its letters: finish the question now its flight is timed.
+  for (let end = Date.now() + FLIGHT_TIMEOUT; (await asked(page)) === q0;) {
+    if (Date.now() > end) throw new Error('the first question never finished');
     await page.waitForFunction(k => window.__pk.asked() > k || window.__pk.ready(), q0, { timeout: FLIGHT_TIMEOUT, polling: 100 });
-    if ((await asked(page)) === q0) await page.evaluate(() => window.__sna.answer());
+    if ((await asked(page)) === q0) { await page.evaluate(() => window.__sna.answer()); await page.waitForTimeout(150); }
   }
+  page.__at = 'a wrong bubble on screen';
   await page.waitForFunction(k => window.__pk.asked() > k && window.__pk.wrongReady(), q0, { timeout: ACTION_TIMEOUT, polling: 100 });
   const wrong = await wrongOnce(page, shot, () => page.evaluate(() => window.__sna.wrong()), 'just after one deliberate wrong slice');
   const result = await toResult(page, shot);
