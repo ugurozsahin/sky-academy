@@ -10,7 +10,8 @@ import { workflowFiles } from './helpers/sources';
  * the fix. Now every setup-node step reads `node-version-file: .node-version`, so the next security release is a
  * one-line bump of that file, and these rails keep it the only place the version is set.
  *
- * Prove it red: put `node-version: 22` back into any workflow; or write `22` or `22.23.3` into `.node-version`.
+ * Prove it red: put `node-version: 22` back into any workflow; write `22` or `22.23.3` into `.node-version`; drop
+ * the setup-node step from a job that runs `npm`; or lower a line of the `engines` floor in `package.json`.
  */
 const root = new URL('../../', import.meta.url);
 const workflows = workflowFiles();
@@ -38,11 +39,27 @@ const satisfies = (version: string, range: string): boolean => {
   }));
 };
 
+/** The first patched release on each line (nodejs.org, 2026-10-21). A later security release may raise these;
+ *  lowering one is the edit this rail exists to make visible. */
+const PATCHED = ['22.23.4', '24.22.1', '26.12.1'];
+
+/** A command line that runs Node, outside a whole-line comment. */
+const RUNS_NODE = /^(?!\s*#).*\b(node|npm|npx)\s/m;
+
+/** The jobs of a workflow, cut at each two-space-indented key under `jobs:`. */
+const jobs = (text: string): { name: string; body: string }[] => {
+  const after = text.split(/^jobs:\s*$/m)[1] ?? '';
+  return after.split(/^(?= {2}[\w-]+:\s*(?:#.*)?$)/m).filter((part) => part.trim())
+    .map((body) => ({ name: body.trim().split(':')[0], body }));
+};
+
 describe('Node comes from .node-version, and it meets the security floor (#2254)', () => {
   it('reads the workflows, .node-version and the engines field, or these rails check nothing', () => {
     expect(workflows.length).toBeGreaterThanOrEqual(3);
     expect(workflows.filter(({ text }) => text.includes('actions/setup-node@')).length).toBeGreaterThan(0);
     expect(engines, 'package.json must carry engines.node').not.toBe('');
+    const ci = workflows.find(({ name }) => name === 'ci.yml')?.text ?? '';
+    expect(jobs(ci).map((job) => job.name), 'the job splitter must find the jobs in ci.yml').toEqual(['test', 'branch-name']);
   });
 
   for (const { name, text } of workflows) {
@@ -54,6 +71,22 @@ describe('Node comes from .node-version, and it meets the security floor (#2254)
       expect(fromFile, `${name}: each of its ${steps} setup-node steps needs node-version-file: .node-version`).toBe(steps);
     });
   }
+
+  for (const { name, text } of workflows) {
+    it(`${name}: every job that runs node, npm or npx sets up Node first`, () => {
+      const unpinned = jobs(text).filter((job) => RUNS_NODE.test(job.body) && !job.body.includes('actions/setup-node@'));
+      expect(unpinned.map((job) => job.name), `${name}: these jobs would run on the runner's own, unpinned Node`).toEqual([]);
+    });
+  }
+
+  it('the engines floor admits no release older than the October 2026 fixes', () => {
+    for (const fixed of PATCHED) {
+      const [major, minor, patch] = parse(fixed);
+      const older = patch > 0 ? `${major}.${minor}.${patch - 1}` : `${major}.${minor - 1}.99`;
+      expect(satisfies(older, engines), `${older} is below the ${fixed} fix but passes ${engines}`).toBe(false);
+      expect(satisfies(`${major}.0.0`, engines), `${major}.0.0 passes ${engines}`).toBe(false);
+    }
+  });
 
   it('.node-version is an exact version that satisfies the engines floor', () => {
     expect(pinned, 'a bare major lets setup-node pick a cached, unpatched release').toMatch(/^\d+\.\d+\.\d+$/);
