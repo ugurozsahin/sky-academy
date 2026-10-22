@@ -62,7 +62,7 @@ const openIsland = async (page, job) => {
 };
 
 /** Chromium encodes WebP; Playwright's screenshot cannot. `crop` is a source rectangle and `side` the output size (0 = whole frame). */
-const encode = (page, png, crop, side, quality) => page.evaluate(async ([b64, crop, side, quality]) => {
+export const encode = (page, png, crop, side, quality) => page.evaluate(async ([b64, crop, side, quality]) => {
   const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
   const sx = crop ? Math.max(0, (img.width - crop) / 2) : 0, sy = crop ? Math.max(0, (img.height - crop) / 2) : 0;
   const sw = crop || img.width, sh = crop || img.height;

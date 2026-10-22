@@ -26,3 +26,5 @@ docs/sketchbook/
 site-shots/
 # #2202: `npm run game:shots` writes the catalogue's pictures here; none is committed
 game-shots/
+# #2205: `npm run playtest:pack` writes the play packs here; the playtest profiles read them, none is committed
+playtest-packs/
