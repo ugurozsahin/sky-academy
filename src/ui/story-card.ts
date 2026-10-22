@@ -14,15 +14,22 @@ const wordCount = (line: string): number => line.split(/\s+/).filter(Boolean).le
 
 /**
  * Speak a story question's line and run `go` once it has been heard, or after the reading time: with a voice at
- * `500 ms × words + VOICE_START_MS` if no end ever comes, without one after `500 ms × words`. Every wait goes
+ * `500 ms × words + VOICE_START_MS` if no end ever comes, without one after `500 ms × words`, either at most `capMs`. Every wait goes
  * through `later`, so the pause overlay freezes it as it freezes the peek. `go` runs once.
  */
-export function holdForStory(later: (fn: () => void, ms: number) => void, line: string, go: () => void): void {
+export function holdForStory(later: (fn: () => void, ms: number) => void, line: string, go: () => void, capMs = Infinity): void {
   let done = false;
   const once = () => { if (!done) { done = true; go(); } };
   const read = STORY_WORD_MS * wordCount(line), hear = canHear();
   // Spoken either way: `canHear()` is false on the APK (no web synth) though the native engine is heard, and a
   // verdict of `no` could never flip back if the line were never offered. `say()` does nothing with speech off.
   say(line, false, hear ? { onEnd: () => later(once, scaled(0)) } : {});   // through `later`: an end heard behind the pause overlay waits for it
-  later(once, scaled(hear ? read + VOICE_START_MS : read));
+  later(once, scaled(Math.min(capMs, hear ? read + VOICE_START_MS : read)));
 }
+
+/** #2268: the longest an ordinary question's wave waits for its voice, so a long line never stalls a wave. */
+export const VOICE_HOLD_CAP_MS = 6000;
+
+/** An ordinary question's wave goes the way a story's does, with the hold capped (#2268). */
+export const holdForVoice = (later: (fn: () => void, ms: number) => void, line: string, go: () => void): void =>
+  holdForStory(later, line, go, VOICE_HOLD_CAP_MS);

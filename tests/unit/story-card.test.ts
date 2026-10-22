@@ -162,12 +162,14 @@ describe('the comprehension story card (#1352)', () => {
     expect(arena.spawned).toHaveLength(1);
   });
 
-  it('a question without a story still speaks its line once and launches at once', async () => {
+  it('a question without a story speaks its line once and, like a story, launches when the voice ends (#2268)', async () => {
     save({ voice: 'yes' });
     const plain = (): Question => ({ prompt: 'What colour is the kite?', answer: 'red', options: ['red', 'blue', 'green', 'pink'] });
     const { arena, ps } = build(plain);
     ps.session.start(); await settle();
     expect(spoken).toEqual(['t! What colour is the kite?']);
+    expect(arena.spawned, 'the wave waits for the voice').toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(6000);   // no end ever comes: the fallback is capped at 6 s
     expect(arena.spawned).toHaveLength(1);
   });
 
