@@ -1649,6 +1649,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'frontend-design': { ...MARKETPLACE, path: 'plugins/frontend-design/skills/frontend-design' },
     'open-pr': null,
     'pick-issue': null,
+    'playtest': null,
     'qa-screenshot': null,
     'review-pr': null,
     'three-art': null,
@@ -1657,11 +1658,23 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
     'test-driven-development': { ...SUPERPOWERS, path: 'skills/test-driven-development' },
   };
-  /** Every agent definition that may exist. All three are vendored review agents (#180). */
-  const AGENTS: Record<string, { repo: string; sha: string; path: string }> = {
+  /**
+   * Every agent definition that may exist, and where it came from (`null` = written for this project). The three
+   * review agents are vendored (#180); the eight playtest profiles are the project's own (#2204), and
+   * `tests/unit/playtest-profiles.test.ts` holds what their bodies must carry.
+   */
+  const AGENTS: Record<string, { repo: string; sha: string; path: string } | null> = {
     'pr-test-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/pr-test-analyzer.md' },
     'silent-failure-hunter': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/silent-failure-hunter.md' },
     'type-design-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/type-design-analyzer.md' },
+    'playtester-reception': null,
+    'playtester-year1': null,
+    'playtester-year2': null,
+    'playtester-year3': null,
+    'playtester-year4': null,
+    'playtester-year5': null,
+    'playtester-year6': null,
+    'playtester-parent': null,
   };
   /** Vendored files kept byte-for-byte, with no header: a comment would have to go inside code or a licence. */
   const VERBATIM = [
@@ -1768,6 +1781,8 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'pr-test-analyzer': ['model', 'color'],
     'silent-failure-hunter': ['model', 'color'],
     'type-design-analyzer': ['model', 'color'],
+    // #2204: `tools` is the profile's whole tool list — no Edit or Write, so a playtester cannot change the game it scores.
+    ...Object.fromEntries(Object.keys(AGENTS).filter((n) => n.startsWith('playtester-')).map((n) => [n, ['tools', 'model']])),
   };
   const EXPECTED_KEYS = (name: string) => ['name', 'description', ...(EXTRA_KEYS[name] ?? [])].sort();
   /**
@@ -1911,8 +1926,18 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'pr-test-analyzer': /^Use this agent when you need to review a pull request for test coverage quality and completeness/,
     'silent-failure-hunter': /^Use this agent when reviewing code changes in a pull request to identify silent failures/,
     'type-design-analyzer': /^Use this agent when you need expert analysis of type design/,
+    'playtest': /^Score a Sharpwise game's playability out of 10 .*Use when running a playtester agent/,
+    'playtester-reception': /^Playtest profile of a Reception child, age 4–5, .*Use when scoring a Sharpwise game's Reception play pack/,
+    'playtester-year1': /^Playtest profile of a Year 1 child, age 5–6, .*Use when scoring a Sharpwise game's Year 1 play pack/,
+    'playtester-year2': /^Playtest profile of a Year 2 child, age 6–7, .*Use when scoring a Sharpwise game's Year 2 play pack/,
+    'playtester-year3': /^Playtest profile of a Year 3 child, age 7–8, .*Use when scoring a Sharpwise game's Year 3 play pack/,
+    'playtester-year4': /^Playtest profile of a Year 4 child, age 8–9, .*Use when scoring a Sharpwise game's Year 4 play pack/,
+    'playtester-year5': /^Playtest profile of a Year 5 child, age 9–10, .*Use when scoring a Sharpwise game's Year 5 play pack/,
+    'playtester-year6': /^Playtest profile of a Year 6 child, age 10–11, .*Use when scoring a Sharpwise game's Year 6 play pack/,
+    'playtester-parent': /^Playtest profile of a parent of a 4- to 11-year-old\. Use when giving a Sharpwise game its overall playability score/,
   };
-  const PROJECT_SKILLS = Object.entries(SKILLS).filter(([, v]) => !v).map(([n]) => n);
+  /** The project-written skills and agents: their pins must carry the trigger clause (#312, #2204). */
+  const PROJECT_SKILLS = [...Object.entries(SKILLS), ...Object.entries(AGENTS)].filter(([, v]) => !v).map(([n]) => n);
   /** The one upstream clause each of two files is exempt from the negation check for — the whole clause, so it cannot be re-purposed, and not the file. */
   const NEGATION_EXEMPT: Record<string, RegExp> = { 'frontend-design': /don't read as templated defaults/, 'silent-failure-hunter': /don't introduce silent failures/ };
   /**
@@ -2045,7 +2070,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
 
   it.each([
     ...Object.entries(SKILLS).filter(([, v]) => v).map(([n, v]) => [`.claude/skills/${n}/SKILL.md`, v!] as const),
-    ...Object.entries(AGENTS).map(([n, v]) => [`.claude/agents/${n}.md`, v!] as const),
+    ...Object.entries(AGENTS).filter(([, v]) => v).map(([n, v]) => [`.claude/agents/${n}.md`, v!] as const),
   ])('%s carries the source and the pin it was copied from', (file, src) => {
     const header = /<!-- vendored: (\S+) (\S+) @ ([0-9a-f]{12}) —/.exec(read(file));
     expect(header, `${file} is vendored, so it must say where from and at which commit (#180)`).not.toBeNull();
@@ -2072,6 +2097,9 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
         }
       }
     }
+    // #2204: the same `null` half for an agent — one listed as the project's own claims no upstream.
+    for (const [name, src] of Object.entries(AGENTS))
+      if (!src) expect(read(`.claude/agents/${name}.md`), `.claude/agents/${name}.md carries a vendored header but is listed as written for this project (#2204)`).not.toContain('<!-- vendored:');
   });
 
   // #130 item 3: the rail used to match only `.md|.ts|.sh` targets with no `#` or `:` in them, against a set
