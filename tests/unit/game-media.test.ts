@@ -3,7 +3,9 @@ import { createServer, type Server } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
-import { CATALOGUE, type Catalogue } from '../../src/config/catalogue';
+import type { Catalogue } from '../../src/config/catalogue';
+import { RUNTIME } from '../../src/config/resolve';
+import { CATALOGUE } from './helpers/catalogue-file';
 import { TOPICS, shownYears, type YearId } from '../../src/curriculum';
 import { catalogueShown, gameOn, islandShown } from '../../src/curriculum/catalogue-shown';
 import { mediaPlan, checkMedia, checkFile } from '../../scripts/game-media.mjs';
@@ -22,6 +24,9 @@ describe('what the catalogue shows (src/curriculum/catalogue-shown.ts)', () => {
     const onShown = TOPICS.filter(t => shown.years.includes(t.year)).map(t => t.id);
     expect([...shown.games].sort()).toEqual([...onShown].sort());
     expect(shown.games.length, 'the registry has drills, and the catalogue holds them').toBeGreaterThan(TOPICS.filter(t => !t.drill && shown.years.includes(t.year)).length);
+  });
+  it('the game\'s runtime copy (#2194) gives the same answer as the full file', () => {
+    expect(catalogueShown(RUNTIME, TOPICS)).toEqual(catalogueShown(CATALOGUE, TOPICS));
   });
   it('an island: true always shows, false never, "auto" by the gate', () => {
     expect(islandShown(copy(c => { c.years.year1.visible = false; }), 'year1', TOPICS)).toBe(false);
