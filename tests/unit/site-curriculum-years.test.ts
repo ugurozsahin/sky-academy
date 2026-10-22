@@ -65,6 +65,13 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
       }
     }
   });
+  it('names Development Matters on a year page exactly when the map has a topic from it (#2154)', () => {
+    for (const y of map.byYear) {
+      const uses = map.topics.some(t => t.year === y.year && t.nc.startsWith('Development Matters'));
+      expect(read(fileOf(y.year)).includes('Development Matters'), y.year).toBe(uses);
+    }
+    expect(map.topics.some(t => t.year === 'reception' && t.nc.startsWith('Development Matters')), 'Reception has one today').toBe(true);
+  });
   it('shows every home tip the map gives a topic of that year, under that topic\'s area', () => {
     for (const y of map.byYear) {
       const html = read(fileOf(y.year));
