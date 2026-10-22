@@ -9,13 +9,14 @@ const OFF: [string, RegExp, string][] = [
   ['y4-tables', /"y4-tables":\{"visible":true/g, '"y4-tables":{"visible":false'],
   ['y4-pronouns', /("y4-pronouns":\{"visible":true,"settings":\{\},"groupSettings":\{\},"years":\{"year4":\{"visible":)true/g, '$1false'],
 ];
+const y1Writing = TOPICS.filter(t => t.year === 'year1' && t.subject === 'writing' && !t.drill).map(t => t.id);
 const core = (subject: 'maths' | 'writing') => TOPICS.filter(t => t.year === 'year4' && t.subject === subject && !t.drill);
 
 /** Serve the game's entry chunk with each `OFF` node switched off; fail loudly unless each matched exactly once. */
-const hideGames = (page: Page) => page.route(/\/assets\/index-[^/]*\.js$/, async route => {
+const hideGames = (page: Page, off = OFF) => page.route(/\/assets\/index-[^/]*\.js$/, async route => {
   const res = await route.fetch();
   let body = await res.text();
-  for (const [id, re, to] of OFF) {
+  for (const [id, re, to] of off) {
     const n = body.match(re)?.length ?? 0;
     if (n !== 1) throw new Error(`hidden-games e2e: ${id}'s catalogue node matched ${n} times in the bundle, not once — the bundle's shape changed`);
     body = body.replace(re, to);
@@ -65,5 +66,17 @@ test.describe('hidden games (#2196)', () => {
     await expect(page.locator('.island-screen')).toBeVisible();
     await expect(page.locator('#island-notice')).toHaveText('This game is switched off in the grown-ups settings.');
     await expect(page.locator('.play')).toHaveCount(0);
+  });
+
+  test('Year 1 with every writing game hidden draws no Writing tab, and Sprint stays maths (#2238)', async ({ page }) => {
+    await hideGames(page, y1Writing.map(id => [id, new RegExp(`"${id}":\\{"visible":true`, 'g'), `"${id}":{"visible":false`]));
+    await page.addInitScript(save => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save); },
+      JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', onboarded: true, progress: { 'r-count': { stars: 1 } } }));
+    await page.goto('/');
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expect(page.locator('.tab')).toHaveCount(1);
+    await expect(page.locator('.tab[data-s="maths"]')).toHaveClass(/on/);
+    await expect(page.locator('#topics .topic').first()).toBeVisible();
   });
 });

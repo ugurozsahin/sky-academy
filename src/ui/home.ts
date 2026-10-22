@@ -335,10 +335,15 @@ export function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Reco
   ], year.id), year);
 }
 
+/** #2238: the subject tabs an island draws — a subject with no shown game is not drawn, so no tab is ever empty. */
+export const islandSubjects = (year: YearId): Array<'maths' | 'writing'> => (['maths', 'writing'] as const).filter(s => topicsFor(year, s).length > 0);
+const TAB_LABEL = { maths: '🔢 Maths', writing: '✍️ Writing' };
+
 /** Island: topics for one year group + its Sky Storm. */
 export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths', notice?: typeof HIDDEN_LINE) {
   const d = load();
-  let subject = subjectInit;
+  const tabs = islandSubjects(year.id);   // #2238: the mixed rows read `subject`, which can now only be a subject that has games
+  let subject = tabs.includes(subjectInit) ? subjectInit : tabs[0] ?? subjectInit;
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
   const progress = safeRecord<TopicProgress>(d.progress);   // #95: same tolerance as mapScreen's totalStars
   const menu = islandMenu(nav, year, d, progress, () => subject);
@@ -351,7 +356,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <div><b>${year.title} Island</b><small>${ageLabel(year, d.ks2.schoolYear)} · ${year.blurb}${trophyCount(year, progress)}</small></div>
     </div>
     <div class="tabs" role="tablist">
-      ${subjectTab('maths', subject, '🔢 Maths')}${subjectTab('writing', subject, '✍️ Writing')}
+      ${(tabs.length ? tabs : [subject]).map(t => subjectTab(t, subject, TAB_LABEL[t])).join('')}
     </div>
     <div class="topics" id="topics" role="tabpanel" aria-labelledby="tab-${subject}"></div>
     <div class="mode-grid">

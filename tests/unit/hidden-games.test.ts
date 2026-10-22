@@ -8,7 +8,7 @@ import { CORE_TOPICS, TOPICS, YEARS, drillsFor, isGameShown, listedTopics, shown
 import { GRAMMAR, grammarPool } from '../../src/game/sprint-pools';
 import { answerableBy } from '../../src/game/pools';
 import { mtcOffered } from '../../src/game/mtc';
-import { islandMenu } from '../../src/ui/home';
+import { islandMenu, islandSubjects } from '../../src/ui/home';
 import { load } from '../../src/storage';
 import { SOURCES, code } from './helpers/sources';
 
@@ -178,6 +178,30 @@ const ALLOWED: Record<string, string> = {
   '/src/game/sprint-pools.ts': 'grammarPool looks its ids up with topicById and applies isGameShown itself',
   '/src/deeplink-open.ts': 'a link resolves every registry id so a hidden game gets its notice (#2197); takeLink then applies gameHidden',
 };
+
+describe('a subject with no shown game draws no tab (#2238)', () => {
+  const WRITING = CORE_TOPICS.filter(t => t.year === 'year1' && t.subject === 'writing').map(t => t.id);
+  const NO_WRITING = copy(c => { for (const id of WRITING) c.games[id].visible = false; });
+  it('the committed catalogue draws both tabs on every island', () => {
+    for (const y of YEARS) expect(islandSubjects(y.id), y.id).toEqual(['maths', 'writing']);
+  });
+  it('Year 1 with every writing game hidden keeps Maths only, and its mixed rows stay maths', () => withCatalogue(NO_WRITING, async () => {
+    const { islandSubjects: subjects, islandMenu: im } = await import('../../src/ui/home');
+    const { subjectPool } = await import('../../src/game/pools');
+    const cur = await import('../../src/curriculum');
+    expect(subjects('year1')).toEqual(['maths']);
+    expect(subjects('year2')).toEqual(['maths', 'writing']);
+    expect(cur.topicsFor('year1', 'writing')).toEqual([]);
+    expect(subjectPool(cur.topicsFor('year1'), 'maths').every(t => t.subject === 'maths')).toBe(true);
+    const { load: ld } = await import('../../src/storage');
+    expect(ids(menu(im, ld, { id: 'year1' })).length).toBeGreaterThan(0);
+  }));
+  it('startFirstMission falls back to writing, then to the island, never a silent map', () => {
+    const src = SOURCES['/src/main.ts'];
+    expect(src).toMatch(/\['maths', 'writing'\] as const\)\.flatMap\(s => topicsFor\(y\.id, s\)\)/);
+    expect(src).toMatch(/if \(!topic\) \{ nav\.island\(y\); return; \}/);
+  });
+});
 
 describe('guard rail: no list is built from the registry directly (#2196)', () => {
   const hits = Object.entries(SOURCES).filter(([f]) => f !== '/src/curriculum/index.ts')
