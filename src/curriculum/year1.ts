@@ -14,6 +14,7 @@ import {
   gapLetters, gapQ, spellQ, sentGen, type Sent, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
 } from './util';
+import { spokenGap } from './spoken-gap';
 import { syllableQ } from './syllables';
 import { storyQ } from './story';
 import { y1StoryTime } from './stories-y1';
@@ -475,10 +476,11 @@ const y1Plurals: Generator = (d, rng) => {
   const [w, suf] = pick(rng, d === 1 ? S.filter(x => x[1] === 's') : S);
   return wordQ(rng, `one ${w}, two ${w}__`, suf, ['s', 'es', 'ies'], { visual: { type: 'word', text: `${w}_` }, say: `One ${w}, two ${w}${suf}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
 };
+/** [root, ending, sentence]. The sentence alone decides the ending (#2272); `tests/unit/topic-suffix-fit.test.ts` pins each one. */
+export const Y1_SUFFIX: ReadonlyArray<readonly [string, string, string]> = [['jump', 'ing', 'She is jump___ now.'], ['play', 'ed', 'Yesterday he play___.'], ['walk', 'ing', 'I am walk___ to school.'], ['look', 'ed', 'We look___ at the sky.'], ['fast', 'er', 'A car is fast___ than a bike.'], ['tall', 'est', 'It is the tall___ tree of all.'], ['help', 'ing', 'Dad is help___ me.'], ['kick', 'ed', 'He kick___ the ball yesterday.'], ['kind', 'er', 'Mia is kind___ than Sam.'], ['small', 'est', 'It is the small___ mouse of all.']];
 const y1Suffix: Generator = (_d, rng) => {
-  const W: [string, string, string][] = [['jump', 'ing', 'She is jump___ now.'], ['play', 'ed', 'Yesterday he play___.'], ['walk', 'ing', 'I am walk___ to school.'], ['look', 'ed', 'We look___ at the sky.'], ['fast', 'er', 'A car is fast___ than a bike.'], ['tall', 'est', 'The tall___ tree in the park.'], ['help', 'ing', 'Dad is help___ me.'], ['kick', 'ed', 'He kick___ the ball yesterday.'], ['kind', 'er', 'Be kind___ to your friends.'], ['small', 'est', 'The small___ mouse of all.']];
-  const [, suf, sent] = pick(rng, W);
-  return wordQ(rng, sent, suf, ['ing', 'ed', 'er', 'est'], { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the ending', hintIsData: false });
+  const [, suf, sent] = pick(rng, Y1_SUFFIX);
+  return wordQ(rng, sent, suf, ['ing', 'ed', 'er', 'est'], { visual: { type: 'sentence', text: sent }, say: spokenGap(sent), hint: 'Slice the ending', hintIsData: false });
 };
 // #977: un- negates an adjective ("not kind") or undoes a verb ("opposite of lock"); the root never changes spelling.
 // Oracle: the answer is exactly 'un' + the root named in the prompt. Every option is a word from this bank.

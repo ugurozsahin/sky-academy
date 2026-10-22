@@ -16,6 +16,19 @@ export const esc = (s) => String(s).replaceAll('&', '&amp;').replaceAll('<', '&l
 export const yearSlug = (id) => id.replace(/^year(\d)$/, 'year-$1');
 /** The year's own page (#2090): `year1` → `/curriculum/year-1/`. */
 export const yearPath = (id) => `/curriculum/${yearSlug(id)}/`;
+/** Every year the site can have a page for, in order: the one list the pruning below and `site-curriculum.mjs` share (#2201). */
+export const ALL_YEARS = ['reception', 'year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
+
+/**
+ * A hidden year is not advertised (#2201): drop its nav `<li>` line from a page's header and its line from `llms.txt`.
+ * Both are one line each; the page itself and the sitemap entry go with the folder.
+ */
+export function withoutYearLinks(text, id) {
+  const slug = yearSlug(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text
+    .replace(new RegExp(`^[ \\t]*<li><a href="/curriculum/${slug}/">[^<]*</a></li>\\r?\\n`, 'gm'), '')
+    .replace(new RegExp(`^- \\[[^\\]]*\\]\\(https://sharpwise\\.co\\.uk/curriculum/${slug}/\\):.*\\r?\\n`, 'gm'), '');
+}
 
 /** A strand's name inside its own year: `Year 1 Number: fractions` → `Number: fractions`. EYFS names are kept. */
 const areaName = (name) => name.replace(/^Years? [\d–-]+ /, '');

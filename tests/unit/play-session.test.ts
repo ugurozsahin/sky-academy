@@ -224,10 +224,10 @@ describe('the no-voice sentence peek (#65)', () => {
   });
 
   it('a `no` that lands after the bubbles are up never freezes them: the sentence reads through instead', async () => {
-    const { els, arena, ps } = build(sentenceQ);          // voice: 'unknown' → optimistic, hearing form
-    ps.session.start(); await settle();
-    expect(arena.spawned, 'unknown is optimistic: the wave launches at once').toHaveLength(1);
-    expect(els.prompt.innerHTML).toContain('class="seq"');
+    save({ voice: 'yes' });                               // hearing form; #2268: the wave waits for the voice, at most 6 s
+    const { els, arena, ps } = build(sentenceQ);
+    ps.session.start(); await settle(); await vi.advanceTimersByTimeAsync(6000);
+    expect(arena.spawned, 'the wave launches once the voice is heard, or at the cap').toHaveLength(1);
     say('probe', false, { synth: null });                 // the verdict arrives mid-wave (an engine gone missing: `no` at once)
     expect(arena.paused, 'a live wave is never paused for a peek').toBe(false);
     expect(els.prompt.innerHTML, 'the sentence is shown in the gaps instead').toBe(
