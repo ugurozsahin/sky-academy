@@ -149,6 +149,12 @@ describe('the site project walks the sitemap at 360 px and lets nothing off the 
     expect(spec).toMatch(/expect\(outbound[^)]*\)\.toEqual\(\[\]\)/);
     expect(spec).toMatch(/scrollWidth/);
     expect(spec).toMatch(/maxRedirects:\s*0/);
+    // #2163: what the assertions compare, not only that they exist.
+    expect(spec, 'lazy images load, so an off-origin one below the fold is a request at all').toContain(`querySelectorAll('[loading="lazy"]').forEach(e => e.setAttribute('loading', 'eager'))`);
+    expect(spec, 'no slack on the scroll comparison').toContain('expect(scroll,');
+    expect(spec).toMatch(/expect\(scroll,[^\n]*\)\.toBeLessThanOrEqual\(view\);/);
+    expect(spec, 'a page without its viewport meta would lay out wider than the phone').toMatch(/expect\(view,[^\n]*\)\.toBe\(360\);/);
+    expect(spec, 'a same-page anchor nothing carries').toMatch(/expect\(lost,[^\n]*\)\.toEqual\(\[\]\);/);
   });
 
   it('.claude/rules/e2e.md records the project and the paths that run it', () => {
