@@ -1,8 +1,8 @@
 // Bubble spawn, launch stagger and layout (#559, split out of arena.ts): the data model, the pure wave
 // layout, bubble-to-bubble collision, label fitting, and the offscreen sprite caches drawBubble draws from.
 // Nothing here touches a canvas event or the render loop — `Arena` still owns those.
-import { shuffle } from '../curriculum/util';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
-import type { Rng } from '../curriculum/types'; import { boundedRise, TOP_INSET_MAX } from './wave-bounds';   // #2184: the bounds every arc is held to
+import { shuffle } from '../curriculum/util'; import type { Rng } from '../curriculum/types';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
+import { boundedRise, TOP_INSET_MAX } from './wave-bounds'; import { bySpeed, TIMING } from '../config/resolve';   // #2184: the bounds every arc is held to; #2194: air time and stagger per speed, from src/config/catalogue.json
 
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
@@ -317,9 +317,9 @@ function planBubble(p: { label: string; k: number; idx: number; size: number; pe
 export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: number, rng: Rng): WavePlan {
   const { W, H } = geom, topInset = Math.min(geom.topInset, H * TOP_INSET_MAX);   // #2184: a card past half the box (KS2, landscape) left a negative rise
   const n = o.labels.length, r = waveRadius(W, H, !!o.wide, n);
-  const T = ([7.5, 5.6, 4.4][o.speed] ?? 3.4) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
+  const T = bySpeed(TIMING.airTime, o.speed) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
   const apexMin = topInset + r + 10, usable = H - apexMin - r;
-  const stagger = ([500, 420, 330][o.speed] ?? 260) / speedK;
+  const stagger = bySpeed(TIMING.stagger, o.speed) / speedK;
   // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
   // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
   // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:

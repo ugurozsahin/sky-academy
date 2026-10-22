@@ -5,7 +5,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/catalogue-slim.mjs",
     "dev": "vite --host",
+    "prebuild": "node scripts/catalogue-slim.mjs",
     "build": "tsc --noEmit && vite build && vite build -c vite.sketchbook.config.ts && node scripts/build-sw.mjs",
     "preview": "vite preview --host --port 4173",
     "sketch": "vite -c vite.sketchbook.config.ts --host",
@@ -14,6 +16,8 @@
     "hooks": "git config core.hooksPath .githooks",
     "test": "vitest run",
     "content-map": "node scripts/content-map.mjs && node scripts/site-curriculum.mjs",
+    "catalogue:slim": "node scripts/catalogue-slim.mjs",
+    "catalogue:show": "node scripts/catalogue-slim.mjs && node scripts/catalogue-show.mjs",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --project=mobile --grep @smoke",
     "test:sketch": "playwright test --project=sketchbook",
