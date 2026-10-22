@@ -36,7 +36,7 @@ export function buildContentMap({ topics, years, strands, tipFor, banks = {} }) 
   const unmatched = topics.filter(t => !t.nc.trim() || strandsOf(t, strands).length === 0).map(t => t.id);
   if (unmatched.length) throw new Error(`No programme-of-study strand matches the nc of: ${unmatched.join(', ')}. Extend docs/content-map-strands.json.`);
   const rows = topics.map(t => ({
-    id: t.id, title: t.title, year: t.year, subject: t.subject, nc: t.nc, mode: modeOf(t), input: t.input ?? 'bubbles',
+    id: t.id, title: t.title, year: t.year, subject: t.subject, nc: t.nc, ...(t.parent ? { parent: t.parent } : {}), mode: modeOf(t), input: t.input ?? 'bubbles',
     difficulties: [1, 2, 3], stages: years.find(y => y.id === t.year).diffs.length,
     questionBank: banks[t.id] ?? 'generated', hasVisual: drawsVisual(t), tip: tipFor(t.id),
     strands: strandsOf(t, strands).map(s => s.id),
