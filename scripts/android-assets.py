@@ -14,7 +14,7 @@ FONT = next((f for f in FONTS if os.path.exists(f)), None)
 if not FONT: raise SystemExit('No CJK font found — install fonts-noto-cjk (or edit FONTS)')
 def ink(ch):
     im = Image.new('L', (96, 96)); ImageDraw.Draw(im).text((8, 8), ch, font=ImageFont.truetype(FONT, 64), fill=255); return im.tobytes()
-if ink(MARK) == ink('\U000F0000'):   # a font without the glyph draws the same missing-glyph box for both
+if ink(MARK) == ink('\U000F0000'):   # assumes the font has no glyph at U+F0000 (true of Noto CJK and Hiragino); a font without the glyph draws the same missing-glyph box for both
     raise SystemExit(f'{FONT} has no glyph for {MARK} — pick another font in FONTS')
 
 def mark(size, pad=0.0, circle=True):
