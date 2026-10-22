@@ -254,6 +254,7 @@ function forTeachers(map, year, framework) {
 /** Every year in order, this one marked as the current page, then the years either side of it (#2160). */
 function switcher(map, year) {
   const at = map.byYear.findIndex(y => y.year === year.year);
+  if (at < 0) throw new Error(`switcher: ${year.year} is not in byYear`);
   const link = (y, text = esc(y.title), rel = '') =>
     `<a href="${yearPath(y.year)}"${rel ? ` rel="${rel}"` : ''}${!rel && y.year === year.year ? ' aria-current="page"' : ''}>${text}</a>`;
   const prev = map.byYear[at - 1], next = map.byYear[at + 1];
