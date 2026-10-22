@@ -1,0 +1,4009 @@
+{
+  "$comment": "Generated from catalogue.json by scripts/catalogue-slim.mjs. Do not edit: edit catalogue.json, then run npm run catalogue:slim.",
+  "groups": {
+    "eyfs": [
+      "reception"
+    ],
+    "ks1": [
+      "year1",
+      "year2"
+    ],
+    "lks2": [
+      "year3",
+      "year4"
+    ],
+    "uks2": [
+      "year5",
+      "year6"
+    ]
+  },
+  "defaults": {
+    "settings": {
+      "airTime": [
+        7.5,
+        5.6,
+        4.4,
+        3.4
+      ],
+      "stagger": [
+        500,
+        420,
+        330,
+        260
+      ]
+    }
+  },
+  "years": {
+    "reception": {
+      "visible": "auto",
+      "settings": {
+        "perStage": 5,
+        "lives": 4,
+        "gentle": true,
+        "speeds": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        "diffs": [
+          1,
+          1,
+          2,
+          2,
+          3
+        ],
+        "sprintStars": {
+          "threeStar": 8,
+          "twoStar": 4
+        },
+        "maxAnswer": 30,
+        "minAnswer": 0
+      }
+    },
+    "year1": {
+      "visible": "auto",
+      "settings": {
+        "perStage": 6,
+        "lives": 3,
+        "gentle": false,
+        "speeds": [
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "diffs": [
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "sprintStars": {
+          "threeStar": 12,
+          "twoStar": 6
+        },
+        "maxAnswer": 120,
+        "minAnswer": 0
+      }
+    },
+    "year2": {
+      "visible": "auto",
+      "settings": {
+        "perStage": 7,
+        "lives": 3,
+        "gentle": false,
+        "speeds": [
+          1,
+          2,
+          3,
+          3,
+          3
+        ],
+        "diffs": [
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "sprintStars": {
+          "threeStar": 12,
+          "twoStar": 6
+        },
+        "maxAnswer": 130,
+        "minAnswer": 0
+      }
+    },
+    "year3": {
+      "visible": "auto",
+      "settings": {
+        "perStage": 7,
+        "lives": 3,
+        "gentle": false,
+        "speeds": [
+          1,
+          2,
+          3,
+          3,
+          3
+        ],
+        "diffs": [
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "sprintStars": {
+          "threeStar": 12,
+          "twoStar": 6
+        },
+        "maxAnswer": 2000,
+        "minAnswer": 0
+      }
+    },
+    "year4": {
+      "visible": "auto",
+      "settings": {
+        "perStage": 7,
+        "lives": 3,
+        "gentle": false,
+        "speeds": [
+          1,
+          2,
+          3,
+          3,
+          3
+        ],
+        "diffs": [
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "sprintStars": {
+          "threeStar": 12,
+          "twoStar": 6
+        },
+        "maxAnswer": 20000,
+        "minAnswer": -50
+      }
+    },
+    "year5": {
+      "visible": "auto",
+      "settings": {
+        "perStage": 7,
+        "lives": 3,
+        "gentle": false,
+        "speeds": [
+          1,
+          2,
+          3,
+          3,
+          3
+        ],
+        "diffs": [
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "sprintStars": {
+          "threeStar": 12,
+          "twoStar": 6
+        },
+        "maxAnswer": 1000000,
+        "minAnswer": -100
+      }
+    },
+    "year6": {
+      "visible": "auto",
+      "settings": {
+        "perStage": 7,
+        "lives": 3,
+        "gentle": false,
+        "speeds": [
+          1,
+          2,
+          3,
+          3,
+          3
+        ],
+        "diffs": [
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "sprintStars": {
+          "threeStar": 12,
+          "twoStar": 6
+        },
+        "maxAnswer": 10000000,
+        "minAnswer": -1000
+      }
+    }
+  },
+  "games": {
+    "r-count": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-numeral": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-subitise": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-compare": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-onemore": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-measure": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-bonds": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-add": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-sub": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-counton": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-order": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-patterns": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-balance": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-doubles": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-shapes": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-share": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-oddeven": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-rhyme": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-sounds": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-syllables": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-soundhunt": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-storytime": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-capitals": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-tricky": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-build": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-read": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-sentence": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-storyorder": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-trace": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "r-initial": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "reception": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-bonds": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-bonds-10": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-bonds-20": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-add": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-story": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-sub": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-missing": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-doubles": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-doubles-halves": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-skip": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-moreless": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-words": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-half": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-arrays": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-share": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-coins": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-time": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-timewords": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-order": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-compare": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-line": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-shapes": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-shapes3d": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-position": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-length": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-mass": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-capacity": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-months": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-when": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-balance": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-contractions": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-digraphs": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-alien": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-soundhunt": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-storytime": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-spelling": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-spellrules": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-spellrules2": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-plurals": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-compound": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-suffix": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-prefix": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-punct": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-alphabet": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-days": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-syllables": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-sentence": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-storyorder": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-trace": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y1-tracenum": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year1": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-pv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-compare": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-skip": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-add": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-sub": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-related": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-three": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-inverse": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-story-add": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-anyorder": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-tables": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-tables-2": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-tables-5": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-tables-10": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-story-times": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-oddeven": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-fractions": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-equiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-money": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-story-money": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-coincombo": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-time": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-words": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-order": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-line": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-estimate": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-shapes": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-objects3d": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-faces": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-symmetry": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-patterns": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-position": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-length": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-mass": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-capacity": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-measure-compare": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-temp": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-scales": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-duration": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-balance": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-stats": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-stats-order": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-stats-table": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-storytime": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-spelling": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-contractions": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-suffix": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-nouns": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-suffix-root": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-homophones": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-spell-kn": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-spell-le": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-spell-dge": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-spell-c": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-spell-tion": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-spell-more": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-wordclass": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-sentencetype": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-tense": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-punct": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-sentence": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-conjunction": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-infer": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y2-trace": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year2": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-count": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-pv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-compare": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-line": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-words": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-mental": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-column": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-check": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-missing": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-story-as": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-tables": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-tables-3": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-tables-4": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-tables-8": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-multiply": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-story": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-tenths": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-fracof": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-fracline": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-fracequiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-fracadd": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-fraccompare": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-measures": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-perimeter": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-money": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-time": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-roman": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-calendar": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-angles": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-charts": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-wordlist": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-prefix": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-suffix": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-double": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-sounds": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-homophones": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-dictionary": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-dictation": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-an": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-wordfamily": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-conjunctions": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-perfect": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y3-speech": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year3": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-count": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-negative": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-pv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-round": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-roman": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-column": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-mistake": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-story": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-whichop": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-tables": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-tables-6": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-tables-7": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-tables-9": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-tables-11": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-tables-12": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-mental": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-factorpairs": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-shortmult": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-story-md": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-fracequiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-hundredths": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-fracof": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-fracadd": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-decimals": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-div10": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-comparedec": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-money": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-convert": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-area": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-time": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-shapes": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-angles": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-symmetry": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-coords": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-graphs": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-retrieve": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-context": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-wordlist": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-prefix-not": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-sure-ture": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-ous": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-shun": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-origins": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-proofread": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-homophones": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-plural-poss": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-standard": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-nounphrase": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-adverbials": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-speech": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-pronouns": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y4-determiners": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year4": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-pv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-negative": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-round": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-roman": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-column": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-mental": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-story": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-factors": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-primes": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-longmult": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-mentalmd": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-shortdiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-x10": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-squares": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-equals": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-story-md": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-truefalse": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-fraccompare": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-fracequiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-mixed": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-fracadd": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-fracmult": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-decfrac": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-rounddec": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-decimals": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-percent": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-convert": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-imperial": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-area": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-volume": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-story-measure": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-3d": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-angles": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-anglefacts": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-polygons": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-transform": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-linegraph": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-timetable": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-factopinion": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-wordlist": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-cious": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-ant": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-able": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-fer": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-silent": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-verbs": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-verbprefix": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-relative": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-modal": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-parenthesis": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-commas": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-cohesion": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y5-perfect": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year5": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-pv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-round": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-negative": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-longmult": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-longdiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-mental": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-factors": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-order-ops": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-story": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-simplify": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-fracadd": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-fracmult": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-fracdiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-fdp": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-decimals": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-decmult": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-decdiv": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-ratio": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-percentof": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-formulae": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-sequences": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-algebra": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-twounknowns": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-convert": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-areaperim": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-area": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-volume": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-nets": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-missingangles": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-circles": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-coords": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-transform": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-pie": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-graphs": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-mean": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-inference": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-figurative": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-ough": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-homophones": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-wordlist": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-spellgap": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-formal": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-synonyms": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-passive": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-subjunctive": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-cohesion": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-clauses": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-lists": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-hyphen": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-subjectobject": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    },
+    "y6-consistency": {
+      "visible": true,
+      "settings": {},
+      "groupSettings": {},
+      "years": {
+        "year6": {
+          "visible": true,
+          "settings": {}
+        }
+      }
+    }
+  }
+}

@@ -1,16 +1,16 @@
 // The game catalogue (#2192, #2193): one file, `catalogue.json`, with a node for every game (topic) and every
 // year island — visibility, settings, media and a read-only playability score. It was written once from today's
-// code by `scripts/catalogue-init.mjs`; nothing in the game reads it yet (item B, #2194, makes it the source).
+// code by `scripts/catalogue-init.mjs`; since #2194 it is the source of the year settings and the bubble timing.
 //
-// This module sits below `src/curriculum/` so the curriculum can import it later without a cycle: its only
-// import from there is type-only. The validator is hand-written (no dependency) and returns every error.
+// This module holds the file's types and its validator, and imports no JSON: the game reads only the generated
+// runtime copy, through `resolve.ts`, so `media` and `playability` never reach the game bundle (#2194). Its only
+// import from `src/curriculum/` is type-only, so the curriculum can import the resolver without a cycle.
 import type { Difficulty, YearId } from '../curriculum/types';
-import raw from './catalogue.json';
 
 export type GroupId = 'eyfs' | 'ks1' | 'lks2' | 'uks2';
 export type Speed = 0 | 1 | 2 | 3;
-/** One value per bubble speed 0..2; speed 3 is still `layoutWave`'s own fallback, outside the file. */
-export type SpeedTable = readonly [number, number, number];
+/** One value per bubble speed 0..3 (#2194): `layoutWave` indexes it by speed and has no value of its own. */
+export type SpeedTable = readonly [number, number, number, number];
 
 /** The keys a game, a group override or a single year may override (#2193). */
 export interface Overridable {
@@ -58,15 +58,22 @@ export interface Catalogue {
   readonly games: { readonly [id: string]: GameNode };
 }
 
-/** The committed file, typed. Not validated here: `tests/unit/catalogue.test.ts` holds it valid. */
-export const CATALOGUE = raw as unknown as Catalogue;
+/** What `catalogue.runtime.json` holds: the full file without `version`, `media` and `playability` (#2194). */
+export interface RuntimeCatalogue {
+  readonly groups: Catalogue['groups'];
+  readonly defaults: Catalogue['defaults'];
+  readonly years: { readonly [Y in YearId]: Pick<YearNode, 'visible' | 'settings'> };
+  readonly games: { readonly [id: string]: Omit<GameNode, 'media' | 'playability' | 'years'> & { readonly years: { readonly [Y in YearId]?: Pick<GameYearNode, 'visible' | 'settings'> } } };
+}
 
 // ---- Bounds: the values the code accepts today -------------------------------------------------------------
 export const GROUP_IDS: readonly GroupId[] = ['eyfs', 'ks1', 'lks2', 'uks2'];
 /** Stages per mission: the session runs `speeds.length` of them, and `STAGE_NAMES` names five. */
 export const STAGES = 5;
-/** `layoutWave` indexes the timing tables by speed 0..2 and falls back past them, so speed 3 is the fastest. */
+/** `layoutWave` indexes the timing tables by speed 0..3, so speed 3 is the fastest. */
 const SPEED_SET = [0, 1, 2, 3], DIFF_SET = [1, 2, 3];
+/** About double today's slowest values (7.5 s, 500 ms), so an edit cannot leave a wave hanging for ever. */
+const AIR_TIME_MAX = 15, STAGGER_MAX = 1000;
 /** One mission-pill segment per question, so a stage stays short enough for the pill to draw. */
 const PER_STAGE_MAX = 10, LIVES_MIN = 1, LIVES_MAX = 5;
 export const OVERRIDABLE_KEYS = ['perStage', 'lives', 'gentle', 'speeds', 'diffs', 'airTime', 'stagger'] as const satisfies readonly (keyof Overridable)[];
@@ -85,8 +92,9 @@ const isInt = (v: unknown, lo: number, hi: number) => typeof v === 'number' && N
 const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v);
 const stageList = (allowed: number[]): Check => (v) =>
   Array.isArray(v) && v.length === STAGES && v.every((x) => allowed.includes(x)) ? null : `must be ${STAGES} values, one per stage, each one of ${allowed.join(', ')}`;
-const speedTable: Check = (v) =>
-  Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x) && x > 0) ? null : 'must be 3 positive numbers, one per bubble speed 0 to 2';
+const speedTable = (max: number, unit: string): Check => (v) =>
+  Array.isArray(v) && v.length === SPEED_SET.length && v.every((x) => typeof x === 'number' && Number.isFinite(x) && x > 0 && x <= max)
+    ? null : `must be ${SPEED_SET.length} numbers above 0 and at most ${max} ${unit}, one per bubble speed 0 to 3`;
 
 /** Keyed by `Overridable` itself, so a key added to the type without a rule fails to compile. */
 const SETTING_RULES: Record<keyof Overridable, Check> = {
@@ -95,8 +103,8 @@ const SETTING_RULES: Record<keyof Overridable, Check> = {
   gentle: (v) => (typeof v === 'boolean' ? null : 'must be true or false'),
   speeds: stageList(SPEED_SET),
   diffs: stageList(DIFF_SET),
-  airTime: speedTable,
-  stagger: speedTable,
+  airTime: speedTable(AIR_TIME_MAX, 's'),
+  stagger: speedTable(STAGGER_MAX, 'ms'),
 };
 const PLAY_RULES: Record<string, Check> = {
   score: (v) => (isInt(v, 0, 10) ? null : 'must be a whole number from 0 to 10'),
