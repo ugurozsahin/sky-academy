@@ -114,7 +114,7 @@ range, reaction time, target size, attention).
 One JSON object per game, one per line (JSON Lines), with exactly these keys:
 
 ```json
-{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"physical","ref":"metrics.json#aboveCardMs","saw":"stage 4 bubbles above the card for 2.1 s"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
+{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs","saw":"bubbles reachable 4.5 s at stage 1"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
 ```
 
 - **`game`** — the topic id, the pack's folder name. **`year`** — the pack's `YearId`.

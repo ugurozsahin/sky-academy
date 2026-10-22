@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { pinSentence } from './helpers/pin-sentence';
 import { flatten, sliceSkill } from './helpers/slice-skill';
+import { PLAYTESTERS, PLAYTEST_EXTRA_KEYS, PLAYTEST_PINS } from './helpers/playtest';
 import { reviewPr, section, ROUND_CAP_ESCAPES, REVIEW_PR_HEADINGS, REVIEW_PR_UNNUMBERED } from './helpers/review-pr';
 
 /**
@@ -1554,7 +1555,6 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
   });
 });
 
-
 /**
  * #195 — a merge swallowed a bullet onto the line above, and nothing could see it.
  *
@@ -1617,7 +1617,6 @@ describe('a bullet is never swallowed onto the line above it (#195)', () => {
   });
 });
 
-
 /**
  * #180 — the agent skills and review agents this repository carries.
  *
@@ -1658,23 +1657,12 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
     'test-driven-development': { ...SUPERPOWERS, path: 'skills/test-driven-development' },
   };
-  /**
-   * Every agent definition that may exist, and where it came from (`null` = written for this project). The three
-   * review agents are vendored (#180); the eight playtest profiles are the project's own (#2204), and
-   * `tests/unit/playtest-profiles.test.ts` holds what their bodies must carry.
-   */
+  /** Every agent definition that may exist (`null` = written here): three vendored review agents (#180), eight playtest profiles (#2204). */
   const AGENTS: Record<string, { repo: string; sha: string; path: string } | null> = {
     'pr-test-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/pr-test-analyzer.md' },
     'silent-failure-hunter': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/silent-failure-hunter.md' },
     'type-design-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/type-design-analyzer.md' },
-    'playtester-reception': null,
-    'playtester-year1': null,
-    'playtester-year2': null,
-    'playtester-year3': null,
-    'playtester-year4': null,
-    'playtester-year5': null,
-    'playtester-year6': null,
-    'playtester-parent': null,
+    ...Object.fromEntries(PLAYTESTERS.map((n) => [n, null])),
   };
   /** Vendored files kept byte-for-byte, with no header: a comment would have to go inside code or a licence. */
   const VERBATIM = [
@@ -1781,8 +1769,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'pr-test-analyzer': ['model', 'color'],
     'silent-failure-hunter': ['model', 'color'],
     'type-design-analyzer': ['model', 'color'],
-    // #2204: `tools` is the profile's whole tool list — no Edit or Write, so a playtester cannot change the game it scores.
-    ...Object.fromEntries(Object.keys(AGENTS).filter((n) => n.startsWith('playtester-')).map((n) => [n, ['tools', 'model']])),
+    ...Object.fromEntries(PLAYTESTERS.map((n) => [n, PLAYTEST_EXTRA_KEYS])),
   };
   const EXPECTED_KEYS = (name: string) => ['name', 'description', ...(EXTRA_KEYS[name] ?? [])].sort();
   /**
@@ -1926,17 +1913,8 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'pr-test-analyzer': /^Use this agent when you need to review a pull request for test coverage quality and completeness/,
     'silent-failure-hunter': /^Use this agent when reviewing code changes in a pull request to identify silent failures/,
     'type-design-analyzer': /^Use this agent when you need expert analysis of type design/,
-    'playtest': /^Score a Sharpwise game's playability out of 10 .*Use when running a playtester agent/,
-    'playtester-reception': /^Playtest profile of a Reception child, age 4–5, .*Use when scoring a Sharpwise game's Reception play pack/,
-    'playtester-year1': /^Playtest profile of a Year 1 child, age 5–6, .*Use when scoring a Sharpwise game's Year 1 play pack/,
-    'playtester-year2': /^Playtest profile of a Year 2 child, age 6–7, .*Use when scoring a Sharpwise game's Year 2 play pack/,
-    'playtester-year3': /^Playtest profile of a Year 3 child, age 7–8, .*Use when scoring a Sharpwise game's Year 3 play pack/,
-    'playtester-year4': /^Playtest profile of a Year 4 child, age 8–9, .*Use when scoring a Sharpwise game's Year 4 play pack/,
-    'playtester-year5': /^Playtest profile of a Year 5 child, age 9–10, .*Use when scoring a Sharpwise game's Year 5 play pack/,
-    'playtester-year6': /^Playtest profile of a Year 6 child, age 10–11, .*Use when scoring a Sharpwise game's Year 6 play pack/,
-    'playtester-parent': /^Playtest profile of a parent of a 4- to 11-year-old\. Use when giving a Sharpwise game its overall playability score/,
+    ...PLAYTEST_PINS,
   };
-  /** The project-written skills and agents: their pins must carry the trigger clause (#312, #2204). */
   const PROJECT_SKILLS = [...Object.entries(SKILLS), ...Object.entries(AGENTS)].filter(([, v]) => !v).map(([n]) => n);
   /** The one upstream clause each of two files is exempt from the negation check for — the whole clause, so it cannot be re-purposed, and not the file. */
   const NEGATION_EXEMPT: Record<string, RegExp> = { 'frontend-design': /don't read as templated defaults/, 'silent-failure-hunter': /don't introduce silent failures/ };
@@ -2097,9 +2075,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
         }
       }
     }
-    // #2204: the same `null` half for an agent — one listed as the project's own claims no upstream.
-    for (const [name, src] of Object.entries(AGENTS))
-      if (!src) expect(read(`.claude/agents/${name}.md`), `.claude/agents/${name}.md carries a vendored header but is listed as written for this project (#2204)`).not.toContain('<!-- vendored:');
+    for (const [name, src] of Object.entries(AGENTS)) if (!src) expect(read(`.claude/agents/${name}.md`), `.claude/agents/${name}.md carries a vendored header but is listed as written for this project (#2204)`).not.toContain('<!-- vendored:');
   });
 
   // #130 item 3: the rail used to match only `.md|.ts|.sh` targets with no `#` or `:` in them, against a set
@@ -2130,10 +2106,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   });
 });
 
-
 // `sliceSkill` and `flatten` live in `./helpers/slice-skill` (#307/#395): the review-pr rails above reach them too.
-
-
 
 /**
  * The text between one rule's own heading and the next one's, with the non-vacuity floor applied **here**
@@ -2514,7 +2487,6 @@ describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (
       .not.toMatch(/recheck|has not finished computing/i);
   });
 });
-
 
 /**
  * The `add-guard-rail` skill's load-bearing lines (#180).

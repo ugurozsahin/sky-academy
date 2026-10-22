@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { YEARS } from '../../src/curriculum/types';
+import { PLAYTESTERS } from './helpers/playtest';
 
 /**
  * #2204 — the playtest skill and its eight profiles. `governance.test.ts` holds them on the allow-list and pins
@@ -21,6 +22,7 @@ describe('playtest profiles (#2204)', () => {
   it('there is exactly one profile per year group, plus the parent', () => {
     const onDisk = readdirSync(new URL('.claude/agents/', root)).filter((f) => f.startsWith('playtester-')).map((f) => f.replace(/\.md$/, ''));
     expect(onDisk.sort()).toEqual([...PROFILES].sort());
+    expect([...PLAYTESTERS].sort(), 'the allow-list in helpers/playtest.ts names the same eight').toEqual([...PROFILES].sort());
   });
 
   it.each(PROFILES)('%s may read and run, and has no tool that edits a file', (name) => {
@@ -78,6 +80,7 @@ describe('the playtest skill (#2204)', () => {
     expect(Object.keys(row).sort()).toEqual(['by', 'criteria', 'evidence', 'game', 'note', 'score', 'year']);
     expect(Object.keys(row.criteria).sort()).toEqual([...KEYS].sort());
     expect(Object.values<number>(row.criteria).reduce((a, b) => a + b, 0)).toBe(row.score);
+    for (const k of KEYS) expect(row.evidence.filter((e: { criterion: string }) => e.criterion === k).length, `the example cites evidence for ${k}`).toBeGreaterThan(0);
     expect(PROFILES).toContain(row.by);
     expect(YEARS.map((y) => y.id)).toContain(row.year);
   });
