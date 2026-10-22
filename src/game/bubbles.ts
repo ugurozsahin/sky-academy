@@ -44,7 +44,7 @@ export const RELAUNCH_DELAY = 300;
 export const MAX_RELAUNCHES = 3;
 
 export interface WaveOpts {
-  labels: string[]; speed: number; wide?: boolean; gravity?: number;
+  labels: string[]; speed: number; wide?: boolean; gravity?: number; colours?: Record<string, string>;   // #2269: label → colour, else the PALETTE draw
   ordered?: string[];   // sequence labels that must be sliced in this order
   // #700: a non-sequence question's correct-answer label, for a gentle year only — it gets one free trip
   // back up if it falls unhit, the same idea as `ordered` above but for a single label and a single trip.
@@ -290,7 +290,7 @@ export interface WavePlan { r: number; waveT: number; batchSpan: number; perBatc
 interface FlightGeom { W: number; H: number; r: number; topInset: number; apexMin: number; usable: number; T: number; speedK: number }
 
 /** One bubble's x, arc and look; the `rng` calls keep the order layoutWave always made them in. */
-function planBubble(p: { label: string; k: number; idx: number; size: number; perBatch: number; launchAt: number }, g: FlightGeom, rng: Rng): BubblePlan {
+function planBubble(p: { label: string; k: number; idx: number; size: number; perBatch: number; launchAt: number; colour?: string }, g: FlightGeom, rng: Rng): BubblePlan {
   const { W, H, r, topInset, apexMin, usable, T, speedK } = g;
   const margin = r + 8, span = W - margin * 2;
   // spread x across the width in shuffled slots so bubbles don't overlap; a full row uses the whole span edge to edge
@@ -303,7 +303,7 @@ function planBubble(p: { label: string; k: number; idx: number; size: number; pe
   // T/k seconds, so an unscaled vx drifts the bubble 1/k of the way across — a path no child ever sees.
   // Scaling it keeps the whole trajectory identical at any speed: same apex, same landing x, less time.
   const vx = ((W / 2 - x) / W) * 30 * (rng() * 0.6 + 0.4) * speedK;
-  return { label: p.label, x, vx, vy, g: grav, launchAt: p.launchAt, color: PALETTE[(p.k * 3 + Math.floor(rng() * 3)) % PALETTE.length], wobble: rng() * Math.PI * 2 };
+  return { label: p.label, x, vx, vy, g: grav, launchAt: p.launchAt, color: p.colour ?? PALETTE[(p.k * 3 + Math.floor(rng() * 3)) % PALETTE.length], wobble: rng() * Math.PI * 2 };
 }
 
 /**
@@ -330,7 +330,7 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
   const bubbles: BubblePlan[] = [];
   for (let k = 0; k < n; k++) {
     const batch = Math.floor(k / perBatch), idx = k % perBatch, size = Math.min(perBatch, n - batch * perBatch);
-    bubbles.push(planBubble({ label: o.labels[order[k]], k, idx, size, perBatch, launchAt: now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1) }, { W, H, r, topInset, apexMin, usable, T, speedK }, rng));
+    bubbles.push(planBubble({ label: o.labels[order[k]], colour: o.colours?.[o.labels[order[k]]], k, idx, size, perBatch, launchAt: now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1) }, { W, H, r, topInset, apexMin, usable, T, speedK }, rng));
   }
   return { r, waveT: T * 1000, batchSpan: perBatch * stagger, perBatch, batchGap, stagger, bubbles };
 }

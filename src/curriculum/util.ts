@@ -210,7 +210,7 @@ export function balanceQ(rng: Rng, left: string, right: string, answer: number, 
 }
 
 // ---------- Measurement — shared Year 1 / Year 2 (#8, #298) ----------
-const COLOURS = ['red', 'blue', 'green', 'yellow', 'purple'];
+export const COLOUR_BUBBLE: Record<string, string> = { red: '#ff5f6d', blue: '#40c4ff', green: '#66e07d', yellow: '#ffd54f', purple: '#b388ff' };   // #2269: each colour word → its `PALETTE` entry (`src/game/bubbles.ts`), so a "yellow" bubble is yellow
 export const UNIT_WORD: Record<string, string> = { cm: 'centimetres', m: 'metres', g: 'grams', kg: 'kilograms', ml: 'millilitres', l: 'litres' };
 
 function uniqVals(rng: Rng, n: number, lo: number, hi: number): number[] {
@@ -223,7 +223,7 @@ function uniqVals(rng: Rng, n: number, lo: number, hi: number): number[] {
 export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, compare: Compare, lo: number, hi: number): Question {
   const { verb, forms } = compare;
   const n = d === 1 ? 2 : 3;                                   // forms = [compBig, compSmall, superBig, superSmall]
-  const cols = shuffle(rng, COLOURS).slice(0, n);
+  const cols = shuffle(rng, Object.keys(COLOUR_BUBBLE)).slice(0, n);
   const vals = uniqVals(rng, n, lo, hi);
   const big = rng() < 0.5;
   const idx = vals.indexOf(big ? Math.max(...vals) : Math.min(...vals));
@@ -234,7 +234,7 @@ export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: stri
     // data, not the instruction line `hint` usually carries, and the play screen must keep it on a short
     // screen (#328). `unitChoice` below deliberately does NOT set it: there the units are the bubbles.
     hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,
-    say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
+    say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`, colours: Object.fromEntries(cols.map(c => [c, COLOUR_BUBBLE[c]])),
   });
 }
 /** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */

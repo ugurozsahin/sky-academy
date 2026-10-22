@@ -16,7 +16,7 @@ import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow
  * `remaining` (#919) defaults to the whole sequence: omitted means "nothing sliced yet", not "nothing left". */
 export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean, timing?: WaveOpts['timing']): WaveOpts {
   return {
-    labels: info.labels, speed: info.speed, wide: !!q.wide || wideFor(info.labels),
+    labels: info.labels, speed: info.speed, wide: !!q.wide || wideFor(info.labels), colours: q.colours,
     ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined, timing,
   };
 }
