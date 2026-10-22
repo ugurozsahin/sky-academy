@@ -2,7 +2,7 @@
 // layout, bubble-to-bubble collision, label fitting, and the offscreen sprite caches drawBubble draws from.
 // Nothing here touches a canvas event or the render loop — `Arena` still owns those.
 import { shuffle } from '../curriculum/util'; import type { Rng } from '../curriculum/types';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
-import { boundedRise, TOP_INSET_MAX } from './wave-bounds'; import { bySpeed, TIMING } from '../config/resolve';   // #2184: the bounds every arc is held to; #2194: air time and stagger per speed, from src/config/catalogue.json
+import { boundedRise, TOP_INSET_MAX } from './wave-bounds'; import { bySpeed, TIMING } from '../config/resolve'; import type { DefaultSettings } from '../config/catalogue';   // #2184: the bounds every arc is held to; #2194: air time and stagger per speed, from src/config/catalogue.json
 
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
@@ -48,7 +48,7 @@ export interface WaveOpts {
   ordered?: string[];   // sequence labels that must be sliced in this order
   // #700: a non-sequence question's correct-answer label, for a gentle year only — it gets one free trip
   // back up if it falls unhit, the same idea as `ordered` above but for a single label and a single trip.
-  gentleTarget?: string; timing?: { readonly airTime: readonly number[]; readonly stagger: readonly number[] };   // timing (#2198): this game's own; absent = the global `TIMING`
+  gentleTarget?: string; timing?: DefaultSettings;   // timing (#2198): this game's own; absent = the global `TIMING`
 }
 
 /** Deal a sequence wave: the words that must be sliced in order are spread across the batches IN ORDER

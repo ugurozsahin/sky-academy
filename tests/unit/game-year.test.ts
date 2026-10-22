@@ -3,11 +3,13 @@ import { YEARS } from '../../src/curriculum';
 import { proYear } from '../../src/game/modes';
 import { RUNTIME, gameYear, resolveGame } from '../../src/config/resolve';
 import { layoutWave } from '../../src/game/bubbles';
+import { played, playsAlone } from '../../src/game/played';
+import { waveOptsFor } from '../../src/ui/wave-opts';
+import { topicsFor } from '../../src/curriculum';
 import type { RuntimeCatalogue } from '../../src/config/catalogue';
 
 // #2198: a game played on its own reads its own resolved settings. Mixed modes (Sensei, Legend, mixed, Daily, Duel)
-// never call `gameYear`: `played()` in src/main.ts does so only for one topic with no pool, deck or Legend flag, so
-// they keep their mode table and the year's settings.
+// never get it: `played()` (src/game/played.ts) applies `gameYear` only for one topic with no pool, deck or Legend flag.
 
 const yearOf = (id: string) => YEARS.find((y) => y.id === id)!;
 const SETTINGS = ['perStage', 'lives', 'gentle', 'speeds', 'diffs'] as const;
@@ -58,9 +60,36 @@ describe('gameYear (#2198)', () => {
     const geom = { W: 400, H: 700, topInset: 60 }, o = { labels: ['a', 'b'], speed: 1 };
     const rng = () => 0.5;
     const plain = layoutWave(o, geom, 1, 0, rng), same = layoutWave({ ...o, timing: RUNTIME.defaults.settings }, geom, 1, 0, rng);
-    const slow = layoutWave({ ...o, timing: { airTime: [9, 9, 9, 9], stagger: [100, 100, 100, 100] } }, geom, 1, 0, rng);
+    const slow = layoutWave({ ...o, timing: { airTime: [9, 9, 9, 9], stagger: [100, 100, 100, 100] } as const }, geom, 1, 0, rng);
     expect(same.waveT).toBe(plain.waveT);
     expect(slow.waveT).toBe(9000);
     expect(slow.stagger).toBe(100);
+  });
+});
+
+describe('played(): only a game on its own gets its settings (#2198)', () => {
+  const year = yearOf('year1'), topic = topicsFor('year1')[0], pool = topicsFor('year1').slice(0, 3);
+  it('one topic alone plays its resolved year', () => {
+    expect(playsAlone({ year, topic })).toBe(true);
+    expect(played({ year, topic }).year).toEqual(gameYear(year, topic.id));
+    expect(played({ year, topic }).year.timing).toBeDefined();
+  });
+  it.each([
+    ['a pool (Sensei, mixed)', { pool }], ['a deck (Daily, MTC, fix-my-mistakes)', { deck: [{}] }], ['Legend', { legend: true }], ['no topic', { topic: undefined }],
+  ])('%s keeps the year unchanged, with or without Pro', (_n, extra) => {
+    const o = { year, topic, ...extra };
+    expect(playsAlone(o)).toBe(false);
+    expect(played(o).year).toBe(year);
+    expect(played({ ...o, pro: true }).year).toEqual(proYear(year));
+    expect(played({ ...o, pro: true }).year.timing).toBeUndefined();
+  });
+  it('Pro on a single game is proYear of its resolved year, and keeps its timing', () => {
+    const p = played({ year, topic, pro: true }).year;
+    expect(p).toEqual(proYear(gameYear(year, topic.id)));
+    expect(p.timing).toEqual(gameYear(year, topic.id).timing);
+  });
+  it('waveOptsFor carries the timing through', () => {
+    const t = { airTime: [1, 1, 1, 1], stagger: [2, 2, 2, 2] } as const;
+    expect(waveOptsFor({ answer: 'a' } as never, { labels: ['a'], speed: 1 }, undefined, false, t).timing).toBe(t);
   });
 });
