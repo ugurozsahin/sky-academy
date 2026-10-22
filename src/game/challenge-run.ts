@@ -2,6 +2,7 @@
 // In memory only (the save's field list is closed, #903), so closing the app loses the code. No name, avatar or date is held.
 import type { Topic } from '../curriculum';
 import { TOPICS } from '../curriculum';
+import { gameHidden, HIDDEN_LINE } from './hidden-game';
 import { challengeable, challengeCheck, challengeSeed, CHALLENGE_BOUNDS, decode, encode, topicIndex } from './challenge';
 
 let kept: { code: string; title: string } | null = null;
@@ -27,6 +28,7 @@ export function enterCode(text: string): Entered {
   if (!c) return { error: "That code doesn't look right — check the letters." };
   const topic = TOPICS[c.topic], version = { error: 'That code was made on a different version of the game.' };
   if (!topic || !challengeable(topic) || challengeCheck(topic, c.seed) !== c.check) return version;
+  if (gameHidden(topic)) return { error: HIDDEN_LINE };   // #2197: the code stays valid (the position index is unchanged); only the start is refused
   target = c.score;
   return { topic, seed: challengeSeed(topic, c.seed) };
 }
