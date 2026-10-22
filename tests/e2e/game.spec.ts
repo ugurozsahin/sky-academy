@@ -4537,12 +4537,11 @@ test.describe('Sharpwise', () => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="year2"]');
     await expect(page.locator('#memory')).toBeVisible();
-    // Rig only the deck choice (the theme draw, src/ui/memory.ts) onto 'past', then restore real randomness so
-    // the eight pairs stay random; the assertion below fails loudly if the theme order drifts.
-    await page.evaluate(() => { const w = window as any; w.__realRandom = Math.random; Math.random = () => 5.5 / 7; });
+    // Rig only the theme draw (the first Math.random call on the Memory screen, src/ui/memory.ts): the stub
+    // restores the real function inside that call, so the deck draw right after it stays random. The
+    // assertion below fails loudly if the theme order drifts or another call takes the draw.
+    await page.evaluate(() => { const real = Math.random; Math.random = () => { Math.random = real; return 5.5 / 7; }; });
     await page.click('#memory');
-    await page.waitForFunction(() => window.__sna?.theme);
-    await page.evaluate(() => { const w = window as any; Math.random = w.__realRandom; delete w.__realRandom; });
     expect(await page.evaluate(() => window.__sna.theme)).toBe('past');
     await expect(page.locator('.card')).toHaveCount(16);
     const vw = page.viewportSize()!.width;
