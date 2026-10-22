@@ -24,3 +24,5 @@ docs/sketchbook/
 
 # #2088: `npm run site:shots` previews the website's screenshots here; the Pages deploy makes the real ones, none is committed
 site-shots/
+# #2202: `npm run game:shots` writes the catalogue's pictures here; none is committed
+game-shots/

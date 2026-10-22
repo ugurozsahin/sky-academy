@@ -10,16 +10,16 @@ import { pathToFileURL } from 'node:url';
 
 export const SIZES = { phone: { width: 390, height: 844 }, desktop: { width: 1280, height: 800 } };
 export const MAX_BYTES = 150 * 1024;
-const SEED = 20261021;
+export const SEED = 20261021;
 
-const ACTION_TIMEOUT = 20000;
+export const ACTION_TIMEOUT = 20000;
 const waitTarget = page => page.waitForFunction(() => {
   const s = window.__sna; if (!s || s.state().waiting) return false;
   const c = s.session.current; const label = c.sequence ? s.session.remaining()[0] : c.answer;
   return s.bubbles().some(b => b.label === label && b.y > 60);
 }, null, { timeout: ACTION_TIMEOUT });
 /** Stop the wave and lay its bubbles out on a fixed grid, so the frame never depends on how fast this machine drew. */
-const freeze = page => page.evaluate(() => {
+export const freeze = page => page.evaluate(() => {
   const a = window.__sna?.arena; if (!a) return;
   const live = a.bubbles.filter(x => !x.dead && !x.hit);
   const cols = Math.min(live.length, a.W > 600 ? 5 : 3), rows = Math.ceil(live.length / cols);
