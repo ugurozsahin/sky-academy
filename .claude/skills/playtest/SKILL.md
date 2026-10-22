@@ -70,7 +70,11 @@ in milliseconds: divide by 1000), as a percentage: reach ÷ need, both in second
 `speeds[k-1]`: `reach_k ≈ reach_1 × airTime[speeds[k-1]] / airTime[speeds[0]]`. `airTime` is
 `defaults.settings.airTime` in `src/config/catalogue.json`, unless the game overrides it; the pack carries the
 resolved table as `metrics.json#settings.airTime`. A `speeds` value indexes `airTime` from 0, so speed 1 is its
-second entry. The highest `speeds` entry is the shortest flight, so that stage decides. Cite
+second entry. **Ease the speed before indexing:** a `sequence` game (`metrics.json#sequence`) or a `slow` one
+(`metrics.json#slow`) flies one speed lower at every stage, never below 1, or below 0 in a gentle year
+(`metrics.json#settings.gentle`), per `eased()` in `src/game/modes.ts`; use the eased speed on both sides of the
+ratio. A pack plays stage 1 only, so it cannot show that a later stage's questions turn `slow`; the estimate is
+then the cautious bound. The highest eased speed is the shortest flight, so that stage decides. Cite
 `metrics.json#settings.speeds` and put the arithmetic in `saw`: `stage 3 at speed 3: 5.27 × 3.4 / 5.6 = 3.2 s`.
 
 | Key | Criterion | The question |
