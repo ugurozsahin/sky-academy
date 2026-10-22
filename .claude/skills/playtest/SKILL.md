@@ -26,7 +26,8 @@ A pack is one game played once, for one year, the way a child meets it on a 390�
   visual card's needs (`slow`, `wide`). Cite a number as `metrics.json#<key>`, and a nested one by its path
   (`metrics.json#aboveCardMs.min`).
 - **A pack plays stage 1 only.** Judge the later stages from the resolved settings: a higher `speeds` entry is a
-  shorter flight, a higher `diffs` entry harder questions. Say so in the evidence (`metrics.json#settings.speeds`).
+  shorter flight, a higher `diffs` entry harder questions. Say so in the evidence (`metrics.json#settings.speeds`);
+  §2 has the one way to estimate a later stage's reach.
 
 **A key the file lacks, or a moment with no screenshot, is not observed.** Write "not observed" for it; never
 fill it in from what the game probably does. Speech the pack does not show playing by itself counts as a
@@ -50,8 +51,15 @@ the bubbles (all of them, at the cautious end: a child reads them in turn until 
 profile's words a minute), plus the question's reading time when the pack shows the wave launching before it
 could be read. Count the words of the question line only — a fixed instruction under it, the same every wave, is
 read once per game — and words only: numerals and maths symbols are read at a glance from Year 1 up; Reception
-reads neither. Compare that need with the bubble's reachable time
-(`aboveCardMs`, its smallest value).
+reads neither. Compare that need with the bubble's **reach**, its reachable time (`aboveCardMs`, its smallest
+value), as a percentage: reach ÷ need.
+
+**A later stage's reach** is estimated, never guessed, one way:
+`reach_k ≈ reach_1 × airTime[speeds[k]] / airTime[speeds[0]]`. `airTime` is `defaults.settings.airTime` in
+`src/config/catalogue.json`, unless the game overrides it; the pack carries the resolved table as
+`metrics.json#settings.airTime`. A `speeds` value indexes `airTime` from 0, so speed 1 is its second entry. The
+highest `speeds` entry is the shortest flight, so that stage decides. Cite `metrics.json#settings.speeds` and put
+the arithmetic in `saw`: `stage 3 at speed 3: 5.27 × 3.4 / 5.6 = 3.2 s`.
 
 | Key | Criterion | The question |
 |---|---|---|
@@ -71,15 +79,15 @@ reads neither. Compare that need with the bubble's reachable time
 - **2** — Clear from the first screen: the prompt is within their reading level or spoken, the visual card is
   legible, and the answer bubbles are the kind of thing the prompt asks for.
 
-**`physical`**
-- **0** — A target leaves the reachable area before this child could read the prompt and react, by the
-  profile's own reaction-time floor; or the radius is below the profile's minimum; or tracing needs precision
-  the profile lacks.
-- **1** — Manageable at the first stage, but a later stage's speed (the resolved `speeds`)
-  or the answers per wave push past the
-  profile's floor; or bubbles overlap so a slice catches the wrong one.
-- **2** — Every measured bubble stays above the card comfortably longer than the profile's floor, at or above
-  its minimum radius, with room between targets.
+**`physical`** — a band, not a cliff: a near miss is a 1, a clear miss a 0. The lowest anchor any clause reaches
+is the mark. Each `physical` mark's `saw` states the need, the reach and the percentage.
+- **0** — The stage-1 reach is below **75%** of the need; or the radius is below the profile's floor; or tracing
+  needs precision the profile lacks.
+- **1** — The stage-1 reach is 75% to 100% of the need; or stage 1 meets the need but a later stage's estimated
+  reach does not; or the radius is at or above the floor but below the comfortable size; or bubbles overlap so a
+  slice catches the wrong one.
+- **2** — Every stage's estimated reach meets the need, and the radius is at or above the profile's comfortable
+  size, with room between targets.
 
 **`challenge`**
 - **0** — Outside this year's programme of study by more than a year either way, or trivial at every stage.
@@ -135,7 +143,7 @@ not describe the game, re-read the criteria, but never adjust the sum to fit a b
 One JSON object per game, one per line (JSON Lines), with exactly these keys:
 
 ```json
-{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs","saw":"bubbles reachable 4.5 s at stage 1"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
+{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs.min","saw":"need 4 s, reach 5.37 s, 134% at stage 1"},{"criterion":"physical","ref":"metrics.json#settings.speeds","saw":"stage 4 at speed 3: 5.37 × 3.4 / 5.6 = 3.26 s, 82% of the need"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
 ```
 
 - **`game`** — the topic id, the pack's folder name. **`year`** — the pack's `YearId`.

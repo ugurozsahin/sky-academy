@@ -97,6 +97,20 @@ describe('the playtest skill (#2204)', () => {
     expect(SKILL).toMatch(/more than 40% of one profile's games score 8 or above/);
   });
 
+  it('marks `physical` on a band, not a cliff, and estimates later stages one way (#2245)', () => {
+    const at = SKILL.indexOf('**`physical`**');
+    const anchors = SKILL.slice(at, SKILL.indexOf('\n\n', at)).replace(/\s+/g, ' ');
+    expect(anchors, 'a clear miss is below 75% of the need').toMatch(/- \*\*0\*\* — The stage-1 reach is below \*\*75%\*\* of the need/);
+    expect(anchors, 'a near miss is a 1').toMatch(/- \*\*1\*\* — The stage-1 reach is 75% to 100% of the need/);
+    expect(anchors, 'a 2 needs every stage, not only the one the pack played').toMatch(/- \*\*2\*\* — Every stage's estimated reach meets the need/);
+    expect(anchors, 'the mark cites its numbers').toContain('`saw` states the need, the reach and the percentage');
+    expect(SKILL, 'the later-stage estimate is one formula').toContain('`reach_k ≈ reach_1 × airTime[speeds[k]] / airTime[speeds[0]]`');
+    expect(SKILL, 'and says how a speed indexes the table').toContain('A `speeds` value indexes `airTime` from 0');
+    const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]);
+    const saw = row.evidence.filter((e: { criterion: string }) => e.criterion === 'physical').map((e: { saw: string }) => e.saw).join(' ');
+    expect(saw, 'the example row shows the evidence wording it asks for').toMatch(/need [\d.]+ s, reach [\d.]+ s, \d+%/);
+  });
+
   it('its example row is a valid row: the five keys, the sum, evidence, and a profile as `by`', () => {
     const json = /```json\n(\{.*\})\n```/.exec(SKILL);
     expect(json, 'the skill shows one example row').not.toBeNull();
