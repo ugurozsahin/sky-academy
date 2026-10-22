@@ -254,7 +254,7 @@ function questionCallbacks(c: BeatCtx) {
 function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: string, peeking: boolean) {
   const { opts, deps, st, session } = c, { els } = deps;
   const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
-  const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle);
+  const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle, opts.year.timing);
   const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
   const storyLine = !!q.story && !peeking, myWave = st.waveId;   // #1352: holdForStory speaks a story's line
   const spawn = () => {
