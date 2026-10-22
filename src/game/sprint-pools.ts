@@ -1,5 +1,5 @@
 // Pooled Sprints (#1234): a fixed list of our own topics, never a copy of a paper. Pure.
-import { topicById, topicsFor, type Topic, type YearId } from '../curriculum';
+import { isGameShown, topicById, topicsFor, type Topic, type YearId } from '../curriculum';
 import { answerableBy } from './pools';
 
 /** Grammar and punctuation topics in year order. An id with no generator yet is skipped by `grammarPool`. */
@@ -14,10 +14,10 @@ export const GRAMMAR: readonly string[] = [
 export const GRAMMAR_MIN = 6;
 const YEAR_NUMBER: Record<string, number> = { year5: 5, year6: 6 };
 
-/** The listed ids from Year 3 up to and including `year`'s that exist as core bubble topics. Empty off the KS2 upper islands. */
+/** The listed ids from Year 3 up to and including `year`'s that exist as core bubble topics the catalogue shows on their own year (#2196). Empty off the KS2 upper islands. */
 export function grammarPool(year: YearId): Topic[] {
   const n = YEAR_NUMBER[year]; if (!n) return [];
-  return GRAMMAR.filter(id => Number(id[1]) <= n).map(topicById).filter((t): t is Topic => !!t && !t.drill && t.subject === 'writing' && answerableBy(t, 'mixed'));
+  return GRAMMAR.filter(id => Number(id[1]) <= n).map(topicById).filter((t): t is Topic => !!t && !t.drill && t.subject === 'writing' && answerableBy(t, 'mixed') && isGameShown(t.id, t.year));
 }
 
 /** The play screen's heading: a fix round, Sensei, the topic, a titled pool (Grammar mix), else the mode's own. */

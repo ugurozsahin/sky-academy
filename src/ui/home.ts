@@ -1,7 +1,7 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { arithmeticPool, grammarPool, offeredPool } from '../game/sprint-pools';
 import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint'; import { sprintSeed } from '../game/challenge-run';
-import { mtcDeck } from '../game/mtc';
+import { mtcDeck, mtcOffered } from '../game/mtc';
 import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
 import { leastSecure } from '../fact-record';
@@ -27,7 +27,7 @@ import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
 import { familyBest } from '../family-best';
 import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, openEntryChooser, type ChooserEntry, trophyBadge, trophyCount } from './chooser';
-import { subjectPool, subjectTopics } from '../game/pools';
+import { answerableBy, mixable, subjectPool, subjectTopics } from '../game/pools';
 import { strandPools } from '../game/strand-pools';
 import { $, $$, capDigits, esc, render } from './dom';
 import { DAILY_TEN_TITLE, dailyTenDeck, dailyTenPool } from '../game/daily-ten';
@@ -265,6 +265,21 @@ const deckRows = (nav: Nav, year: YearInfo, progress: Record<string, TopicProgre
 export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
 export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId): T[] => rows.filter(r => !r.years || r.years.includes(year));
 
+/** The rows that draw the island's mixed pool: Sensei, Sky Storm, Sprint, Relaxed and Boss (`subjectPool`, `senseiTopics`). */
+const MIXED_ROWS = new Set(['train', 'endless', 'sprint', 'relaxed', 'boss']);
+/**
+ * #2196: a row whose pool the catalogue has emptied is not offered, rather than crash on the tap — `Session.pickTopic()`
+ * and `duelScreen` both throw on an empty pool. The mixed rows need one shown bubble topic on the island (`subjectPool`
+ * falls back to the whole year's); Ninja Duel needs one it can duel on; Tables Check needs `MTC_TOPIC` shown. The
+ * rows that already hide on an empty pool (Legend, Daily, Grammar mix, Arithmetic Sprint) pass through.
+ */
+export const fedRows = <T extends { id: string }>(rows: T[], year: YearInfo): T[] => {
+  const topics = topicsFor(year.id);
+  const mixed = topics.some(mixable), duel = topics.some(t => answerableBy(t, 'duel', year.diffs[0] ?? 1));
+  const fed = (id: string) => id === 'duel' ? duel : id === 'mtc' || id === 'mtcpad' ? mtcOffered() : !MIXED_ROWS.has(id) || mixed;
+  return rows.filter(r => fed(r.id));
+};
+
 /** #932: the Legend run menu row — only with a 3★ topic in hand; opens #910's chooser on exactly those topics, no Mixed. */
 function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>) {
   const list = topicsFor(year.id).filter(t => chooserEligible(t) && (progress[t.id]?.stars ?? 0) >= 3);
@@ -292,7 +307,7 @@ function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Record<stri
   const mixedPool = () => subjectPool(topicsFor(year.id), subject());
   // The island menu in one table (#26): a mode button is one entry. The battle modes take their title from MODES;
   // Sensei-training, Memory-Match and the Legend run (#932) are separate flows, so they live here too.
-  return menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands
+  return fedRows(menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands; #2196: an emptied pool hides its row
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
       title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
       go: () => { say(senseiTrainLine(year, d.ks2.schoolYear, weakest)); nav.play({ year, mode: 'mission', pool: weakest }); } },
@@ -316,7 +331,7 @@ function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Record<stri
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
       go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject()), (topic, teams) => { sfx.tap(); nav.duel(year, topic?.id, teams ? 'teams' : undefined); }, { mixed: true, mixedLabel: 'Random', teams: true }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
-  ], year.id);
+  ], year.id), year);
 }
 
 /** Island: topics for one year group + its Sky Storm. */

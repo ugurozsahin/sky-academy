@@ -1,7 +1,7 @@
 // Multiplication Tables Check form builder (#1116): 25 questions drawn under the STA's published rules
 // (MTC assessment framework §5.1–5.2). Pure: no DOM, no `src/ui` import.
 import type { Question, Rng } from '../curriculum/types';
-import { topicById } from '../curriculum';
+import { isGameShown, topicById } from '../curriculum';
 import { productDecoys } from '../curriculum/year4-tables';
 import { q, shuffle } from '../curriculum/util';
 import type { DeckItem } from './session';
@@ -19,6 +19,10 @@ export const MTC_LIMITS: Record<number, { min: number; max: number }> = {
 export const KS1_TABLES = [2, 5, 10] as const;
 export const KS1_LIMIT = { min: 3, max: 7 };
 export const MTC_SIZE = 25;
+/** The topic a Tables Check deck is dealt under, and the game whose catalogue node offers it (#2196). */
+export const MTC_TOPIC = 'y4-tables';
+/** The Tables Check rows are offered only while the catalogue shows `MTC_TOPIC` on Year 4 (#2196). */
+export const mtcOffered = (): boolean => isGameShown(MTC_TOPIC, 'year4');
 const MAX_ATTEMPTS = 100;
 
 const pick = <T>(xs: T[], rng: Rng): T => xs[Math.floor(rng() * xs.length)];
@@ -89,7 +93,7 @@ const checkCard = (a: number, b: number, rng: Rng): Question => {
 
 /** One Tables Check practice run: 3 untimed practice cards, then the 25 of `mtcForm` — `a × b = ?`, four bubbles each. */
 export function mtcDeck(rng: Rng): DeckItem[] {
-  const topic = topicById('y4-tables')!;
+  const topic = topicById(MTC_TOPIC)!;
   const practice = mtcPractice(rng), form = mtcForm(rng);   // the same two draws, in this order, as a test replays
   return [...practice.map(i => practiceCard(i.b, rng)), ...form.map(i => checkCard(i.a, i.b, rng))].map(q => ({ topic, q }));
 }

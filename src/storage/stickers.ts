@@ -1,5 +1,5 @@
 // The sticker album: which stickers a save qualifies for, from coins and from achievements (#114).
-import { listedTopics, shownYears } from '../curriculum';
+import { isGameShown, listedTopics, shownYears, topicById } from '../curriculum';
 import { AVATARS, VILLAIN } from '../avatars';
 import type { SaveData, TopicProgress } from './shape';
 /** Sticker album (#114). Order = avatars then the villain. The first three stay a fast, purely-coin win —
@@ -29,7 +29,9 @@ export function stickersFor(coins: number): string[] {
  * `#270` chose *accept the import, make every reader tolerant* over rejecting the blob at the door — this is
  * that same fix reaching the readers #270 did not touch. */
 export const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
-const topicsStarred = (d: SaveData) => Object.values(safeRecord<TopicProgress>(d.progress)).filter(p => (p?.stars ?? 0) > 0).length;
+/** #2196: a registry game the catalogue hides now. Its stars stay in the save but count toward no sticker; an id the registry no longer has counts as it always did. */
+const hiddenGame = (id: string): boolean => { const t = topicById(id); return !!t && !isGameShown(id, t.year); };
+const topicsStarred = (d: SaveData) => Object.entries(safeRecord<TopicProgress>(d.progress)).filter(([id, p]) => (p?.stars ?? 0) > 0 && !hiddenGame(id)).length;
 const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return shownYears().filter(y => listedTopics().some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
 /** True when every listed topic on island `yearId` has a star (#935). The `hammer` sticker, Sensei's next-island
  * nudge and any certificate read this one rule, so a topic excluded from the listing is excluded from all of them. */
