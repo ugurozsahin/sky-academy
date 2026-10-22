@@ -157,7 +157,7 @@ const y1MoreLess: Generator = (d, rng) => {
 };
 const y1Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 1 : 10, d === 3 ? 20 : d === 2 ? 15 : 10);
-  if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 20, say: `Which number is ${numberWord(n)}?`, visual: { type: 'word', text: numberWord(n) } });
+  if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 20, say: 'Which number is this word?', visual: { type: 'word', text: numberWord(n) } });
   // At the top of the range (n = 20, only reachable at d3) both n+1 and n+2 fall outside [0,20], leaving only
   // two neighbours — a card with three bubbles instead of four (#462 rail). n±3 is there as a fourth
   // candidate so a boundary this tight never runs the pool short; unreachable in the middle of the range,
@@ -355,7 +355,7 @@ const y1Months: Generator = (d, rng) => {
 };
 /** "My Day" (#979): two fixed ordered lists; the answer is the list neighbour, never wrapping. */
 const DAY_PARTS = ['morning', 'afternoon', 'evening'];
-const DAY_PART_EMOJI = ['🌅', '☀️', '🌙'];
+const DAY_PART_EMOJI = ['🌅', '☀️', '🌇'];
 const DAY_WORDS = ['yesterday', 'today', 'tomorrow'];
 const y1When: Generator = (d, rng) => {
   const hint = { hint: 'Slice the word', hintIsData: false };
@@ -390,7 +390,7 @@ const y1Balance: Generator = (d, rng) => {
 
 // ---------- Year 1 writing ----------
 const y1SoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE3, PHASE3, 2) : d === 2 ? soundQ(rng, PHASE5, [...PHASE3, ...PHASE5], 3) : soundQ(rng, [...PHASE5, ...SPLIT], [...PHASE3, ...PHASE5, ...SPLIT], 3);
-const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['oil', 'oi', '🛢️'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
+const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['thumb', 'th', '👍'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['toilet', 'oi', '🚽'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
 /** Exported for the `y1-digraphs` reachable-spelling fixture (#445). */
 export { DIGRAPH_WORDS };
 const y1Digraphs: Generator = (d, rng) => {
@@ -474,7 +474,7 @@ const y1SpellRules: Generator = (d, rng) => {
 const y1Plurals: Generator = (d, rng) => {
   const S: [string, string][] = [['cat', 's'], ['dog', 's'], ['book', 's'], ['hat', 's'], ['car', 's'], ['tree', 's'], ['fox', 'es'], ['box', 'es'], ['bus', 'es'], ['dish', 'es'], ['bench', 'es'], ['wish', 'es'], ['glass', 'es'], ['brush', 'es']];
   const [w, suf] = pick(rng, d === 1 ? S.filter(x => x[1] === 's') : S);
-  return wordQ(rng, `one ${w}, two ${w}__`, suf, ['s', 'es', 'ies'], { visual: { type: 'word', text: `${w}_` }, say: `One ${w}, two ${w}${suf}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
+  return wordQ(rng, `one ${w}, two ${w}__`, suf, ['s', 'es', 'ies'], { visual: { type: 'word', text: `${w}_` }, say: `One ${w}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
 };
 /** [root, ending, sentence]. The sentence alone decides the ending (#2272); `tests/unit/topic-suffix-fit.test.ts` pins each one. */
 export const Y1_SUFFIX: ReadonlyArray<readonly [string, string, string]> = [['jump', 'ing', 'She is jump___ now.'], ['play', 'ed', 'Yesterday he play___.'], ['walk', 'ing', 'I am walk___ to school.'], ['look', 'ed', 'We look___ at the sky.'], ['fast', 'er', 'A car is fast___ than a bike.'], ['tall', 'est', 'It is the tall___ tree of all.'], ['help', 'ing', 'Dad is help___ me.'], ['kick', 'ed', 'He kick___ the ball yesterday.'], ['kind', 'er', 'Mia is kind___ than Sam.'], ['small', 'est', 'It is the small___ mouse of all.']];
