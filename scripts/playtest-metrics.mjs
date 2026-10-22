@@ -104,18 +104,25 @@ export const cardShare = (rect, view) => Math.round((Math.max(0, rect.width) * M
 const round = v => (v === null || v === undefined ? null : Math.round(v));
 /** When the spoken line ended, if it was spoken to its end: started, ended, and not cut off. */
 const heardEnd = sp => (sp && sp.start !== null && sp.end !== null && !sp.error ? sp.end : null);
+/**
+ * When the voice stopped speaking the line, whether or not it finished: its end, the moment the game's next line
+ * cut it off, or, still speaking when the pack was collected, that moment (`collectedAt`), the most that is known.
+ * Null when the voice never began it.
+ */
+const stoppedAt = (sp, collectedAt) => (!sp || sp.start === null ? null : heardEnd(sp) ?? (sp.error ? sp.cut ?? null : collectedAt ?? null));
 
 /**
  * The spoken prompt. `speechAutoplays`: the game called speak() for it by itself, before any tap. `speechStarted`:
  * the speech engine really began it; with no voice (a headless Linux browser) it never does, and then every
  * duration is null, not a number nobody heard.
  */
-function speechKeys(sp, offered, promptAt) {
+function speechKeys(sp, offered, promptAt, collectedAt) {
   const autoplays = !!sp;
-  const heard = heardEnd(sp) !== null;
+  const heard = heardEnd(sp) !== null, stop = stoppedAt(sp, collectedAt);
   return {
     speech: speechMode({ autoplays, offered }), speechOffered: offered, speechAutoplays: autoplays, speechStarted: autoplays && sp.start !== null,
     speechText: sp?.text ?? null, speechMs: heard ? round(sp.end - sp.start) : null,
+    speechFinished: heard, speechHeardMs: stop === null ? null : round(stop - sp.start),
     speechEndsAfterPromptMs: heard && promptAt !== null ? round(sp.end - promptAt) : null,
     speechVoice: sp?.voice ?? null, speechError: sp?.error ?? null,
     speechCutAfterMs: autoplays && sp.error && sp.cut && sp.start !== null ? round(sp.cut - sp.start) : null,
@@ -124,7 +131,10 @@ function speechKeys(sp, offered, promptAt) {
 
 /** The first wave's timing; every time in `flights` counts from the prompt appearing. */
 function flightKeys(p, sp) {
-  const f = flightMetrics(p.samples, { H: p.screen.H, cardBottom: p.screen.card?.bottom ?? 0, answer: p.screen.answer, speechEnd: heardEnd(sp) });
+  // The reach after speech counts from when the voice stopped: a line that outlasted the wave leaves 0, not "not measured".
+  const stop = stoppedAt(sp, p.collectedAt);
+  const f = flightMetrics(p.samples, { H: p.screen.H, cardBottom: p.screen.card?.bottom ?? 0, answer: p.screen.answer, speechEnd: stop });
+  const lastLeave = f.bubbles.reduce((m, b) => (b.leaveMs === null ? m : Math.max(m, b.leaveMs)), -Infinity);
   const firstLaunch = f.bubbles.length ? Math.min(...f.bubbles.map(b => b.launchMs)) : null;
   const rel = v => (v === null || p.promptAt === null ? null : Math.round(v - p.promptAt));
   return {
@@ -133,6 +143,7 @@ function flightKeys(p, sp) {
     promptLeadMs: firstLaunch === null ? null : rel(firstLaunch),
     launchToApexMs: f.launchToApexMs, aboveCardMs: f.aboveCardMs, answerAboveCardMs: f.answerAboveCardMs,
     afterSpeechMs: f.afterSpeechMs,
+    speechOutlastedWave: stop !== null && heardEnd(sp) === null && lastLeave > -Infinity && stop >= lastLeave,
     slowestBubble: f.slowestBubble, fastestBubble: f.fastestBubble,
     flights: f.bubbles.map(b => ({ label: b.label, launchMs: rel(b.launchMs), enterMs: rel(b.enterMs), apexMs: rel(b.apexMs), leaveMs: rel(b.leaveMs), reachMs: round(b.reachMs), afterSpeechMs: round(b.afterSpeechMs), endedBy: b.endedBy })),
     frames: frameStats(p.frames),
@@ -144,8 +155,11 @@ export const ABOUT = {
   aboveCardMs: "over the first-wave bubbles that fell out of reach on their first flight: the time each one's centre spent below the question card and above the screen's bottom edge",
   answerAboveCardMs: 'the same, for the right answer\'s bubble',
   launchToApexMs: 'from the frame a bubble launched to the top of its arc',
-  afterSpeechMs: 'over the same bubbles: how much of each one\'s reachable time came after the spoken prompt ended',
+  afterSpeechMs: 'over the same bubbles: how much of each one\'s reachable time came after the voice stopped speaking the prompt; 0 when the prompt outlasted the wave',
   speechAutoplays: 'the game spoke the prompt by itself; speechStarted says the voice really began it, and only then are speech times measured',
+  speechMs: 'the spoken prompt\'s length, when it was spoken to its end (speechFinished); null when it was cut off or still playing',
+  speechHeardMs: 'how long the voice spoke the prompt: to its end, to the moment the next line cut it off, or, still speaking when the pack was taken, at least this long',
+  speechOutlastedWave: 'the prompt was still being spoken when every first-wave bubble had gone: the child had no reach at all after hearing it',
   promptLeadMs: 'from the prompt appearing to the first bubble launching; near 0 means the wave rose with the prompt',
   flights: "per bubble, in ms from the prompt appearing; endedBy 'wave over' means the wave ended (the answer fell) while it was still in reach",
   speechCutAfterMs: "when the game's next line cut the spoken prompt off (speechError), how long it had played; a cut just after the answer fell (flights[].leaveMs) means the prompt was still being spoken when the wave ended",
@@ -166,7 +180,7 @@ export function buildMetrics({ job, input, settings, view, seed, rec: p, shots }
     year: job.year, game: job.game, catalogue: job.catalogue, viewport: `${view.width}x${view.height}`, seed,
     input, mode: screen.mode, hasLives: screen.hasLives, settings,
     prompt: screen.prompt, promptWords: countWords(screen.prompt), hint: screen.hint, hintWords: countWords(screen.hint),
-    ...speechKeys(p.speech, screen.speakVisible, p.promptAt), speechVoices: p.voices ?? null,
+    ...speechKeys(p.speech, screen.speakVisible, p.promptAt, p.collectedAt), speechVoices: p.voices ?? null,
     ...(input === 'bubbles' ? flightKeys(p, p.speech) : {}),
     cardShareOfScreen: screen.card ? cardShare(screen.card, view) : null, cardBottomPx: screen.card ? Math.round(screen.card.bottom) : null,
     slow: screen.slow, wide: screen.wide, sequence: screen.sequence, anyOrder: screen.anyOrder, visual: screen.visual,

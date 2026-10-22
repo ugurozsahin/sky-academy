@@ -196,7 +196,28 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
     const none = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: null }, shots: [] });
     expect([none.speech, none.speechAutoplays]).toEqual(['tap', false]);
     const cut = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: { text: 't', at: 0, start: 100, end: null, error: 'interrupted', cut: 1600 } }, shots: [] });
-    expect([cut.speech, cut.speechMs, cut.speechCutAfterMs, cut.afterSpeechMs]).toEqual(['auto', null, 1500, null]);
+    expect([cut.speech, cut.speechMs, cut.speechFinished, cut.speechCutAfterMs, cut.speechHeardMs, cut.speechOutlastedWave]).toEqual(['auto', null, false, 1500, 1500, false]);
+    expect(cut.afterSpeechMs, 'cut while the bubbles were up: the reach after it counts from the cut')
+      .toEqual(flightMetrics(rec.samples!, { H, cardBottom: 187, speechEnd: 1600 }).afterSpeechMs);
+  });
+
+  // #2223 review: a prompt the voice was still speaking when the whole wave had gone left the child no reach after
+  // it. That is a measured 0, never a null a profile reads as "not observed".
+  const lastLeave = Math.max(...flightMetrics(rec.samples!, { H, cardBottom: 187 }).bubbles.map(b => b.leaveMs ?? 0));
+  const outlasting = (speech: Recorded['speech'], collectedAt?: number) =>
+    buildMetrics({ job: { year: 'reception', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech, collectedAt }, shots: [] });
+  it('a prompt cut off only after every bubble had gone outlasted the wave: no reach after it, and how long it was heard', () => {
+    const m2 = outlasting({ text: 't', at: 0, start: 20, end: null, error: 'interrupted', cut: lastLeave + 130 });
+    expect([m2.speechMs, m2.speechFinished, m2.speechOutlastedWave, m2.speechHeardMs]).toEqual([null, false, true, Math.round(lastLeave + 110)]);
+    expect(m2.afterSpeechMs).toEqual({ min: 0, max: 0 });
+    for (const f of m2.flights as { afterSpeechMs: number | null }[]) expect(f.afterSpeechMs).toBe(0);
+  });
+  it('a prompt still playing when the wave was collected outlasted it too, heard for at least that long', () => {
+    const m2 = outlasting({ text: 't', at: 0, start: 20, end: null, error: null }, lastLeave + 400);
+    expect([m2.speechMs, m2.speechFinished, m2.speechOutlastedWave, m2.speechHeardMs, m2.speechCutAfterMs]).toEqual([null, false, true, Math.round(lastLeave + 380), null]);
+    expect(m2.afterSpeechMs).toEqual({ min: 0, max: 0 });
+    const done = outlasting(rec.speech);
+    expect([done.speechFinished, done.speechOutlastedWave, done.speechHeardMs]).toEqual([true, false, done.speechMs]);
   });
 
   it('leaves the bubble keys out of a pack with no bubbles, rather than writing a number nobody measured', () => {

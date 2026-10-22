@@ -22,6 +22,8 @@ export interface Screen {
 export interface Recorded {
   screen: Screen; samples: Sample[] | null; frames: number[]; labels: string[]; promptAt: number | null; speech: Spoken | null;
   extra: Record<string, unknown>; voices?: number;
+  /** performance.now() when recording stopped: a line still playing then had played at least until this. */
+  collectedAt?: number;
 }
 export declare const KEYPAD_PACKS: PackJob[];
 export declare function plannedPacks(cat: { games: Record<string, { years: Record<string, unknown> }> }, filter?: { year?: string | null; only?: string[] | null }): PackJob[];

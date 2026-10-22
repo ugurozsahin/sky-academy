@@ -10,7 +10,7 @@ const RESULT_TIMEOUT = 240000;                        // the keypad's Tables Che
 /** Turn recording off and take what the page kept since the tap: the prompts, the spoken lines, the frames and bubbles. */
 const collect = page => page.evaluate(() => {
   const pk = window.__pk; pk.on = false;
-  return { voices: globalThis.speechSynthesis?.getVoices().length ?? 0, samples: pk.samples, frames: pk.frames, labels: pk.labels ?? [], promptAt: pk.prompts[0]?.t ?? null, speech: pk.speech.filter(e => e.at >= pk.onAt)[0] ?? null };
+  return { collectedAt: performance.now(), voices: globalThis.speechSynthesis?.getVoices().length ?? 0, samples: pk.samples, frames: pk.frames, labels: pk.labels ?? [], promptAt: pk.prompts[0]?.t ?? null, speech: pk.speech.filter(e => e.at >= pk.onAt)[0] ?? null };
 });
 /** Wait, up to 10 s, for the first spoken line to finish, so a stroke's own feedback line does not interrupt it. */
 const spoken = page => page.waitForFunction(() => { const e = window.__pk.speech.find(x => x.at >= window.__pk.onAt); return !e || e.end !== null || e.error; }, null, { timeout: 10000, polling: 100 }).then(() => false, () => true);
