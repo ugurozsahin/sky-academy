@@ -1,6 +1,6 @@
 // Multiplication Tables Check form builder (#1116): 25 questions drawn under the STA's published rules
 // (MTC assessment framework §5.1–5.2). Pure: no DOM, no `src/ui` import.
-import type { Question, Rng } from '../curriculum/types';
+import type { Question, Rng, YearId } from '../curriculum/types';
 import { isGameShown, topicById } from '../curriculum';
 import { productDecoys } from '../curriculum/year4-tables';
 import { q, shuffle } from '../curriculum/util';
@@ -19,10 +19,11 @@ export const MTC_LIMITS: Record<number, { min: number; max: number }> = {
 export const KS1_TABLES = [2, 5, 10] as const;
 export const KS1_LIMIT = { min: 3, max: 7 };
 export const MTC_SIZE = 25;
-/** The topic a Tables Check deck is dealt under, and the game whose catalogue node offers it (#2196). */
+/** The topic a Tables Check deck is dealt under, the game whose catalogue node offers it, and its island (#2196). */
 export const MTC_TOPIC = 'y4-tables';
-/** The Tables Check rows are offered only while the catalogue shows `MTC_TOPIC` on Year 4 (#2196). */
-export const mtcOffered = (): boolean => isGameShown(MTC_TOPIC, 'year4');
+export const MTC_YEAR = 'year4' satisfies YearId;
+/** The Tables Check rows are offered only while the catalogue shows `MTC_TOPIC` on its island (#2196). */
+export const mtcOffered = (): boolean => isGameShown(MTC_TOPIC, MTC_YEAR);
 const MAX_ATTEMPTS = 100;
 
 const pick = <T>(xs: T[], rng: Rng): T => xs[Math.floor(rng() * xs.length)];

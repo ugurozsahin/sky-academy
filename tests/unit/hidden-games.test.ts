@@ -8,7 +8,8 @@ import { CORE_TOPICS, TOPICS, YEARS, drillsFor, isGameShown, listedTopics, shown
 import { GRAMMAR, grammarPool } from '../../src/game/sprint-pools';
 import { answerableBy } from '../../src/game/pools';
 import { mtcOffered } from '../../src/game/mtc';
-import { fedRows } from '../../src/ui/home';
+import { islandMenu } from '../../src/ui/home';
+import { load } from '../../src/storage';
 import { SOURCES, code } from './helpers/sources';
 
 type Mut = { years: Record<string, { visible: 'auto' | boolean }>; games: Record<string, { visible: boolean; years: Record<string, { visible: boolean }> }> };
@@ -16,8 +17,11 @@ type Mut = { years: Record<string, { visible: 'auto' | boolean }>; games: Record
 const copy = (edit: (c: Mut) => void): RuntimeCatalogue => { const c = structuredClone(RUNTIME) as unknown as Mut; edit(c); return c as unknown as RuntimeCatalogue; };
 const ids = (ts: readonly { id: string }[]) => ts.map(t => t.id);
 const SUBJECTS = [undefined, 'maths', 'writing'] as const;
-/** Every island-menu row id (`src/ui/home.ts`), so `fedRows` is asked about each one. */
-const ROWS = ['train', 'endless', 'legend', 'legend-pro', 'mtc', 'mtcpad', 'paper', 'arith', 'grammar', 'daily', 'daily10', 'daily10t', 'sprint', 'tricky', 'relaxed', 'boss', 'memory', 'duel'].map(id => ({ id }));
+/** The real island menu's rows on `year` for a new save (`islandMenu`, src/ui/home.ts), against the loaded catalogue. */
+type Menu = typeof islandMenu;
+const menu = (im: Menu, ld: typeof load, year: { id: YearId }) => im({} as never, YEARS.find(y => y.id === year.id)!, ld(), {}, () => 'maths');
+/** The rows the catalogue can empty, in menu order, as the committed file offers them. */
+const FED = (y: YearId) => ['train', 'endless', ...(y === 'year4' ? ['mtc', 'mtcpad'] : []), 'sprint', 'relaxed', 'boss', 'duel'];
 
 /** Today's lists, as they were before the catalogue (#915, #1039, #1234): the baseline the committed file must equal. */
 const before = {
@@ -45,7 +49,7 @@ describe('with the committed catalogue every list is exactly today\'s (#2196)', 
     expect(ids(listedTopics())).toEqual(ids(CORE_TOPICS.filter(t => shown.has(t.year))));
     for (const n of [5, 6]) expect(ids(grammarPool(`year${n}` as YearId))).toEqual(ids(before.grammarPool(n)));
     expect(mtcOffered()).toBe(true);
-    for (const y of YEARS) expect(fedRows(ROWS, y), y.id).toEqual(ROWS);
+    for (const y of YEARS) expect(ids(menu(islandMenu, load, y).filter(r => r.feeds)), y.id).toEqual(FED(y.id));
   });
   it('isGameShown is true for every registry game on its own year, and agrees with topicsFor/drillsFor', () => {
     expect(TOPICS.filter(t => !isGameShown(t.id, t.year)).map(t => t.id)).toEqual([]);
@@ -107,11 +111,11 @@ describe('a hidden maths game and a hidden writing game leave every list and poo
   }));
 
   it('Tables Check rows go with y4-tables; no other row moves', () => withCatalogue(TEST_CAT, async () => {
-    const { YEARS: ys } = await import('../../src/curriculum');
-    const { fedRows: fed } = await import('../../src/ui/home');
+    const { islandMenu: im } = await import('../../src/ui/home');
+    const { load: ld } = await import('../../src/storage');
     const { mtcOffered: offered } = await import('../../src/game/mtc');
     expect(offered()).toBe(false);
-    for (const y of ys) expect(ids(fed(ROWS, y)), y.id).toEqual(without(ROWS, ['mtc', 'mtcpad']));
+    for (const y of YEARS) expect(ids(menu(im, ld, y).filter(r => r.feeds)), y.id).toEqual(without(FED(y.id).map(id => ({ id })), ['mtc', 'mtcpad']));
   }));
 
   it('every total and unlock counts shown games only; the save keeps the hidden games\' stars', () => withCatalogue(TEST_CAT, async () => {
@@ -151,11 +155,11 @@ describe('a pool the catalogue empties hides its entry point (#2196)', () => {
     const mixable = before.topicsFor('reception').filter(t => answerableBy(t, 'mixed')).map(t => t.id);
     return withCatalogue(copy(c => { for (const id of mixable) c.games[id].visible = false; }), async () => {
       const cur = await import('../../src/curriculum');
-      const { fedRows: fed } = await import('../../src/ui/home');
-      const rec = cur.YEARS.find(y => y.id === 'reception')!;
+      const { islandMenu: im } = await import('../../src/ui/home');
+      const { load: ld } = await import('../../src/storage');
       expect(ids(cur.topicsFor('reception')), 'the story and tracing games are left').toEqual(['r-storytime', 'r-trace']);
       expect(cur.shownYears().map(y => y.id)).toContain('reception');
-      expect(ids(fed(ROWS, rec))).toEqual(without(ROWS, ['train', 'endless', 'sprint', 'relaxed', 'boss', 'duel']));
+      expect(ids(menu(im, ld, { id: 'reception' })), 'every row id, so a renamed or new mixed row shows up here').toEqual(['memory']);
     });
   });
   it('a hidden island lists nothing', () => withCatalogue(copy(c => { c.years.year2.visible = false; }), async () => {

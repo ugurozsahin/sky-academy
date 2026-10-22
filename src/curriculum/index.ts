@@ -25,7 +25,8 @@ export const topicById = (id: string) => TOPICS.find(t => t.id === id);
  * The catalogue every island, game list, pool and total reads its visibility from (#2195, #2196): the committed
  * file. The one seam a user's patched catalogue comes through (#2199): return the active profile's patched copy
  * here and `shownYears`, `isGameShown` and every list below follow at once. A whole catalogue, never a bare patch:
- * a year or game it leaves out is hidden.
+ * a year or game it leaves out is hidden. Lists call it on every read, so a patched copy must be built once per
+ * profile and patch, never per call.
  */
 const activeCatalogue = (): Visibility => RUNTIME;
 
@@ -48,8 +49,7 @@ const islandOn = (year: YearId, cat: Visibility): boolean => previewAllYears() |
 export const isGameShown = (id: string, year: YearId, cat: Visibility = activeCatalogue()): boolean => gameOn(cat, id, year) && islandOn(year, cat);
 
 /** The rows of `list` (all on `year`) that `isGameShown` keeps: the same two checks, the island's made once. */
-const shownOn = (year: YearId, list: Topic[], cat: Visibility = activeCatalogue()): Topic[] =>
-  islandOn(year, cat) ? list.filter(t => gameOn(cat, t.id, year)) : [];
+const shownOn = (year: YearId, list: Topic[]): Topic[] => { const cat = activeCatalogue(); return islandOn(year, cat) ? list.filter(t => gameOn(cat, t.id, year)) : []; };
 
 /** A year's shown non-drill topics, in registry order: the island list, its totals, and every mixed pool (#2196). */
 export const topicsFor = (year: YearId, subject?: Topic['subject']) => shownOn(year, CORE_TOPICS.filter(t => t.year === year && (!subject || t.subject === subject)));

@@ -1,7 +1,7 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { arithmeticPool, grammarPool, offeredPool } from '../game/sprint-pools';
 import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint'; import { sprintSeed } from '../game/challenge-run';
-import { mtcDeck, mtcOffered } from '../game/mtc';
+import { MTC_YEAR, mtcDeck, mtcOffered } from '../game/mtc';
 import { paperDeck } from '../game/arithmetic-paper';
 import { TRICKY, trickyDeck } from '../game/tricky-facts';
 import { leastSecure } from '../fact-record';
@@ -203,7 +203,7 @@ export function mapScreen(nav: Nav) {
 
 /** Tables Check practice (#1118): Year 4 only, through the menu's `years` filter. */
 const mtcRow = (nav: Nav, year: YearInfo): MenuRow => ({ id: 'mtc', mod: 'sprint', vport: '<span class="vport emoji">✖️</span>', title: MODES.mtc.title,
-  blurb: '25 questions · 6 seconds each', years: ['year4'], go: () => nav.play({ year, mode: 'mtc', deck: mtcDeck(Math.random) }) });
+  blurb: '25 questions · 6 seconds each', years: [MTC_YEAR], feeds: 'mtc', go: () => nav.play({ year, mode: 'mtc', deck: mtcDeck(Math.random) }) });
 /** #1120: the same run, answered by typing on the number pad as the real check does. */
 const mtcPadRow = (nav: Nav, year: YearInfo): MenuRow => ({
   ...mtcRow(nav, year), id: 'mtcpad', title: 'Tables Check on the number pad', blurb: 'type each answer · 6 seconds each',
@@ -261,23 +261,23 @@ const deckRows = (nav: Nav, year: YearInfo, progress: Record<string, TopicProgre
   [...legendRow(nav, year, progress), mtcRow(nav, year), mtcPadRow(nav, year), paperRow(nav, year),
     ...arithmeticRow(nav, year), ...grammarRow(nav, year), ...dailySprintRow(nav, year), ...dailyTenRows(nav, year)];
 
-/** One island-menu row. `years` (#1117) limits it to those islands; no row has it yet, so every row shows everywhere. */
-export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[] }
+/** What a row's tap draws from, when the catalogue can empty it (#2196): the island's mixed pool, a duel pool, or Tables Check's topic. */
+export type Feed = 'mixed' | 'duel' | 'mtc';
+/** One island-menu row. `years` (#1117) limits it to those islands; `feeds` (#2196) hides it once the catalogue empties that pool. */
+export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[]; feeds?: Feed }
 export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId): T[] => rows.filter(r => !r.years || r.years.includes(year));
 
-/** The rows that draw the island's mixed pool: Sensei, Sky Storm, Sprint, Relaxed and Boss (`subjectPool`, `senseiTopics`). */
-const MIXED_ROWS = new Set(['train', 'endless', 'sprint', 'relaxed', 'boss']);
 /**
  * #2196: a row whose pool the catalogue has emptied is not offered, rather than crash on the tap — `Session.pickTopic()`
- * and `duelScreen` both throw on an empty pool. The mixed rows need one shown bubble topic on the island (`subjectPool`
- * falls back to the whole year's); Ninja Duel needs one it can duel on; Tables Check needs `MTC_TOPIC` shown. The
- * rows that already hide on an empty pool (Legend, Daily, Grammar mix, Arithmetic Sprint) pass through.
+ * and `duelScreen` both throw on an empty pool. A `mixed` row (Sensei, Sky Storm, Sprint, Relaxed, Boss) needs one
+ * shown bubble topic on the island (`subjectPool` falls back to the whole year's); `duel` needs one it can duel on;
+ * `mtc` needs `MTC_TOPIC` shown. A row with no `feeds` already hides on an empty pool itself (Legend, Daily, Grammar
+ * mix, Arithmetic Sprint) or draws from no game (Memory Match, Tricky Facts, Arithmetic practice).
  */
-export const fedRows = <T extends { id: string }>(rows: T[], year: YearInfo): T[] => {
+export const fedRows = <T extends { feeds?: Feed }>(rows: T[], year: YearInfo): T[] => {
   const topics = topicsFor(year.id);
-  const mixed = topics.some(mixable), duel = topics.some(t => answerableBy(t, 'duel', year.diffs[0] ?? 1));
-  const fed = (id: string) => id === 'duel' ? duel : id === 'mtc' || id === 'mtcpad' ? mtcOffered() : !MIXED_ROWS.has(id) || mixed;
-  return rows.filter(r => fed(r.id));
+  const fed: Record<Feed, boolean> = { mixed: topics.some(mixable), duel: topics.some(t => answerableBy(t, 'duel', year.diffs[0] ?? 1)), mtc: mtcOffered() };
+  return rows.filter(r => !r.feeds || fed[r.feeds]);
 };
 
 /** #932: the Legend run menu row — only with a 3★ topic in hand; opens #910's chooser on exactly those topics, no Mixed. */
@@ -293,8 +293,8 @@ function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgr
   return !list.length ? [] : year.gentle ? [row] : [row, pro];
 }
 
-/** The island menu rows; `subject` is read at tap time so a tab switch is honoured without rebuilding it. */
-function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Record<string, TopicProgress>, subject: () => 'maths' | 'writing') {
+/** The island menu rows; `subject` is read at tap time so a tab switch is honoured without rebuilding it. Exported for its unit test (#2196). */
+export function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Record<string, TopicProgress>, subject: () => 'maths' | 'writing') {
   const weakest = senseiTopics(topicsFor(year.id), progress, new Date());
   // #95: the four per-year best/count fields have the same hazard as `progress` — a hand-edited or corrupted
   // "Restore" paste can carry any of them as anything, and `d.training[year.id]` throws the moment `d.training`
@@ -309,19 +309,19 @@ function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Record<stri
   // Sensei-training, Memory-Match and the Legend run (#932) are separate flows, so they live here too.
   return fedRows(menuFor<MenuRow>([   // #1117: a row with `years` shows only on those islands; #2196: an emptied pool hides its row
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
-      title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
+      feeds: 'mixed', title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
       go: () => { say(senseiTrainLine(year, d.ks2.schoolYear, weakest)); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
-      title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
+      feeds: 'mixed', title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
       go: () => playMixed(nav, year, 'endless', mixedPool(), progress) }, ...deckRows(nav, year, progress),
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
-      title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
+      feeds: 'mixed', title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
       go: () => chooseThenPlay(nav, year, subject(), 'sprint', mixedPool(), progress) }, ...trickyRow(nav, year, d.ks2.facts),
-    { id: 'relaxed', mod: 'relaxed', vport: `<span class="vport emoji">🌱</span>`, title: MODES.relaxed.title, blurb: 'No lives, no clock',   // #937
+    { id: 'relaxed', mod: 'relaxed', vport: `<span class="vport emoji">🌱</span>`, feeds: 'mixed', title: MODES.relaxed.title, blurb: 'No lives, no clock',   // #937
       go: () => chooseThenPlay(nav, year, subject(), 'relaxed', mixedPool(), progress) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
-      title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
+      feeds: 'mixed', title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
       go: () => bossThenPlay(nav, year, subject(), mixedPool(), progress) },
     // #1049: Memory Match used to fall back to Reception's decks for a year with none of its own — hidden
     // instead, since `pickTheme` now throws rather than hand a KS2 child a Reception board.
@@ -329,7 +329,7 @@ function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Record<stri
       title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${memory[year.id] ?? 0}`,
       go: () => nav.memory(year) }] : []),
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
-      title: 'Ninja Duel', blurb: 'Two players · first slice wins',
+      feeds: 'duel', title: 'Ninja Duel', blurb: 'Two players · first slice wins',
       go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject()), (topic, teams) => { sfx.tap(); nav.duel(year, topic?.id, teams ? 'teams' : undefined); }, { mixed: true, mixedLabel: 'Random', teams: true }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
   ], year.id), year);
 }
