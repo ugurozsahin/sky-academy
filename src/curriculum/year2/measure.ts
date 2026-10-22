@@ -195,7 +195,8 @@ function endTime(rng: Rng): Question {
     if (ds.length === 3) break;
   }
   const said = `It starts at ${clockPhrase(h, m)} and lasts ${phrase}. When does it end?`;
-  return wordQ(rng, said, ans, ds, { say: said });
+  // The start time is drawn so the child has a clock to count on from (#2271); the end stays unseen.
+  return wordQ(rng, said, ans, ds, { say: said, visual: { type: 'clock', h, m } });
 }
 export const y2Duration: Generator = (d, rng) => {
   if (d === 1) {
