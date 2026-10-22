@@ -130,7 +130,7 @@ async function packOne(browser, enc, base, app, job, out) {
   };
   try {
     const tile = await findOnIsland(page, base, job, topic);
-    await tile.scrollIntoViewIfNeeded(); await page.waitForTimeout(300);
+    await tile.scrollIntoViewIfNeeded(); await page.waitForTimeout(700);   // the chooser fades in
     await shot('1-island.webp', job.catalogue ? (topic.drill ? 'the Relaxed chooser card for this drill' : 'the game tile on its island') : 'the menu row on the Year 4 island');
     await page.evaluate(() => { window.__pk.on = true; window.__pk.onAt = performance.now(); });
     await tile.click();                              // a real tap: it is also what lets the page speak

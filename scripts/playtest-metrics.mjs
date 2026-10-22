@@ -148,7 +148,7 @@ export const ABOUT = {
   speechAutoplays: 'the game spoke the prompt by itself; speechStarted says the voice really began it, and only then are speech times measured',
   promptLeadMs: 'from the prompt appearing to the first bubble launching; near 0 means the wave rose with the prompt',
   flights: "per bubble, in ms from the prompt appearing; endedBy 'wave over' means the wave ended (the answer fell) while it was still in reach",
-  speechCutAfterMs: "when the spoken prompt was cut off (speechError), how long it had played",
+  speechCutAfterMs: "when the game's next line cut the spoken prompt off (speechError), how long it had played; a cut just after the answer fell (flights[].leaveMs) means the prompt was still being spoken when the wave ended",
   frames: 'the longest gap between frames while the wave was timed; over 100 ms the arena slows its step, so the times ran long',
   promptWords: 'words only: numerals, symbols and the ? placeholder are read at a glance',
   demoShown: "the animated first-ever-play demo is skipped: the pack plays as a child who has played any game before",
