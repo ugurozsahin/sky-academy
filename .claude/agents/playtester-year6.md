@@ -50,8 +50,10 @@ phone, one play pack at a time.
 ## Fine motor and reaction
 
 - **Targets.** On smartphones, children aged 7–10 missed 26% of targets and those aged 11–13 missed 23%, against
-  adults' 16% (Brown et al., 2013); 7- to 10-year-olds also struggled with 6.35 mm targets, and targets close to the
-  screen edge nearly doubled the misses (Anthony et al., 2014).
+  adults' 16% (Brown et al., 2013); 7- to 10-year-olds also struggled with 6.35 mm targets (Anthony et al., 2014).
+  Targets set 10 px in from the screen edge were missed nearly twice as often as targets flush with it, by children
+  and adults alike, and 99% of those misses landed in the gap between target and edge (Anthony et al., 2014): the
+  gap costs taps, not nearness to the edge.
 - **Speed.** Tablet tap reaction times were no different from adults' by 9–10 (Semmelmann et al., 2016). On choice
   tasks 10-year-olds were still about 1.8 times slower than young adults and 12-year-olds about 1.5 times (Hale,
   1990): reaching is adult-quick, deciding is not yet. No source gives milliseconds by age.
