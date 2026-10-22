@@ -6,8 +6,8 @@ import { PLAYTESTERS } from './helpers/playtest';
 /**
  * #2204 — the playtest skill and its eight profiles. `governance.test.ts` holds them on the allow-list and pins
  * their descriptions; this holds what the later items of #2192 rely on: one profile per `YearId` plus the
- * parent, the row the skill defines (#2206 validates against it), sources cited by link, and no tool that could
- * change the game being scored.
+ * parent, the row the skill defines (#2206 validates against it), sources cited by link, and no Edit or Write
+ * tool. Bash stays, to drive the live game; that a profile changes nothing is held by its prompt, not here.
  */
 const root = new URL('../../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
@@ -25,7 +25,7 @@ describe('playtest profiles (#2204)', () => {
     expect([...PLAYTESTERS].sort(), 'the allow-list in helpers/playtest.ts names the same eight').toEqual([...PROFILES].sort());
   });
 
-  it.each(PROFILES)('%s may read and run, and has no tool that edits a file', (name) => {
+  it.each(PROFILES)('%s has no Edit or Write tool', (name) => {
     const tools = /^tools:[ \t]+(.+)$/m.exec(body(name));
     expect(tools, `${name} must name its tools, or it inherits Edit and Write`).not.toBeNull();
     const list = tools![1].split(',').map((t) => t.trim());
@@ -46,14 +46,18 @@ describe('playtest profiles (#2204)', () => {
     expect(all.filter((u) => !gov.includes(u)).length, `${name}: motor and reaction-time norms need a published source`).toBeGreaterThanOrEqual(1);
   });
 
-  it('the parent profile states how it reweights the rubric', () => {
-    expect(body('playtester-parent')).toMatch(/reweight/i);
+  it('the parent profile states how it reweights the rubric: two caps that keep the sum', () => {
+    const parent = body('playtester-parent');
+    expect(parent).toMatch(/reweight/i);
+    expect(parent, 'learning value counts twice').toMatch(/`again` may not be higher than `challenge`/);
+    expect(parent, 'safety and calm is a gate').toMatch(/if `feedback` is 0, `again` is 0 too/);
   });
 });
 
 describe('the playtest skill (#2204)', () => {
   it('defines five criteria, each 0 to 2, summed to a whole score out of 10', () => {
     for (const k of KEYS) expect(SKILL, `the rubric table names \`${k}\``).toContain(`| \`${k}\` |`);
+    expect(SKILL.match(/^\| `\w+` \|/gm), 'exactly five rows, or "out of 10" stops being true').toHaveLength(5);
     expect(SKILL).toMatch(/five criteria, 0 to 2 each, summed to a whole score out of 10/);
   });
 
@@ -80,6 +84,13 @@ describe('the playtest skill (#2204)', () => {
     expect(Object.keys(row).sort()).toEqual(['by', 'criteria', 'evidence', 'game', 'note', 'score', 'year']);
     expect(Object.keys(row.criteria).sort()).toEqual([...KEYS].sort());
     expect(Object.values<number>(row.criteria).reduce((a, b) => a + b, 0)).toBe(row.score);
+    for (const v of Object.values(row.criteria)) expect([0, 1, 2], 'each criterion is a whole mark from 0 to 2').toContain(v);
+    expect(Number.isInteger(row.score) && row.score >= 0 && row.score <= 10).toBe(true);
+    for (const e of row.evidence) {
+      expect(Object.keys(e).sort(), 'an evidence entry is { criterion, ref, saw }').toEqual(['criterion', 'ref', 'saw']);
+      expect(KEYS).toContain(e.criterion);
+      expect(e.ref && e.saw, 'ref and saw say something').toBeTruthy();
+    }
     for (const k of KEYS) expect(row.evidence.filter((e: { criterion: string }) => e.criterion === k).length, `the example cites evidence for ${k}`).toBeGreaterThan(0);
     expect(PROFILES).toContain(row.by);
     expect(YEARS.map((y) => y.id)).toContain(row.year);

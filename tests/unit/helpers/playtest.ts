@@ -9,7 +9,7 @@ export const PLAYTESTERS = [
 ] as const;
 
 /** Each description's pin: anchored, with the trigger clause inside it (#150, #312). */
-export const PLAYTEST_PINS: Record<string, RegExp> = {
+export const PLAYTEST_PINS: Record<(typeof PLAYTESTERS)[number] | 'playtest', RegExp> = {
   'playtest': /^Score a Sharpwise game's playability out of 10 .*Use when running a playtester agent/,
   'playtester-reception': /^Playtest profile of a Reception child, age 4–5, .*Use when scoring a Sharpwise game's Reception play pack/,
   'playtester-year1': /^Playtest profile of a Year 1 child, age 5–6, .*Use when scoring a Sharpwise game's Year 1 play pack/,
@@ -22,4 +22,4 @@ export const PLAYTEST_PINS: Record<string, RegExp> = {
 };
 
 /** The frontmatter keys a profile carries beyond `name` and `description`: `tools` is its whole tool list, so it has no Edit or Write. */
-export const PLAYTEST_EXTRA_KEYS = ['tools', 'model'];
+export const PLAYTEST_EXTRA_KEYS = ['tools', 'model'] as const;

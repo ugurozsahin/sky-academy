@@ -118,8 +118,10 @@ not describe the game, re-read the criteria, but never adjust the sum to fit a b
 
 - **Every criterion's mark cites evidence**: at least one entry naming a screenshot file, a
   `metrics.json#<key>`, or a `live:` measurement. **A mark with no evidence is a 0.**
-- **Anything not observed is written as "not observed", never guessed.** A whole criterion not observed is
-  a 0, and the note says the pack lacked it, so the run recaptures the pack rather than filing a game issue.
+- **Anything not observed is written as "not observed", never guessed.** **A whole criterion
+  the pack says nothing about is a capture gap, not a score:** write no row for that game, and list it in the
+  summary as `not scored: <game> — pack lacks <criterion>`, so the run recaptures the pack. A low score that
+  is really a missing screenshot would reach the catalogue looking like a verdict on the game.
 - **Score what the child would experience, not what the game intends.** A demo the child cannot read is no
   demo; a speech button they do not know to press is no speech.
 - **Honesty check before submitting.** If more than 40% of one profile's games score 8 or above, re-justify
@@ -145,6 +147,7 @@ One JSON object per game, one per line (JSON Lines), with exactly these keys:
 - **`note`** — one sentence a teacher would recognise, in British English.
 
 Before handing over, check every row: the sum, all five keys, at least one evidence entry per key, `by`
-spelt as the agent's name. Write the rows to the file the caller names, or, with none named, return them in
+spelt as the agent's name, and every `ref` naming a file that is in the pack, a key that is in its
+`metrics.json`, or a `live:` measurement you made. Write the rows to the file the caller names, or, with none named, return them in
 one fenced `jsonl` block. Then add a two-line summary: the score distribution, and whether the honesty check
-fired.
+fired. List any game held back as `not scored`.
