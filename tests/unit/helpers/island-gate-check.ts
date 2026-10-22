@@ -1,5 +1,5 @@
 // Exported so the same rule runs over the real registry and over a fixture array (#1040) — a mocked module
-// graph is not needed just to prove EXPECTED_SHOWN agrees with `meetsShowGate()`. Calls the real gate and the
+// graph is not needed just to prove GATE_SHOWN agrees with `meetsShowGate()`. Calls the real gate and the
 // real KS2 test, never restates either.
 import { isKs2, meetsShowGate } from '../../../src/curriculum';
 import type { YearId } from '../../../src/curriculum';
