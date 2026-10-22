@@ -11,6 +11,9 @@ import { serve } from '../../scripts/site-serve.mjs';
  *   - no request leaves the page's own origin. Nothing is allowed through: a font, a script or a picture from
  *     anywhere else is a third party that sees the reader. A link out (`<a href="https://ico.org.uk/…">`) is not a
  *     request, so it is neither followed nor counted.
+ * #2162: a same-origin response that is not 2xx/304 fails the page (a stylesheet, font or icon that 404s), except under
+ * `/img/` (screenshots made at deploy time, #2088); and `website/404.html`, which no sitemap lists, is walked too, by
+ * asking for an address that does not exist and so must answer 404 with it, at a depth no page has.
  * `/play/` is in the sitemap but is the game, not a page of website/: it is served here from dist/ (built for `/`,
  * not for `/play/` as the deploy builds it), so only its link must answer, never its page be walked.
  */
@@ -18,6 +21,9 @@ const ORIGIN = 'https://sharpwise.co.uk';
 const GAME = '/play/';
 const locs = [...readFileSync('website/sitemap.xml', 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
 const pages = locs.map(l => l.slice(ORIGIN.length)).filter(p => p !== GAME);
+const LOST = '/no-such-page/at/any-depth/';          // served website/404.html with status 404
+const DEPLOY_TIME = '/img/';                          // screenshots are made at deploy time (#2088), so they may be absent here
+const walked: Array<[string, number]> = [...pages.map((p): [string, number] => [p, 200]), [LOST, 404]];
 
 let site: { origin: string; close: () => Promise<void> };
 test.beforeAll(async () => { site = await serve(); });
@@ -29,7 +35,7 @@ test('the sitemap lists the pages this walks, every one on sharpwise.co.uk', () 
   expect(pages).toContain('/');
 });
 
-for (const path of pages) {
+for (const [path, status] of walked) {
   test(`${path} at 360 px: no sideways scroll, every on-site link answers 200, nothing leaves the origin`, async ({ page }) => {
     const outbound: string[] = [];
     await page.route('**/*', route => {
@@ -39,13 +45,20 @@ for (const path of pages) {
       return route.abort('blockedbyclient');
     });
     page.on('websocket', ws => outbound.push(ws.url()));
+    const failed: string[] = [];
+    page.on('response', r => {
+      const u = new URL(r.url());
+      if (u.origin !== site.origin || u.pathname === path || u.pathname.startsWith(DEPLOY_TIME)) return;
+      if (!r.ok() && r.status() !== 304) failed.push(`${u.pathname} → ${r.status()}`);
+    });
     const res = await page.goto(site.origin + path, { waitUntil: 'load' });
-    expect(res?.status(), `${path} must answer 200`).toBe(200);
+    expect(res?.status(), `${path} must answer ${status}`).toBe(status);
     expect(res?.request().redirectedFrom()?.url(), `${path} must answer itself, not redirect`).toBeUndefined();
     // A lazy picture below the fold is never fetched at this height: fetch every one now, so one that would leave
     // the origin is seen here rather than only by a reader who scrolls.
     await page.evaluate(() => document.querySelectorAll('[loading="lazy"]').forEach(e => e.setAttribute('loading', 'eager')));
     await page.waitForLoadState('networkidle');
+    expect(failed, `${path} loads on-site files that do not answer`).toEqual([]);
     expect(outbound, `${path} asked for something off its own origin`).toEqual([]);
 
     const { scroll, view } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
@@ -64,6 +77,7 @@ for (const path of pages) {
     expect(onSite.size, `${path} must link somewhere on the site`).toBeGreaterThan(0);
     const broken: string[] = [];
     for (const target of onSite) {
+      if (target === path) continue;   // the skip link's `#main` is the page itself, which answers `status`, not 200
       const status = (await page.request.get(site.origin + target, { maxRedirects: 0 })).status();
       if (status !== 200) broken.push(`${target} → ${status}`);
     }

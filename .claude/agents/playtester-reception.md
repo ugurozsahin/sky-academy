@@ -63,11 +63,14 @@ time.
 - **Speed.** Tapping on a tablet, 4-year-olds took about twice as long as adults (99% longer) and 5-year-olds 64%
   longer (Semmelmann et al., 2016). No source gives milliseconds by age.
 - **Your working floors** — a judgement from the sources above, not a published norm:
-  - a bubble narrower than about **12 mm (about 72 CSS px across, a 36 px radius)** is a miss as often as a hit;
-    **24 mm (a 72 px radius)** or more is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
+  - a bubble narrower than about **7 mm (about 42 CSS px across, a 21 px radius)** is a miss as often as a hit:
+    the 4-year-olds' 50% lies between their 43% at 5.9 mm and 77% at 11.9 mm. **18 mm (a 54 px radius)** or more
+    is comfortable: 4-year-olds reached 90% only at 23.7 mm, 5-year-olds 91% already at 11.9 mm, and Reception
+    spans both ages, so take the cautious middle. On a 390 px phone, take roughly 6 CSS px per mm.
   - a bubble must stay reachable **at least 5 seconds** after the prompt is spoken, because the child listens,
     looks and then moves, all at about half adult speed.
-  - moving targets are harder than the still targets every study used; these floors are generous to the game.
+  - moving targets are harder than the still targets every study used; that margin sits in the comfortable
+    size, not in the floor, so a bubble between the two is manageable rather than a failure.
 
 ## What frustrates and delights
 
