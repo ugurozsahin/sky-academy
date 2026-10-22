@@ -9,6 +9,12 @@ vi.mock('../../src/curriculum/year2-topics', async (importOriginal) => {
     gen: () => ({ prompt: '1 + 1', answer: '2', options: ['2', '3', '4'] }) };
   return { ...actual, YEAR2_TOPICS: [...actual.YEAR2_TOPICS, drill] };
 });
+// #2196: a game the catalogue does not list is hidden, so the fixture drill gets its own visible node.
+vi.mock('../../src/config/catalogue.runtime.json', async (importOriginal) => {
+  const cat = structuredClone((await importOriginal<{ default: { games: Record<string, unknown> } }>()).default);
+  cat.games['fx-drill'] = { visible: true, settings: {}, groupSettings: {}, years: { year2: { visible: true, settings: {} } } };
+  return { default: cat };
+});
 
 import { CORE_TOPICS, TOPICS, drillsFor, listedTopics, shownYears, topicById, topicsFor } from '../../src/curriculum';
 import { chooserTopics } from '../../src/ui/chooser';
