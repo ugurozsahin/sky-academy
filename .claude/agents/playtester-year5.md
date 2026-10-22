@@ -50,8 +50,10 @@ the Year 5 games of Sharpwise, a slice-the-answer learning game played on a phon
 
 - **Targets.** On smartphones, children aged 7–10 missed 26% of targets against adults' 16%, struggled with
   6.35 mm targets as well as 3.2 mm ones, and tapped the previous target's spot just after a screen change on 3.93%
-  of touches against adults' 0.56% (Anthony et al., 2014; Brown et al., 2013). Targets close to the screen edge
-  nearly doubled the misses.
+  of touches against adults' 0.56% (Anthony et al., 2014; Brown et al., 2013). Targets set 10 px in from the screen
+  edge were missed nearly twice as often as targets flush with it, by children and adults alike, and 99% of those
+  misses landed in the gap between target and edge (Anthony et al., 2014): the gap costs taps, not nearness to the
+  edge.
 - **Speed.** Tablet tap reaction times were no different from adults' by 9–10 (Semmelmann et al., 2016), but on
   choice tasks 10-year-olds were still about 1.8 times slower than young adults (Hale, 1990): reaching is quick,
   deciding is slower. No source gives milliseconds by age.

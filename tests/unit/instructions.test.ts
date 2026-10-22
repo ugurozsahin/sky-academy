@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { PLAYTESTERS } from './helpers/playtest';
 
 /**
  * Rails for the agent instruction files themselves (docs/decisions/001-one-home-per-rule.md).
@@ -18,8 +19,9 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'pick-issue', 'playtest', 'qa-screenshot', 'review-pr',
                     'three-art'];
 // The agents written for this project (#2204): their pointers are read like a skill's. The three vendored review
-// agents point at nothing here. `governance.test.ts`'s `AGENTS` map is the allow-list; this is only the reading list.
-const OWN_AGENTS = readdirSync(join(root, '.claude/agents')).filter((f) => f.startsWith('playtester-')).map((f) => `.claude/agents/${f}`);
+// agents point at nothing here. `governance.test.ts`'s `AGENTS` map is the allow-list and marks these `null` from the
+// same `PLAYTESTERS` list; this is only the reading list, so it reads by that name, not by a file-name prefix (#2213).
+const OWN_AGENTS = PLAYTESTERS.map((n) => `.claude/agents/${n}.md`);
 const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven-development', 'using-git-worktrees',
                          'verification-before-completion'];   // pinned upstream; they point at their own siblings
 

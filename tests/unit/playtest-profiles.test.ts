@@ -10,7 +10,8 @@ import { PLAYTESTERS } from './helpers/playtest';
  * #2204 — the playtest skill and its eight profiles. `governance.test.ts` holds them on the allow-list and pins
  * their descriptions; this holds what the later items of #2192 rely on: one profile per `YearId` plus the
  * parent, the row the skill defines (#2206 validates against it), sources cited by link, and no Edit or Write
- * tool. Bash stays, to drive the live game; that a profile changes nothing is held by its prompt, not here.
+ * tool. Bash stays, to drive the live game, so a profile's one guard against writing is its prompt's own line,
+ * pinned below (#2213).
  */
 const root = new URL('../../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
@@ -20,6 +21,14 @@ const PROFILES = [...CHILD, 'playtester-parent'];
 const KEYS = CRITERIA;   // the row's one home in code is scripts/playtest-row.mjs, which #2206 applies (#2214)
 const body = (name: string) => read(`.claude/agents/${name}.md`);
 const links = (text: string) => [...new Set([...text.matchAll(/\]\((https:\/\/[^)\s]+)\)/g)].map((m) => m[1]))];
+// #2213: what counts as "a published study" — a DOI, PubMed, ERIC, or a paper PDF on its author's own site. A
+// blog or news link is not one. A new author site is an edit to this list, so a reviewer reads it.
+const AUTHOR_PDF_HOSTS = ['lisa-anthony.com'];
+const isStudy = (u: string) => {
+  const { hostname: h, pathname } = new URL(u);
+  return h === 'doi.org' || h === 'pubmed.ncbi.nlm.nih.gov' || h === 'eric.ed.gov' || h === 'files.eric.ed.gov'
+    || (AUTHOR_PDF_HOSTS.includes(h) && pathname.endsWith('.pdf'));
+};
 
 describe('playtest profiles (#2204)', () => {
   it('there is exactly one profile per year group, plus the parent', () => {
@@ -35,6 +44,10 @@ describe('playtest profiles (#2204)', () => {
     expect(list.filter((t) => !['Read', 'Glob', 'Grep', 'Bash'].includes(t)), `${name}: a playtester never edits code`).toEqual([]);
   });
 
+  it.each(PROFILES)('%s keeps its no-writing line, its only guard while it holds Bash (#2213)', (name) => {
+    expect(body(name)).toContain('Read code, packs and the catalogue; never change any of them.');
+  });
+
   it.each(PROFILES)('%s scores under the playtest skill and signs its rows with its own name', (name) => {
     const text = body(name);
     expect(text, `${name} must send the scorer to the skill that holds the rubric`).toMatch(/`playtest` skill/);
@@ -46,7 +59,11 @@ describe('playtest profiles (#2204)', () => {
     const gov = all.filter((u) => u.startsWith('https://www.gov.uk/') || u.startsWith('https://assets.publishing.service.gov.uk/')
       || u.startsWith('https://explore-education-statistics.service.gov.uk/'));
     expect(gov.length, `${name}: the acceptance criterion is three official sources, linked`).toBeGreaterThanOrEqual(3);
-    expect(all.filter((u) => !gov.includes(u)).length, `${name}: motor and reaction-time norms need a published source`).toBeGreaterThanOrEqual(1);
+    expect(all.filter(isStudy).length, `${name}: motor and reaction-time norms need a published study (DOI, PubMed, ERIC or an author's PDF)`).toBeGreaterThanOrEqual(1);
+  });
+
+  it('the parent cites at least one published study, by link (#2213)', () => {
+    expect(links(body('playtester-parent')).filter(isStudy).length, 'the parent\'s pressure and anxiety claims rest on a study').toBeGreaterThanOrEqual(1);
   });
 
   it('the parent profile states how it reweights the rubric: two caps that keep the sum', () => {
@@ -98,6 +115,7 @@ describe('the playtest skill (#2204)', () => {
     }
     for (const k of KEYS) expect(row.evidence.filter((e: { criterion: string }) => e.criterion === k).length, `the example cites evidence for ${k}`).toBeGreaterThan(0);
     expect(PROFILES).toContain(row.by);
+    expect(row.by === `playtester-${row.year}` || row.by === 'playtester-parent', 'a year profile scores only its own year (#2213)').toBe(true);
     expect(YEARS.map((y) => y.id)).toContain(row.year);
   });
 });
