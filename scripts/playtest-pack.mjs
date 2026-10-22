@@ -140,6 +140,7 @@ async function packOne(browser, enc, base, app, job, out) {
     if (errors.length) throw new Error(errors.slice(0, 3).join('; '));
     const settings = job.catalogue ? app.resolveGame(job.game, job.year).settings : app.resolveYear(job.year);
     const metrics = buildMetrics({ job, input, settings, view: VIEW, seed: SEED, rec: played, shots });
+    if (metrics.frames && !metrics.frames.clean) throw new Error(`a ${metrics.frames.maxGapMs} ms frame gap while the wave was timed: its times ran long`);
     writeFileSync(`${dir}/metrics.json`, `${JSON.stringify(metrics, null, 2)}\n`);
     return metrics;
   } finally { await ctx.close(); }
@@ -154,7 +155,7 @@ async function main(argv) {
   if (unknown.length) throw new Error(`--only names no game: ${unknown.join(', ')}`);
   const jobs = plannedPacks(app.RUNTIME, { year, only });
   if (!jobs.length) throw new Error('no pack matches --year and --only');
-  const done = [], failed = [];
+  const done = [], failed = [], retried = [];
   let next = 0;
   // One browser per worker, not one shared: Chromium speaks through one queue per browser process, and a page's
   // cancel() stops a line another page of the same origin is speaking, so a shared browser cuts the prompts short.
@@ -163,20 +164,21 @@ async function main(argv) {
     try {
       const enc = await (await browser.newContext()).newPage();
       for (let j = jobs[next++]; j; j = jobs[next++]) {
-        let last;
+        const errs = [];
         for (let attempt = 1; attempt <= 2; attempt++) {   // one retry: four live pages can miss a beat
-          try { done.push(await packOne(browser, enc, base, app, j, out)); last = null; break; } catch (e) { last = e; }
+          try { done.push(await packOne(browser, enc, base, app, j, out)); break; } catch (e) { errs.push(e.message.split('\n')[0]); }
         }
-        if (last) failed.push(`${j.year}/${j.game}: ${last.message.split('\n')[0]}`);
+        const name = `${j.year}/${j.game}`;
+        if (errs.length === 2) { failed.push(`${name}: ${errs.join(' | then | ')}`); rmSync(`${out}/${name}`, { recursive: true, force: true }); }
+        else if (errs.length) retried.push(`${name}: ${errs[0]}`);
         process.stdout.write(`\rplaytest-pack: ${done.length + failed.length}/${jobs.length}`);
       }
     } finally { await browser.close(); }
   };
   await Promise.all(Array.from({ length: PARALLEL }, worker));
   const seconds = Math.round((Date.now() - t0) / 1000);
-  const slow = done.filter(m => m.frames && !m.frames.clean).map(m => `${m.year}/${m.game}`);
-  writeFileSync(`${out}/run.json`, `${JSON.stringify({ base, year, only, packs: done.length, failed, seconds, parallel: PARALLEL, framesOver100ms: slow }, null, 2)}\n`);
-  console.log(`\nplaytest-pack: ${done.length} packs in ${seconds} s (${PARALLEL} pages)${slow.length ? `; ${slow.length} timed with a frame gap over 100 ms: ${slow.join(', ')}` : ''}`);
+  writeFileSync(`${out}/run.json`, `${JSON.stringify({ base, year, only, packs: done.length, failed, retried, seconds, parallel: PARALLEL }, null, 2)}\n`);
+  console.log(`\nplaytest-pack: ${done.length} packs in ${seconds} s (${PARALLEL} pages)${retried.length ? `; ${retried.length} passed on a retry: ${retried.join('; ')}` : ''}`);
   if (failed.length) throw new Error(`${failed.length} pack(s) failed: ${failed.join('; ')}`);
 }
 

@@ -10,10 +10,10 @@ const RESULT_TIMEOUT = 240000;                        // the keypad's Tables Che
 /** Turn recording off and take what the page kept since the tap: the prompts, the spoken lines, the frames and bubbles. */
 const collect = page => page.evaluate(() => {
   const pk = window.__pk; pk.on = false;
-  return { samples: pk.samples, frames: pk.frames, labels: pk.labels ?? [], promptAt: pk.prompts[0]?.t ?? null, speech: pk.speech.filter(e => e.at >= pk.onAt)[0] ?? null };
+  return { voices: globalThis.speechSynthesis?.getVoices().length ?? 0, samples: pk.samples, frames: pk.frames, labels: pk.labels ?? [], promptAt: pk.prompts[0]?.t ?? null, speech: pk.speech.filter(e => e.at >= pk.onAt)[0] ?? null };
 });
 /** Wait, up to 10 s, for the first spoken line to finish, so a stroke's own feedback line does not interrupt it. */
-const spoken = page => page.waitForFunction(() => { const e = window.__pk.speech.find(x => x.at >= window.__pk.onAt); return !e || e.end !== null || e.error; }, null, { timeout: 10000, polling: 100 }).catch(() => {});
+const spoken = page => page.waitForFunction(() => { const e = window.__pk.speech.find(x => x.at >= window.__pk.onAt); return !e || e.end !== null || e.error; }, null, { timeout: 10000, polling: 100 }).then(() => false, () => true);
 const lives = page => page.evaluate(() => window.__sna.state().lives);
 const asked = page => page.evaluate(() => window.__pk.asked());
 const waitNext = (page, n) => page.waitForFunction(k => window.__pk.asked() > k && window.__pk.ready(), n, { timeout: ACTION_TIMEOUT, polling: 100 });
@@ -71,7 +71,7 @@ export async function playTracing(page, shot, readScreen) {
   await page.waitForTimeout(700);                    // the pad draws its guide letter after the card
   const screen = await readScreen(page);
   await shot('2-prompt.webp', 'the first thing to trace, before any ink');
-  await spoken(page);                                // ink before the line ends would cut it off, and speechMs with it
+  const spokenWaitTimedOut = await spoken(page);     // ink before the line ends would cut it off, and speechMs with it
   const box = await page.locator('#trace').boundingBox();
   const x = box.x + box.width / 2;
   await page.mouse.move(x, box.y + box.height * 0.3); await page.mouse.down();
@@ -95,7 +95,7 @@ export async function playTracing(page, shot, readScreen) {
   }, 'a scribble off the letter, then Check: the feedback shown');
   const rec = await collect(page);
   const result = await toResult(page, shot);
-  return { screen, ...rec, samples: null, extra: { trace: { ...trace, padPx: { width: Math.round(box.width), height: Math.round(box.height) } }, livesStart: screen.lives, ...wrong, result } };
+  return { screen, ...rec, samples: null, extra: { trace: { ...trace, padPx: { width: Math.round(box.width), height: Math.round(box.height) } }, spokenWaitTimedOut, livesStart: screen.lives, ...wrong, result } };
 }
 
 export async function playKeypad(page, shot, readScreen) {

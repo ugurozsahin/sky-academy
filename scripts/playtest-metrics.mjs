@@ -40,27 +40,33 @@ const span = vs => (vs.length ? { min: ms(Math.min(...vs)), max: ms(Math.max(...
  * (`cardBottom`) and above the screen's bottom edge (`H`); its reach is the time it spent there. Its first
  * flight ends when it falls back below the screen's edge (`fell`), or, if the wave ended first (the answer fell,
  * or was sliced), at its last live frame (`wave over`). FIRST flight only: a gentle year's relaunch, or a
- * sequence letter sent back up, is a second chance, not a slower bubble.
+ * sequence letter sent back up, is a second chance, not a slower bubble. With `speechEnd`, each bubble's reach is
+ * also counted from the moment the spoken prompt ended: the Reception floor counts from there.
  */
-export function flightMetrics(samples, { H, cardBottom, answer = null }) {
+export function flightMetrics(samples, { H, cardBottom, answer = null, speechEnd = null }) {
   const byId = new Map();
   for (const [t, id, label, y, r, vy] of samples) {
     if (!byId.has(id)) byId.set(id, { id, label, r, pts: [] });
     byId.get(id).pts.push({ t, y, vy });
   }
   const inside = p => p.y < H && p.y > cardBottom;
+  /** Time inside the play area, from `from` on: each frame interval counts when it starts inside. */
+  const timeInside = (pts, from) => {
+    let sum = 0;
+    for (let i = 0; i + 1 < pts.length; i++) if (inside(pts[i])) sum += Math.max(0, pts[i + 1].t - Math.max(pts[i].t, from));
+    return sum;
+  };
   const bubbles = [...byId.values()].map(b => {
     const all = b.pts.sort((p, q) => p.t - q.t);
-    const down = all.findIndex((p, i) => i > 0 && p.vy >= 0);         // the first frame on the way down
-    const fell = down < 0 ? -1 : all.findIndex((p, i) => i > down && p.y >= H);
+    const enter = all.findIndex(inside);
+    const fell = enter < 0 ? -1 : all.findIndex((p, i) => i > enter && p.vy > 0 && p.y >= H);   // back below the edge after rising into view
     const pts = fell < 0 ? all : all.slice(0, fell + 1);
-    const top = down < 0 ? null : pts.slice(0, down + 1).reduce((m, p) => (p.y < m.y ? p : m));
-    const enter = pts.findIndex(inside);
-    let reach = 0;
-    for (let i = 0; i + 1 < pts.length; i++) if (inside(pts[i])) reach += pts[i + 1].t - pts[i].t;
+    const top = pts.reduce((m, p) => (p.y < m.y ? p : m));                                         // the lowest y, not the first vy >= 0: a collision can flip vy mid-rise
+    const peaked = top !== pts[pts.length - 1];
     return {
-      id: b.id, label: b.label, r: b.r, launchMs: pts[0].t, apexMs: top ? top.t : null, apexY: top ? Math.round(top.y) : null,
-      enterMs: enter < 0 ? null : pts[enter].t, leaveMs: enter < 0 ? null : pts[pts.length - 1].t, reachMs: enter < 0 ? null : reach,
+      id: b.id, label: b.label, r: b.r, launchMs: pts[0].t, apexMs: peaked ? top.t : null, apexY: peaked ? Math.round(top.y) : null,
+      enterMs: enter < 0 ? null : pts[enter].t, leaveMs: enter < 0 ? null : pts[pts.length - 1].t, reachMs: enter < 0 ? null : timeInside(pts, -Infinity),
+      afterSpeechMs: enter < 0 || speechEnd === null ? null : timeInside(pts, speechEnd),
       endedBy: fell >= 0 ? 'fell' : 'wave over', entrySpeedPxS: enter < 0 ? null : Math.round(Math.abs(pts[enter].vy)),
     };
   });
@@ -75,15 +81,10 @@ export function flightMetrics(samples, { H, cardBottom, answer = null }) {
     launchToApexMs: span(bubbles.filter(b => b.apexMs !== null).map(b => b.apexMs - b.launchMs)),
     aboveCardMs: span(full.map(b => b.reachMs)),
     answerAboveCardMs: right ? ms(right.reachMs) : null,
+    afterSpeechMs: speechEnd === null ? null : span(full.map(b => b.afterSpeechMs)),
     slowestBubble: brief(pick((a, b) => a > b)),
     fastestBubble: brief(pick((a, b) => a < b)),
   };
-}
-
-/** How long each bubble stayed reachable after the spoken prompt ended: the Reception floor counts from there. */
-export function afterSpeechMs(bubbles, speechEnd) {
-  if (speechEnd === null || speechEnd === undefined) return null;
-  return span(bubbles.filter(b => b.enterMs !== null && b.endedBy === 'fell').map(b => Math.min(b.reachMs, Math.max(0, b.leaveMs - Math.max(b.enterMs, speechEnd)))));
 }
 
 /** The longest gap between frames while a wave was timed. Over 100 ms the arena clamps its step (arena.ts), so the flight ran slow. */
@@ -104,22 +105,26 @@ const round = v => (v === null || v === undefined ? null : Math.round(v));
 /** When the spoken line ended, if it was spoken to its end: started, ended, and not cut off. */
 const heardEnd = sp => (sp && sp.start !== null && sp.end !== null && !sp.error ? sp.end : null);
 
-/** The spoken prompt: whether the game said it by itself (it really started), how long it took, and when it ended. */
+/**
+ * The spoken prompt. `speechAutoplays`: the game called speak() for it by itself, before any tap. `speechStarted`:
+ * the speech engine really began it; with no voice (a headless Linux browser) it never does, and then every
+ * duration is null, not a number nobody heard.
+ */
 function speechKeys(sp, offered, promptAt) {
-  const autoplays = !!sp && sp.start !== null;
+  const autoplays = !!sp;
   const heard = heardEnd(sp) !== null;
   return {
-    speech: speechMode({ autoplays, offered }), speechOffered: offered, speechAutoplays: autoplays,
+    speech: speechMode({ autoplays, offered }), speechOffered: offered, speechAutoplays: autoplays, speechStarted: autoplays && sp.start !== null,
     speechText: sp?.text ?? null, speechMs: heard ? round(sp.end - sp.start) : null,
     speechEndsAfterPromptMs: heard && promptAt !== null ? round(sp.end - promptAt) : null,
     speechVoice: sp?.voice ?? null, speechError: sp?.error ?? null,
-    speechCutAfterMs: autoplays && sp.error && sp.cut ? round(sp.cut - sp.start) : null,
+    speechCutAfterMs: autoplays && sp.error && sp.cut && sp.start !== null ? round(sp.cut - sp.start) : null,
   };
 }
 
 /** The first wave's timing; every time in `flights` counts from the prompt appearing. */
 function flightKeys(p, sp) {
-  const f = flightMetrics(p.samples, { H: p.screen.H, cardBottom: p.screen.card?.bottom ?? 0, answer: p.screen.answer });
+  const f = flightMetrics(p.samples, { H: p.screen.H, cardBottom: p.screen.card?.bottom ?? 0, answer: p.screen.answer, speechEnd: heardEnd(sp) });
   const firstLaunch = f.bubbles.length ? Math.min(...f.bubbles.map(b => b.launchMs)) : null;
   const rel = v => (v === null || p.promptAt === null ? null : Math.round(v - p.promptAt));
   return {
@@ -127,9 +132,9 @@ function flightKeys(p, sp) {
     bubbleWords: p.labels.reduce((n, l) => n + countWords(l), 0), bubbleRadiusPx: f.bubbleRadiusPx,
     promptLeadMs: firstLaunch === null ? null : rel(firstLaunch),
     launchToApexMs: f.launchToApexMs, aboveCardMs: f.aboveCardMs, answerAboveCardMs: f.answerAboveCardMs,
-    afterSpeechMs: afterSpeechMs(f.bubbles, heardEnd(sp)),
+    afterSpeechMs: f.afterSpeechMs,
     slowestBubble: f.slowestBubble, fastestBubble: f.fastestBubble,
-    flights: f.bubbles.map(b => ({ label: b.label, launchMs: rel(b.launchMs), enterMs: rel(b.enterMs), apexMs: rel(b.apexMs), leaveMs: rel(b.leaveMs), reachMs: round(b.reachMs), endedBy: b.endedBy })),
+    flights: f.bubbles.map(b => ({ label: b.label, launchMs: rel(b.launchMs), enterMs: rel(b.enterMs), apexMs: rel(b.apexMs), leaveMs: rel(b.leaveMs), reachMs: round(b.reachMs), afterSpeechMs: round(b.afterSpeechMs), endedBy: b.endedBy })),
     frames: frameStats(p.frames),
   };
 }
@@ -139,7 +144,8 @@ export const ABOUT = {
   aboveCardMs: "over the first-wave bubbles that fell out of reach on their first flight: the time each one's centre spent below the question card and above the screen's bottom edge",
   answerAboveCardMs: 'the same, for the right answer\'s bubble',
   launchToApexMs: 'from the frame a bubble launched to the top of its arc',
-  afterSpeechMs: 'how much of each bubble\'s reachable time was left once the spoken prompt ended',
+  afterSpeechMs: 'over the same bubbles: how much of each one\'s reachable time came after the spoken prompt ended',
+  speechAutoplays: 'the game spoke the prompt by itself; speechStarted says the voice really began it, and only then are speech times measured',
   promptLeadMs: 'from the prompt appearing to the first bubble launching; near 0 means the wave rose with the prompt',
   flights: "per bubble, in ms from the prompt appearing; endedBy 'wave over' means the wave ended (the answer fell) while it was still in reach",
   speechCutAfterMs: "when the spoken prompt was cut off (speechError), how long it had played",
@@ -156,15 +162,15 @@ export const ABOUT = {
 export function buildMetrics({ job, input, settings, view, seed, rec: p, shots }) {
   const { screen } = p;
   return {
+    ...p.extra,                                       // first, so a play flow's own key can never overwrite a measured one
     year: job.year, game: job.game, catalogue: job.catalogue, viewport: `${view.width}x${view.height}`, seed,
     input, mode: screen.mode, hasLives: screen.hasLives, settings,
     prompt: screen.prompt, promptWords: countWords(screen.prompt), hint: screen.hint, hintWords: countWords(screen.hint),
-    ...speechKeys(p.speech, screen.speakVisible, p.promptAt),
-    ...(p.samples ? flightKeys(p, p.speech) : {}),
+    ...speechKeys(p.speech, screen.speakVisible, p.promptAt), speechVoices: p.voices ?? null,
+    ...(input === 'bubbles' ? flightKeys(p, p.speech) : {}),
     cardShareOfScreen: screen.card ? cardShare(screen.card, view) : null, cardBottomPx: screen.card ? Math.round(screen.card.bottom) : null,
     slow: screen.slow, wide: screen.wide, sequence: screen.sequence, anyOrder: screen.anyOrder, visual: screen.visual,
     demoShown: false,
-    ...p.extra,
     shots,
     about: ABOUT,
   };

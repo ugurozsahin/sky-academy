@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { CATALOGUE } from './helpers/catalogue-file';
 import { RUNTIME } from '../../src/config/resolve';
 import {
-  ABOUT, FRAME_CLAMP_MS, KEYPAD_PACKS, afterSpeechMs, buildMetrics, cardShare, countWords, flightMetrics, frameStats,
+  ABOUT, FRAME_CLAMP_MS, KEYPAD_PACKS, buildMetrics, cardShare, countWords, flightMetrics, frameStats,
   parseArgs, plannedPacks, speechMode, type Recorded, type Sample,
 } from '../../scripts/playtest-metrics.mjs';
 
@@ -92,14 +92,24 @@ describe('play-pack flight metrics on a stub arena (#2205)', () => {
     expect(f.aboveCardMs).toBeNull();
   });
 
-  it('counts what is left of each reach after the spoken prompt ends', () => {
-    const f = flightMetrics(fly([{ id: 1, label: '7', launch: 0, vy, g }], 8000), { H, cardBottom: 0 });
+  it('counts what is left of each reach after the spoken prompt ends, below the card only', () => {
+    const samples = fly([{ id: 1, label: '7', launch: 0, vy, g }], 8000);
     const [up, down] = crossings(vy, g);
-    expect(afterSpeechMs(f.bubbles, null)).toBeNull();
-    expect(afterSpeechMs(f.bubbles, 0)).toEqual(f.aboveCardMs);                 // spoken before it rose: all of it
-    expect(Math.abs(afterSpeechMs(f.bubbles, 3000)!.min - (down - 3000))).toBeLessThan(2 * FRAME);
-    expect(afterSpeechMs(f.bubbles, down + 1000)).toEqual({ min: 0, max: 0 });
+    const after = (speechEnd: number | null, card = 0) => flightMetrics(samples, { H, cardBottom: card, speechEnd }).afterSpeechMs;
+    expect(after(null)).toBeNull();
+    expect(after(0)).toEqual(flightMetrics(samples, { H, cardBottom: 0 }).aboveCardMs);   // spoken before it rose: all of it
+    expect(Math.abs(after(3000)!.min - (down - 3000))).toBeLessThan(2 * FRAME);
+    expect(after(down + 1000)).toEqual({ min: 0, max: 0 });
+    const [, below] = crossings(vy, g, 300);                  // it passes above a card at 300: that time is not reachable
+    expect(below).toBeGreaterThan(3000);
+    expect(Math.abs(after(3000, 300)!.min - (down - below))).toBeLessThan(2 * FRAME);
     expect(up).toBeGreaterThan(0);
+  });
+
+  it('takes the apex at the highest point, not at the first frame a collision flips vy', () => {
+    const samples = fly([{ id: 1, label: '7', launch: 0, vy, g }], 8000);
+    const bumped = samples.map((x, i): Sample => (i === 30 ? [x[0], x[1], x[2], x[3], x[4], 40] : x));   // a knock mid-rise
+    expect(flightMetrics(bumped, { H, cardBottom: 0 }).launchToApexMs).toEqual(flightMetrics(samples, { H, cardBottom: 0 }).launchToApexMs);
   });
 
   it('flags a frame gap the arena would have clamped, and none at the clamp', () => {
@@ -164,15 +174,33 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
     expect(m.about).toBe(ABOUT);
   });
 
-  it('marks speech that never started as tap, and a line cut off as unmeasured', () => {
+  it('counts its prompt-relative times from the prompt appearing, and its speech times from the line itself', () => {
+    const first = rec.samples![0][0];
+    const flights = m.flights as { launchMs: number }[];
+    expect(m.speechEndsAfterPromptMs).toBe(2880 - 50);
+    expect(m.promptLeadMs).toBe(Math.round(first - 50));
+    expect(flights[0].launchMs).toBe(Math.round(first - 50));
+    expect(m.afterSpeechMs).toEqual(flightMetrics(rec.samples!, { H, cardBottom: 187, speechEnd: 2880 }).afterSpeechMs);
+    expect(m.afterSpeechMs).not.toEqual(m.aboveCardMs);
+  });
+
+  it('never lets a play flow\'s own key overwrite a measured one', () => {
+    const x = buildMetrics({ job: { year: 'year1', game: 'y1-add', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, extra: { aboveCardMs: 'forged', livesStart: 3 } }, shots: [] });
+    expect(x.aboveCardMs).toEqual(m.aboveCardMs);
+    expect(x.livesStart).toBe(3);
+  });
+
+  it('keeps a line the engine never voiced as autoplayed but unmeasured, a cut line as unmeasured, and no line as tap', () => {
     const never = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: { text: 't', at: 0, start: null, end: null, error: null } }, shots: [] });
-    expect([never.speech, never.speechAutoplays, never.speechMs]).toEqual(['tap', false, null]);
+    expect([never.speech, never.speechAutoplays, never.speechStarted, never.speechMs, never.afterSpeechMs]).toEqual(['auto', true, false, null, null]);
+    const none = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: null }, shots: [] });
+    expect([none.speech, none.speechAutoplays]).toEqual(['tap', false]);
     const cut = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...rec, speech: { text: 't', at: 0, start: 100, end: null, error: 'interrupted', cut: 1600 } }, shots: [] });
     expect([cut.speech, cut.speechMs, cut.speechCutAfterMs, cut.afterSpeechMs]).toEqual(['auto', null, 1500, null]);
   });
 
   it('leaves the bubble keys out of a pack with no bubbles, rather than writing a number nobody measured', () => {
-    const trace = buildMetrics({ job: { year: 'year1', game: 'y1-trace', catalogue: true }, input: 'tracing', settings, view, seed: 1, rec: { ...rec, samples: null }, shots: [] });
+    const trace = buildMetrics({ job: { year: 'year1', game: 'y1-trace', catalogue: true }, input: 'tracing', settings, view, seed: 1, rec, shots: [] });
     for (const k of ['aboveCardMs', 'launchToApexMs', 'answersPerWave', 'bubbleRadiusPx']) expect(trace, k).not.toHaveProperty(k);
   });
 });
