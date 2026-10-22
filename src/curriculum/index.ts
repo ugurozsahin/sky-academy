@@ -5,8 +5,10 @@ import { YEAR3_TOPICS } from './year3-topics';
 import { YEAR4_TOPICS } from './year4-topics';
 import { YEAR5_TOPICS } from './year5-topics';
 import { YEAR6_TOPICS } from './year6-topics';
-import { isKs2 } from './key-stage';
-import { meetsShowGate, previewAllYears } from './shown';
+import { islandShown } from './catalogue-shown';
+import { previewAllYears } from './shown';
+import { RUNTIME } from '../config/resolve';
+import type { RuntimeCatalogue } from '../config/catalogue';
 import { YEARS, type Topic, type YearId, type YearInfo } from './types';
 
 export * from './types';
@@ -21,14 +23,16 @@ export const topicsFor = (year: YearId, subject?: Topic['subject']) => CORE_TOPI
 /** Drill topics for a year, offered after the regular ones in the Sprint chooser (#915). */
 export const drillsFor = (year: YearId, subject?: Topic['subject']) => TOPICS.filter(t => t.drill && t.year === year && (!subject || t.subject === subject));
 
-// #1032: the registry is static, so the gate is computed once here rather than on every map render. The `true`
-// is not hardcoded per row — the `||` above already guarantees `isKs2(y.id)` when this branch runs.
-const GATED_YEARS: YearInfo[] = YEARS.filter(y =>
-  !isKs2(y.id) || meetsShowGate(true, topicsFor(y.id, 'maths').length, topicsFor(y.id, 'writing').length));
-
-/** Every `YEARS` row the map may show right now: every EYFS/KS1 island, always, plus the KS2 islands that
- *  meet the topic-count gate — or, with the preview key set, every row regardless (#1032). */
-export const shownYears = (): YearInfo[] => (previewAllYears() ? YEARS : GATED_YEARS);
+/**
+ * Every `YEARS` row the map may show right now, in `YEARS` order (#2195): each island's `years.<id>.visible` in
+ * the catalogue, through `islandShown`, the one rule — `false` hides it, `true` shows it, `"auto"` is the
+ * topic-count gate (#1032). The preview key shows every row regardless. `cat` is the seam a user's patched
+ * catalogue comes through (#2199). Every caller, `listedTopics` included, passes nothing, so the default decides:
+ * the committed file today; swap the default for the active profile's patched copy and every map, reward and
+ * dashboard total follows at once. A whole catalogue, never a bare patch: a year or game it leaves out is hidden.
+ */
+export const shownYears = (cat: Pick<RuntimeCatalogue, 'years' | 'games'> = RUNTIME): YearInfo[] =>
+  previewAllYears() ? YEARS : YEARS.filter(y => islandShown(cat, y.id, TOPICS));
 
 /** #1039: `TOPICS` rows on an island the map is showing right now — what a reward or a dashboard total should
  *  count, so a topic added to a hidden KS2 year (below `shownYears()`'s gate) never moves a star tally, a

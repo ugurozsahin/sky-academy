@@ -27,14 +27,17 @@ export function gameOn(cat: Visibility, id: string, year: YearId): boolean {
  * (`src/curriculum/index.ts`, #1032): every EYFS/KS1 island, and a KS2 island with enough maths and writing
  * topics. The gate counts the year's non-drill topics that the catalogue switches on, so hiding games can take a
  * KS2 island under its gate. With every game on, as in the committed file, that is exactly today's count.
+ * Whatever `visible` says, an island with no non-drill game on never shows: there would be nothing to play on it
+ * (#2195). `true` beats the topic-count gate, never an empty island.
  */
 export function islandShown(cat: Visibility, year: YearId, topics: readonly GateTopic[]): boolean {
   const v = cat.years[year]?.visible;
-  if (v !== 'auto') return v === true;
-  if (!isKs2(year)) return true;
-  const count = (subject: GateTopic['subject']) =>
-    topics.filter(t => t.year === year && t.subject === subject && !t.drill && gameOn(cat, t.id, year)).length;
-  return meetsShowGate(true, count('maths'), count('writing'));
+  if (v !== 'auto' && v !== true) return false;
+  const on = (subject?: GateTopic['subject']) =>
+    topics.filter(t => t.year === year && (!subject || t.subject === subject) && !t.drill && gameOn(cat, t.id, year)).length;
+  if (on() === 0) return false;
+  if (v === true || !isKs2(year)) return true;
+  return meetsShowGate(true, on('maths'), on('writing'));
 }
 
 /** What `catalogueShown` returns; scripts/game-media.d.mts and later callers import this one shape. */
