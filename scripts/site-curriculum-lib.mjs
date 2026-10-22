@@ -151,7 +151,7 @@ export function renderCurriculumPage(map, home) {
   const intro = section('', [
     '<h1 id="page-title">What Sharpwise covers</h1>',
     `<p class="lede">Sharpwise has ${map.topicCount} maths and English topics, from Reception to Year 6: ${counts}.</p>`,
-    '<p>Reception follows the EYFS Early Learning Goals, and Years 1 to 6 are aligned to the National Curriculum for England. This page is made from the game\'s own list of topics, so it changes when the game does.</p>',
+    '<p>Reception follows the EYFS Early Learning Goals, and Years 1 to 6 are aligned to the <a href="https://www.gov.uk/government/collections/national-curriculum" rel="noopener">National Curriculum for England</a>. This page is made from the game\'s own list of topics, so it changes when the game does.</p>',
     '<p><a class="btn" href="/play/">Play Sharpwise</a></p>',
   ]);
   const years = section('years', [
