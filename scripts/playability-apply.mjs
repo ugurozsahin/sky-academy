@@ -25,6 +25,7 @@ import { CRITERIA, PARENT, profilesIn, rowProblems } from './playtest-row.mjs';
 export const CATALOGUE_FILE = 'src/config/catalogue.json';
 const AGENTS = '.claude/agents';
 const SCORES = Array.from({ length: 11 }, (_, i) => i);
+const TABLE_HEAD = '| Game | Year | Score | Note |';
 
 /** A YYYY-MM-DD that is a real date, the rule `catalogue.ts` holds `playability.at` to. */
 export const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v);
@@ -95,7 +96,7 @@ export function renderReport(profile, date, rows, chosen) {
   const lines = [
     `# Playability: ${profile}, ${date}`, '',
     `Scored by the \`${profile}\` profile under the \`playtest\` skill (\`.claude/skills/playtest/SKILL.md\`) from each game's play pack, and written into \`${CATALOGUE_FILE}\` by \`scripts/playability-apply.mjs\` (#2206): ${scope}.`, '',
-    '| Game | Year | Score | Note |', '|---|---|---|---|',
+    TABLE_HEAD, '|---|---|---|---|',
     ...rows.map((r) => `| ${r.game} | ${r.year} | ${r.score} | ${cell(r.note)} |`), '',
     ...(several.length ? [`Scored in more than one year, so the catalogue took the lowest: ${[...new Set(several)].map((g) => `${g} (${chosen.find((r) => r.game === g).year})`).join(', ')}.`, ''] : []),
     ...distribution(rows), '',
@@ -138,6 +139,14 @@ function scored(catalogue) {
   return out;
 }
 
+/** The lines of a report's score table only, split on `\n` alone: text elsewhere in the report can never count. */
+function tableRows(text) {
+  const lines = text.split('\n'), start = lines.indexOf(TABLE_HEAD);
+  if (start < 0) return [];
+  const rest = lines.slice(start + 2), end = rest.findIndex((l) => !l.startsWith('| '));
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
 /**
  * The rail behind "every score has a report": each non-null playability names `docs/playability/<at>/<by>.md`,
  * that file exists (`read` returns its text, or null), and its table backs the score: a game-year node's row
@@ -150,7 +159,7 @@ export function reportProblems(catalogue, read) {
     const text = read(p.report);
     if (text === null) { problems.push(`${where}.playability.report: ${p.report} does not exist`); continue; }
     if (!game) continue;
-    const listed = [...text.matchAll(new RegExp(`^\\| ${game} \\| ([a-z0-9]+) \\| (\\d+) \\|`, 'gm'))].map((m) => ({ year: m[1], score: Number(m[2]) }));
+    const listed = tableRows(text).map((l) => new RegExp(`^\\| ${game} \\| ([a-z0-9]+) \\| (\\d+) \\|`).exec(l)).filter(Boolean).map((m) => ({ year: m[1], score: Number(m[2]) }));
     if (year && !listed.some((r) => r.year === year && r.score === p.score)) problems.push(`${where}.playability: ${p.report} has no row for ${game} in ${year} scoring ${p.score}`);
     // A game's own score is the parent's lowest across the years it scored (the rule in the header).
     if (!year && (!listed.length || Math.min(...listed.map((r) => r.score)) !== p.score))

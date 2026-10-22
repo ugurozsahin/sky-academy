@@ -15,12 +15,15 @@ export const CRITERIA = Object.freeze(['understand', 'physical', 'challenge', 'f
 export const ROW_KEYS = Object.freeze(['game', 'year', 'by', 'score', 'criteria', 'evidence', 'note']);
 export const PARENT = 'playtester-parent';
 const EVIDENCE_KEYS = ['criterion', 'ref', 'saw'];
-const NOT_OBSERVED = /^not observed\b/i;
+const NOT_OBSERVED = /^not[\s-]+observed\b/i;   // "not observed", "Not  observed", "not-observed"
 /** A screenshot in the pack, a `metrics.json` key (nested by dots), or a measurement made on the live game. */
-const REF = /^(?:[\w.-]+\.(?:webp|png)|metrics\.json#[\w.[\]-]+|live:\s*\S.*)$/;
+const REF = /^(?:[\w.-]+\.(?:webp|png)|metrics\.json#[\w.[\]-]+|live:[^\S\r\n\u2028\u2029]*\S.*)$/;
+/** A line break of any kind, U+2028/U+2029 included: one in a row's text could forge a line of its report. */
+const BREAK = /[\r\n\u2028\u2029]/;
 
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isText = (v) => typeof v === 'string' && v.trim() !== '';
+const isLine = (v) => isText(v) && !BREAK.test(v);
 const isMark = (v) => Number.isInteger(v) && v >= 0 && v <= 2;
 
 /** The profile names on disk: every `playtester-*.md` in `dir` (`.claude/agents/`), without the extension. */
@@ -68,8 +71,8 @@ function entryProblems(e, i) {
   if (!isObj(e)) return [`evidence[${i}]: must be { criterion, ref, saw }`];
   const errs = keyProblems(e, EVIDENCE_KEYS, `evidence[${i}].`);
   if ('criterion' in e && !CRITERIA.includes(e.criterion)) errs.push(`evidence[${i}].criterion: ${JSON.stringify(e.criterion)} is not one of ${CRITERIA.join(', ')}`);
-  if ('ref' in e && !(typeof e.ref === 'string' && REF.test(e.ref))) errs.push(`evidence[${i}].ref: ${JSON.stringify(e.ref)} must name a pack screenshot (.webp or .png), metrics.json#<key> or live:<what>`);
-  if ('saw' in e && !(isText(e.saw) && !/[\r\n]/.test(e.saw))) errs.push(`evidence[${i}].saw: must say what the ref shows, or "not observed", on one line`);
+  if ('ref' in e && !(typeof e.ref === 'string' && !BREAK.test(e.ref) && REF.test(e.ref))) errs.push(`evidence[${i}].ref: ${JSON.stringify(e.ref)} must name a pack screenshot (.webp or .png), metrics.json#<key> or live:<what>`);
+  if ('saw' in e && !isLine(e.saw)) errs.push(`evidence[${i}].saw: must say what the ref shows, or "not observed", on one line`);
   return errs;
 }
 
@@ -94,5 +97,5 @@ export function rowProblems(row, ctx) {
   const keys = keyProblems(row, ROW_KEYS, '');
   if (ROW_KEYS.some((k) => !(k in row))) return keys;   // the rest would only repeat a missing key in other words
   return [...keys, ...targetProblems(row, ctx),...markProblems(row), ...evidenceProblems(row.evidence),
-    ...(isText(row.note) && !/[\r\n]/.test(row.note) ? [] : ['note: must be one sentence on one line'])];
+    ...(isLine(row.note) ? [] : ['note: must be one sentence on one line'])];
 }

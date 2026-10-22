@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { YEARS } from '../../src/curriculum/types';
-import { CATALOGUE } from '../../src/config/catalogue';
+import { CATALOGUE } from './helpers/catalogue-file';
 import { CRITERIA, ROW_KEYS, profilesIn, rowProblems } from '../../scripts/playtest-row.mjs';
 import { PLAYTESTERS } from './helpers/playtest';
 

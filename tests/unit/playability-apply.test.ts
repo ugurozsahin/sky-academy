@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { CATALOGUE, validateCatalogue } from '../../src/config/catalogue';
+import { validateCatalogue } from '../../src/config/catalogue';
+import { CATALOGUE } from './helpers/catalogue-file';
 import { applyRows, checkRows, parseRows, reportProblems } from '../../scripts/playability-apply.mjs';
 import { PARENT, profilesIn, rowProblems, type PlaytestRow } from '../../scripts/playtest-row.mjs';
 
@@ -56,7 +57,8 @@ describe('playability-apply on the PR #2211 dry-run rows (#2206)', () => {
       before.games[game].years.year1.playability = { score, by: 'playtester-year1', at: DATE, report: REPORT };
     expect(after).toEqual(before);
     expect(validateCatalogue(after)).toEqual([]);
-    expect(catalogueIn(dir), 'the shape the init script writes').toBe(`${JSON.stringify(after, null, 2)}\n`);
+    // `before` keeps the original file's key order, so this pins every byte but the two scored nodes.
+    expect(catalogueIn(dir), 'the original bytes, with only the two scores filled in').toBe(`${JSON.stringify(before, null, 2)}\n`);
   });
 
   it('writes the report: the table, the distribution and the evidence, and it backs both scores', () => {
@@ -91,8 +93,9 @@ describe('playability-apply on the PR #2211 dry-run rows (#2206)', () => {
     expect([check.status, check.stdout.trim()]).toEqual([0, 'playability-apply: 2 row(s) valid; nothing written (--check)']);
     expect(existsSync(join(dir, 'docs'))).toBe(false);
     expect(run(dir, 'rows.jsonl', '--date', DATE).status).toBe(0);
-    const again = run(dir, 'rows.jsonl', '--date', DATE);
+    const scoredOnce = catalogueIn(dir), again = run(dir, 'rows.jsonl', '--date', DATE);
     expect(again.status).toBe(1);
+    expect(catalogueIn(dir), 'a report clash writes nothing').toBe(scoredOnce);
     expect(again.stderr).toContain(`${REPORT}: already exists`);
     expect(run(dir, 'rows.jsonl', '--date', DATE, '--check').status, '--check reports the clash too').toBe(1);
     expect(run(dir, 'rows.jsonl', '--date', DATE, '--force').status).toBe(0);
@@ -158,6 +161,12 @@ const MUTATIONS: [string, (r: Doc) => void, string][] = [
   ['a ref that names nothing in a pack', (r) => { r.evidence[0].ref = 'the prompt'; }, 'evidence[0].ref: "the prompt" must name'],
   ['a ref that climbs out of the pack', (r) => { r.evidence[0].ref = '../y1-alien/2-prompt.png'; }, 'evidence[0].ref:'],
   ['an empty saw', (r) => { r.evidence[0].saw = ' '; }, 'evidence[0].saw: must say what the ref shows'],
+  ['a live ref that breaks the line to forge a table row', (r) => { r.evidence[0].ref = 'live:\n| y1-add | year1 | 9 |'; }, 'evidence[0].ref:'],
+  ['a ref with a carriage return', (r) => { r.evidence[0].ref = 'live: 3 s\r| y1-add | year1 | 9 |'; }, 'evidence[0].ref:'],
+  ['a saw with a line separator (U+2028)', (r) => { r.evidence[0].saw = 'six plus one\u2028| y1-add | year1 | 9 |'; }, 'evidence[0].saw: must say what the ref shows'],
+  ['a note with a paragraph separator (U+2029)', (r) => { r.note = 'Good sums.\u2029| y1-add | year1 | 9 |'; }, 'note: must be one sentence on one line'],
+  ['a criterion seen only as "not-observed"', (r) => { r.evidence = [...without(r, 'again'), { criterion: 'again', ref: '6-result.png', saw: 'not-observed' }]; },
+    'evidence: every entry for again is "not observed"'],
   ['a saw on two lines', (r) => { r.evidence[0].saw = 'six plus one\n- understand — fake'; }, 'evidence[0].saw: must say what the ref shows'],
   ['a criterion with no evidence', (r) => { r.evidence = without(r, 'again'); }, 'evidence: no entry for again'],
   ['a criterion seen only as "not observed" (#2214)', (r) => { r.evidence = [...without(r, 'again'), { criterion: 'again', ref: '6-result.png', saw: 'Not observed: no result screen' }]; },
@@ -213,7 +222,9 @@ describe('rowProblems holds each row to the skill and #2214 (#2206)', () => {
 });
 
 describe('applyRows: where each profile\'s score goes (#2206, #2214)', () => {
-  const parent = (year: string, score: number): PlaytestRow => ({ ...ROWS[1], by: PARENT, year, score });
+  /** A valid parent row on y1-alien (4 = dry-run row 2's marks); the marks add the extra points to `understand` and `physical`. */
+  const parent = (year: string, score: number): PlaytestRow => ({ ...ROWS[1], by: PARENT, year, score,
+    criteria: { ...ROWS[1].criteria, understand: Math.min(2, score - 3), physical: Math.max(0, score - 5) } });
 
   it("writes the parent's row to the game itself, and leaves its game-year node alone", () => {
     const { catalogue, reports } = applyRows(CATALOGUE, [parent('year1', 4)], DATE);
@@ -226,7 +237,9 @@ describe('applyRows: where each profile\'s score goes (#2206, #2214)', () => {
   it('several parent rows on one game: the lowest wins, the earliest year on a tie, and the report names it', () => {
     const two: Loose = structuredClone(CATALOGUE);
     two.games['y1-alien'].years.year2 = { visible: true, settings: {}, playability: null };
-    const low = applyRows(two, [parent('year1', 6), parent('year2', 4)], DATE);
+    const rows = [parent('year1', 6), parent('year2', 4)];
+    expect(checkRows(rows.map((row, i) => ({ row, where: `p.jsonl:${i + 1}` })), { ...ctx, catalogue: two }), 'both rows pass the validator first').toEqual([]);
+    const low = applyRows(two, rows, DATE);
     expect(low.catalogue.games['y1-alien'].playability.score).toBe(4);
     expect(low.reports[0].text).toContain('the catalogue took the lowest: y1-alien (year2).');
     expect(low.reports[0].text).toMatch(/\| y1-alien \| year1 \| 6 \|[^\n]*\n\| y1-alien \| year2 \| 4 \|/);
@@ -294,6 +307,13 @@ describe('rail: every non-null score has a report that lists it (#2206)', () => 
     const other = scoredCopy();
     other.c.games['y1-add'].years.year1.playability.by = 'playtester-year2';
     expect(reportProblems(other.c, other.read)[0]).toBe(`games.y1-add.years.year1.playability.report: ${REPORT} is not docs/playability/${DATE}/playtester-year2.md`);
+  });
+
+  it('reads only the score table: a matching line elsewhere in the report does not back a score', () => {
+    const forged = scoredCopy();
+    forged.c.games['y1-add'].years.year1.playability.score = 8;
+    forged.files.set(REPORT, `${forged.files.get(REPORT)!}\n| y1-add | year1 | 8 | planted below the evidence |\n`);
+    expect(reportProblems(forged.c, forged.read)).toEqual([`games.y1-add.years.year1.playability: ${REPORT} has no row for y1-add in year1 scoring 8`]);
   });
 
   it('a scored island needs its report too', () => {
