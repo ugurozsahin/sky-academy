@@ -275,7 +275,7 @@ export const y3Words: Generator = (d, rng) => {
 
 export const Y3_NUMBER: Topic[] = [
   { id: 'y3-count', title: 'Count in 4s, 8s, 50s and 100s', icon: '🔢', subject: 'maths', year: 'year3', nc: 'Y3 NPV: count in 4s, 8s, 50s, 100s; 10 or 100 more or less', gen: y3Count },
-  { id: 'y3-pv', title: 'Hundreds, Tens and Ones', icon: '💯', subject: 'maths', year: 'year3', nc: 'Y3 NPV: place value of each digit, partitioning (3M2)', gen: y3PlaceValue },
+  { id: 'y3-pv', title: 'Hundreds, Tens and Ones', icon: '💯', subject: 'maths', year: 'year3', nc: 'Y3 NPV: place value of each digit, partitioning (3M2)', parent: 'What each digit is worth, and splitting a number into hundreds, tens and ones', gen: y3PlaceValue },
   { id: 'y3-compare', title: 'Compare and Order to 1,000', icon: '⚖️', subject: 'maths', year: 'year3', nc: 'Y3 NPV: compare and order numbers to 1,000 (3M3)', sequenceFrom: 3, gen: y3Compare },
   { id: 'y3-line', title: 'Number Line to 1,000', icon: '📏', subject: 'maths', year: 'year3', nc: 'Y3 NPV: identify, represent and estimate numbers (3M4)', gen: y3Line },
   { id: 'y3-words', title: 'Numbers to 1,000 in Words', icon: '🔤', subject: 'maths', year: 'year3', nc: 'Y3 NPV: read and write numbers to 1,000 in numerals and words (3M5)', gen: y3Words },
