@@ -10,7 +10,7 @@ export interface GameYearPatch { visible?: boolean; settings?: Overridable }
 export interface GamePatch { visible?: boolean; settings?: Overridable; years?: { [Y in YearId]?: GameYearPatch } }
 export interface Patch { version: 1; years?: { [Y in YearId]?: YearPatch }; games?: { [id: string]: GamePatch } }
 
-export const EMPTY_PATCH: Patch = { version: 1 };
+export const EMPTY_PATCH: Patch = Object.freeze({ version: 1 }) as Patch;
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);

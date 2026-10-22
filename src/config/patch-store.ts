@@ -5,7 +5,7 @@
 // parameter that could carry a `media` or `playability` value.
 import type { ProfileId } from '../storage/profile-index';
 import type { YearId } from '../curriculum/types';
-import { OVERRIDABLE_KEYS, type Overridable } from './catalogue';
+import { OVERRIDABLE_KEYS, SETTING_RULES, type Overridable } from './catalogue';
 import { EMPTY_PATCH, sanitisePatch, type GamePatch, type Patch } from './patch';
 import { RUNTIME } from './resolve';
 
@@ -18,7 +18,9 @@ export const patchText = (profile: ProfileId): string | null => getItem(keyFor(p
 /** Parses and sanitises stored text: anything unreadable is the empty patch. */
 export function parsePatch(text: string | null): Patch {
   if (text === null) return EMPTY_PATCH;
-  try { return sanitisePatch(JSON.parse(text), RUNTIME); } catch { return EMPTY_PATCH; }
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { return EMPTY_PATCH; }
+  return sanitisePatch(raw, RUNTIME);
 }
 
 export const readPatch = (profile: ProfileId): Patch => parsePatch(patchText(profile));
@@ -53,11 +55,11 @@ export function setYearVisible(profile: ProfileId, year: YearId, visible: 'auto'
 /** `scope` null is the game's own setting, a year id is the game on that island. A key that is not an overridable setting, or a value out of bounds, is refused and nothing is stored. */
 export function setGameSetting<K extends keyof Overridable>(profile: ProfileId, id: string, scope: YearId | null, key: K, value: Overridable[K]): boolean {
   if (!(OVERRIDABLE_KEYS as readonly string[]).includes(key) || !Object.prototype.hasOwnProperty.call(RUNTIME.games, id)) return false;
+  if (SETTING_RULES[key](value) !== null) return false;   // out of bounds: refused before anything is built
   if (scope !== null && !RUNTIME.games[id].years[scope]) return false;
   const p = clone(readPatch(profile)), g = gameOf(p, id), node = scope === null ? g : ((g.years ??= {})[scope] ??= {});
   node.settings = { ...node.settings, [key]: value };
-  const stuck = JSON.stringify(sanitisePatch(p, RUNTIME)) === JSON.stringify(p);   // an out-of-bounds value was dropped by the sanitiser: say so
-  return stuck && commit(profile, p);
+  return commit(profile, p);
 }
 
 /** Back to the committed catalogue. Returns whether the key is gone. */

@@ -124,7 +124,7 @@ export function addProfile(): AddProfileResult {
     if (readItem(saveKeyFor(free)) !== null) { state.writeFailed = true; return { ok: false, why: 'store' }; }
     if (!writeTombstones(tombstoned.filter(id => id !== free))) { state.writeFailed = true; return { ok: false, why: 'store' }; }
   }
-  removePatch(free);   // #2199: a new child starts on the committed catalogue, whatever a refused delete left behind
+  if (!removePatch(free)) { state.writeFailed = true; return { ok: false, why: 'store' }; }   // #2199: a new child starts on the committed catalogue, never on a leftover patch
   if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) { state.writeFailed = true; return { ok: false, why: 'store' }; }
   leaveProfile();
   return { ok: true, id: free };

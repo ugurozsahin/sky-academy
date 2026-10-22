@@ -7,6 +7,7 @@ import { parsePatch, patchText, readPatch, removePatch, resetCatalogue, setGameS
 import { addProfile, deleteProfile, setActiveProfile } from '../../src/storage';
 import { isGameShown, shownYears } from '../../src/curriculum';
 import { gameYear } from '../../src/config/resolve';
+import { played } from '../../src/game/played';
 import { YEARS } from '../../src/curriculum/types';
 
 // #2199: the grown-ups' own changes to the catalogue, one small patch per child profile. Prove it red: drop a
@@ -124,6 +125,38 @@ describe('the store', () => {
     localStorage.setItem('sna:catalogue:p3', JSON.stringify({ version: 1, games: { [GAME]: { visible: false } } }));
     expect(removePatch('p3')).toBe(true);
     expect(patchText('p3')).toBeNull();
+  });
+});
+
+describe('review round 1 (#2246)', () => {
+  const year = YEARS.find(y => y.id === YEAR)!, topic = { id: GAME } as never;
+  it('two settings set in non-canonical order both stick, beside a game-year visibility', () => {
+    expect(setGameVisible('p1', GAME, YEAR, true)).toBe(true);
+    expect(setGameSetting('p1', GAME, null, 'lives', 3)).toBe(true);
+    expect(setGameSetting('p1', GAME, null, 'perStage', 4)).toBe(true);
+    expect(readPatch('p1').games![GAME].settings).toEqual({ perStage: 4, lives: 3 });
+  });
+  it('played() hands a single game the patched settings, and a mixed pool the year as it was', () => {
+    setGameSetting('p1', GAME, null, 'perStage', 4); setGameSetting('p1', GAME, null, 'lives', 2);
+    const alone = played({ year, topic });
+    expect([alone.year.perStage, alone.year.lives]).toEqual([4, 2]);
+    expect(played({ year, topic, pool: [] }).year).toBe(year);
+  });
+  it('addProfile clears a leftover patch in the slot it hands out', () => {
+    localStorage.setItem('sna:catalogue:p2', JSON.stringify({ version: 1, games: { [GAME]: { visible: false } } }));
+    const added = addProfile(); expect(added.ok && added.id).toBe('p2');
+    expect(patchText('p2')).toBeNull();
+  });
+  it('addProfile refuses, rather than hand over a stale patch, when it cannot be removed', () => {
+    localStorage.setItem('sna:catalogue:p2', JSON.stringify({ version: 1, games: { [GAME]: { visible: false } } }));
+    const real = localStorage.removeItem;
+    (globalThis as any).localStorage.removeItem = (k: string) => { if (k.startsWith('sna:catalogue:')) throw new Error('denied'); real(k); };
+    try { expect(addProfile().ok).toBe(false); } finally { (globalThis as any).localStorage.removeItem = real; }
+  });
+  it('refuses an unknown year and a year the game has no node for, and stores nothing', () => {
+    expect(setYearVisible('p1', 'year9' as never, false)).toBe(false);
+    expect(setGameSetting('p1', GAME, 'year1', 'lives', 2)).toBe(false);
+    expect(patchText('p1')).toBeNull();
   });
 });
 
