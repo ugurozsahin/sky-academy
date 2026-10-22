@@ -42,6 +42,7 @@ export const whileSentence = ([s, aux, ing, det, noun, rest]: WhileRow): string 
 export const addressMeaning = (row: AddressRow): string => `We are talking to ${row[2]}.`;
 export const whileMeaning = ([, , ing, det, noun]: WhileRow): string => `Nobody was ${ing} ${det} ${noun}.`;
 
+export const COMMA_PROMPT = 'Which word is before the comma?';
 const wordsOf = (s: string): string[] => s.replace(/[!?.]$/, '').split(' ');
 
 /** Bubbles: the answer plus decoys. d3 uses the words either side of the answer; d1 and d2 take other words of the sentence. */
@@ -53,9 +54,9 @@ function decoys(rng: Rng, sentence: string, answer: string, near: boolean): stri
 
 function build(rng: Rng, d: Difficulty, sentence: string, answer: string, meaning: string, bubbles: number): Question {
   const ds = decoys(rng, sentence, answer, d === 3).slice(0, bubbles - 1);
-  return wordQ(rng, `Which word gets the comma? ${meaning}`, answer, ds, {
+  return wordQ(rng, `${COMMA_PROMPT} ${meaning}`, answer, ds, {
     visual: { type: 'sentence', text: sentence },
-    say: `${meaning} ${sentence} Which word does the comma go after?`, hint: 'Say it aloud: where would you pause?', hintIsData: false,
+    say: `${meaning} ${sentence} Which word is before the comma?`, hint: 'Say it aloud: where would you pause?', hintIsData: false,
   });
 }
 
