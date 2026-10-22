@@ -10,6 +10,7 @@ const OFF: [string, RegExp, string][] = [
   ['y4-pronouns', /("y4-pronouns":\{"visible":true,"settings":\{\},"groupSettings":\{\},"years":\{"year4":\{"visible":)true/g, '$1false'],
 ];
 const y1Writing = TOPICS.filter(t => t.year === 'year1' && t.subject === 'writing' && !t.drill).map(t => t.id);
+const y1Maths = TOPICS.filter(t => t.year === 'year1' && t.subject === 'maths' && !t.drill).map(t => t.id);
 const core = (subject: 'maths' | 'writing') => TOPICS.filter(t => t.year === 'year4' && t.subject === subject && !t.drill);
 
 /** Serve the game's entry chunk with each `OFF` node switched off; fail loudly unless each matched exactly once. */
@@ -78,5 +79,21 @@ test.describe('hidden games (#2196)', () => {
     await expect(page.locator('.tab')).toHaveCount(1);
     await expect(page.locator('.tab[data-s="maths"]')).toHaveClass(/on/);
     await expect(page.locator('#topics .topic').first()).toBeVisible();
+  });
+
+  test('Year 1 with every maths game hidden opens on Writing, and Sprint lists writing topics (#2238)', async ({ page }) => {
+    await hideGames(page, y1Maths.map(id => [id, new RegExp(`"${id}":\\{"visible":true`, 'g'), `"${id}":{"visible":false`]));
+    await page.addInitScript(save => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save); },
+      JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', onboarded: true, progress: { 'r-count': { stars: 1 } } }));
+    await page.goto('/');
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expect(page.locator('.tab')).toHaveCount(1);
+    await expect(page.locator('.tab[data-s="writing"]')).toHaveClass(/on/);
+    await expect(page.locator('#topics .topic').first()).toBeVisible();
+    await page.click('#sprint');
+    const ids = await page.locator('#island-overlay .topic[data-id]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.id));
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.filter(id => y1Maths.includes(id!))).toEqual([]);
   });
 });
