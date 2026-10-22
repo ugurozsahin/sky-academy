@@ -13,10 +13,9 @@ if (!id) {
 const server = await createServer({ logLevel: 'silent', server: { middlewareMode: true }, appType: 'custom' });
 try {
   const { RUNTIME, resolveGame } = await server.ssrLoadModule('/src/config/resolve.ts');
-  const game = RUNTIME.games[id];
-  if (!game) throw new Error(`catalogue-show: no game "${id}" in src/config/catalogue.json`);
-  const y = year ?? Object.keys(game.years)[0];
-  if (!(y in RUNTIME.years)) throw new Error(`catalogue-show: no year "${y}"; the years are ${Object.keys(RUNTIME.years).join(', ')}`);
+  if (!Object.hasOwn(RUNTIME.games, id)) throw new Error(`catalogue-show: no game "${id}" in src/config/catalogue.json`);
+  const y = year ?? Object.keys(RUNTIME.games[id].years)[0];
+  if (!Object.hasOwn(RUNTIME.years, y)) throw new Error(`catalogue-show: no year "${y}"; the years are ${Object.keys(RUNTIME.years).join(', ')}`);
   // Arrays of numbers on one line each, so a speed or stage table reads across.
   console.log(JSON.stringify({ game: id, year: y, ...resolveGame(id, y) }, null, 2).replace(/\[\s+([^[\]{}]*?)\s+\]/g, (_, xs) => `[${xs.split(/,\s+/).join(', ')}]`));
 } catch (e) {

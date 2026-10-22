@@ -19,6 +19,9 @@ export const TIMING: DefaultSettings = RUNTIME.defaults.settings;
 /** A timing table's value at `speed`; past the table, its last (fastest) entry, as `layoutWave`'s old fallback was. */
 export const bySpeed = (table: readonly number[], speed: number): number => table[speed] ?? table[table.length - 1];
 
+/** An own key only, so `constructor` is not a game. Not `Object.hasOwn`: older Android WebViews (Chrome < 93) lack it. */
+const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+
 /** Only the overridable keys of `layer`, so a game level or a patch can never reach a year-only key. */
 function overridable(layer: Overridable | undefined): Overridable {
   if (!layer) return {};
@@ -33,9 +36,8 @@ function groupOf(year: YearId, cat: RuntimeCatalogue): GroupId {
 
 /** A year's settings. Order, last wins: `defaults.settings`, then `years.<year>.settings`. */
 export function resolveYear(year: YearId, cat: RuntimeCatalogue = RUNTIME): ResolvedSettings {
-  const node = cat.years[year];
-  if (!node) throw new Error(`catalogue: no year ${year}`);
-  return { ...cat.defaults.settings, ...node.settings };
+  if (!own(cat.years, year)) throw new Error(`catalogue: no year ${year}`);
+  return { ...cat.defaults.settings, ...cat.years[year].settings };
 }
 
 /**
@@ -45,9 +47,9 @@ export function resolveYear(year: YearId, cat: RuntimeCatalogue = RUNTIME): Reso
  * is not on that island, so it is not visible there. Island visibility is item C1's (#2195), not this.
  */
 export function resolveGame(id: string, year: YearId, patch?: Overridable, cat: RuntimeCatalogue = RUNTIME): ResolvedGame {
+  if (!own(cat.games, id)) throw new Error(`catalogue: no game ${id}`);
   const game = cat.games[id];
-  if (!game) throw new Error(`catalogue: no game ${id}`);
   const node = game.years[year];
-  const layers = [game.settings, game.groupSettings[groupOf(year, cat)], node?.settings, patch].map(overridable);
-  return { visible: game.visible && !!node?.visible, settings: Object.assign({}, resolveYear(year, cat), ...layers) };
+  const over: Overridable = Object.assign({}, ...[game.settings, game.groupSettings[groupOf(year, cat)], node?.settings, patch].map(overridable));
+  return { visible: game.visible && !!node?.visible, settings: { ...resolveYear(year, cat), ...over } };
 }

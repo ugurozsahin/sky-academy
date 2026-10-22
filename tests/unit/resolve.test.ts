@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -159,6 +159,17 @@ describe('the runtime catalogue (#2194)', () => {
     expect(readFileSync(RUNTIME_FILE, 'utf8')).toBe(slimCatalogue(CATALOGUE));
   });
 
+  it('keeps every visibility and setting of the full file, built here independently of the script', () => {
+    const { version: _v, ...rest } = structuredClone(CATALOGUE) as Doc;
+    for (const y of Object.values(rest.years) as Doc[]) { delete y.media; delete y.playability; }
+    for (const g of Object.values(rest.games) as Doc[]) {
+      delete g.media; delete g.playability;
+      for (const n of Object.values(g.years) as Doc[]) delete n.playability;
+    }
+    const { $comment: _c, ...slim } = JSON.parse(readFileSync(RUNTIME_FILE, 'utf8'));
+    expect(slim).toEqual(rest);
+  });
+
   it('holds no media and no playability anywhere', () => {
     const text = readFileSync(RUNTIME_FILE, 'utf8');
     expect(text).not.toMatch(/"(media|playability|thumbnail|screenshots|alt|src)"\s*:/);
@@ -172,5 +183,12 @@ describe('the runtime catalogue (#2194)', () => {
   it('`npm run catalogue:show -- <game>` prints the resolved node for the game on its own year', () => {
     const out = execFileSync(process.execPath, ['scripts/catalogue-show.mjs', 'y4-decimals'], { encoding: 'utf8' });
     expect(JSON.parse(out)).toEqual({ game: 'y4-decimals', year: 'year4', ...resolveGame('y4-decimals', 'year4') });
+  });
+
+  it('`catalogue:show` names a mistyped game or year and exits 1, an inherited key included', () => {
+    for (const [args, msg] of [[['no-such-game'], 'no game "no-such-game"'], [['constructor'], 'no game "constructor"'], [['y4-decimals', 'year9'], 'no year "year9"']] as const) {
+      const run = spawnSync(process.execPath, ['scripts/catalogue-show.mjs', ...args], { encoding: 'utf8' });
+      expect([run.status, run.stderr.includes(msg)], args.join(' ')).toEqual([1, true]);
+    }
   });
 });

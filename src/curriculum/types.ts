@@ -1,6 +1,7 @@
 // Shared question model for every subject. Generators are pure: (difficulty, rng) => Question.
 import type { Strand } from './strands';
 import { resolveYear } from '../config/resolve';   // the year settings live in src/config/catalogue.json (#2194)
+import type { YearSettings } from '../config/catalogue';
 export type Rng = () => number; // [0,1)
 
 /** One category of a chart visual: its label (emoji + name) and the count it stands for. */
@@ -210,7 +211,7 @@ const ART_YEAR1 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 const ART_YEAR2 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M14 38h92l-18 28H32z' fill='%233a2a4a'/%3E%3Cpath d='M26 46l22 12 14-9 14 11 18-15' stroke='%23261a34' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='38' rx='48' ry='9' fill='%237a5ad6'/%3E%3Cellipse cx='60' cy='35' rx='44' ry='6' fill='%23a98cff'/%3E%3Cpath d='M44 34V14h32v20' fill='%232a1f4a'/%3E%3Cpath d='M38 14h44l-4-6H42z' fill='%23ff3b5c'/%3E%3Cpath d='M48 34V20h8v14zM64 34V20h8v14z' fill='%23ffe07a'/%3E%3Ccircle cx='24' cy='30' r='4' fill='%233ec9ff'/%3E%3Ccircle cx='98' cy='28' r='5' fill='%23ffd54f'/%3E%3C/svg%3E";
 
 /** The eight settings `YEARS` takes from the catalogue (#2194); the rest of a row is display. */
-type YearSettingKey = 'maxAnswer' | 'minAnswer' | 'perStage' | 'lives' | 'gentle' | 'speeds' | 'diffs' | 'sprintStars';
+type YearSettingKey = Exclude<keyof YearSettings, 'airTime' | 'stagger'>;
 /** A `YEARS` row: its display fields here, its settings from `resolveYear` (defaults, then the year's own). */
 function year(id: YearId, display: Omit<YearInfo, 'id' | YearSettingKey>): YearInfo {
   const s = resolveYear(id);
