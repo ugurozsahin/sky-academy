@@ -11,8 +11,9 @@ import { PARENT, profilesIn, rowProblems, type PlaytestRow } from '../../scripts
 
 // #2206: `scripts/playability-apply.mjs` checks the playtester profiles' rows and writes each score into the
 // catalogue with a report behind it; `scripts/playtest-row.mjs` is the row's validator, with #2214's three rules.
-// The fixture is the two dry-run rows `playtester-year1` wrote in PR #2211, verbatim. They are applied only to a
-// copy of the catalogue in a temporary folder: the committed file stays all null until the playtest run (#2207).
+// The fixture is the two dry-run rows `playtester-year1` wrote in PR #2211, verbatim. They are applied only to
+// `UNSCORED`, a copy of the catalogue with every score cleared (the committed file carries #2207's scores), in
+// memory or in a temporary folder.
 //
 // Prove it red: drop a check from `rowProblems` (its mutation below then passes clean); write a parent row to
 // the game-year node; skip the report; read `playability` in any file under src/ui/; delete a report a score names.
@@ -21,23 +22,26 @@ const SCRIPT = path('scripts/playability-apply.mjs');
 const AGENTS = path('.claude/agents');
 const DATE = '2026-10-22';
 const REPORT = `docs/playability/${DATE}/playtester-year1.md`;
-const FIXTURE = readFileSync(path('tests/unit/fixtures/playability-dry-run.jsonl'), 'utf8');
-const ROWS = FIXTURE.trim().split('\n').map((l) => JSON.parse(l) as PlaytestRow);
-const ctx = { catalogue: CATALOGUE, profiles: profilesIn(AGENTS) };
 type Doc = Record<string, any>;
 type Loose = any;   // a hand-broken catalogue copy, for the rails' failure cases
+const FIXTURE = readFileSync(path('tests/unit/fixtures/playability-dry-run.jsonl'), 'utf8');
+const ROWS = FIXTURE.trim().split('\n').map((l) => JSON.parse(l) as PlaytestRow);
+/** The committed catalogue with every `playability` back to null, as it was before the #2207 run scored it. */
+const UNSCORED: Loose = structuredClone(CATALOGUE);
+for (const n of [...Object.values<Doc>(UNSCORED.years), ...Object.values<Doc>(UNSCORED.games).flatMap((g) => [g, ...Object.values<Doc>(g.years)])]) n.playability = null;
+const ctx = { catalogue: UNSCORED, profiles: profilesIn(AGENTS) };
 const fresh = (i = 0): Doc => structuredClone(ROWS[i]);
 
 const dirs: string[] = [];
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 
-/** A scratch repository root: the committed catalogue, the eight profiles and the fixture rows. */
+/** A scratch repository root: the unscored catalogue, the eight profiles and the fixture rows. */
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), 'sna-playability-'));
   dirs.push(dir);
   mkdirSync(join(dir, 'src/config'), { recursive: true });
   mkdirSync(join(dir, '.claude/agents'), { recursive: true });
-  copyFileSync(path('src/config/catalogue.json'), join(dir, 'src/config/catalogue.json'));
+  writeFileSync(join(dir, 'src/config/catalogue.json'), `${JSON.stringify(UNSCORED, null, 2)}\n`);
   for (const f of readdirSync(AGENTS).filter((f) => f.startsWith('playtester-'))) copyFileSync(join(AGENTS, f), join(dir, '.claude/agents', f));
   writeFileSync(join(dir, 'rows.jsonl'), FIXTURE);
   return dir;
@@ -135,7 +139,7 @@ describe('playability-apply on the PR #2211 dry-run rows (#2206)', () => {
 });
 
 // ---- The row validator catches each rule ----------------------------------------------------------------------
-const Y2_GAME = Object.keys(CATALOGUE.games).find((g) => 'year2' in CATALOGUE.games[g].years)!;
+const Y2_GAME = Object.keys(UNSCORED.games).find((g) => 'year2' in UNSCORED.games[g].years)!;
 const without = (r: Doc, k: string) => r.evidence.filter((e: Doc) => e.criterion !== k);
 /** [what is wrong, how to break a fresh copy of dry-run row 1 (y1-add, 7), the problem it must produce (prefix)]. */
 const MUTATIONS: [string, (r: Doc) => void, string][] = [
@@ -227,15 +231,15 @@ describe('applyRows: where each profile\'s score goes (#2206, #2214)', () => {
     criteria: { ...ROWS[1].criteria, understand: Math.min(2, score - 3), physical: Math.max(0, score - 5) } });
 
   it("writes the parent's row to the game itself, and leaves its game-year node alone", () => {
-    const { catalogue, reports } = applyRows(CATALOGUE, [parent('year1', 4)], DATE);
+    const { catalogue, reports } = applyRows(UNSCORED, [parent('year1', 4)], DATE);
     expect(catalogue.games['y1-alien'].playability).toEqual({ score: 4, by: PARENT, at: DATE, report: `docs/playability/${DATE}/${PARENT}.md` });
     expect(catalogue.games['y1-alien'].years.year1!.playability).toBeNull();
     expect(reports.map((r) => r.path)).toEqual([`docs/playability/${DATE}/${PARENT}.md`]);
-    expect(CATALOGUE.games['y1-alien'].playability, 'the input is not mutated').toBeNull();
+    expect(UNSCORED.games['y1-alien'].playability, 'the input is not mutated').toBeNull();
   });
 
   it('several parent rows on one game: the lowest wins, the earliest year on a tie, and the report names it', () => {
-    const two: Loose = structuredClone(CATALOGUE);
+    const two: Loose = structuredClone(UNSCORED);
     two.games['y1-alien'].years.year2 = { visible: true, settings: {}, playability: null };
     const rows = [parent('year1', 6), parent('year2', 4)];
     expect(checkRows(rows.map((row, i) => ({ row, where: `p.jsonl:${i + 1}` })), { ...ctx, catalogue: two }), 'both rows pass the validator first').toEqual([]);
@@ -253,7 +257,7 @@ describe('applyRows: where each profile\'s score goes (#2206, #2214)', () => {
 
   it('marks a bunched run in the distribution, over the skill\'s 40% line', () => {
     const top = { ...ROWS[0], score: 9 };
-    expect(applyRows(CATALOGUE, [top, ROWS[1]], DATE).reports[0].text).toContain("8 or above: 1 of 2 (50%) — over the skill's 40% honesty line");
+    expect(applyRows(UNSCORED, [top, ROWS[1]], DATE).reports[0].text).toContain("8 or above: 1 of 2 (50%) — over the skill's 40% honesty line");
   });
 });
 
@@ -286,7 +290,7 @@ describe('rail: every non-null score has a report that lists it (#2206)', () => 
   });
 
   const scoredCopy = () => {
-    const out = applyRows(CATALOGUE, ROWS, DATE) as { catalogue: Loose; reports: { path: string; text: string }[] };
+    const out = applyRows(UNSCORED, ROWS, DATE) as { catalogue: Loose; reports: { path: string; text: string }[] };
     const files = new Map(out.reports.map((r) => [r.path, r.text]));
     return { c: out.catalogue, files, read: (p: string) => files.get(p) ?? null };
   };

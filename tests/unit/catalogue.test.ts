@@ -1,17 +1,18 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { STAGE_NAMES, TOPICS, YEARS, type YearId } from '../../src/curriculum';
 import { EYFS_KS1 } from '../../src/curriculum/key-stage';
 import { GROUP_IDS, OVERRIDABLE_KEYS, STAGES, YEAR_ONLY_KEYS, validateCatalogue, type MediaEntry } from '../../src/config/catalogue';
 import { CATALOGUE } from './helpers/catalogue-file';
+import { reportProblems } from '../../scripts/playability-apply.mjs';
 
 // #2193: the game catalogue file, `src/config/catalogue.json`, written once from today's code by
 // `scripts/catalogue-init.mjs`. These rails hold it complete and valid; since #2194 it is the source of the year
 // settings and the bubble timing, and `tests/unit/resolve.test.ts` pins those values to today's.
 //
-// Prove it red: delete a game node or add one; give a game an override; give two games one thumbnail; set a
-// playability score; drop a validator check (its mutation below then passes clean).
+// Prove it red: delete a game node or add one; give a game an override; give two games one thumbnail; change a
+// playability score its report does not list; drop a validator check (its mutation below then passes clean).
 const FILE = 'src/config/catalogue.json';
 const onDisk = () => JSON.parse(readFileSync(FILE, 'utf8')) as Record<string, any>;
 const years = CATALOGUE.years as Record<string, (typeof CATALOGUE.years)[YearId]>;
@@ -77,12 +78,12 @@ describe('catalogue media and playability (#2193)', () => {
     expect(bad).toEqual([]);
   });
 
-  it('every playability value is null until the playtest run scores it', () => {
-    const scored = [
-      ...games.flatMap(([id, g]) => [[id, g.playability], ...Object.entries(g.years).map(([y, n]) => [`${id}/${y}`, n?.playability])]),
-      ...Object.entries(years).map(([id, y]) => [id, y.playability]),
-    ].filter(([, p]) => p !== null);
-    expect(scored).toEqual([]);
+  // Until #2207 every value here had to be null; the playtest run scored them, so the rail is now the one #2206
+  // gives: a score, wherever it sits, names a report that exists and lists it (`reportProblems`).
+  it('every playability score has a report that lists it (#2206, #2207)', () => {
+    const read = (p: string) => (existsSync(p) ? readFileSync(p, 'utf8') : null);
+    expect(games.filter(([, g]) => g.playability !== null).length, 'scores exist, so the check below is not vacuous').toBeGreaterThan(0);
+    expect(reportProblems(CATALOGUE, read)).toEqual([]);
   });
 });
 
