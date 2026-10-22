@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
-        with: { node-version: 22, cache: npm }
+        with: { node-version-file: .node-version, cache: npm }
       - run: npm ci
       - run: npm run build
       - name: Drop the apt sources we do not use (#85)
