@@ -1,5 +1,6 @@
 // Switching to a profile and adding one (#20).
 import { forgetDailyLine } from '../game/daily-line';
+import { removePatch } from '../config/patch-store';
 import { currentIndex, PROFILE_IDS, readItem, readTombstones, saveKeyFor, slotState, writeIndex, writeTombstones, type ProfileId } from './profile-index';
 import { leaveProfile, rereadProfile, state } from './state';
 /**
@@ -123,6 +124,7 @@ export function addProfile(): AddProfileResult {
     if (readItem(saveKeyFor(free)) !== null) { state.writeFailed = true; return { ok: false, why: 'store' }; }
     if (!writeTombstones(tombstoned.filter(id => id !== free))) { state.writeFailed = true; return { ok: false, why: 'store' }; }
   }
+  if (!removePatch(free)) { state.writeFailed = true; return { ok: false, why: 'store' }; }   // #2199: a new child starts on the committed catalogue, never on a leftover patch
   if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) { state.writeFailed = true; return { ok: false, why: 'store' }; }
   leaveProfile();
   return { ok: true, id: free };

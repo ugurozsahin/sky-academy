@@ -1,3 +1,4 @@
+import { HIDDEN_LINE } from '../game/hidden-game';
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { arithmeticPool, grammarPool, offeredPool } from '../game/sprint-pools';
 import { dailySprintPool, dailySprintSeed } from '../game/daily-sprint'; import { sprintSeed } from '../game/challenge-run';
@@ -38,7 +39,7 @@ import type { PlayOpts } from './play';
 export type StartOpts = PlayOpts & { pro?: boolean };   // #1297: `pro` is applied by main.ts, so every `year` handed around stays canonical
 export type StartPlay = (o: StartOpts) => void;
 export type Nav = {
-  avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
+  avatar: () => void; map: () => void; island: (year: YearInfo, notice?: typeof HIDDEN_LINE) => void; play: StartPlay;
   memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string, labels?: 'players' | 'teams') => void; rewards: () => void; shop: () => void; parents: () => void;
   pickYear: (year: YearInfo) => void;   // #1055: the school-year tap on a new child's map (a mission after "Let's go!", else the island)
   profiles: () => void;   // #20 slice 2: "Who is playing?"
@@ -334,10 +335,15 @@ export function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Reco
   ], year.id), year);
 }
 
+/** #2238: the subject tabs an island draws — a subject with no shown game is not drawn, so no tab is ever empty. */
+export const islandSubjects = (year: YearId): Array<'maths' | 'writing'> => (['maths', 'writing'] as const).filter(s => topicsFor(year, s).length > 0);
+const TAB_LABEL = { maths: '🔢 Maths', writing: '✍️ Writing' };
+
 /** Island: topics for one year group + its Sky Storm. */
-export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths') {
+export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths', notice?: typeof HIDDEN_LINE) {
   const d = load();
-  let subject = subjectInit;
+  const tabs = islandSubjects(year.id);   // #2238: the mixed rows read `subject`, which can now only be a subject that has games
+  let subject = tabs.includes(subjectInit) ? subjectInit : tabs[0] ?? subjectInit;
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
   const progress = safeRecord<TopicProgress>(d.progress);   // #95: same tolerance as mapScreen's totalStars
   const menu = islandMenu(nav, year, d, progress, () => subject);
@@ -350,7 +356,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <div><b>${year.title} Island</b><small>${ageLabel(year, d.ks2.schoolYear)} · ${year.blurb}${trophyCount(year, progress)}</small></div>
     </div>
     <div class="tabs" role="tablist">
-      ${subjectTab('maths', subject, '🔢 Maths')}${subjectTab('writing', subject, '✍️ Writing')}
+      ${(tabs.length ? tabs : [subject]).map(t => subjectTab(t, subject, TAB_LABEL[t])).join('')}
     </div>
     <div class="topics" id="topics" role="tabpanel" aria-labelledby="tab-${subject}"></div>
     <div class="mode-grid">
@@ -359,6 +365,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       ).join('\n      ')}
     </div>
     <div class="overlay" id="island-overlay" hidden></div>
+    ${notice ? `<div class="toast show" id="island-notice" role="status">${notice}</div>` : ''}
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {

@@ -7,6 +7,7 @@ import { $, $$ } from './dom';
 import { shownYears, type YearId } from '../curriculum';
 import type { Settings } from '../save-records';
 import { schoolYearFromBirthDate, yearIdFromLevel } from '../school-year';
+import { bindCatalogue, catalogueHTML } from './parents-catalogue';
 
 export const THREE_LABEL: Readonly<Record<ThreeSetting, string>> = { auto: 'Auto', on: 'On', off: 'Off' };
 export const CALM_LABEL: Readonly<Record<CalmSetting, string>> = { auto: 'Auto', on: 'On' };
@@ -66,7 +67,7 @@ export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean
         `<option value="${y.id}"${y.id === load().ks2.schoolYear ? ' selected' : ''}>${y.title}</option>`).join('')}</select>
       <label class="p-three-say" for="school-birth">Work it out from a birthday</label>
       <input type="date" id="school-birth" class="p-year-birth" aria-label="Birthday">
-    </div>`;
+    </div>${catalogueHTML()}`;
 }
 
 /** Wire the Settings section's controls: the 3-D pictures tabs, then "Slower bubbles" (#905). */
@@ -125,6 +126,7 @@ export function bindSettings(): void {
   }));
   bindEasyRead();
   bindTimeSettings();
+  bindCatalogue();
   // #1055: stored in `ks2.schoolYear` only. The birthday is read once to fill the select and is never saved.
   const pick = $('#school-year') as HTMLSelectElement;
   pick.addEventListener('change', () => {

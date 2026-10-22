@@ -22,6 +22,7 @@ import { plugin, wireBackButton, type AppPlugin } from './native';
 import { backGuard } from './ui/screen';
 import { shownYears, topicById, topicsFor, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
+import { blockedStart, type HIDDEN_LINE } from './game/hidden-game';
 import { needsSchoolYear, placementYear } from './school-year';
 import { handleDeepLink, queueLink, stripLinkParams, takeLink, wireDeepLinks } from './deeplink-open';
 import { wireNativeLinks } from './deeplink-native';
@@ -67,15 +68,16 @@ const renderIntro = () => introScreen(() => finishWizard(true), () => finishWiza
 const startFirstMission = (chosen?: YearInfo) => {
   if (openLink()) return;   // #2027: a pending link outranks the default first mission
   const shown = shownYears();   // #2195: an island the catalogue hides is never where a first mission starts
-  const y = chosen ?? shown.find(i => i.id === placementYear(load(), shown)) ?? shown[0], topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
-  if (!y || !topic) { nav.map(); return; }
+  const y = chosen ?? shown.find(i => i.id === placementYear(load(), shown)) ?? shown[0], topic = y && (['maths', 'writing'] as const).flatMap(s => topicsFor(y.id, s)).find(t => t.input !== 'tracing');   // #2238: writing games when every maths one is hidden
+  if (!y) { nav.map(); return; }
+  if (!topic) { nav.island(y); return; }   // #2238: nothing to start — open the island, never a silent map
   year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
   nav.play({ year: y, mode: 'mission', topic });
 };
 /** #2027: open the pending deep link, once (`takeLink` clears it), as [map, island?, play?] so Back unwinds it. False when none. */
 const openLink = (): boolean => {
   const l = takeLink(); if (!l) return false;
-  if (l.topic) { year = l.year; enter('island'); nav.play({ year: l.year, mode: 'mission', topic: l.topic }); } else nav.island(l.year);
+  if (l.topic) { year = l.year; enter('island'); nav.play({ year: l.year, mode: 'mission', topic: l.topic }); } else nav.island(l.year, l.notice);
   return true;
 };
 const renderName = () => nameScreen(() => { enter('onboard-intro'); renderIntro(); });
@@ -86,8 +88,8 @@ const nav = {
     chooseNinjaScreen(() => { enter('onboard-name'); renderName(); });
   },
   map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); if (!missionAfterAsk) openLink(); },   // #2041: a new child's school-year question comes first; the link then outranks the first mission
-  island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
-  play: ((o: StartOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(played(o), up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, pro: o.pro, seed: replaySeed(o.topic, o.seed), input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : o.mode === 'paper' ? paperDeck(Math.random) : o.title === DAILY_TEN_TITLE ? dailyTenDeck(topicsFor(o.year.id), Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend, pro: o.pro })); }) as StartPlay,
+  island: (y: YearInfo, notice?: typeof HIDDEN_LINE) => { leave(); year = y; enter('island'); islandScreen(nav, y, 'maths', notice); },
+  play: ((o: StartOpts) => { if (blockedStart(o.topic, o.year, nav)) return; leave(); year = o.year; enter('play'); dispose = playScreen(played(o), up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, weights: o.weights, legend: o.legend, pro: o.pro, seed: replaySeed(o.topic, o.seed), input: o.input, deck: o.mode === 'mtc' ? mtcDeck(Math.random) : o.mode === 'paper' ? paperDeck(Math.random) : o.title === DAILY_TEN_TITLE ? dailyTenDeck(topicsFor(o.year.id), Math.random) : undefined }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, title: o.title, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend, pro: o.pro })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
   duel: (y: YearInfo, topic?: string, labels?: 'players' | 'teams') => { leave(); year = y; enter('duel'); dispose = duelScreen({ year: y, topic, labels }, up, () => nav.duel(y, topic, labels)); },   // #16
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },

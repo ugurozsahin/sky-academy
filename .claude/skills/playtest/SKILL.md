@@ -20,13 +20,18 @@ A pack is one game played once, for one year, the way a child meets it on a 390�
   wave at its apex, just after one deliberate wrong slice, and the stage result. Tracing and keypad games have
   their own equivalent moments. List the folder and open each image with `Read`; cite each by its file name.
 - **`metrics.json`**, the measured numbers: the resolved settings (lives, gentle, and the per-stage `speeds`
-  and `diffs`), the input kind (bubbles, tracing, keypad), the prompt text and its word count, whether speech is
-  offered, answers per wave, the bubble radius in CSS px, the time from launch to apex, the time a bubble stays
-  above the question card, the slowest and fastest bubble, the share of the screen the card covers, and the
-  visual card's needs (`slow`, `wide`). Cite a number as `metrics.json#<key>`, and a nested one by its path
-  (`metrics.json#aboveCardMs.min`).
+  and `diffs`), the input kind (bubbles, tracing, keypad), the prompt text and its word count, whether that line
+  is the same on every question of the stage (`promptFixed`), whether speech is offered, answers per wave, the
+  bubble radius in CSS px, the time from launch to apex, the time a bubble stays above the question card, for a
+  sequence game each required label's reach over its relaunches (`labelReachMs`), the slowest and fastest bubble,
+  the share of the screen the card covers, and the visual card's needs (`slow`, `wide`). Cite a number as
+  `metrics.json#<key>`, and a nested one by its path (`metrics.json#aboveCardMs.min`).
+- **A sequence game's first question is missed on purpose.** The pack slices nothing until a required label has
+  used every relaunch, to time its whole chance, so `metrics.json#livesAfterLabelsRanOut` and the result shot may
+  show one miss the pack chose. It is not a child's mistake: never mark `feedback` or `again` down for it.
 - **A pack plays stage 1 only.** Judge the later stages from the resolved settings: a higher `speeds` entry is a
-  shorter flight, a higher `diffs` entry harder questions. Say so in the evidence (`metrics.json#settings.speeds`).
+  shorter flight, a higher `diffs` entry harder questions. Say so in the evidence (`metrics.json#settings.speeds`);
+  §2 has the one way to estimate a later stage's reach.
 
 **A key the file lacks, or a moment with no screenshot, is not observed.** Write "not observed" for it; never
 fill it in from what the game probably does. Speech the pack does not show playing by itself counts as a
@@ -45,13 +50,48 @@ measured as `live:<what>`, for example `live:bubble above card 2.9 s at stage 3`
 Mark each criterion for **this profile's child**, using the profile's own numbers (reading level, number
 range, reaction time, target size, attention).
 
-**The time a bubble needs**, for `physical`: the profile's reaction floor, plus the reading time of any words on
-the bubbles (all of them, at the cautious end: a child reads them in turn until one fits; word count ÷ the
-profile's words a minute), plus the question's reading time when the pack shows the wave launching before it
-could be read. Count the words of the question line only — a fixed instruction under it, the same every wave, is
-read once per game — and words only: numerals and maths symbols are read at a glance from Year 1 up; Reception
-reads neither. Compare that need with the bubble's reachable time
-(`aboveCardMs`, its smallest value).
+**The time a bubble needs**, for `physical`, is the sum of these parts, in seconds. Count words only: numerals and
+maths symbols are read at a glance from Year 1 up, and Reception reads neither.
+- **The profile's reaction floor.**
+- **The words on the bubbles**, all of them, at the cautious end: a child reads them in turn until one fits (word
+  count ÷ the profile's words a minute).
+- **The question line**, when the pack shows the wave launching before it could be read. **A line that is the
+  same every wave is read once per game, so it is not in the per-wave need** — y1-order's `Smallest to biggest!`
+  is one, and so is a fixed instruction under the question line. **Read whether the question line is fixed from
+  `metrics.json#promptFixed`** (#2250): `true` when the pack read the same line from the game's state on every
+  question of the stage it played. It covers a sequence game too, which hides the line once slicing starts, so
+  never compare screenshots or read the line live for it. When it is `false` or missing, count the line. Tell the
+  instruction under the line from the pack: the same text in `2-prompt.webp` (wave 1) and in `5-wrong.webp`
+  (wave 2). When it differs, or neither shows it, count it.
+- **Card text, only when the child must read it to choose the answer**, as with y6-lists' gap sentence. Count it
+  once per wave. A picture does not count, nor a card that only repeats the question line.
+- **Working time**, a judgement, not a published norm: **a recalled fact adds 0** (a times-table answer, a number
+  bond), and **each further mental step the question needs adds 1 s**. `0.4 × 3` is recall 4 × 3, then adjust the
+  place value: one step, 1 s. Every `physical` `saw` names the steps it counted.
+
+Compare that need with the bubble's **reach**, its reachable time (`aboveCardMs`, its smallest value,
+in milliseconds: divide by 1000), as a percentage: reach ÷ need, both in seconds.
+
+**A `sequence` game's reach is `labelReachMs.min`, not `aboveCardMs`** (#2251, the product owner's decision).
+- **Why:** a required label that falls unsliced is sent back up, up to `metrics.json#labelReach.maxRelaunches`
+  times. So its reach is its total time below the card over its first flight and every relaunch, until it is sliced
+  or its relaunches run out. `aboveCardMs` times one flight of any bubble, decoys included, so it is not used.
+- **A label cut short** (`endedBy` `wave over` in `metrics.json#labelReach.labels`) was stopped by the pack's own
+  miss, not by the game, so it is information only and never the reach.
+- **Later stages:** it is `reach_1` in the estimate below.
+- **What it does not cover:** waiting for a label to come back is judged under `again` (pace) and `feedback`, not
+  `physical`.
+
+**A later stage's reach** is estimated, never guessed, one way. Stages count from 1, so stage k plays
+`speeds[k-1]`: `reach_k ≈ reach_1 × airTime[speeds[k-1]] / airTime[speeds[0]]`. `airTime` is
+`defaults.settings.airTime` in `src/config/catalogue.json`, unless the game overrides it; the pack carries the
+resolved table as `metrics.json#settings.airTime`. A `speeds` value indexes `airTime` from 0, so speed 1 is its
+second entry. **Ease the speed before indexing:** a `sequence` game (`metrics.json#sequence`) or a `slow` one
+(`metrics.json#slow`) flies one speed lower at every stage, never below 1, or below 0 in a gentle year
+(`metrics.json#settings.gentle`), per `eased()` in `src/game/modes.ts`; use the eased speed on both sides of the
+ratio. A pack plays stage 1 only, so it cannot show that a later stage's questions turn `slow`; the estimate is
+then the cautious bound. The highest eased speed is the shortest flight, so that stage decides. Cite
+`metrics.json#settings.speeds` and put the arithmetic in `saw`: `stage 3 at speed 3: 5.27 × 3.4 / 5.6 = 3.2 s`.
 
 | Key | Criterion | The question |
 |---|---|---|
@@ -71,15 +111,15 @@ reads neither. Compare that need with the bubble's reachable time
 - **2** — Clear from the first screen: the prompt is within their reading level or spoken, the visual card is
   legible, and the answer bubbles are the kind of thing the prompt asks for.
 
-**`physical`**
-- **0** — A target leaves the reachable area before this child could read the prompt and react, by the
-  profile's own reaction-time floor; or the radius is below the profile's minimum; or tracing needs precision
-  the profile lacks.
-- **1** — Manageable at the first stage, but a later stage's speed (the resolved `speeds`)
-  or the answers per wave push past the
-  profile's floor; or bubbles overlap so a slice catches the wrong one.
-- **2** — Every measured bubble stays above the card comfortably longer than the profile's floor, at or above
-  its minimum radius, with room between targets.
+**`physical`** — a band, not a cliff: a near miss is a 1, a clear miss a 0. The lowest anchor any clause reaches
+is the mark. Each `physical` mark's `saw` states the need, the reach and the percentage.
+- **0** — The stage-1 reach is below **75%** of the need; or the radius is below the profile's floor; or tracing
+  needs precision the profile lacks.
+- **1** — The stage-1 reach is at least 75% but below 100% of the need; or stage 1 meets the need but a later stage's estimated
+  reach does not; or the radius is at or above the floor but below the comfortable size; or bubbles overlap so a
+  slice catches the wrong one.
+- **2** — Every stage's estimated reach meets the need, and the radius is at or above the profile's comfortable
+  size, with room between targets.
 
 **`challenge`**
 - **0** — Outside this year's programme of study by more than a year either way, or trivial at every stage.
@@ -135,7 +175,7 @@ not describe the game, re-read the criteria, but never adjust the sum to fit a b
 One JSON object per game, one per line (JSON Lines), with exactly these keys:
 
 ```json
-{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs","saw":"bubbles reachable 4.5 s at stage 1"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
+{"game":"y1-add","year":"year1","by":"playtester-year1","score":7,"criteria":{"understand":2,"physical":1,"challenge":2,"feedback":1,"again":1},"evidence":[{"criterion":"understand","ref":"2-prompt.webp","saw":"5-word sum, speaker button shown"},{"criterion":"physical","ref":"metrics.json#aboveCardMs.min","saw":"need 4 s, reach 5.37 s, 134% at stage 1; no words, working: 0 steps, a recalled fact"},{"criterion":"physical","ref":"metrics.json#settings.speeds","saw":"stage 4 at speed 3: 5.37 × 3.4 / 5.6 = 3.26 s, 82% of the need; working: 0 steps"},{"criterion":"challenge","ref":"2-prompt.webp","saw":"6 + 1, within 20"},{"criterion":"feedback","ref":"5-wrong.webp","saw":"right answer filled in, one heart lost"},{"criterion":"again","ref":"6-result.webp","saw":"one star and a cheer by name"}],"note":"Right sums for Year 1, but the later waves move too fast to read and slice."}
 ```
 
 - **`game`** — the topic id, the pack's folder name. **`year`** — the pack's `YearId`.

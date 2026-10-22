@@ -95,6 +95,90 @@ export function frameStats(times) {
   return { count: times.length, maxGapMs: ms(maxGap), clean: maxGap <= FRAME_CLAMP_MS };
 }
 
+/**
+ * One frame of a sequence wave's reach recording (#2251). Self-contained, because the pack's page runs this very
+ * function (scripts/playtest-pack.mjs injects its source) and tests/unit runs it on the real Arena. `need` is the
+ * question's required labels. Each required bubble is sampled `[t, id, label, y, relaunches]` while it is launched
+ * and unresolved, and its end is noted on the first frame it is hit, dead, faded or frozen by the outcome. A bubble
+ * first seen already resolved is skipped: `Arena.reveal` adds the missed answer as a ghost bubble born hit.
+ */
+export function reachStep(rc, t, bubbles, frozen, need) {
+  rc.frames.push(t);
+  for (const b of bubbles) {
+    if (!need.includes(b.label) || b.id in rc.ends) continue;
+    const over = b.hit || b.dead || b.fade || frozen;
+    if (over && !(b.id in rc.ids)) continue;        // born resolved: the outcome's ghost of the right answer, never a target
+    rc.ids[b.id] = b.label;
+    if (over) rc.ends[b.id] = { t, hit: b.hit, dead: b.dead, launched: b.launched, relaunches: b.relaunches };
+    else if (b.launched) rc.samples.push([t, b.id, b.label, b.y, b.relaunches]);
+  }
+}
+export const newReach = () => ({ on: false, ids: {}, ends: {}, samples: [], frames: [] });
+
+/**
+ * One frame of the question-line recording (#2250). Self-contained, for the same reason as `reachStep`: the pack's
+ * page runs this very function. `asked` is the session's `questionsAsked`; `st` is `window.__sna.state()`, whose
+ * `prompt` is the question's own line, shown or hidden; `listen` says the question has a `listen` line, which a
+ * device with no voice shows instead (promptHTML in src/ui/hud.ts). A row `[asked, stage, prompt, listen]` is kept
+ * each time the question or its line changes; an empty line (no question yet, or the session over) is skipped.
+ */
+export function promptStep(rows, asked, st, listen) {
+  if (!st?.prompt || asked < 1) return;
+  const last = rows[rows.length - 1];
+  if (last && last[0] === asked && last[2] === st.prompt) return;
+  rows.push([asked, st.stage, st.prompt, !!listen]);
+}
+
+/**
+ * Whether the question line is the same on every question of the stage the pack played (#2250): the first row's
+ * stage, read from the game's state per question, never from a screenshot, because a sequence game hides the line
+ * once slicing starts. A line that changed within a question is not fixed. Nor is one the pack cannot vouch was
+ * shown: with no voice (`voiced` false), a question with a `listen` line put that, or its answer, on the card
+ * instead, so a fixed `prompt` says nothing about what the child read. Fewer than two questions read is no
+ * comparison, so the pack fails rather than write a value nobody observed.
+ */
+export function promptKeys(rows, { voiced = true } = {}) {
+  const stage = rows[0]?.[1];
+  const own = rows.filter(r => r[1] === stage);
+  const waves = new Set(own.map(r => r[0])).size;
+  if (waves < 2) throw new Error(`promptFixed needs the question line of two questions in one stage; ${waves} read`);
+  return { promptFixed: own.every(r => r[2] === own[0][2]) && (voiced || !own.some(r => r[3])), promptWaves: waves };
+}
+
+/**
+ * How a required bubble's reach ended: `sliced`; `ran out`, when it fell on its last flight (launched, dead, unhit,
+ * every relaunch used); or `wave over`, when the outcome froze or cleared it first, or recording stopped first.
+ */
+const reachEnd = (e, maxRelaunches) => (!e ? 'wave over' : e.hit ? 'sliced' : e.dead && e.launched && e.relaunches >= maxRelaunches ? 'ran out' : 'wave over');
+const median = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+
+/**
+ * A sequence game's reach (#2251, the product owner's option 2): for each required bubble, its total time inside
+ * the play area (below `cardBottom`, above `H`) over its first flight and every relaunch, until it was sliced or
+ * its relaunches ran out. `labelReachMs` is the min, median and max over the bubbles that ended either way. One
+ * the question's end cut short (`wave over`) is listed for information only: the pack's own miss ended it, so its
+ * reach so far says nothing about the game, as `aboveCardMs` keeps a cut flight out.
+ */
+export function labelReach(rc, { H, cardBottom, maxRelaunches }) {
+  if (!Number.isInteger(maxRelaunches)) throw new Error('labelReach needs maxRelaunches, from src/game/bubbles.ts');
+  const inside = y => y < H && y > cardBottom;
+  const byId = new Map(Object.keys(rc.ids).map(id => [Number(id), []]));
+  for (const s of rc.samples) byId.get(s[1])?.push(s);
+  const labels = [...byId].map(([id, pts]) => {
+    pts.sort((p, q) => p[0] - q[0]);
+    const end = rc.ends[id];
+    let sum = 0;                                     // each frame interval counts when it starts inside; the last one runs to the end frame
+    for (let i = 0; i < pts.length; i++) {
+      const next = i + 1 < pts.length ? pts[i + 1][0] : end?.t;
+      if (next !== undefined && inside(pts[i][3])) sum += Math.max(0, next - pts[i][0]);
+    }
+    return { label: rc.ids[id], reachMs: ms(sum), flights: pts.length ? 1 + Math.max(...pts.map(p => p[4])) : 0, endedBy: reachEnd(end, maxRelaunches) };
+  });
+  const ended = labels.filter(l => l.endedBy !== 'wave over').map(l => l.reachMs);
+  const stats = ended.length ? { min: Math.min(...ended), median: ms(median(ended)), max: Math.max(...ended) } : null;
+  return { labelReachMs: stats, labelReach: { maxRelaunches, labels, frames: frameStats(rc.frames) } };
+}
+
 /** `auto` when the game spoke the prompt by itself, `tap` when only the speaker button would, `none` with neither. */
 export const speechMode = ({ autoplays, offered }) => (autoplays ? 'auto' : offered ? 'tap' : 'none');
 
@@ -150,6 +234,14 @@ function flightKeys(p, sp) {
   };
 }
 
+/** A sequence game's reach keys (#2251). A sequence pack with no label that ran out or was sliced has no reach to score: it fails, never a silent null. */
+function reachKeys(p, maxRelaunches) {
+  if (!p.screen.sequence) return {};
+  const r = p.reach ? labelReach(p.reach, { H: p.screen.H, cardBottom: p.screen.card?.bottom ?? 0, maxRelaunches }) : null;
+  if (!r?.labelReachMs) throw new Error('a sequence game with no required label that ran out or was sliced: labelReachMs would be empty');
+  return r;
+}
+
 /** What each timing key means, written into every pack so a profile reads the definition beside the number. */
 export const ABOUT = {
   aboveCardMs: "over the first-wave bubbles that fell out of reach on their first flight: the time each one's centre spent below the question card and above the screen's bottom edge",
@@ -165,23 +257,30 @@ export const ABOUT = {
   speechCutAfterMs: "when the game's next line cut the spoken prompt off (speechError), how long it had played; a cut just after the answer fell (flights[].leaveMs) means the prompt was still being spoken when the wave ended",
   frames: 'the longest gap between frames while the wave was timed; over 100 ms the arena slows its step, so the times ran long',
   promptWords: 'words only: numerals, symbols and the ? placeholder are read at a glance',
+  promptFixed: "the question line was the same text on every question of the stage the pack played, read from the game's state (window.__sna.state().prompt) for each question, not from a screenshot: a sequence game hides the line once slicing starts. Always false when the voice never started and a question had a listen line, which a voiceless device shows instead",
+  promptWaves: 'how many questions of that stage promptFixed compared',
   demoShown: "the animated first-ever-play demo is skipped: the pack plays as a child who has played any game before",
+  labelReachMs: "sequence games only: over the first question's required labels, each one's total time below the question card and above the screen's bottom edge, across its first flight and its relaunches, until it was sliced or its relaunches ran out. The pack slices none of them while timing, so each one's whole chance is measured; a label the wave cut short is left out",
+  labelReach: "per required label: its reachMs, how many flights it had, and endedBy: 'ran out' (it fell on its last flight), 'sliced', or 'wave over' (the pack's own miss decided the question first: information only, never the reach); frames is the longest frame gap while it was timed",
 };
 
 /**
  * A pack's metrics.json: every key the skill reads, plus what a profile needs to check them, the shots in play
  * order with what each shows, and `about`, the definitions. `rec` is what the play flow recorded (`screen`, the
- * first wave's `samples`/`frames`/`labels`, `promptAt`, the first spoken line, and `extra` keys of its own).
+ * first wave's `samples`/`frames`/`labels`, `promptAt`, the first spoken line, and `extra` keys of its own), every
+ * question's `lines` (#2250), and for a sequence game `reach`, the first question's reach recording (#2251), read
+ * with `maxRelaunches`.
  */
-export function buildMetrics({ job, input, settings, view, seed, rec: p, shots }) {
+export function buildMetrics({ job, input, settings, view, seed, rec: p, shots, maxRelaunches }) {
   const { screen } = p;
   return {
     ...p.extra,                                       // first, so a play flow's own key can never overwrite a measured one
     year: job.year, game: job.game, catalogue: job.catalogue, viewport: `${view.width}x${view.height}`, seed,
     input, mode: screen.mode, hasLives: screen.hasLives, settings,
-    prompt: screen.prompt, promptWords: countWords(screen.prompt), hint: screen.hint, hintWords: countWords(screen.hint),
+    prompt: screen.prompt, promptWords: countWords(screen.prompt), ...promptKeys(p.lines ?? [], { voiced: !!p.speech && p.speech.start !== null }), hint: screen.hint, hintWords: countWords(screen.hint),
     ...speechKeys(p.speech, screen.speakVisible, p.promptAt, p.collectedAt), speechVoices: p.voices ?? null,
     ...(input === 'bubbles' ? flightKeys(p, p.speech) : {}),
+    ...(input === 'bubbles' ? reachKeys(p, maxRelaunches) : {}),
     cardShareOfScreen: screen.card ? cardShare(screen.card, view) : null, cardBottomPx: screen.card ? Math.round(screen.card.bottom) : null,
     slow: screen.slow, wide: screen.wide, sequence: screen.sequence, anyOrder: screen.anyOrder, visual: screen.visual,
     demoShown: false,

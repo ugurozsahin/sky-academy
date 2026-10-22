@@ -22,6 +22,12 @@ npm run preview    # serve the built dist/
 `npm run dev` binds to every interface on purpose: the game is designed for a phone, and the fastest way to
 judge a change is to open the Network URL on one.
 
+**Node version.** CI, the Android workflow and the Pages deploy all take Node from `.node-version`, an exact
+release, and the `engines` field in `package.json` sets the patched floor for each supported line. When Node
+ships a security release, bump `.node-version` and the floor in one pull request:
+`tests/unit/node-version.test.ts` fails any workflow that sets `node-version:` itself, and any pin below the
+floor. `engines` is advisory, so `npm ci` only warns on an older local Node.
+
 ## Tests
 
 ```

@@ -6,6 +6,7 @@ import { load, save } from './store';
 import { isMigratable } from './migrate';
 import { cleanName } from './name'; import { forgetDailyLine } from '../game/daily-line';
 import { futureSaveIn } from './profile-card';
+import { removePatch } from '../config/patch-store';
 /**
  * Why a rename was refused, as a value the grown-ups screen can turn into a sentence (#20 slice 3, the
  * `AddProfileResult` shape). The accepted arm carries the name **as stored**, trimmed and truncated, because
@@ -258,6 +259,7 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
   // promise itself — but a refusal here is a real store fault like every other write in this file, so it
   // latches `writeFailed` rather than passing silently (#690 review round 2).
   if (!writeTombstones([...readTombstones(), id])) state.writeFailed = true;
+  removePatch(id);   // #2199: the slot is reused, and its old child's catalogue patch must not outlive it
   // Only the *session's* profile going takes the session with it. A second tab that is playing someone else
   // keeps its cache and both latches even though `active` moved here — `sessionProfile()` is latched to that
   // child, so their writes still land in their own slot. This is `rereadProfile`'s rule (#380 round 5, B2)
