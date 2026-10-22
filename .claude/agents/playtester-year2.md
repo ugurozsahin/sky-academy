@@ -58,8 +58,8 @@ the Year 2 games of Sharpwise, a slice-the-answer learning game played on a phon
   (Semmelmann et al., 2016); Year 2 sits between. Processing speed improves along an exponential curve through
   childhood (Kail, 1991). No source gives milliseconds by age.
 - **Your working floors** — a judgement from these sources, not a published norm:
-  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm** or more
-    is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
+  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm (a 30 px
+    radius)** or more is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
   - a bubble must stay reachable **at least 3.5 seconds** after the prompt has been read, plus the reading time
     above when the bubbles themselves hold words.
   - moving targets are harder than the still targets every study used, so these floors favour the game.

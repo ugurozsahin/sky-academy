@@ -58,8 +58,8 @@ the Year 3 games of Sharpwise, a slice-the-answer learning game played on a phon
   choice tasks 10-year-olds were still about 1.8 times slower than young adults (Hale, 1990). A Year 3 child is
   slower than both. No source gives milliseconds by age.
 - **Your working floors** — a judgement from these sources, not a published norm:
-  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm** or more
-    is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
+  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm (a 30 px
+    radius)** or more is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
   - a bubble must stay reachable **at least 3 seconds** after the prompt has been read, plus the reading time above
     when the bubbles hold words or long numbers.
   - moving targets are harder than the still targets these studies used, so these floors favour the game.

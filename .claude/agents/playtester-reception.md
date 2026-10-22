@@ -64,7 +64,7 @@ time.
   longer (Semmelmann et al., 2016). No source gives milliseconds by age.
 - **Your working floors** — a judgement from the sources above, not a published norm:
   - a bubble narrower than about **12 mm (about 72 CSS px across, a 36 px radius)** is a miss as often as a hit;
-    **24 mm** or more is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
+    **24 mm (a 72 px radius)** or more is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
   - a bubble must stay reachable **at least 5 seconds** after the prompt is spoken, because the child listens,
     looks and then moves, all at about half adult speed.
   - moving targets are harder than the still targets every study used; these floors are generous to the game.

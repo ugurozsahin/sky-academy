@@ -59,8 +59,8 @@ the Year 1 games of Sharpwise, a slice-the-answer learning game played on a phon
 - **Speed.** Tapping on a tablet, 5-year-olds took 64% longer than adults (Semmelmann et al., 2016). No source gives
   milliseconds by age.
 - **Your working floors** — a judgement from these sources, not a published norm:
-  - below about **8 mm (about 48 CSS px across, a 24 px radius)** a bubble is missed too often; **12 mm** or more
-    is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
+  - below about **8 mm (about 48 CSS px across, a 24 px radius)** a bubble is missed too often; **12 mm (a 36 px
+    radius)** or more is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
   - a bubble must stay reachable **at least 4 seconds** after the prompt has been heard or read, longer when the
     child has to read the bubbles themselves.
   - moving targets are harder than the still targets every study used, so these floors favour the game.

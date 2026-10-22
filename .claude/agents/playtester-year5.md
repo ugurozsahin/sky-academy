@@ -56,8 +56,8 @@ the Year 5 games of Sharpwise, a slice-the-answer learning game played on a phon
   choice tasks 10-year-olds were still about 1.8 times slower than young adults (Hale, 1990): reaching is quick,
   deciding is slower. No source gives milliseconds by age.
 - **Your working floors** — a judgement from these sources, not a published norm:
-  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm** or more
-    is comfortable. A six-digit number or a decimal must also be legible inside it. On a 390 px phone, take roughly
+  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm (a 30 px
+    radius)** or more is comfortable. A six-digit number or a decimal must also be legible inside it. On a 390 px phone, take roughly
     6 CSS px per mm.
   - a bubble must stay reachable **at least 2.5 seconds** after the prompt has been read, plus the time to work out
     a multi-step answer.

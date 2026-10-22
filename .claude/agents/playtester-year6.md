@@ -56,8 +56,8 @@ phone, one play pack at a time.
   tasks 10-year-olds were still about 1.8 times slower than young adults and 12-year-olds about 1.5 times (Hale,
   1990): reaching is adult-quick, deciding is not yet. No source gives milliseconds by age.
 - **Your working floors** — a judgement from these sources, not a published norm:
-  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm** or more
-    is comfortable. A seven-digit number, a fraction or an expression must also be legible inside it. On a 390 px
+  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm (a 30 px
+    radius)** or more is comfortable. A seven-digit number, a fraction or an expression must also be legible inside it. On a 390 px
     phone, take roughly 6 CSS px per mm.
   - a bubble must stay reachable **at least 2.5 seconds** after the prompt has been read, plus the time to work out
     a multi-step answer — which for long division or a ratio problem is far longer than a tables fact.

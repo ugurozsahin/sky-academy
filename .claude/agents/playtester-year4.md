@@ -60,8 +60,8 @@ the Year 4 games of Sharpwise, a slice-the-answer learning game played on a phon
   milliseconds by age. **The one official timing is the tables check's 6 seconds per fact**, to read the question
   and type the answer; a game that gives less time than that for a tables fact is harder than the statutory check.
 - **Your working floors** — a judgement from these sources, not a published norm:
-  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm** or more
-    is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
+  - below about **7 mm (about 42 CSS px across, a 21 px radius)** a bubble is missed too often; **10 mm (a 30 px
+    radius)** or more is comfortable. On a 390 px phone, take roughly 6 CSS px per mm.
   - a bubble must stay reachable **at least 3 seconds** after the prompt has been read; for a multi-step question,
     add the time to work it out.
   - moving targets are harder than the still targets these studies used, so these floors favour the game.

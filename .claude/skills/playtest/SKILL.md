@@ -19,14 +19,18 @@ A pack is one game played once, for one year, the way a child meets it on a 390�
 - **Up to six WebP screenshots**, in play order: the island tile, the first prompt, the first wave rising, the
   wave at its apex, just after one deliberate wrong slice, and the stage result. Tracing and keypad games have
   their own equivalent moments. List the folder and open each image with `Read`; cite each by its file name.
-- **`metrics.json`**, the measured numbers: the resolved settings (lives, gentle, speeds, stages), the input
-  kind (bubbles, tracing, keypad), the prompt text and its word count, whether speech is offered, answers per
-  wave, the bubble radius in CSS px, the time from launch to apex, the time a bubble stays above the question
-  card, the slowest and fastest bubble, the share of the screen the card covers, and the visual card's needs
-  (`slow`, `wide`). Cite a number as `metrics.json#<key>`.
+- **`metrics.json`**, the measured numbers: the resolved settings (lives, gentle, and the per-stage `speeds`
+  and `diffs`), the input kind (bubbles, tracing, keypad), the prompt text and its word count, whether speech is
+  offered, answers per wave, the bubble radius in CSS px, the time from launch to apex, the time a bubble stays
+  above the question card, the slowest and fastest bubble, the share of the screen the card covers, and the
+  visual card's needs (`slow`, `wide`). Cite a number as `metrics.json#<key>`, and a nested one by its path
+  (`metrics.json#aboveCardMs.min`).
+- **A pack plays stage 1 only.** Judge the later stages from the resolved settings: a higher `speeds` entry is a
+  shorter flight, a higher `diffs` entry harder questions. Say so in the evidence (`metrics.json#settings.speeds`).
 
 **A key the file lacks, or a moment with no screenshot, is not observed.** Write "not observed" for it; never
-fill it in from what the game probably does. **Score from the pack, never from the source code:** the source
+fill it in from what the game probably does. Speech the pack does not show playing by itself counts as a
+button the child must find and press. **Score from the pack, never from the source code:** the source
 says what the game intends, the pack shows what the child gets.
 
 **Driving the live game is optional, for a doubtful case only** — a metric that looks wrong, or a moment the
@@ -40,6 +44,14 @@ measured as `live:<what>`, for example `live:bubble above card 2.9 s at stage 3`
 
 Mark each criterion for **this profile's child**, using the profile's own numbers (reading level, number
 range, reaction time, target size, attention).
+
+**The time a bubble needs**, for `physical`: the profile's reaction floor, plus the reading time of any words on
+the bubbles (all of them, at the cautious end: a child reads them in turn until one fits; word count ÷ the
+profile's words a minute), plus the question's reading time when the pack shows the wave launching before it
+could be read. Count the words of the question line only — a fixed instruction under it, the same every wave, is
+read once per game — and words only: numerals and maths symbols are read at a glance from Year 1 up; Reception
+reads neither. Compare that need with the bubble's reachable time
+(`aboveCardMs`, its smallest value).
 
 | Key | Criterion | The question |
 |---|---|---|
@@ -63,7 +75,8 @@ range, reaction time, target size, attention).
 - **0** — A target leaves the reachable area before this child could read the prompt and react, by the
   profile's own reaction-time floor; or the radius is below the profile's minimum; or tracing needs precision
   the profile lacks.
-- **1** — Manageable at the first stage, but a later stage's speed or the answers per wave push past the
+- **1** — Manageable at the first stage, but a later stage's speed (the resolved `speeds`)
+  or the answers per wave push past the
   profile's floor; or bubbles overlap so a slice catches the wrong one.
 - **2** — Every measured bubble stays above the card comfortably longer than the profile's floor, at or above
   its minimum radius, with room between targets.
@@ -71,14 +84,17 @@ range, reaction time, target size, attention).
 **`challenge`**
 - **0** — Outside this year's programme of study by more than a year either way, or trivial at every stage.
 - **1** — In range but flat across stages, one stage strays out of range, or the wrong answers are giveaways.
-- **2** — Matches the statement it claims, rises in difficulty across stages, and the wrong answers are the
+- **2** — Matches the statement it claims, rises in difficulty across stages (the resolved
+  `diffs`), and the wrong answers are the
   mistakes a child of this year really makes.
 
 **`feedback`**
-- **0** — A wrong slice teaches nothing (no right answer shown), or the cost is harsh for the age: a life
-  lost on a miss the child could not have reached, or an abrupt end.
-- **1** — Right and wrong are shown, but not why; or lives run out mostly from speed rather than mistakes.
-- **2** — The right answer is shown clearly and held long enough to read, and the cost of a mistake fits the
+- **0** — A wrong slice teaches nothing (no right answer shown), or the game ends abruptly with no way back.
+- **1** — Right and wrong are shown, but not why; or lives run out mostly from misses the child could not reach
+  in time, by speed or reading time, rather than from mistakes. The why is anything beyond the right answer — a
+  worked step, a picture, a sounded-out word; a filled-in number sentence alone is the answer, not the why.
+- **2** — The right answer is shown clearly and held long enough to read (the wrong-slice shot shows it still on
+  screen), and the cost of a mistake fits the
   age (Reception's gentle mode, a fair number of lives).
 
 **`again`**
@@ -88,6 +104,9 @@ range, reaction time, target size, attention).
 - **2** — Brisk, varied within a stage, with a reward on the result screen this child understands.
 
 ### Anchors for the whole score
+
+The score is always the sum of the five marks. These bands are a cross-check: when a sum lands in a band that does
+not describe the game, re-read the criteria, but never adjust the sum to fit a band.
 
 - **3** — A child of this age mostly fails or gives up; an adult has to sit with them throughout.
 - **5** — Playable with help or after several tries; one serious problem — speed, reading load or range.
