@@ -16,7 +16,8 @@
 //
 // Exit 0 = written (or valid, with --check); 1 = a row or report problem, nothing written; 2 = bad usage.
 // The rails are in `tests/unit/playability-apply.test.ts`: nothing that displays the game reads `playability`,
-// and every non-null score has a report that lists it (`reportProblems` below).
+// and every non-null score has a report that lists it (`reportProblems` below), which `tests/unit/catalogue.test.ts`
+// holds the committed catalogue to.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
