@@ -74,7 +74,7 @@ function packProbe([seed, reach]) {
     const s = window.__sna;
     const st = s && 'session' in s ? s.state() : null;
     if (st && st.prompt !== lastPrompt) { lastPrompt = st.prompt; if (st.prompt) pk.prompts.push({ t, prompt: st.prompt, index: st.index, stage: st.stage }); }
-    if (st) window.__promptStep(pk.lines, s.session.questionsAsked, st);   // every question's line, shown or hidden (#2250)
+    if (st) window.__promptStep(pk.lines, s.session.questionsAsked, st, s.session.current?.listen);   // every question's line, shown or hidden (#2250)
     const ar = s && 'session' in s ? s.arena : null;
     if (pk.on && st?.prompt && pk.wave === undefined) pk.wave = s.session.questionsAsked;   // the first question's wave is the one timed
     if (pk.on && ar && s.session.questionsAsked === pk.wave) {

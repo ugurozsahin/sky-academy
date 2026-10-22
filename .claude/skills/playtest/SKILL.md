@@ -60,9 +60,9 @@ maths symbols are read at a glance from Year 1 up, and Reception reads neither.
   is one, and so is a fixed instruction under the question line. **Read whether the question line is fixed from
   `metrics.json#promptFixed`** (#2250): `true` when the pack read the same line from the game's state on every
   question of the stage it played. It covers a sequence game too, which hides the line once slicing starts, so
-  never compare screenshots or read the line live for it. When it is `false`, count the line. Tell the instruction
-  under the line from the pack: the same text in `2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2). When it
-  differs, or neither shows it, count it.
+  never compare screenshots or read the line live for it. When it is `false` or missing, count the line. Tell the
+  instruction under the line from the pack: the same text in `2-prompt.webp` (wave 1) and in `5-wrong.webp`
+  (wave 2). When it differs, or neither shows it, count it.
 - **Card text, only when the child must read it to choose the answer**, as with y6-lists' gap sentence. Count it
   once per wave. A picture does not count, nor a card that only repeats the question line.
 - **Working time**, a judgement, not a published norm: **a recalled fact adds 0** (a times-table answer, a number

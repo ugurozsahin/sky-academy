@@ -118,28 +118,31 @@ export const newReach = () => ({ on: false, ids: {}, ends: {}, samples: [], fram
 /**
  * One frame of the question-line recording (#2250). Self-contained, for the same reason as `reachStep`: the pack's
  * page runs this very function. `asked` is the session's `questionsAsked`; `st` is `window.__sna.state()`, whose
- * `prompt` is the question's own line, shown or hidden. A row `[asked, stage, prompt]` is kept each time the
- * question or its line changes; an empty line (no question yet, or the session over) is not a line, so it is skipped.
+ * `prompt` is the question's own line, shown or hidden; `listen` says the question has a `listen` line, which a
+ * device with no voice shows instead (promptHTML in src/ui/hud.ts). A row `[asked, stage, prompt, listen]` is kept
+ * each time the question or its line changes; an empty line (no question yet, or the session over) is skipped.
  */
-export function promptStep(rows, asked, st) {
+export function promptStep(rows, asked, st, listen) {
   if (!st?.prompt || asked < 1) return;
   const last = rows[rows.length - 1];
   if (last && last[0] === asked && last[2] === st.prompt) return;
-  rows.push([asked, st.stage, st.prompt]);
+  rows.push([asked, st.stage, st.prompt, !!listen]);
 }
 
 /**
  * Whether the question line is the same on every question of the stage the pack played (#2250): the first row's
  * stage, read from the game's state per question, never from a screenshot, because a sequence game hides the line
- * once slicing starts. A line that changed within a question is not fixed. Fewer than two questions read is no
+ * once slicing starts. A line that changed within a question is not fixed. Nor is one the pack cannot vouch was
+ * shown: with no voice (`voiced` false), a question with a `listen` line put that, or its answer, on the card
+ * instead, so a fixed `prompt` says nothing about what the child read. Fewer than two questions read is no
  * comparison, so the pack fails rather than write a value nobody observed.
  */
-export function promptKeys(rows) {
+export function promptKeys(rows, { voiced = true } = {}) {
   const stage = rows[0]?.[1];
   const own = rows.filter(r => r[1] === stage);
   const waves = new Set(own.map(r => r[0])).size;
   if (waves < 2) throw new Error(`promptFixed needs the question line of two questions in one stage; ${waves} read`);
-  return { promptFixed: own.every(r => r[2] === own[0][2]), promptWaves: waves };
+  return { promptFixed: own.every(r => r[2] === own[0][2]) && (voiced || !own.some(r => r[3])), promptWaves: waves };
 }
 
 /**
@@ -254,7 +257,7 @@ export const ABOUT = {
   speechCutAfterMs: "when the game's next line cut the spoken prompt off (speechError), how long it had played; a cut just after the answer fell (flights[].leaveMs) means the prompt was still being spoken when the wave ended",
   frames: 'the longest gap between frames while the wave was timed; over 100 ms the arena slows its step, so the times ran long',
   promptWords: 'words only: numerals, symbols and the ? placeholder are read at a glance',
-  promptFixed: "the question line was the same text on every question of the stage the pack played, read from the game's state (window.__sna.state().prompt) for each question, not from a screenshot: a sequence game hides the line once slicing starts",
+  promptFixed: "the question line was the same text on every question of the stage the pack played, read from the game's state (window.__sna.state().prompt) for each question, not from a screenshot: a sequence game hides the line once slicing starts. Always false when the voice never started and a question had a listen line, which a voiceless device shows instead",
   promptWaves: 'how many questions of that stage promptFixed compared',
   demoShown: "the animated first-ever-play demo is skipped: the pack plays as a child who has played any game before",
   labelReachMs: "sequence games only: over the first question's required labels, each one's total time below the question card and above the screen's bottom edge, across its first flight and its relaunches, until it was sliced or its relaunches ran out. The pack slices none of them while timing, so each one's whole chance is measured; a label the wave cut short is left out",
@@ -274,7 +277,7 @@ export function buildMetrics({ job, input, settings, view, seed, rec: p, shots, 
     ...p.extra,                                       // first, so a play flow's own key can never overwrite a measured one
     year: job.year, game: job.game, catalogue: job.catalogue, viewport: `${view.width}x${view.height}`, seed,
     input, mode: screen.mode, hasLives: screen.hasLives, settings,
-    prompt: screen.prompt, promptWords: countWords(screen.prompt), ...promptKeys(p.lines ?? []), hint: screen.hint, hintWords: countWords(screen.hint),
+    prompt: screen.prompt, promptWords: countWords(screen.prompt), ...promptKeys(p.lines ?? [], { voiced: !!p.speech && p.speech.start !== null }), hint: screen.hint, hintWords: countWords(screen.hint),
     ...speechKeys(p.speech, screen.speakVisible, p.promptAt, p.collectedAt), speechVoices: p.voices ?? null,
     ...(input === 'bubbles' ? flightKeys(p, p.speech) : {}),
     ...(input === 'bubbles' ? reachKeys(p, maxRelaunches) : {}),

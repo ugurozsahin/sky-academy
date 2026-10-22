@@ -289,16 +289,22 @@ describe('the reach recorder on the real Arena (#2251)', () => {
 
 describe('whether the question line is fixed over the stage, on a stub session (#2250)', () => {
   /** What the page's tick sees, frame by frame: `questionsAsked` and `state()`'s stage and prompt. */
-  const record = (frames: [asked: number, stage: number, prompt: string | undefined][]) => {
+  const record = (frames: [asked: number, stage: number, prompt: string | undefined, listen?: string][], step = promptStep) => {
     const rows: PromptRow[] = [];
-    for (const [asked, stage, prompt] of frames) promptStep(rows, asked, { stage, prompt });
+    for (const [asked, stage, prompt, listen] of frames) step(rows, asked, { stage, prompt }, listen);
     return rows;
   };
   const order = 'Smallest to biggest!';
 
   it('keeps one row per question, not per frame, and skips the frames with no line', () => {
     const rows = record([[0, 1, undefined], [1, 1, order], [1, 1, order], [1, 1, order], [2, 1, order], [2, 1, order], [2, 1, undefined], [3, 1, order]]);
-    expect(rows).toEqual([[1, 1, order], [2, 1, order], [3, 1, order]]);
+    expect(rows).toEqual([[1, 1, order, false], [2, 1, order, false], [3, 1, order, false]]);
+  });
+
+  it('runs as the page runs it: from its own source text, with no module scope to lean on', () => {
+    const frames: [number, number, string | undefined, string?][] = [[1, 1, order], [1, 1, order], [2, 1, order, 'six'], [3, 1, undefined]];
+    const fromSource = new Function(`return ${promptStep}`)() as typeof promptStep;
+    expect(record(frames, fromSource)).toEqual(record(frames));
   });
 
   it('a sequence game whose line is the same every question is fixed, though the screen hides it once slicing starts', () => {
@@ -314,6 +320,13 @@ describe('whether the question line is fixed over the stage, on a stub session (
     expect(promptKeys(record([[1, 1, order], [1, 1, 'Now the next one'], [2, 1, order]]))).toEqual({ promptFixed: false, promptWaves: 2 });
   });
 
+  it('a fixed line is not vouched for when the voice never started and a question had a listen line, which a voiceless card shows', () => {
+    const listened = record([[1, 1, 'Find the word you hear', 'cat'], [2, 1, 'Find the word you hear', 'dog']]);
+    expect(promptKeys(listened).promptFixed, 'voiced: the card showed the prompt').toBe(true);
+    expect(promptKeys(listened, { voiced: false }).promptFixed, 'voiceless: it showed cat, then dog').toBe(false);
+    expect(promptKeys(record([[1, 1, order], [2, 1, order]]), { voiced: false }).promptFixed, 'no listen line: the prompt is what showed').toBe(true);
+  });
+
   it('compares the stage the pack played only, not a stage the result moved on to', () => {
     expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 2, 'Biggest to smallest!']]))).toEqual({ promptFixed: true, promptWaves: 2 });
   });
@@ -325,10 +338,13 @@ describe('whether the question line is fixed over the stage, on a stub session (
 
   it('is written into every pack, bubbles or not, from the rows the page recorded', () => {
     const screen = { H, card: null, speakVisible: false, prompt: order, answer: '1', hasLives: true, hint: null, slow: false, wide: false, sequence: false, anyOrder: false, visual: null, lives: 3, mode: 'mission' };
-    const rec: Recorded = { screen, samples: null, frames: [], labels: [], promptAt: null, speech: null, extra: {}, lines: record([[1, 1, order], [2, 1, order]]) };
+    const heard = { text: order, at: 0, start: 10, end: 900, error: null };
+    const rec: Recorded = { screen, samples: null, frames: [], labels: [], promptAt: null, speech: heard, extra: {}, lines: record([[1, 1, order, 'a'], [2, 1, order, 'b']]) };
     const job = { year: 'year1', game: 'y1-trace', catalogue: true };
     const m = buildMetrics({ job, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec, shots: [], maxRelaunches: MAX_RELAUNCHES });
     expect([m.promptFixed, m.promptWaves]).toEqual([true, 2]);
+    const silent = buildMetrics({ job, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec: { ...rec, speech: { ...heard, start: null, end: null } }, shots: [], maxRelaunches: MAX_RELAUNCHES });
+    expect(silent.promptFixed, 'a voice that never started cannot vouch for a listen line').toBe(false);
     expect(() => buildMetrics({ job, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec: { ...rec, lines: [] }, shots: [], maxRelaunches: MAX_RELAUNCHES })).toThrow(/promptFixed/);
     expect(Object.keys(ABOUT)).toEqual(expect.arrayContaining(['promptFixed', 'promptWaves']));
   });
@@ -336,7 +352,8 @@ describe('whether the question line is fixed over the stage, on a stub session (
   it('the page runs the very recorder tested here, each frame, and hands its rows over after the stage result', () => {
     const pack = read('scripts/playtest-pack.mjs');
     expect(pack).toContain('window.__promptStep = ${promptStep};');
-    expect(pack).toContain('window.__promptStep(pk.lines, s.session.questionsAsked, st);');
+    expect(pack).toContain('window.__promptStep(pk.lines, s.session.questionsAsked, st, s.session.current?.listen);');
+    expect(pack, 'the rows start empty').toContain('prompts: [], lines: [],');
     expect(pack.indexOf('played.lines = await page.evaluate(() => window.__pk.lines);'), 'read once play() has reached the result').toBeGreaterThan(pack.indexOf('const played = await play('));
   });
 });
@@ -372,7 +389,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   };
   const rec: Recorded = {
     screen, samples: fly([{ id: 1, label: '7', launch: 100, vy: -600, g: 250 }, { id: 2, label: '8', launch: 500, vy: -600, g: 250 }], 9000),
-    frames: [0, 16, 33], labels: ['7', '8'], promptAt: 50, extra: {}, lines: [[1, 1, '6 + 1 = ?'], [2, 1, '8 + 0 = ?']],
+    frames: [0, 16, 33], labels: ['7', '8'], promptAt: 50, extra: {}, lines: [[1, 1, '6 + 1 = ?', false], [2, 1, '8 + 0 = ?', false]],
     speech: { text: 'Adding! 6 plus 1 equals what', at: 60, start: 80, end: 2880, error: null },
   };
   const settings: Record<string, unknown> = { ...resolveGame('y1-add', 'year1').settings };   // what scripts/playtest-pack.mjs passes, so a key the skill cites (#2245: airTime) is the real one

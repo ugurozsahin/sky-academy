@@ -192,6 +192,7 @@ describe('the playtest skill (#2204)', () => {
     expect(need, 'a fixed question line is read from the pack\'s key (#2250)').toContain('**Read whether the question line is fixed from `metrics.json#promptFixed`**');
     expect(need, 'which covers a sequence game, so no screenshot comparison and no live read for it').toContain('never compare screenshots or read the line live for it');
     expect(need, 'the old live two-wave read is gone').not.toMatch(/over two waves live/);
+    expect(need, 'a pack without the key counts the line').toContain('When it is `false` or missing, count the line');
     expect(need, 'and the instruction under the line is still told from two waves in the pack, never the source').toContain('the same text in `2-prompt.webp` (wave 1) and in `5-wrong.webp` (wave 2)');
     expect(need, 'the mark shows its working').toContain('Every `physical` `saw` names the steps it counted');
     const row = JSON.parse(/```json\n(\{.*\})\n```/.exec(SKILL)![1]) as { evidence: { criterion: string; saw: string }[] };
