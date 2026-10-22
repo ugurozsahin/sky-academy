@@ -44,13 +44,14 @@ describe('with the committed catalogue nothing is blocked (#2197)', () => {
 describe('with a hidden game no direct path starts it (#2197)', () => {
   it('a valid challenge code is refused with the one line; TOPICS order is unchanged', () => withCatalogue(HIDE_GAME, async () => {
     const { HIDDEN_LINE } = await import('../../src/game/hidden-game');
-    const { enterCode, challengeResult, lastChallenge, forgetChallenge } = await import('../../src/game/challenge-run');
+    const { enterCode, challengeResult, forgetChallenge } = await import('../../src/game/challenge-run');
     const { t, code } = await codeFor('y4-tables');
+    forgetChallenge();
     expect(enterCode(code)).toEqual({ error: HIDDEN_LINE });
     expect(TOPICS.map(x => x.id)).toEqual((await import('../../src/curriculum')).TOPICS.map(x => x.id));
-    // the refused code left no friend's target behind
-    forgetChallenge(); challengeResult(t, 'challenge:y4-tables:7', 3);
-    expect(lastChallenge()).not.toBeNull();
+    // the refused code left no friend's target behind: a Sprint finished next says nothing about a challenge
+    expect(challengeResult(t, 'challenge:y4-tables:7', 3)).toBeNull();
+    forgetChallenge();
   }));
   it('a deep link lands on the island with the notice; a shown game still opens', () => withCatalogue(HIDE_GAME, async () => {
     const { HIDDEN_LINE } = await import('../../src/game/hidden-game');
@@ -74,4 +75,35 @@ describe('with a hidden game no direct path starts it (#2197)', () => {
     expect(landingFor(cur.YEARS.find(y => y.id === 'year4')!)).toBeNull();
     expect(landingFor(cur.YEARS.find(y => y.id === 'year3')!)?.id).toBe('year3');
   }));
+});
+
+describe('every nav.play start goes through blockedStart (#2197)', () => {
+  const nav = () => ({ island: vi.fn(), map: vi.fn() });
+  it('a hidden game: the island with the notice; a hidden island: the map; a shown game: not blocked', () => withCatalogue(HIDE_GAME, async () => {
+    const { blockedStart, HIDDEN_LINE } = await import('../../src/game/hidden-game');
+    const cur = await import('../../src/curriculum'), y4 = cur.YEARS.find(y => y.id === 'year4')!, n = nav();
+    expect(blockedStart(cur.topicById('y4-tables'), y4, n)).toBe(true);
+    expect(n.island).toHaveBeenCalledWith(y4, HIDDEN_LINE); expect(n.map).not.toHaveBeenCalled();
+    const m = nav();
+    expect(blockedStart(cur.topicById('y4-pronouns'), y4, m)).toBe(false);
+    expect(blockedStart(undefined, y4, m)).toBe(false);
+    expect(m.island).not.toHaveBeenCalled(); expect(m.map).not.toHaveBeenCalled();
+  }));
+  it('a hidden island lands on the map, by design with no notice', () => withCatalogue(HIDE_ISLAND, async () => {
+    const { blockedStart } = await import('../../src/game/hidden-game');
+    const cur = await import('../../src/curriculum'), n = nav();
+    expect(blockedStart(cur.topicById('y4-tables'), cur.YEARS.find(y => y.id === 'year4')!, n)).toBe(true);
+    expect(n.map).toHaveBeenCalledOnce(); expect(n.island).not.toHaveBeenCalled();
+  }));
+  it('a game hidden for one year only is blocked on that year and refused as a code', () => withCatalogue(copy(c => { c.games['y4-pronouns'].years.year4.visible = false; }), async () => {
+    const { gameHidden, HIDDEN_LINE } = await import('../../src/game/hidden-game');
+    const { enterCode } = await import('../../src/game/challenge-run');
+    const { t, code } = await codeFor('y4-pronouns');
+    expect(gameHidden(t)).toBe(true);
+    expect(enterCode(code)).toEqual({ error: HIDDEN_LINE });
+  }));
+  it('main.ts nav.play calls the guard before it leaves the screen', async () => {
+    const src = (await import('fs')).readFileSync('src/main.ts', 'utf8');
+    expect(src).toMatch(/play: \(\(o: StartOpts\) => \{ if \(blockedStart\(o\.topic, o\.year, nav\)\) return; leave\(\);/);
+  });
 });

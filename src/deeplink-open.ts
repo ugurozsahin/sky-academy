@@ -26,7 +26,7 @@ export function stripLinkParams(): boolean {
 }
 
 /** What the pending link opens, cleared as it is read. A link to a hidden game opens its island with `notice` (#2197), or nothing when that island is hidden too. */
-export function takeLink(): { year: YearInfo; topic?: Topic; notice?: string } | null {
+export function takeLink(): { year: YearInfo; topic?: Topic; notice?: typeof HIDDEN_LINE } | null {
   const p = pending; pending = null;
   if (!p) return null;
   const topic = p.to === 'topic' ? topicById(p.id) : undefined;
