@@ -94,6 +94,7 @@ function card(rng: Rng, [sentence, target, wrong, listWord]: ProofreadRow, d: Di
     { hint: 'Read each word slowly, letter by letter', hintIsData: false, wide: true });
   q.options = shuffle(rng, [wrong, ...chosen.slice(0, bubbles - 1)]); // wordQ stops at four options; d3 shows five
   q.visual = { type: 'sentence', text: shown };
+  q.spelt = target;   // #2277: the outcome line shows the right spelling, not only the misspelling
   q.say = `${sentence} Which word is spelt wrong?`;
   return q;
 }

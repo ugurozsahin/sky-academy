@@ -139,4 +139,14 @@ describe('y4-proofread (#1170)', () => {
     for (const [sentence] of [...D1_BANK, ...D2_BANK, ...D3_BANK])
       for (const w of sentence.split(' ').map(bare)) expect(new Set<string>([...AVOID, ...EXCLUDE]).has(w.toLowerCase()), w).toBe(false);
   });
+
+  it('every card carries the right spelling, which differs from the answer and is a word of the correct sentence (#2277)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      for (const c of draws(d, 200)) {
+        expect(c.spelt, c.answer).toBeTruthy();
+        expect(c.spelt).not.toBe(c.answer);
+        expect(c.say!.split(' ').map(bare)).toContain(c.spelt);
+      }
+    }
+  });
 });
