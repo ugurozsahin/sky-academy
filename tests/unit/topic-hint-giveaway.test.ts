@@ -32,8 +32,23 @@ describe('hints do not name the answer (#2274)', () => {
     const topic = TOPICS.find(t => t.id === 'y6-figurative')!;
     for (let s = 0; s < 50; s++) {
       expect(topic.gen(1, rng(s)).hint).toBe('Is there a like or an as?');
-      expect(topic.gen(2, rng(s)).hint).toBeUndefined();
+      for (const d of [2, 3] as Difficulty[]) expect(topic.gen(d, rng(s)).hint, `d${d}`).toBeUndefined();
     }
+  });
+  it('y6-fdp hints never say which number is the top or the bottom', () => {
+    // The options are numbers (3/4, 3 ÷ 4), so the generic check above cannot see this rule.
+    const topic = TOPICS.find(t => t.id === 'y6-fdp')!;
+    let hints = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      for (let s = 0; s < 200; s++) {
+        const q = topic.gen(d, rng(s)), hint = q.hint;
+        // Only the division cards: the decimal cards' "divide the top by the bottom" teaches the method, not the answer.
+        if (!hint || !/÷|Which division/.test(q.prompt)) continue;
+        hints++;
+        expect(hint).not.toMatch(/\b(top|bottom|numerator|denominator)\b/i);
+      }
+    }
+    expect(hints).toBeGreaterThan(0);
   });
   it('y4-determiners hints name no determiner and no possessive pronoun', () => {
     const topic = TOPICS.find(t => t.id === 'y4-determiners')!;
