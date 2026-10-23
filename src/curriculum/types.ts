@@ -122,6 +122,7 @@ interface QuestionCore {
   slow?: boolean;         // several mental steps: one speed step slower, like a sequence — in every mode but Sky Storm. Opt-in per generator (`slowAtD3`), not year-wide (#297)
   fact?: string;          // a times-table fact as shown ('9×6'; '6×9' is another): what the fact record keys on (#1122). Only `a × b = ?` / missing-factor cards, both factors 2–12
   listWord?: string;      // a statutory-list card's word (the entry's first form), what the word record keys on (#1289)
+  spelt?: string;         // #2277: the right spelling, when `answer` is a misspelling — the outcome line shows it, so the child sees the word done properly
   noSayAnswer?: boolean;  // #893/#982: this card's answer must never be spoken as the wrong/miss correction line (a pseudo-word)
 }
 
