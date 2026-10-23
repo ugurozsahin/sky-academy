@@ -28,7 +28,7 @@ describe('y6-transform (#1249)', () => {
     expect(fmt([-3, 4])).toBe('(−3, 4)');
   });
 
-  it('is registered for Year 6 maths in the geometry strand', () => { expect(topic).toMatchObject({ year: 'year6', subject: 'maths', strand: 'geometry', title: 'Reflect in the Axes' }); });
+  it('is registered for Year 6 maths in the geometry strand', () => { expect(topic).toMatchObject({ year: 'year6', subject: 'maths', strand: 'geometry', title: 'Translate and Reflect' }); });
 
   it('every card is on the −5…5 grid, with four distinct options (three lettered at d2), a speakable say, R-LBL labels and a real minus sign', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
