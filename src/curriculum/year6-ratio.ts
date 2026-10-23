@@ -63,7 +63,7 @@ function forEvery(rng: Rng): Question {
     const [q, p] = flip ? [b, a] : [a, b], known = q * k, ans = p * k;
     if (ans > 100) continue;
     const kind = pick(rng, KINDS), [kx, ky] = flip ? [kind.y, kind.x] : [kind.x, kind.y];
-    const prompt = `For every ${q} ${noun(kx, q)} there are ${p} ${noun(ky, p)}. ${known} ${kx[2] ?? kx[1]}: how many ${ky[2] ?? ky[1]}?`;
+    const prompt = `For every ${q} ${noun(kx, q)} there ${p === 1 ? 'is' : 'are'} ${p} ${noun(ky, p)}. ${known} ${kx[2] ?? kx[1]}: how many ${ky[2] ?? ky[1]}?`;
     // additive slip, the amount given, the amount times the wrong part
     return card(rng, prompt, ans, [known + (p - q), known, known * p], 'Find how many groups, then multiply');
   }
