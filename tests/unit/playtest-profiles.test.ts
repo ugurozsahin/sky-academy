@@ -115,6 +115,29 @@ describe('playtest profiles (#2204)', () => {
     expect(parent, 'learning value counts twice').toMatch(/`again` may not be higher than `challenge`/);
     expect(parent, 'safety and calm is a gate').toMatch(/if `feedback` is 0, `again` is 0 too/);
   });
+
+  it('the parent marks `physical` with the year profile\'s reading rate and working-time rules, naming the file (#2291)', () => {
+    const parent = body('playtester-parent'), flat = parent.replace(/\s+/g, ' ');
+    expect(flat, 'the rule, so the need is one number from both profiles').toContain('**For `physical`, you use the reading rate and working-time rules of the year profile for the year being scored (`playtester-<year>.md`), so the need is the same number from both profiles**');
+    expect(flat, 'the rubric table sends `physical` to that rule').toContain("| `physical` | **Frustration risk**, marked the year profile's way (below).");
+    expect(flat, 'steps are counted for that year\'s child, not an adult').toContain("**Count the working steps that year's child takes, not the ones you would.**");
+    expect(flat, 'card text and a hint as that child reads them').toContain('Card text and a hint count whenever that child would need them to choose, even when you could choose from the bubbles alone');
+    expect(flat, 'frustration risk reads the mark, it does not replace it').toContain('**Frustration risk is what the mark means to you, not a second measure:**');
+    // Named, never copied: a rate, a floor or a size written here would drift from the year profile it came from.
+    const at = parent.indexOf('## How you mark `physical`'), section = parent.slice(at, parent.indexOf('\n## ', at + 1));
+    expect(at, 'the section is there').toBeGreaterThan(-1);
+    expect(section, 'no reading rate of its own').not.toMatch(/\d+\s+words a minute/);
+    expect(section, 'no reaction floor of its own').not.toMatch(/\d+(\.\d+)?\s*(s|seconds?)\b/);
+    expect(section, 'no target size of its own').not.toMatch(/\d+(\.\d+)?\s*(mm|px)\b/);
+  });
+
+  it.each(CHILD)('%s carries what the parent takes from it for `physical`: a reach floor, a reading rule and a Number section (#2291)', (name) => {
+    const text = body(name).replace(/\s+/g, ' ');
+    expect(text, `${name}: the reaction floor the need starts from`).toMatch(/a bubble must stay reachable \*\*at least [\d.]+ seconds\*\*/);
+    expect(text, `${name}: a reading rate, or Reception's rule that it reads no prompt`).toMatch(name === 'playtester-reception'
+      ? /Treat any prompt over three or four short words as unread/ : /\*\*Assume about \d+ words a minute/);
+    expect(body(name), `${name}: the Number section the parent reads for what is recalled`).toMatch(/^## Number$/m);
+  });
 });
 
 describe('the playtest skill (#2204)', () => {
@@ -221,5 +244,11 @@ describe('the playtest skill (#2204)', () => {
     expect(PROFILES).toContain(row.by);
     expect(row.by === `playtester-${row.year}` || row.by === 'playtester-parent', 'a year profile scores only its own year (#2213)').toBe(true);
     expect(YEARS.map((y) => y.id)).toContain(row.year);
+  });
+
+  it('keeps both scores, the parent\'s and the year profile\'s, and combines nothing (#2291)', () => {
+    const flat = SKILL.replace(/\s+/g, ' ');
+    expect(flat, 'the product owner\'s decision on #2291, in the skill').toContain("**Both scores stay** (#2291): the parent's row is the game's own score and a year profile's row its game-and-year score, each written to its own node by `scripts/playability-apply.mjs`, so when the two disagree nothing combines them into one.");
+    expect(flat, '§2 sends the parent\'s `physical` to the year profile').toContain("The parent has none of its own: its `physical` takes them, with the working-time count, from the year profile of the pack's year, as `playtester-parent.md` says.");
   });
 });
