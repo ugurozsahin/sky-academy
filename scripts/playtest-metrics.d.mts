@@ -50,11 +50,13 @@ export declare function labelReach(rc: ReachRecording, o: { H: number; cardBotto
   labelReachMs: { min: number; median: number; max: number } | null;
   labelReach: { maxRelaunches: number; labels: LabelReach[]; frames: FrameStats };
 };
-/** One question's line (#2250): `[questionsAsked, stage, prompt, has a listen line]`. */
-export type PromptRow = [asked: number, stage: number, prompt: string, listen: boolean];
-export declare function promptStep(rows: PromptRow[], asked: number, st: { stage: number; prompt?: string | null } | null | undefined, listen?: string | null): void;
+/** One question's line (#2250): `[questionsAsked, stage, prompt, has a listen line, the card shows a line (#2265)]`. */
+export type PromptRow = [asked: number, stage: number, prompt: string, listen: boolean, shown: boolean];
+/** The fields of the current question the recorder reads: a real `Question` from src/curriculum/types.ts has them all. */
+export interface PromptQuestion { listen?: string | null; sequence?: readonly string[] | null; build?: unknown; anyOrder?: boolean | null }
+export declare function promptStep(rows: PromptRow[], asked: number, st: { stage: number; prompt?: string | null } | null | undefined, q?: PromptQuestion | null): void;
 /** Throws when fewer than two questions of the first row's stage were read. `voiced`: the pack's spoken prompt really started. */
-export declare function promptKeys(rows: PromptRow[], o?: { voiced?: boolean }): { promptFixed: boolean; promptWaves: number };
+export declare function promptKeys(rows: PromptRow[], o?: { voiced?: boolean }): { promptFixed: boolean; promptWaves: number; promptShown: boolean };
 export declare const speechMode: (o: { autoplays: boolean; offered: boolean }) => 'auto' | 'tap' | 'none';
 export declare const cardShare: (rect: { width: number; height: number }, view: { width: number; height: number }) => number;
 export declare const ABOUT: Record<string, string>;

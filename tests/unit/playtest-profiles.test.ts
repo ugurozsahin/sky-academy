@@ -115,6 +115,34 @@ describe('playtest profiles (#2204)', () => {
     expect(parent, 'learning value counts twice').toMatch(/`again` may not be higher than `challenge`/);
     expect(parent, 'safety and calm is a gate').toMatch(/if `feedback` is 0, `again` is 0 too/);
   });
+
+  it('the parent marks `physical` with the year profile\'s reading rate and working-time rules, naming the file (#2291)', () => {
+    const parent = body('playtester-parent'), flat = parent.replace(/\s+/g, ' ');
+    expect(flat, 'the rule, so the need is one number from both profiles').toContain('**For `physical`, you use the reading rate and working-time rules of the year profile for the year being scored (`playtester-<year>.md`), so the need is the same number from both profiles**');
+    expect(flat, 'the rubric table sends `physical` to that rule').toContain("| `physical` | **Frustration risk**, marked the year profile's way (below).");
+    expect(flat, 'every number comes from that one file').toContain("**Every number in the skill's §2 need comes from that file**: the reaction floor and what it is counted from, the words a minute, the target floor and the comfortable size. Never a figure of your own, and never another year's.");
+    expect(flat, 'steps are counted for that year\'s child, not an adult').toContain("**Count the working steps that year's child takes, not the ones you would.** A fact adds 0 as recalled only when that file's Number section lists it as secure for the year; anything else is a step.");
+    expect(flat, 'with the steps the pattern-2 games turned on').toContain('Counting tallies, reading a bar against a scale, converting pence to pounds and finding the doer of a sentence are each a step');
+    expect(flat, 'card text and a hint as that child reads them').toContain('Card text and a hint count whenever that child would need them to choose, even when you could choose from the bubbles alone');
+    expect(flat, 'frustration risk reads the mark, it does not replace it').toContain('**Frustration risk is what the mark means to you, not a second measure:**');
+    // Named, never copied: a rate, a floor or a size written here would drift from the year profile it came from.
+    const at = parent.indexOf('## How you mark `physical`'), section = parent.slice(at, parent.indexOf('\n## ', at + 1));
+    expect(at, 'the section is there').toBeGreaterThan(-1);
+    // The figures as the year profiles write them: "60 words a minute", "29 words correct per minute", "3.5 seconds", "42 CSS px".
+    expect(section, 'no reading rate of its own').not.toMatch(/\d+\s+(words?\b|wpm\b)/);
+    expect(section, 'no reaction floor of its own').not.toMatch(/\d+(\.\d+)?\s*(s|seconds?)\b/);
+    expect(section, 'no target size of its own').not.toMatch(/\d+(\.\d+)?\s*(CSS\s+)?(mm|px)\b/);
+  });
+
+  it.each(CHILD)('%s carries what the parent takes from it for `physical`: a reach floor, a reading rule and a Number section (#2291)', (name) => {
+    const text = body(name).replace(/\s+/g, ' ');
+    expect(text, `${name}: the reaction floor the need starts from`).toMatch(/a bubble must stay reachable \*\*at least [\d.]+ seconds\*\*/);
+    expect(text, `${name}: a reading rate, or Reception's rule that it reads no prompt`).toMatch(name === 'playtester-reception'
+      ? /Treat any prompt over three or four short words as unread/ : /\*\*Assume about \d+ words a minute/);
+    const number = /^## Number$([\s\S]*?)^## /m.exec(body(name));
+    expect(number, `${name}: the Number section the parent reads for what is recalled`).not.toBeNull();
+    expect(number![1], `${name}: and it says what the year has secure, the word the parent's rule reads`).toMatch(/\bSecure\b/);
+  });
 });
 
 describe('the playtest skill (#2204)', () => {
@@ -201,6 +229,24 @@ describe('the playtest skill (#2204)', () => {
     for (const e of physical) expect(e.saw, 'every physical saw in the example names its steps').toMatch(/working: \d+ steps?/);
   });
 
+  it('leaves a question line the card never shows out of the need, from the pack\'s key (#2265)', () => {
+    const at = SKILL.indexOf('**The time a bubble needs**'), end = SKILL.indexOf('Compare that need', at);
+    const need = SKILL.slice(at, end).replace(/\s+/g, ' ');
+    const rule = '**A line the card never shows adds nothing to the need, whatever `promptFixed` says** (#2265)';
+    expect(need, 'the rule is in the need paragraph').toContain(rule);
+    expect(need.indexOf(rule), 'and comes before the fixed-line rule it overrides').toBeLessThan(need.indexOf('**A line that is the same every wave is read once per game'));
+    expect(need, 'read from the pack').toContain('When `metrics.json#promptShown` is `false`, the card never shows the line, so its words add no reading time');
+    expect(need, 'a voiceless plain sequence is an understand matter, never reading time (#2325 review)')
+      .toContain('a plain sequence leaves the child with no question at all, neither heard nor read: mark that under `understand`, never as reading time');
+    expect(need, 'and the key is never tied to the voice').not.toMatch(/only when the voice really spoke/);
+    expect(need, 'the spoken prompt\'s timing still counts (the owner\'s interim rule on the issue)')
+      .toContain('The spoken prompt\'s timing still counts, through `metrics.json#afterSpeechMs` and `metrics.json#speechOutlastedWave`');
+    expect(need, 'an older pack falls back to the prompt shot').toContain('A pack without the key counts the line only when `2-prompt.webp` shows it on the card');
+    expect(need, 'the fixed-line fallback no longer counts an unshown line').toContain('When it is `false` or missing, count the line, unless the card never shows it');
+    expect(SKILL, 'the old wording, that a sequence card hides the line once slicing starts, is gone').not.toMatch(/once slicing starts/);
+    expect(SKILL.replace(/\s+/g, ' '), '§1 lists the key').toContain('whether the card shows it at all (`promptShown`)');
+  });
+
   it('its example row is a valid row: the five keys, the sum, evidence, and a profile as `by`', () => {
     const json = /```json\n(\{.*\})\n```/.exec(SKILL);
     expect(json, 'the skill shows one example row').not.toBeNull();
@@ -221,5 +267,11 @@ describe('the playtest skill (#2204)', () => {
     expect(PROFILES).toContain(row.by);
     expect(row.by === `playtester-${row.year}` || row.by === 'playtester-parent', 'a year profile scores only its own year (#2213)').toBe(true);
     expect(YEARS.map((y) => y.id)).toContain(row.year);
+  });
+
+  it('keeps both scores, the parent\'s and the year profile\'s, and combines nothing (#2291)', () => {
+    const flat = SKILL.replace(/\s+/g, ' ');
+    expect(flat, 'the product owner\'s decision on #2291, in the skill').toContain("**Both scores stay** (#2291): the parent's row is the game's own score and a year profile's row its game-and-year score, each written to its own node by `scripts/playability-apply.mjs`, so when the two disagree nothing combines them into one.");
+    expect(flat, '§2 sends the parent\'s `physical` to the year profile').toContain("The parent has none of its own: its `physical` takes them, with the working-time count, from the year profile of the pack's year, as `playtester-parent.md` says.");
   });
 });
