@@ -51,13 +51,14 @@ describe('y2-scales (#1005)', () => {
 });
 
 describe('the measured thing is on the card (#2271)', () => {
-  it('y2-scales prompts lead with an icon and their spoken line does not', async () => {
+  const ICON: Record<string, string> = { cm: '🎀', g: '🌾', ml: '🥛', '°C': '🌡️' };
+  it('each prompt leads with its instrument\'s icon and its spoken line is the same words without it', () => {
     const r = rng(42);
-    for (let i = 0; i < 200; i++) {
-      for (const q of [y2Scales(1 + (i % 3) as 1 | 2 | 3, r)]) {
-        expect(q.prompt).toMatch(/^\P{L}+ How /u);
-        expect(q.say).not.toMatch(/^\P{L}/u);
-      }
+    for (let i = 0; i < 300; i++) {
+      const q = y2Scales(1 + (i % 3) as 1 | 2 | 3, r), icon = ICON[q.answer.split(' ')[1]];
+      expect(q.prompt.startsWith(`${icon} `)).toBe(true);
+      expect(q.say).toContain(q.prompt.slice(icon.length + 1));
+      expect(q.say).not.toContain(icon);
     }
   });
 });
