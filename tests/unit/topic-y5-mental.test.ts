@@ -39,6 +39,8 @@ describe('y5-mental (#1183)', () => {
 
   it('the ladder: d1 stays within 100,000, d2 multiples of 1,000 reaching past it, d3 has near multiples and missing numbers', () => {
     for (const q of draw(1, 400)) expect(q.prompt).toMatch(/^[\d,]+ [+−] [\d,]+ = \?$/);
+    for (const q of draw(1, 400)) { const b = num(q.prompt.match(/^[\d,]+ [+−] ([\d,]+) = \?$/)![1]); expect(b % 1000).toBe(0); expect(b).toBeGreaterThanOrEqual(1000); }
+    expect(draw(1, 400).filter(q => num(q.prompt.split(' ')[0]) % 1000 !== 0).length).toBeGreaterThan(80);
     let big = 0;
     for (const q of draw(2, 400)) { const [, a, , b] = q.prompt.match(/^([\d,]+) ([+−]) ([\d,]+) = \?$/)!; expect(num(b) % 1000).toBe(0); if (num(a) > 100000 || num(q.answer) > 100000) big++; }
     expect(big).toBeGreaterThan(200);

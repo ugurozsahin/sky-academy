@@ -1,5 +1,5 @@
 // y5-mental (#1183): add and subtract large numbers in your head (5M8), pick the answer. d1 multiples of 1,000 within
-// 100,000, or ±10/100/1,000 on a 5-digit number; d2 multiples of 1,000/10,000 across a boundary, to 1,000,000; d3 compensation
+// 100,000, or ±2,000 to 9,000 on a 5-digit number (#2276: never just ±10/100/1,000, a place-value step); d2 multiples of 1,000/10,000 across a boundary, to 1,000,000; d3 compensation
 // with a near multiple (46,735 + 9,999) or a missing number (? − 30,000 = 125,400). Decoys are the slips: the wrong place,
 // a lost exchange, a compensation off by one, the inverse operation. Answers stay in 0..999,999.
 import type { Difficulty, Generator, Question, Rng } from './types';
@@ -39,7 +39,7 @@ function draw(d: Difficulty, rng: Rng): Card {
       const add = pick(rng, [true, false]), b = ri(rng, 1, 9) * 1000;
       return add ? calc(ri(rng, 1, 90) * 1000, b, true) : calc(ri(rng, 10, 99) * 1000, b, false);
     }
-    const add = pick(rng, [true, false]), b = pick(rng, [10, 100, 1000]), n = ri(rng, 10001, 98999);
+    const add = pick(rng, [true, false]), b = ri(rng, 2, 9) * 1000, n = add ? ri(rng, 10001, 90999) : ri(rng, 11001, 98999);
     return calc(n, b, add);
   }
   if (d === 2) {
