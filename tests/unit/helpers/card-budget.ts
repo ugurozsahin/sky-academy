@@ -7,6 +7,7 @@ export const PROMPT_FS_PHONE = 28;
 export const PROMPT_FS_SHORT = 26;
 export const PROMPT_LETTER_SPACING_EM = 0.02;
 export const MAX_PROMPT_LINES = 3;
+const EMOJI_EM = 1.3;
 /** A prompt longer than this must carry its own `say`: read verbatim, a long prompt is spoken symbol by symbol. */
 export const SAY_ABOVE_CHARS = 60;
 /**
@@ -18,7 +19,10 @@ export const CARD_TEXT_WIDTH_390 = 336;
 
 /** Width in px of `text` at `fontPx` in Fredoka 700, `letter-spacing: .02em` included for every character. */
 function widthPx(text: string, fontPx: number): number {
-  return (labelEm(text) + [...text].length * PROMPT_LETTER_SPACING_EM) * fontPx;
+  // A pictograph is not in Fredoka (the system emoji font draws it): count 1.3em each, over the ~1.2em it draws (#2271).
+  const icons = text.match(/\p{Extended_Pictographic}/gu)?.length ?? 0;
+  const letters = text.replace(/\p{Extended_Pictographic}|\uFE0F/gu, '');
+  return ((letters ? labelEm(letters) : 0) + icons * EMOJI_EM + [...letters].length * PROMPT_LETTER_SPACING_EM + icons * PROMPT_LETTER_SPACING_EM) * fontPx;
 }
 
 /**
