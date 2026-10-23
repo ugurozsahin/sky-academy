@@ -436,3 +436,11 @@ describe('a data hint survives the verdict (#2286)', () => {
     expect(els.outcome.innerHTML).toBe('');
   });
 });
+
+describe('promptHTML — degree signs stay with their number (#2278)', () => {
+  it('ties ° to the character before it so it never wraps alone', () => {
+    const q = { prompt: 'Opposite = ?°', answer: '45°', options: [], sequence: undefined } as unknown as Parameters<typeof promptHTML>[0];
+    expect(promptHTML(q, 0)).toBe('Opposite = ?⁠°');
+    expect(promptHTML(q, 0).replace(/⁠/g, '')).toBe('Opposite = ?°');
+  });
+});

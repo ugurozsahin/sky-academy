@@ -110,6 +110,9 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
   return q.peek ? 'peek' : 'read';
 }
 
+/** A degree sign never wraps onto a line of its own (#2278): a word joiner (U+2060) ties it to the character before it. */
+export const keepDegrees = (html: string) => html.replace(/(\S)°/g, '$1\u2060°');
+
 /**
  * The question prompt: a plain question, or the sequence so far with the letters still to come as gaps.
  * `reveal` (#65, a device with no voice) shows the letters still to come as well — the word to copy AND the
@@ -128,7 +131,7 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
  * advances it there) so this branch never reads it.
  */
 export function promptHTML(q: Question, done: number, reveal = false, remaining?: readonly string[]): string {
-  if (!q.sequence) return esc(reveal && q.listen ? q.listen : q.prompt);
+  if (!q.sequence) return keepDegrees(esc(reveal && q.listen ? q.listen : q.prompt));
   if (q.build) return buildPromptHTML(q.prompt, q.build.template, q.sequence, done);
   if (q.anyOrder) {
     const left = new Set(remaining ?? q.sequence);
