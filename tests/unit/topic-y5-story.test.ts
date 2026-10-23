@@ -38,6 +38,10 @@ describe('y5-story (#1184)', () => {
     }
   });
 
+  it('the choir story asks for the total, not a bare "Tickets?" (#2275)', () => {
+    expect(BANK.find(t => t[1] === 'A choir sold #, then # and #.')![2]).toBe('Tickets in all?');
+  });
+
   it('the ladder: d1 two steps to 10,000; d2 two steps with five-digit numbers; d3 three steps', () => {
     for (const q of draw(1, 300)) { expect(templateOf(q.prompt)[0]).toHaveLength(2); for (const n of nums(q.prompt)) expect(n, q.prompt).toBeLessThanOrEqual(10000); }
     for (const q of draw(2, 300)) { expect(templateOf(q.prompt)[0]).toHaveLength(2); expect(nums(q.prompt)[0], q.prompt).toBeGreaterThanOrEqual(10000); }

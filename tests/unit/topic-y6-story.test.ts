@@ -44,6 +44,7 @@ describe('y6-story (#1259)', () => {
       '# pupils, # away. Each pupil here has # pens.': [[300, 30, 5], 270, 1350],
     };
     expect(BANK.map(t => t[1]).sort()).toEqual(Object.keys(ROWS).sort());
+    expect(BANK.find(t => t[1] === 'A hall has # seats. # go, then #.')![2], 'the hall asks a full question (#2275)').toBe('How many left?');
     for (const [ops, text] of BANK) {
       const [vals, first, answer] = ROWS[text], r = runs(ops, vals);
       expect([r[1], r[2]], text).toEqual([first, answer]);

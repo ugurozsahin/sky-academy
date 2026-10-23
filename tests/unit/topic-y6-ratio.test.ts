@@ -69,7 +69,8 @@ describe('y6-ratio (#1268)', () => {
   });
 
   it('grammar: "there is 1", never "there are 1" (#2275)', () => {
-    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 300)) expect(c.prompt, c.prompt).not.toMatch(/there are 1 /);
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 300)) { expect(c.prompt, c.prompt).not.toMatch(/there are 1 /); expect(c.prompt, c.prompt).not.toMatch(/there is (?!1 )/); }
+    expect(draw(1, 300).some(c => /there is 1 /.test(c.prompt)), 'the "there is 1" branch is drawn').toBe(true);
   });
 
   it('d1 uses parts 1–9 and an answer up to 100; d3 keeps lengths to 60 cm', () => {
