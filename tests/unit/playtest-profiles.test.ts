@@ -207,7 +207,10 @@ describe('the playtest skill (#2204)', () => {
     const rule = '**A line the card never shows adds nothing to the need, whatever `promptFixed` says** (#2265)';
     expect(need, 'the rule is in the need paragraph').toContain(rule);
     expect(need.indexOf(rule), 'and comes before the fixed-line rule it overrides').toBeLessThan(need.indexOf('**A line that is the same every wave is read once per game'));
-    expect(need, 'read from the pack').toContain('When `metrics.json#promptShown` is `false`, the child only hears the line, so its words add no reading time');
+    expect(need, 'read from the pack').toContain('When `metrics.json#promptShown` is `false`, the card never shows the line, so its words add no reading time');
+    expect(need, 'a voiceless plain sequence is an understand matter, never reading time (#2325 review)')
+      .toContain('a plain sequence leaves the child with no question at all, neither heard nor read: mark that under `understand`, never as reading time');
+    expect(need, 'and the key is never tied to the voice').not.toMatch(/only when the voice really spoke/);
     expect(need, 'the spoken prompt\'s timing still counts (the owner\'s interim rule on the issue)')
       .toContain('The spoken prompt\'s timing still counts, through `metrics.json#afterSpeechMs` and `metrics.json#speechOutlastedWave`');
     expect(need, 'an older pack falls back to the prompt shot').toContain('A pack without the key counts the line only when `2-prompt.webp` shows it on the card');

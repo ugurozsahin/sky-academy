@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MAX_RELAUNCHES } from '../../src/game/bubbles';
-import { promptHTML } from '../../src/ui/hud';
+import { promptHTML, promptMode } from '../../src/ui/hud';
 import { TOPICS, type Difficulty } from '../../src/curriculum';
 import { ABOUT, buildMetrics, promptKeys, promptStep, type PromptQuestion, type PromptRow, type Recorded } from '../../scripts/playtest-metrics.mjs';
 
@@ -36,11 +36,11 @@ describe('whether the card shows the question line at all (#2265)', () => {
     expect(keys([seq, seq], {}).promptShown, 'a later stage the result moved on to is not counted').toBe(false);
   });
 
-  it('is never false when the voice never started: the line was neither heard nor, as a pack can vouch, unread', () => {
+  it('is false for a plain sequence whether or not the voice started: its card never shows the line (#2325 review)', () => {
     const rows: PromptRow[] = [];
     step(rows, 1, 'Spell it', { ...seq, listen: 'cat' }); step(rows, 2, 'Spell it', seq);
     expect(promptKeys(rows).promptShown, 'voiced: heard, never read').toBe(false);
-    expect(promptKeys(rows, { voiced: false }).promptShown, 'voiceless: letters or the listen line on the card, nothing heard').toBe(true);
+    expect(promptKeys(rows, { voiced: false }).promptShown, 'voiceless: the answer\'s letters or bare slots, never the line').toBe(false);
   });
 
   it('is written into every pack, with its definition', () => {
@@ -54,30 +54,39 @@ describe('whether the card shows the question line at all (#2265)', () => {
     expect(ABOUT.promptFixed, 'the old wording is gone').not.toMatch(/once slicing starts/);
   });
 
-  // Driven by the real generators and the real card renderer: the recorder's rule must say what promptHTML draws,
-  // for every bubble topic and difficulty, so a card that starts or stops showing its line fails here.
-  it('agrees with promptHTML on every bubble topic\'s questions: the line\'s words are on the card exactly when it says shown', () => {
+  // Driven by the real generators and the real card renderer: the pack's key must say what promptHTML draws, for
+  // every bubble topic and difficulty, on a device with a voice and on one without (#2325 review: a voiceless card
+  // reveals a `read` question's letters, and a plain question's listen line in place of its prompt).
+  it('agrees with promptHTML on every bubble topic\'s questions, voiced and voiceless: a line is on the card exactly when it says shown', () => {
     const decode = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
     const words = (p: string) => p.match(/\p{L}[\p{L}'’-]*/gu) ?? [];
     let a = 2265;
     const rng = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const seen = { shown: 0, unshown: 0 }, wrong: string[] = [];
+    const seen = { shown: 0, unshown: 0, voiceless: 0 }, wrong: string[] = [];
+    const has = (card: string, text: string | undefined) => { const ws = words(text ?? ''); return ws.length > 0 && ws.every(w => card.includes(w)); };
     for (const t of TOPICS.filter(x => (x.input ?? 'bubbles') === 'bubbles')) {
       for (const d of [1, 2, 3] as Difficulty[]) {
         for (let i = 0; i < 12; i++) {
           const q = t.gen(d, rng), ws = words(q.prompt);
           if (!ws.length) continue;                    // no words: nothing to read either way
           const rows: PromptRow[] = [];
-          promptStep(rows, 1, { stage: 1, prompt: q.prompt }, q);
-          const card = decode(promptHTML(q, 0));
-          const onCard = ws.every(w => card.includes(w));
-          seen[rows[0][4] ? 'shown' : 'unshown']++;
-          if (onCard !== rows[0][4]) wrong.push(`${t.id} d${d}: "${q.prompt}" recorded ${rows[0][4] ? 'shown' : 'unshown'}, card "${card.trim()}"`);
+          promptStep(rows, 1, { stage: 1, prompt: q.prompt }, q); promptStep(rows, 2, { stage: 1, prompt: q.prompt }, q);
+          for (const voiced of [true, false]) {
+            const card = decode(promptHTML(q, 0, !voiced && promptMode(q, false) === 'read'));
+            // The question's line, or with no voice a plain question's listen line printed in its place. A sequence's
+            // revealed letters or words are the answer to copy, not a line.
+            const onCard = has(card, q.prompt) || (!voiced && !q.sequence && has(card, q.listen));
+            const key = promptKeys(rows, { voiced }).promptShown;
+            seen[key ? 'shown' : 'unshown']++;
+            if (!voiced && q.listen) seen.voiceless++;
+            if (onCard !== key) wrong.push(`${t.id} d${d} ${voiced ? 'voiced' : 'voiceless'}: "${q.prompt}" key ${key}, card "${card.trim()}"`);
+          }
         }
       }
     }
     expect(wrong.slice(0, 5)).toEqual([]);
     expect(seen.unshown, 'the sweep reached plain sequence cards').toBeGreaterThan(100);
     expect(seen.shown, 'and cards that show their line').toBeGreaterThan(1000);
+    expect(seen.voiceless, 'and voiceless cards with a listen line').toBeGreaterThan(100);
   });
 });
