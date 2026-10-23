@@ -120,15 +120,18 @@ describe('playtest profiles (#2204)', () => {
     const parent = body('playtester-parent'), flat = parent.replace(/\s+/g, ' ');
     expect(flat, 'the rule, so the need is one number from both profiles').toContain('**For `physical`, you use the reading rate and working-time rules of the year profile for the year being scored (`playtester-<year>.md`), so the need is the same number from both profiles**');
     expect(flat, 'the rubric table sends `physical` to that rule').toContain("| `physical` | **Frustration risk**, marked the year profile's way (below).");
-    expect(flat, 'steps are counted for that year\'s child, not an adult').toContain("**Count the working steps that year's child takes, not the ones you would.**");
+    expect(flat, 'every number comes from that one file').toContain("**Every number in the skill's §2 need comes from that file**: the reaction floor and what it is counted from, the words a minute, the target floor and the comfortable size. Never a figure of your own, and never another year's.");
+    expect(flat, 'steps are counted for that year\'s child, not an adult').toContain("**Count the working steps that year's child takes, not the ones you would.** A fact adds 0 as recalled only when that file's Number section lists it as secure for the year; anything else is a step.");
+    expect(flat, 'with the steps the pattern-2 games turned on').toContain('Counting tallies, reading a bar against a scale, converting pence to pounds and finding the doer of a sentence are each a step');
     expect(flat, 'card text and a hint as that child reads them').toContain('Card text and a hint count whenever that child would need them to choose, even when you could choose from the bubbles alone');
     expect(flat, 'frustration risk reads the mark, it does not replace it').toContain('**Frustration risk is what the mark means to you, not a second measure:**');
     // Named, never copied: a rate, a floor or a size written here would drift from the year profile it came from.
     const at = parent.indexOf('## How you mark `physical`'), section = parent.slice(at, parent.indexOf('\n## ', at + 1));
     expect(at, 'the section is there').toBeGreaterThan(-1);
-    expect(section, 'no reading rate of its own').not.toMatch(/\d+\s+words a minute/);
+    // The figures as the year profiles write them: "60 words a minute", "29 words correct per minute", "3.5 seconds", "42 CSS px".
+    expect(section, 'no reading rate of its own').not.toMatch(/\d+\s+(words?\b|wpm\b)/);
     expect(section, 'no reaction floor of its own').not.toMatch(/\d+(\.\d+)?\s*(s|seconds?)\b/);
-    expect(section, 'no target size of its own').not.toMatch(/\d+(\.\d+)?\s*(mm|px)\b/);
+    expect(section, 'no target size of its own').not.toMatch(/\d+(\.\d+)?\s*(CSS\s+)?(mm|px)\b/);
   });
 
   it.each(CHILD)('%s carries what the parent takes from it for `physical`: a reach floor, a reading rule and a Number section (#2291)', (name) => {
@@ -136,7 +139,9 @@ describe('playtest profiles (#2204)', () => {
     expect(text, `${name}: the reaction floor the need starts from`).toMatch(/a bubble must stay reachable \*\*at least [\d.]+ seconds\*\*/);
     expect(text, `${name}: a reading rate, or Reception's rule that it reads no prompt`).toMatch(name === 'playtester-reception'
       ? /Treat any prompt over three or four short words as unread/ : /\*\*Assume about \d+ words a minute/);
-    expect(body(name), `${name}: the Number section the parent reads for what is recalled`).toMatch(/^## Number$/m);
+    const number = /^## Number$([\s\S]*?)^## /m.exec(body(name));
+    expect(number, `${name}: the Number section the parent reads for what is recalled`).not.toBeNull();
+    expect(number![1], `${name}: and it says what the year has secure, the word the parent's rule reads`).toMatch(/\bSecure\b/);
   });
 });
 
