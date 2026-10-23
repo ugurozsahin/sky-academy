@@ -49,3 +49,15 @@ describe('y2-scales (#1005)', () => {
     }
   });
 });
+
+describe('the measured thing is on the card (#2271)', () => {
+  it('y2-scales prompts lead with an icon and their spoken line does not', async () => {
+    const r = rng(42);
+    for (let i = 0; i < 200; i++) {
+      for (const q of [y2Scales(1 + (i % 3) as 1 | 2 | 3, r)]) {
+        expect(q.prompt).toMatch(/^\P{L}+ How /u);
+        expect(q.say).not.toMatch(/^\P{L}/u);
+      }
+    }
+  });
+});
