@@ -2399,7 +2399,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Go on a shape hunt around the house for circles, boxes, cylinders and right angles.",
    "strands": [
     "y2-m-position"

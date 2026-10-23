@@ -1,5 +1,5 @@
 // Year 2 shape, position, symmetry and repeating patterns. Split out of year2.ts (#1416); index.ts re-exports every name.
-import { type Generator, type Rng } from '../types';
+import { type Generator, type GeoPart, type Rng, type Visual } from '../types';
 import { ri, pick, shuffle, numQ, wordQ, SHAPES_3D, name3dQ, balanceQ, DIRS, ARROWS, TURNS_ALL, turnEnd } from '../util';
 import { PATTERN_OBJECTS } from '../patterns';
 
@@ -26,6 +26,13 @@ export const y2Balance: Generator = (d, rng) => {
 };
 // ---------- Position & direction (#8 Phase 2) ----------
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Degrees anticlockwise from the right for each `DIRS` entry (up, right, down, left). */
+const DIR_DEG = [90, 0, 270, 180];
+/** A ray from the centre of the geometry card towards direction `i`: the way the child faces, with no arc, so the turn's size is still theirs to judge (#2271). */
+const facing = (i: number): GeoPart => {
+  const a = DIR_DEG[i] * Math.PI / 180;
+  return { kind: 'segment', a: [50, 35], b: [Math.round(50 + 22 * Math.cos(a)), Math.round(35 - 22 * Math.sin(a))] };
+};
 export const y2Position: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) {                                              // where do you face after a turn (all four turns, both directions)
@@ -33,16 +40,19 @@ export const y2Position: Generator = (d, rng) => {
     const cw = rng() < 0.5, start = ri(rng, 0, 3), end = turnEnd(start, steps, cw);
     return wordQ(rng, `Face ${DIRS[start][1]}, then ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way now?`, DIRS[end][1], ARROWS.filter(a => a !== DIRS[end][1]), {
       say: `You are facing ${DIRS[start][0]}. Turn ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow', hintIsData: false,
+      visual: { type: 'geometry', parts: [facing(start)] },
     });
   }
   if (kind === 1) {                                              // rotation as right angles
     const [name, steps] = pick(rng, TURNS_ALL);
-    if (rng() < 0.5) return numQ(rng, `${cap(name)} = how many right angles?`, steps, { min: 0, max: 8, say: `How many right angles are the same as ${name}?`, distractors: [steps + 1, steps - 1, steps + 2] });
-    return wordQ(rng, `${steps} right angle${steps === 1 ? '' : 's'} = ?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), { say: `Which turn is the same as ${steps} right angle${steps === 1 ? '' : 's'}?`, hint: 'Slice the turn', hintIsData: false });
+    const turn: Visual = { type: 'geometry', parts: [{ kind: 'angle', at: [50, 35], dir: 0, deg: steps * 90, len: 22 }] };
+    if (rng() < 0.5) return numQ(rng, `${cap(name)} = how many right angles?`, steps, { min: 0, max: 8, visual: turn, say: `How many right angles are the same as ${name}?`, distractors: [steps + 1, steps - 1, steps + 2] });
+    return wordQ(rng, `${steps} right angle${steps === 1 ? '' : 's'} = ?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), { visual: turn, say: `Which turn is the same as ${steps} right angle${steps === 1 ? '' : 's'}?`, hint: 'Slice the turn', hintIsData: false });
   }
   const cw = rng() < 0.5, steps = pick(rng, [1, 2, 3]), start = ri(rng, 0, 3), end = turnEnd(start, steps, cw), name = TURNS_ALL[steps - 1][0];
   return wordQ(rng, `Face ${DIRS[start][1]}, turn ${cw ? 'clockwise' : 'anti-clockwise'} to face ${DIRS[end][1]}. Which turn?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), {
     say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn', hintIsData: false,
+    visual: { type: 'geometry', parts: [facing(start), facing(end)] },
   });
 };
 // ---------- Symmetry & repeating patterns (#299 slice 4) ----------

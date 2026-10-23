@@ -148,7 +148,7 @@ Generated from the registry: 343 topics. A strand counts as covered only when a 
 | Faces of Shapes (`y2-faces`) | Y2 Geometry: identify 2-D shapes on the surface of 3-D shapes | mixed | Slices the answer | generated | yes |
 | Mirror Lines (`y2-symmetry`) | Y2 Geometry: line symmetry in a vertical line | mixed | Slices the answer | generated | yes |
 | What Comes Next? (`y2-patterns`) | Y2 Geometry: order and arrange objects in patterns and sequences | mixed | Slices the answer | generated | yes |
-| Turns & Right Angles (`y2-position`) | Y2 Geometry: position, direction, rotation as right angles | mixed | Slices the answer | generated | no |
+| Turns & Right Angles (`y2-position`) | Y2 Geometry: position, direction, rotation as right angles | mixed | Slices the answer | generated | yes |
 | Length: cm & m (`y2-length`) | Y2 Measurement: length (cm/m) | mixed | Slices the answer | generated | yes |
 | Mass: g & kg (`y2-mass`) | Y2 Measurement: mass (g/kg) | mixed | Slices the answer | generated | yes |
 | Capacity: ml & l (`y2-capacity`) | Y2 Measurement: capacity (ml/l) | mixed | Slices the answer | generated | yes |
