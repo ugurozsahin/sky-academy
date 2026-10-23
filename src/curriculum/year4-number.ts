@@ -15,7 +15,7 @@ const STEPS = [6, 7, 9, 25, 1000] as const;
 const MAX = 10999;
 const inRange = (v: number) => v >= 0 && v <= MAX;
 
-/** Four terms of a run, and the index of the "?". d1: 25s/1,000s from 0, next term; d2: 6/7/9 from 0, 25s from
+/** Four terms of a run, and the index of the "?". d1: any step from 0, next term (so the 6s, 7s and 9s the title promises are met first, #2276); d2: 25s from
  *  any multiple up to 1,000, next term; d3: any step, may count back (never below 0), gap anywhere after the first. */
 function runTerms(d: Difficulty, step: number, rng: () => number): { terms: number[]; gapIndex: number; local: number } {
   const back = d === 3 && rng() < 0.4;
@@ -41,7 +41,7 @@ function runDecoys(answer: number, step: number, local: number, rng: () => numbe
 }
 
 function countRun(d: Difficulty, rng: () => number): Question {
-  const step = d === 1 ? pick(rng, [25, 1000] as const) : pick(rng, STEPS);
+  const step = pick(rng, STEPS);
   const { terms, gapIndex, local } = runTerms(d, step, rng);
   const answer = terms[gapIndex];
   const shown = terms.map((t, i) => i === gapIndex ? '?' : fmtN(t)).join(', ');
