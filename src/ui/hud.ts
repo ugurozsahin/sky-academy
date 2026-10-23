@@ -113,6 +113,9 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
 /** A degree sign never wraps onto a line of its own (#2278): a word joiner (U+2060) ties it to the character before it. */
 export const keepDegrees = (html: string) => html.replace(/(\S)°/g, '$1\u2060°');
 
+/** #2314: the card already prints this question's text (a `word` or `sentence` visual equal to the prompt), so the question line does not print it a second time. */
+export const cardRepeatsPrompt = (q: Question): boolean => !q.sequence && (q.visual?.type === 'word' || q.visual?.type === 'sentence') && q.visual.text === q.prompt;
+
 /**
  * The question prompt: a plain question, or the sequence so far with the letters still to come as gaps.
  * `reveal` (#65, a device with no voice) shows the letters still to come as well — the word to copy AND the
@@ -131,6 +134,7 @@ export const keepDegrees = (html: string) => html.replace(/(\S)°/g, '$1\u2060°
  * advances it there) so this branch never reads it.
  */
 export function promptHTML(q: Question, done: number, reveal = false, remaining?: readonly string[]): string {
+  if (cardRepeatsPrompt(q)) return '';
   if (!q.sequence) return keepDegrees(esc(reveal && q.listen ? q.listen : q.prompt));
   if (q.build) return buildPromptHTML(q.prompt, q.build.template, q.sequence, done);
   if (q.anyOrder) {
