@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { AVOID } from '../../src/curriculum/util';
-import { BANK, KINDS, DASH, build, gapped, uniqueWords, type Kind } from '../../src/curriculum/year5-parenthesis';
+import { BANK, KINDS, DASH, build, gapped, bothGapped, pairLabel, uniqueWords, type Kind } from '../../src/curriculum/year5-parenthesis';
 
 function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -70,10 +70,11 @@ describe('y5-parenthesis (#1226)', () => {
     const seen = new Set<Kind>();
     for (const q of draws(2)) {
       const text = (q.visual as { text: string }).text;
-      expect([...q.options].sort()).toEqual(['(', ')', ',', DASH].sort());
-      const left = text.includes('(') ? '(' : text.includes(')') ? ')' : text.includes(DASH) ? DASH : ',';
-      expect(q.answer).toBe(PARTNER[left]);
-      seen.add(left === ',' ? 'comma' : left === DASH ? 'dash' : 'bracket');
+      expect(count(text, '_'), text).toBe(2);
+      expect(text).not.toMatch(/[(),–]/);
+      expect(q.options).toHaveLength(3);
+      expect(q.options.filter(o => KINDS.some(k => pairLabel(k) === o))).toEqual([q.answer]);
+      seen.add(KINDS.find(k => pairLabel(k) === q.answer)!);
     }
     expect(seen.size).toBe(3);
   });
@@ -98,6 +99,16 @@ describe('y5-parenthesis (#1226)', () => {
       expect(q.say).not.toMatch(/[()–_]/);
       for (const o of q.options) { expect((AVOID as Set<string>).has(o.toLowerCase()), o).toBe(false); expect(EXCLUDE.has(o.toLowerCase()), o).toBe(false); }
       if (d === 3) for (const o of q.options) expect(o.toLowerCase()).not.toContain('parenthesis');
+    }
+  });
+});
+
+describe('y5-parenthesis: no half of the pair is left to mirror (#2274)', () => {
+  it('d2 hides both marks, so the mirror trick has nothing to copy; the NC statement (brackets, dashes or commas) is kept', () => {
+    for (const row of BANK) for (const kind of KINDS) {
+      const g = bothGapped(row, kind);
+      expect(count(g, '_'), g).toBe(2);
+      expect(g).not.toMatch(/[(),–]/);
     }
   });
 });

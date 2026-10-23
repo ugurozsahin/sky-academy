@@ -1920,7 +1920,7 @@ describe('Year 2 grammar and spelling (#299 slice 3)', () => {
           drawn.add(q.answer);
           // A bubble a child has not been taught yet is not a distractor, it is noise.
           expect([...q.options].sort(), `d${d} bubbles`).toEqual([...allowed[d]].sort());
-          const row = SENTENCE_TYPES.find(e => e[0] === (q.visual as { text: string }).text)!;
+          const row = SENTENCE_TYPES.find(e => e[0].replace(/[.?!]$/, '_') === (q.visual as { text: string }).text)!; // the final mark is hidden (#2274)
           expect(row, q.say).toBeTruthy();
           expect(q.answer, row[0]).toBe(row[1]);
         }
