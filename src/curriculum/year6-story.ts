@@ -14,7 +14,7 @@ const BIG: [Range, Range, Range] = [[1000, 6000], [150, 3500], [150, 3500]];
 export const BANK: Template[] = [
   [['+', '-'], 'A library had #. It got #, gave away #.', 'Books now?', BIG],
   [['-', '+'], 'A shop had #. # sold, # delivered.', 'Tins now?', BIG],
-  [['-', '-'], 'A hall has #. # taken, then # more.', 'Seats left?', BIG],
+  [['-', '-'], 'A hall has # seats. # go, then #.', 'How many left?', BIG],
   [['+', '+'], 'A club had #. # joined, then # more.', 'Members now?', BIG],
   [['×', '-'], '# rows of # seats. # seats are empty.', 'Seats full?', [[12, 40], [15, 60], [20, 300]]],
   [['×', '+'], '# boxes of # pens. # more pens arrive.', 'Pens now?', [[12, 40], [12, 48], [50, 900]]],

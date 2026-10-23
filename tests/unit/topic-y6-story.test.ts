@@ -32,7 +32,7 @@ describe('y6-story (#1259)', () => {
     const ROWS: Record<string, [number[], number, number]> = {
       'A library had #. It got #, gave away #.': [[4250, 875, 1300], 5125, 3825],
       'A shop had #. # sold, # delivered.': [[2000, 750, 1200], 1250, 2450],
-      'A hall has #. # taken, then # more.': [[5000, 1200, 900], 3800, 2900],
+      'A hall has # seats. # go, then #.': [[5000, 1200, 900], 3800, 2900],
       'A club had #. # joined, then # more.': [[1500, 320, 180], 1820, 2000],
       '# rows of # seats. # seats are empty.': [[24, 35, 186], 840, 654],
       '# boxes of # pens. # more pens arrive.': [[20, 15, 60], 300, 360],
@@ -44,6 +44,7 @@ describe('y6-story (#1259)', () => {
       '# pupils, # away. Each pupil here has # pens.': [[300, 30, 5], 270, 1350],
     };
     expect(BANK.map(t => t[1]).sort()).toEqual(Object.keys(ROWS).sort());
+    expect(BANK.find(t => t[1] === 'A hall has # seats. # go, then #.')![2], 'the hall asks a full question (#2275)').toBe('How many left?');
     for (const [ops, text] of BANK) {
       const [vals, first, answer] = ROWS[text], r = runs(ops, vals);
       expect([r[1], r[2]], text).toEqual([first, answer]);
