@@ -15,7 +15,7 @@ const num = (s: string) => Number(s);
 interface Solved { ans: number; additive?: number; other?: number }
 /** Recomputes the answer from the prompt alone. */
 function solve(p: string): Solved {
-  let m = p.match(/^For every (\d+) .*? there are (\d+) .*?\. (\d+) .*?: how many/);
+  let m = p.match(/^For every (\d+) .*? there (?:are|is) (\d+) .*?\. (\d+) .*?: how many/);
   if (m) { const [q, r, known] = [num(m[1]), num(m[2]), num(m[3])]; expect(known % q).toBe(0); return { ans: known / q * r, additive: known + (r - q) }; }
   m = p.match(/^(\d+) \w+: (\w+) gets (\d+) for every (\d+) (\w+) gets\. How many for (\w+)\?$/);
   if (m) {
@@ -68,9 +68,14 @@ describe('y6-ratio (#1268)', () => {
     }
   });
 
+  it('grammar: "there is 1", never "there are 1" (#2275)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draw(d, 300)) { expect(c.prompt, c.prompt).not.toMatch(/there are 1 /); expect(c.prompt, c.prompt).not.toMatch(/there is (?!1 )/); }
+    expect(draw(1, 300).some(c => /there is 1 /.test(c.prompt)), 'the "there is 1" branch is drawn').toBe(true);
+  });
+
   it('d1 uses parts 1–9 and an answer up to 100; d3 keeps lengths to 60 cm', () => {
     for (const c of draw(1)) {
-      const [, q, p] = c.prompt.match(/^For every (\d+) .*? there are (\d+)/)!.map(Number) as number[];
+      const [, q, p] = c.prompt.match(/^For every (\d+) .*? there (?:are|is) (\d+)/)!.map(Number) as number[];
       for (const v of [q, p]) { expect(v).toBeGreaterThanOrEqual(1); expect(v).toBeLessThanOrEqual(9); }
       expect(q).not.toBe(p); expect(num(c.answer)).toBeLessThanOrEqual(100);
     }
