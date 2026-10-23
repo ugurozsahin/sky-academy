@@ -45,14 +45,16 @@ describe('y4-count (#1069)', () => {
     }
   });
 
-  it('d1: runs count in 25s or 1,000s asking the next term; more/less stays within 1,000–9,999', () => {
+  it('d1: runs count in 6s, 7s, 9s, 25s or 1,000s from 0 asking the next term, and every step turns up (#2276); more/less stays within 1,000–9,999', () => {
     const r = rng(1069_100);
+    const steps = new Set<number>();
     for (let i = 0; i < DRAWS; i++) {
       const q = topic.gen(1, r);
       if (isRun(q.prompt)) {
         const p = parts(q.prompt);
         expect(p.indexOf('?'), q.prompt).toBe(3);
-        expect([25, 1000], q.prompt).toContain(num(p[1]) - num(p[0]));
+        expect([6, 7, 9, 25, 1000], q.prompt).toContain(num(p[1]) - num(p[0]));
+        steps.add(num(p[1]) - num(p[0]));
         expect(num(p[0]), q.prompt).toBe(0);
       } else {
         const base = num(q.prompt.match(/than ([\d,]+) =/)![1]);
@@ -62,6 +64,7 @@ describe('y4-count (#1069)', () => {
         expect(num(q.answer), q.prompt).toBeLessThanOrEqual(9999);
       }
     }
+    expect([...steps].sort((a, b) => a - b)).toEqual([6, 7, 9, 25, 1000]);
   });
 
   it('d2: runs ask the next term, count on from 0 in 6/7/9 (up to 12 × step), 25s start at any multiple up to 1,000', () => {
