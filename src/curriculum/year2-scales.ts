@@ -4,11 +4,12 @@
 import type { Generator, Question, Rng } from './types';
 import { pick, ri, shuffle, UNIT_WORD } from './util';
 
-interface Instrument { prompt: string; unit: string; say: string }
-const RULER: Instrument = { prompt: 'How long is the ribbon?', unit: 'cm', say: 'How long is the ribbon?' };
-const SCALE: Instrument = { prompt: 'How heavy is the flour?', unit: 'g', say: 'How heavy is the flour?' };
-const JUG: Instrument = { prompt: 'How much juice is in the jug?', unit: 'ml', say: 'How much juice is in the jug?' };
-const THERMOMETER: Instrument = { prompt: 'How warm is the water?', unit: '°C', say: 'How warm is the water?' };
+// `icon` puts the thing being measured on the card: the number line alone draws no ribbon, flour or jug (#2271).
+interface Instrument { prompt: string; unit: string; say: string; icon: string }
+const RULER: Instrument = { prompt: 'How long is the ribbon?', unit: 'cm', say: 'How long is the ribbon?', icon: '🎀' };
+const SCALE: Instrument = { prompt: 'How heavy is the flour?', unit: 'g', say: 'How heavy is the flour?', icon: '🌾' };
+const JUG: Instrument = { prompt: 'How much juice is in the jug?', unit: 'ml', say: 'How much juice is in the jug?', icon: '🥛' };
+const THERMOMETER: Instrument = { prompt: 'How warm is the water?', unit: '°C', say: 'How warm is the water?', icon: '🌡️' };
 
 /** Three different values, each at least 0, from the answer's neighbours: one interval away, or one unit away. */
 function decoys(rng: Rng, mark: number, step: number): number[] {
@@ -23,7 +24,7 @@ export const y2Scales: Generator = (d, rng): Question => {
   const answer = `${mark} ${inst.unit}`;
   const unitWord = inst.unit === '°C' ? 'degrees Celsius' : UNIT_WORD[inst.unit];
   return {
-    prompt: inst.prompt, answer,
+    prompt: `${inst.icon} ${inst.prompt}`, answer,
     options: shuffle(rng, [answer, ...decoys(rng, mark, step).map(x => `${x} ${inst.unit}`)]),
     visual: { type: 'numberline', from: 0, to, step, mark, ...(d > 1 ? { ends: true } : {}) },
     say: `${inst.say} The scale goes from 0 to ${to} ${unitWord}.`,
