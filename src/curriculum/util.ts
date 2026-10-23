@@ -290,6 +290,8 @@ export function unitQ(rng: Rng, total: number, coins: number[], max = Infinity):
 // Four compass directions in clockwise order, each with its arrow; a turn moves that many quarter-steps round the ring.
 export const DIRS: [string, string][] = [['up', '⬆️'], ['right', '➡️'], ['down', '⬇️'], ['left', '⬅️']];
 export const ARROWS = DIRS.map(d => d[1]);
+/** Degrees anticlockwise from the right for each `DIRS` entry, in the same order (up, right, down, left). */
+export const DIR_DEG = [90, 0, 270, 180];
 export const TURNS_ALL: [string, number][] = [['a quarter turn', 1], ['a half turn', 2], ['a three-quarter turn', 3], ['a whole turn', 4]];
 /** Direction faced after turning `steps` quarter-turns clockwise (or anti-clockwise) from `start` (indices into DIRS). */
 export const turnEnd = (start: number, steps: number, clockwise: boolean): number => (((start + (clockwise ? steps : -steps)) % 4) + 4) % 4;

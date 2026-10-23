@@ -1,6 +1,6 @@
 // Year 2 shape, position, symmetry and repeating patterns. Split out of year2.ts (#1416); index.ts re-exports every name.
 import { type Generator, type GeoPart, type Rng, type Visual } from '../types';
-import { ri, pick, shuffle, numQ, wordQ, SHAPES_3D, name3dQ, balanceQ, DIRS, ARROWS, TURNS_ALL, turnEnd } from '../util';
+import { ri, pick, shuffle, numQ, wordQ, SHAPES_3D, name3dQ, balanceQ, DIRS, DIR_DEG, ARROWS, TURNS_ALL, turnEnd } from '../util';
 import { PATTERN_OBJECTS } from '../patterns';
 
 /** Year 2: "identify and describe the properties of 3-D shapes, including the number of edges, vertices and faces". */
@@ -26,8 +26,6 @@ export const y2Balance: Generator = (d, rng) => {
 };
 // ---------- Position & direction (#8 Phase 2) ----------
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-/** Degrees anticlockwise from the right for each `DIRS` entry (up, right, down, left). */
-const DIR_DEG = [90, 0, 270, 180];
 /** A ray from the centre of the geometry card towards direction `i`: the way the child faces, with no arc, so the turn's size is still theirs to judge (#2271). */
 const facing = (i: number): GeoPart => {
   const a = DIR_DEG[i] * Math.PI / 180;
@@ -51,8 +49,7 @@ export const y2Position: Generator = (d, rng) => {
   }
   const cw = rng() < 0.5, steps = pick(rng, [1, 2, 3]), start = ri(rng, 0, 3), end = turnEnd(start, steps, cw), name = TURNS_ALL[steps - 1][0];
   return wordQ(rng, `Face ${DIRS[start][1]}, turn ${cw ? 'clockwise' : 'anti-clockwise'} to face ${DIRS[end][1]}. Which turn?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), {
-    say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn', hintIsData: false,
-    visual: { type: 'geometry', parts: [facing(start), facing(end)] },
+    say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn', hintIsData: false,   // no picture: two bare rays cannot tell a quarter turn one way from three-quarters the other (#2271)
   });
 };
 // ---------- Symmetry & repeating patterns (#299 slice 4) ----------
