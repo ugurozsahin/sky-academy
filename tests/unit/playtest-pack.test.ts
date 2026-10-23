@@ -393,11 +393,18 @@ describe('whether the card shows the question line at all (#2265)', () => {
     expect(keys([seq, seq], {}).promptShown, 'a later stage the result moved on to is not counted').toBe(false);
   });
 
+  it('is never false when the voice never started: the line was neither heard nor, as a pack can vouch, unread', () => {
+    const rows: PromptRow[] = [];
+    step(rows, 1, 'Spell it', { ...seq, listen: 'cat' }); step(rows, 2, 'Spell it', seq);
+    expect(promptKeys(rows).promptShown, 'voiced: heard, never read').toBe(false);
+    expect(promptKeys(rows, { voiced: false }).promptShown, 'voiceless: letters or the listen line on the card, nothing heard').toBe(true);
+  });
+
   it('is written into every pack, with its definition', () => {
     const screen = { H, card: null, speakVisible: false, prompt: 'x', answer: 'c', hasLives: true, hint: null, slow: false, wide: false, sequence: false, anyOrder: false, visual: null, lives: 3, mode: 'mission' };
     const lines: PromptRow[] = [];
     step(lines, 1, 'Spell it', seq); step(lines, 2, 'Spell it', seq);
-    const rec: Recorded = { screen, samples: null, frames: [], labels: [], promptAt: null, speech: null, extra: {}, lines };
+    const rec: Recorded = { screen, samples: null, frames: [], labels: [], promptAt: null, speech: { text: 'Spell it', at: 0, start: 10, end: 600, error: null }, extra: {}, lines };
     const m = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec, shots: [], maxRelaunches: MAX_RELAUNCHES });
     expect([m.promptShown, m.promptFixed]).toEqual([false, true]);
     expect(ABOUT.promptShown).toMatch(/plain sequence/);

@@ -58,7 +58,8 @@ maths symbols are read at a glance from Year 1 up, and Reception reads neither.
   count ÷ the profile's words a minute).
 - **The question line**, when the pack shows the wave launching before it could be read.
   - **A line the card never shows adds nothing to the need, whatever `promptFixed` says** (#2265). When
-    `metrics.json#promptShown` is `false`, the child only hears the line, so its words add no reading time. A plain
+    `metrics.json#promptShown` is `false`, the child only hears the line, so its words add no reading time. The pack
+    writes `false` only when the voice really spoke it. A plain
     sequence card draws only the slots, never the line: y1-order's `Smallest to biggest!` is spoken, not shown.
     The spoken prompt's timing still counts, through `metrics.json#afterSpeechMs` and
     `metrics.json#speechOutlastedWave`. A pack without the key counts the line only when `2-prompt.webp` shows

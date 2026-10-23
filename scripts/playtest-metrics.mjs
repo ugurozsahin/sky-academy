@@ -137,8 +137,9 @@ export function promptStep(rows, asked, st, q) {
  * shows the line (#2265). A line that changed within a question is not fixed. Nor is one the pack cannot vouch was
  * shown: with no voice (`voiced` false), a question with a `listen` line put that, or its answer, on the card
  * instead, so a fixed `prompt` says nothing about what the child read. `promptShown` (#2265) says whether the card
- * carried a line on any question of that stage: `false` only when every one was a plain sequence, so the child
- * only heard it. Fewer than two questions read is no comparison, so the pack fails rather than write a value
+ * carried a line on any question of that stage: `false` only when every one was a plain sequence and the voice
+ * really spoke, so the child heard the line. With no voice, a plain sequence card shows the word's letters or its
+ * listen line instead, and nobody heard the line, so it counts as shown. Fewer than two questions read is no comparison, so the pack fails rather than write a value
  * nobody observed.
  */
 export function promptKeys(rows, { voiced = true } = {}) {
@@ -148,7 +149,7 @@ export function promptKeys(rows, { voiced = true } = {}) {
   if (waves < 2) throw new Error(`promptFixed needs the question line of two questions in one stage; ${waves} read`);
   return {
     promptFixed: own.every(r => r[2] === own[0][2]) && (voiced || !own.some(r => r[3])), promptWaves: waves,
-    promptShown: own.some(r => r[4]),
+    promptShown: !voiced || own.some(r => r[4]),
   };
 }
 
@@ -266,7 +267,7 @@ export const ABOUT = {
   promptWords: 'words only: numerals, symbols and the ? placeholder are read at a glance. They are the line\'s words whether or not the card shows it (promptShown)',
   promptFixed: "the question line was the same text on every question of the stage the pack played, read from the game's state (window.__sna.state().prompt) for each question, not from a screenshot: a plain sequence card never shows the line (promptShown). Always false when the voice never started and a question had a listen line, which a voiceless device shows instead",
   promptWaves: 'how many questions of that stage promptFixed compared',
-  promptShown: "the card showed the question line, or on a voiceless device its listen line, on at least one question of that stage. False when every question was a plain sequence (a sequence with no build and no anyOrder): its card draws only the slots, so the child hears the line and never reads it",
+  promptShown: "the card showed the question line on at least one question of that stage. False when every question was a plain sequence (a sequence with no build and no anyOrder) and the voice really spoke: its card draws only the slots, so the child hears the line and never reads it. Always true when the voice never started: a voiceless card shows the letters or the listen line instead, and nobody heard the line",
   demoShown: "the animated first-ever-play demo is skipped: the pack plays as a child who has played any game before",
   labelReachMs: "sequence games only: over the first question's required labels, each one's total time below the question card and above the screen's bottom edge, across its first flight and its relaunches, until it was sliced or its relaunches ran out. The pack slices none of them while timing, so each one's whole chance is measured; a label the wave cut short is left out",
   labelReach: "per required label: its reachMs, how many flights it had, and endedBy: 'ran out' (it fell on its last flight), 'sliced', or 'wave over' (the pack's own miss decided the question first: information only, never the reach); frames is the longest frame gap while it was timed",
