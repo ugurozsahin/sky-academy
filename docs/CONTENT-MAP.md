@@ -153,7 +153,7 @@ Generated from the registry: 343 topics. A strand counts as covered only when a 
 | Mass: g & kg (`y2-mass`) | Y2 Measurement: mass (g/kg) | mixed | Slices the answer | generated | yes |
 | Capacity: ml & l (`y2-capacity`) | Y2 Measurement: capacity (ml/l) | mixed | Slices the answer | generated | yes |
 | Compare Measures < > = (`y2-measure-compare`) | Y2 Measurement: compare measures and record using >, < and = | mixed | Slices the answer | generated | no |
-| Temperature (`y2-temp`) | Y2 Measurement: temperature (°C) | mixed | Slices the answer | generated | no |
+| Temperature (`y2-temp`) | Y2 Measurement: temperature (°C) | mixed | Slices the answer | generated | yes |
 | Read the Scale (`y2-scales`) | Y2 Measurement: read a ruler, scale, thermometer or jug | mixed | Slices the answer | generated | yes |
 | Time & Durations (`y2-duration`) | Y2 Measurement: compare and sequence intervals of time | mixed | Slices the answer | generated | yes |
 | Balance the Scales (`y2-balance`) | Y2 A&S: equivalence, inverse, tables | mixed | Slices the answer | generated | yes |

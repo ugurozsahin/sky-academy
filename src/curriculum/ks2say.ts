@@ -366,6 +366,9 @@ function unitSpoken(toks: readonly Tok[], idx: number, norm: string): string {
   return before?.kind === 'digit' && before.raw === '1' ? singular(tok.spoken) : tok.spoken;
 }
 
+/** A lone "?" span has lost its neighbours, so `symSay` cannot tell a question's end from a gap; a question's own "?" is spoken as nothing (#2275). */
+const endsQuestion = (tok: Tok, norm: string): boolean => tok.raw === '?' && /[A-Za-z0-9)'"’]/.test(norm[tok.start - 1] ?? '') && /^\s?$/.test(norm[tok.end] ?? '');
+
 /** Plain text: a spaced slash is "divided by", a hyphen between two times is "to", `>` and `<` are spoken, the rest goes through `symSay`. */
 function textSpoken(toks: readonly Tok[], idx: number, norm: string): string {
   const tok = toks[idx];
@@ -373,6 +376,7 @@ function textSpoken(toks: readonly Tok[], idx: number, norm: string): string {
   const gap = (i: number, d: number): Tok | undefined => toks[toks[i + d]?.raw === ' ' ? i + 2 * d : i + d];
   if ((tok.raw === '-' || tok.raw === '–') && gap(idx, -1)?.kind === 'time' && gap(idx, 1)?.kind === 'time') return 'to';
   if (tok.raw === '>' || tok.raw === '<') return tok.raw === '>' ? 'greater than' : 'less than';
+  if (endsQuestion(tok, norm)) return '';
   return tok.raw.trim() !== '' ? symSay(tok.raw) : tok.spoken;
 }
 
