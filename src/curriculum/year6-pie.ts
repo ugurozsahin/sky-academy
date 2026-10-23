@@ -3,7 +3,7 @@
 // its simplest form); d3 "60 children were asked: how many chose it?" with a total that makes every count whole.
 // The pie is drawn from the same counts the answer is computed from (`src/ui/vis-pie.ts`).
 import type { Difficulty, Generator, Question, Rng, ChartRow } from './types';
-import { ri, pick, shuffle, wordQ } from './util';
+import { ri, pick, shuffle, wordQ, COLOUR_BUBBLE } from './util';
 import { simplify, equal, fmtFrac, parseFrac, type Frac } from './fractions';
 
 /** Survey words of at most 7 letters, one theme to a chart, so no two slices of a pie are alike. */
@@ -12,6 +12,15 @@ const THEMES: readonly (readonly string[])[] = [
   ['pizza', 'pasta', 'salad', 'soup', 'rice', 'curry'], ['red', 'blue', 'green', 'pink', 'yellow', 'purple'],
   ['tennis', 'rugby', 'chess', 'dance', 'judo', 'golf'], ['bus', 'car', 'bike', 'train', 'walk', 'tram'],
 ];
+
+/** #2269: `PALETTE` entries (`src/game/bubbles.ts`) a slice may be drawn in; a colour word keeps its own, so "red" is red. */
+const SLICE_COLOURS = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
+const OWN: Record<string, string> = { ...COLOUR_BUBBLE, pink: '#ff7ac6' };
+/** One colour per label, distinct, so the bubble for a slice is drawn in the slice's own colour. */
+export function sliceColours(labels: readonly string[]): Record<string, string> {
+  const free = SLICE_COLOURS.filter(c => !labels.some(l => OWN[l] === c));
+  return Object.fromEntries(labels.map(l => [l, OWN[l] ?? free.shift()!]));
+}
 
 /** Slice sizes over a common denominator `d`: every slice at least a twelfth of the circle, numerators summing to `d`. */
 const SPLITS: readonly (readonly [number, readonly number[]])[] = [
@@ -40,9 +49,9 @@ function extreme(rng: Rng): Question {
     const asc = [...ns].sort((a, b) => a - b), gap = most ? asc[3] - asc[2] : asc[1] - asc[0];
     if (gap / total * 360 < MIN_GAP_DEG) continue;
     const hit = ns.indexOf(most ? Math.max(...ns) : Math.min(...ns));
-    const word = most ? 'most' : 'least';
+    const word = most ? 'most' : 'least', colours = sliceColours(labels);
     return wordQ(rng, `Which was chosen ${word}?`, labels[hit], labels, {
-      visual: { type: 'pie', slices: ns.map((n, i) => ({ label: labels[i], n })) }, say: `${LOOK}Which was chosen ${word}?`, wide: true,
+      visual: { type: 'pie', slices: ns.map((n, i) => ({ label: labels[i], n, colour: colours[labels[i]] })) }, say: `${LOOK}Which was chosen ${word}?`, wide: true, colours,
     });
   }
 }
