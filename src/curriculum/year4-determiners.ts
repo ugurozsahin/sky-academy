@@ -72,7 +72,7 @@ function term(rng: () => number): Question {
 
 /** d1: the determiner among a noun, a verb and an adjective · d2: the possessive pronoun · d3: the term for "their" or "theirs". */
 export const y4Determiners: Generator = (d, rng) => {
-  if (d === 1) return find(rng, DET_BANK, 'Which word is the determiner?', 'D', 4, true, 'A determiner comes before a noun, like the, a, this or my.');
-  if (d === 2) return find(rng, POSS_BANK, 'Which word is the possessive pronoun?', 'P', 4, false, 'A possessive pronoun stands on its own, like mine or theirs.');
+  if (d === 1) return find(rng, DET_BANK, 'Which word is the determiner?', 'D', 4, true, 'A determiner comes just before a noun, or before an adjective describing it.');
+  if (d === 2) return find(rng, POSS_BANK, 'Which word is the possessive pronoun?', 'P', 4, false, 'A possessive pronoun stands on its own, with no noun after it.');
   return term(rng);
 };

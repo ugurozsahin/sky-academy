@@ -37,10 +37,10 @@ function division(rng: Rng): Question {
   do { d = ri(rng, 2, 12); n = ri(rng, 1, d - 1); } while (gcd(n, d) > 1);
   const nb = [n + 1, n - 1, n + 2].map(x => frac(x, d)), db = [d + 1, d - 1].map(x => frac(n, x));
   if (rng() < 0.5) {
-    return card(rng, `${n} ÷ ${d} as a fraction`, frac(n, d), [frac(d, n), ...nb], db, 'The first number is the top, the second is the bottom');
+    return card(rng, `${n} ÷ ${d} as a fraction`, frac(n, d), [frac(d, n), ...nb], db, 'A fraction bar means divided by');
   }
   const div = (a: number, b: number): Opt => ({ label: `${a} ÷ ${b}`, n: a, d: b });
-  return card(rng, `Which division gives ${n}/${d}?`, div(n, d), [div(d, n), div(n + 1, d), div(n, d + 1)], [div(n - 1, d), div(n, d - 1), div(n + 2, d)], 'The top is divided by the bottom');
+  return card(rng, `Which division gives ${n}/${d}?`, div(n, d), [div(d, n), div(n + 1, d), div(n, d + 1)], [div(n - 1, d), div(n, d - 1), div(n + 2, d)], 'A fraction bar means divided by');
 }
 
 /** d2: the recall set as fractions in lowest terms (thirds are left out: 1/3 has no exact percentage). */
