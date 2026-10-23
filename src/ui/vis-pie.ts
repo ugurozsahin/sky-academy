@@ -32,7 +32,7 @@ export function pieSVG(v: Pie): string {
     // A label above the circle sits on its baseline; one below it hangs from its cap height.
     const dy = Math.cos(mid * Math.PI / 180) > 0.2 ? 0 : Math.cos(mid * Math.PI / 180) < -0.2 ? PIE.fs * 0.8 : PIE.fs * 0.35;
     from = to;
-    return `<path d="M${PIE.cx} ${PIE.cy}L${x1} ${y1}A${PIE.r} ${PIE.r} 0 ${sweep > 180 ? 1 : 0} 1 ${x2} ${y2}Z" fill="${FILLS[i]}" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round"/>`
+    return `<path d="M${PIE.cx} ${PIE.cy}L${x1} ${y1}A${PIE.r} ${PIE.r} 0 ${sweep > 180 ? 1 : 0} 1 ${x2} ${y2}Z" fill="${s.colour ?? FILLS[i]}" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round"/>`
       + `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="var(--text)" stroke-width="1.5"/>`
       + `<text x="${tx}" y="${r2(ty + dy)}" text-anchor="${anchor}" font-size="${PIE.fs}" font-weight="700" fill="var(--text)">${esc(s.label)}</text>`;
   }).join('');
