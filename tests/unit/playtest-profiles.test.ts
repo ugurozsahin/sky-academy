@@ -229,6 +229,24 @@ describe('the playtest skill (#2204)', () => {
     for (const e of physical) expect(e.saw, 'every physical saw in the example names its steps').toMatch(/working: \d+ steps?/);
   });
 
+  it('leaves a question line the card never shows out of the need, from the pack\'s key (#2265)', () => {
+    const at = SKILL.indexOf('**The time a bubble needs**'), end = SKILL.indexOf('Compare that need', at);
+    const need = SKILL.slice(at, end).replace(/\s+/g, ' ');
+    const rule = '**A line the card never shows adds nothing to the need, whatever `promptFixed` says** (#2265)';
+    expect(need, 'the rule is in the need paragraph').toContain(rule);
+    expect(need.indexOf(rule), 'and comes before the fixed-line rule it overrides').toBeLessThan(need.indexOf('**A line that is the same every wave is read once per game'));
+    expect(need, 'read from the pack').toContain('When `metrics.json#promptShown` is `false`, the card never shows the line, so its words add no reading time');
+    expect(need, 'a voiceless plain sequence is an understand matter, never reading time (#2325 review)')
+      .toContain('a plain sequence leaves the child with no question at all, neither heard nor read: mark that under `understand`, never as reading time');
+    expect(need, 'and the key is never tied to the voice').not.toMatch(/only when the voice really spoke/);
+    expect(need, 'the spoken prompt\'s timing still counts (the owner\'s interim rule on the issue)')
+      .toContain('The spoken prompt\'s timing still counts, through `metrics.json#afterSpeechMs` and `metrics.json#speechOutlastedWave`');
+    expect(need, 'an older pack falls back to the prompt shot').toContain('A pack without the key counts the line only when `2-prompt.webp` shows it on the card');
+    expect(need, 'the fixed-line fallback no longer counts an unshown line').toContain('When it is `false` or missing, count the line, unless the card never shows it');
+    expect(SKILL, 'the old wording, that a sequence card hides the line once slicing starts, is gone').not.toMatch(/once slicing starts/);
+    expect(SKILL.replace(/\s+/g, ' '), '§1 lists the key').toContain('whether the card shows it at all (`promptShown`)');
+  });
+
   it('its example row is a valid row: the five keys, the sum, evidence, and a profile as `by`', () => {
     const json = /```json\n(\{.*\})\n```/.exec(SKILL);
     expect(json, 'the skill shows one example row').not.toBeNull();
