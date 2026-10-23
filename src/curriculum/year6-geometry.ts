@@ -20,5 +20,5 @@ export const Y6_GEOMETRY: Topic[] = [
   // slot: y6-coords
   { id: 'y6-coords', title: 'Four-Quadrant Coordinates', icon: '🧭', subject: 'maths', year: 'year6', nc: 'Y6 Geometry: describe positions on the full coordinate grid, all four quadrants (6M46)', gen: y6Coords },
 
-  { id: 'y6-transform', title: 'Reflect in the Axes', icon: '🔄', subject: 'maths', year: 'year6', strand: 'geometry', nc: 'Y6 Geometry: translate and reflect in the axes (6M47)', gen: y6Transform },
+  { id: 'y6-transform', title: 'Translate and Reflect', icon: '🔄', subject: 'maths', year: 'year6', strand: 'geometry', nc: 'Y6 Geometry: translate and reflect in the axes (6M47)', gen: y6Transform },
 ];
