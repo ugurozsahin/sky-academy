@@ -398,3 +398,11 @@ describe('hearts follow ModeSpec.hasLives (#1117)', () => {
     for (const m of ['mission', 'endless', 'boss'] as const) expect(draw(m, 3), m).toBe(livesHTML(3, 3));
   });
 });
+
+describe('promptHTML — degree signs stay with their number (#2278)', () => {
+  it('ties ° to the character before it so it never wraps alone', () => {
+    const q = { prompt: 'Opposite = ?°', answer: '45°', options: [], sequence: undefined } as unknown as Parameters<typeof promptHTML>[0];
+    expect(promptHTML(q, 0)).toBe('Opposite = ?⁠°');
+    expect(promptHTML(q, 0).replace(/⁠/g, '')).toBe('Opposite = ?°');
+  });
+});
