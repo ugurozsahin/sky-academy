@@ -36,7 +36,7 @@ export const SUB_PAIRS: SubRow[] = [
 ];
 
 const gapped = (a: string, b: string): string => `${a} _ ${b}.`;
-const FLAG = 'A semicolon, colon or dash joins two clauses that could each stand alone';
+const FLAG = 'Each clause could stand alone, so a comma is too weak to join them';
 
 function markCard(d: Difficulty, rng: () => number) {
   const colon = d === 2 && rng() < 0.5;
