@@ -1297,10 +1297,10 @@
         ]
       },
       "playability": {
-        "score": 9,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "r-trace": {
@@ -4552,10 +4552,10 @@
         ]
       },
       "playability": {
-        "score": 6,
+        "score": 5,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y2-stats-order": {
@@ -4587,10 +4587,10 @@
         ]
       },
       "playability": {
-        "score": 7,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y2-stats-table": {
@@ -6652,10 +6652,10 @@
         ]
       },
       "playability": {
-        "score": 9,
+        "score": 8,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y3-dictation": {
@@ -7072,10 +7072,10 @@
         ]
       },
       "playability": {
-        "score": 9,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y4-mistake": {
@@ -7807,10 +7807,10 @@
         ]
       },
       "playability": {
-        "score": 8,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y4-convert": {
@@ -8089,8 +8089,8 @@
       "playability": {
         "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y4-retrieve": {
@@ -8297,10 +8297,10 @@
         ]
       },
       "playability": {
-        "score": 8,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y4-shun": {
@@ -8682,10 +8682,10 @@
         ]
       },
       "playability": {
-        "score": 8,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y5-pv": {
@@ -11727,10 +11727,10 @@
         ]
       },
       "playability": {
-        "score": 7,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y6-mean": {
@@ -12287,10 +12287,10 @@
         ]
       },
       "playability": {
-        "score": 7,
+        "score": 6,
         "by": "playtester-parent",
-        "at": "2026-10-22",
-        "report": "docs/playability/2026-10-22/playtester-parent.md"
+        "at": "2026-10-23",
+        "report": "docs/playability/2026-10-23/playtester-parent.md"
       }
     },
     "y6-consistency": {

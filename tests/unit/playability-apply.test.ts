@@ -246,6 +246,17 @@ describe('applyRows: where each profile\'s score goes (#2206, #2214)', () => {
     expect(UNSCORED.games['y1-alien'].playability, 'the input is not mutated').toBeNull();
   });
 
+  it('a pair 2 apart keeps both scores, each on its own node, with nothing combined (#2291)', () => {
+    const year = structuredClone(ROWS[1]), mine = parent('year1', 6);
+    expect(mine.score - year.score, 'the pair disagrees by 2, as the #2291 games do').toBe(2);
+    expect(checkRows([year, mine].map((row, i) => ({ row, where: `r.jsonl:${i + 1}` })), ctx)).toEqual([]);
+    const { catalogue } = applyRows(UNSCORED, [year, mine], DATE);
+    expect(catalogue.games['y1-alien'].playability, 'the game node is the parent\'s score, nothing added')
+      .toEqual({ score: 6, by: PARENT, at: DATE, report: `docs/playability/${DATE}/${PARENT}.md` });
+    expect(catalogue.games['y1-alien'].years.year1!.playability, 'the game-and-year node the year profile\'s')
+      .toEqual({ score: 4, by: 'playtester-year1', at: DATE, report: REPORT });
+  });
+
   it('several parent rows on one game: the lowest wins, the earliest year on a tie, and the report names it', () => {
     const two: Loose = structuredClone(UNSCORED);
     two.games['y1-alien'].years.year2 = { visible: true, settings: {}, playability: null };
