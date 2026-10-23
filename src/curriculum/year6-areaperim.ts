@@ -1,4 +1,4 @@
-// y6-areaperim (#1243): same area with a different perimeter, and the reverse (NC 6M37–38). Text cards only: a rectangle
+// y6-areaperim (#1243, #2276): same area with a different perimeter, and the reverse (NC 6M37–38). Text cards only: a rectangle
 // is `a × b` (cm). Each card has exactly one option that meets its condition, and the test checks every option (#666).
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
@@ -6,26 +6,20 @@ import { areaCard } from './year6-area';
 
 type Pair = [number, number];
 const label = (rng: Rng, [a, b]: Pair) => (rng() < 0.5 ? `${a} × ${b}` : `${b} × ${a}`);
-const key = ([a, b]: Pair) => (a < b ? `${a}x${b}` : `${b}x${a}`);
-const area = ([a, b]: Pair) => a * b;
 /** Areas with at least two whole-number rectangles, sides 2–12. */
 const AREAS = [12, 16, 18, 20, 24, 30, 36];
 const pairsOf = (a: number): Pair[] => { const out: Pair[] = []; for (let w = 2; w <= 12; w++) if (a % w === 0 && a / w >= w && a / w <= 12) out.push([w, a / w]); return out; };
 
-/** d1: which rectangle has the same area as the one shown? The same-perimeter rectangle is always among the decoys. */
-function sameArea(rng: Rng): Question {
-  const A = pick(rng, AREAS), [shown, other] = shuffle(rng, pairsOf(A)).slice(0, 2);
-  const s = shown[0] + shown[1], seen = new Set([key(shown), key(other)]);
-  const lookalike = shuffle(rng, Array.from({ length: s - 1 }, (_, i): Pair => [i + 1, s - i - 1])).find(p => !seen.has(key(p)) && area(p) !== A)!;
-  seen.add(key(lookalike));
-  const decoys: Pair[] = [lookalike];
-  while (decoys.length < 3) {
-    const p: Pair = [ri(rng, 2, 9), ri(rng, 2, 9)];
-    if (!seen.has(key(p)) && area(p) !== A) { seen.add(key(p)); decoys.push(p); }
-  }
-  const text = `${shown[0]} × ${shown[1]}`;
-  return wordQ(rng, `Same area as ${text}?`, label(rng, other), decoys.map(p => label(rng, p)), {
-    say: `Which rectangle has the same area as ${shown[0]} times ${shown[1]}?`, hint: 'Multiply to find each area', hintIsData: false });
+/** Areas with at least four whole-number rectangles (1 × n included). */
+const MANY = [24, 30, 36, 40, 48];
+const allPairs = (a: number): Pair[] => { const out: Pair[] = []; for (let w = 1; w * w <= a; w++) if (a % w === 0) out.push([w, a / w]); return out; };
+
+/** d1 (6M38): four rectangles with one area; the one with the longest perimeter is the longest and thinnest. */
+function longestPerimeter(rng: Rng): Question {
+  const A = pick(rng, MANY), ps = shuffle(rng, allPairs(A)).slice(0, 4);
+  const best = ps.reduce((m, p) => (p[0] + p[1] > m[0] + m[1] ? p : m));
+  return wordQ(rng, `All have area ${A} cm². Longest perimeter?`, label(rng, best), ps.filter(p => p !== best).map(p => label(rng, p)), {
+    say: `All of these rectangles have an area of ${A} square centimetres. Which one has the longest perimeter?`, hint: 'The longer and thinner, the longer the perimeter', hintIsData: false });
 }
 
 /** d2: two rectangles with the same area; the perimeter of the second. */
@@ -54,4 +48,4 @@ function longerSide(rng: Rng): Question {
 }
 
 export const y6AreaPerim: Generator = (level: Difficulty, rng) =>
-  (level === 1 ? sameArea : level === 2 ? (rng() < 0.5 ? perimeterOfSecond : biggestArea) : longerSide)(rng);
+  (level === 1 ? longestPerimeter : level === 2 ? (rng() < 0.5 ? perimeterOfSecond : biggestArea) : longerSide)(rng);
