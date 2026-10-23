@@ -27,3 +27,16 @@ describe('colour-word bubbles (#2269)', () => {
     for (const b of plan.bubbles) expect(PALETTE).toContain(b.color);
   });
 });
+
+describe('pie-chart bubbles (#2269)', () => {
+  it('a Year 6 "which was chosen" bubble is planned in the colour of its slice, over 200 seeds', () => {
+    const pie = TOPICS.find(t => t.id === 'y6-pie')!;
+    for (let seed = 1; seed <= 200; seed++) {
+      const q = pie.gen(1, seeded(seed));
+      const slices = (q.visual as { slices: { label: string; colour?: string }[] }).slices;
+      expect(new Set(slices.map(s => s.colour)).size, 'distinct slice colours').toBe(slices.length);
+      const plan = layoutWave(waveOptsFor(q, { labels: q.options, speed: 1 }), { W: 390, H: 600, topInset: 120 }, 1, 0, seeded(seed));
+      for (const b of plan.bubbles) { expect(PALETTE).toContain(b.color); expect(b.color, `${seed} ${b.label}`).toBe(slices.find(s => s.label === b.label)!.colour); }
+    }
+  });
+});
