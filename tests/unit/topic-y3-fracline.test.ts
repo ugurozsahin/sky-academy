@@ -25,8 +25,17 @@ describe('y3-fracline (#1093)', () => {
       expect(v.labels!.length, c.prompt).toBeLessThanOrEqual(6);
       expect(c.answer, c.prompt).toBe(`${v.from + i}/${den}`);
       expect(v.mark).toBe(v.from + i);
-      for (const l of [...v.labels!, ...c.options]) expect(l, c.prompt).toMatch(/^(\d+|\d+\/\d+|\?)$/);
+      for (const l of v.labels!) expect(l, c.prompt).toMatch(/^(\d+|\?|)$/);
+      for (const l of c.options) expect(l, c.prompt).toMatch(/^\d+\/\d+$/);
       if (d === 1) { expect(v.from).toBe(0); expect(v.to).toBe(den); expect(i).toBeGreaterThan(0); expect(i).toBeLessThan(den); }
+    }
+  });
+
+  it('every difficulty prints only the whole numbers, so no fraction is read off the line (#2274)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d)) {
+      const v = nl(c);
+      for (const l of v.labels!) expect(l, c.prompt).not.toMatch(/\//);
+      expect(v.labels!.filter(l => l !== '' && l !== '?').length, c.prompt).toBeGreaterThanOrEqual(d === 3 ? 1 : 2);
     }
   });
 
