@@ -23,9 +23,12 @@ describe('y5-able (#1220)', () => {
   });
 
   it('every bank row: the answer completes the NC word and each decoy completes a non-word', () => {
-    for (const [stem, answer, decoys, sentence] of ALL) {
+    for (const row of ALL) {
+      const [stem, answer, decoys, sentence] = row;
       expect(sentence.split(`${stem}___`).length - 1, sentence).toBe(1);
-      expect(decoys.length, stem).toBeGreaterThanOrEqual(2);
+      expect(decoys.length, stem).toBeGreaterThanOrEqual(1);
+      // #2277: a made-up -eable/-eably/-eibly decoy is a spelling no child writes — only the -ce/-ge rows carry one.
+      if (!KEEP_E_BANK.includes(row)) expect(decoys.join(), stem).not.toMatch(/^e|,e/);
       for (const dc of decoys) {
         const w = stem + dc;
         expect(dc, w).not.toBe(answer);
@@ -52,10 +55,10 @@ describe('y5-able (#1220)', () => {
   });
 
   it('ladder: d1 able/ible, d2 ably/ibly, d3 everything with 3 bubbles; every card has a sentence and a say', () => {
-    for (const q of draws(1)) { expect(q.options).toHaveLength(2); expect(q.options.every(o => /^(able|ible|eable)$/.test(o))).toBe(true); expect(q.answer).toMatch(/^(able|ible)$/); }
-    for (const q of draws(2)) { expect(q.options).toHaveLength(2); expect(q.options.every(o => /^(ably|ibly|eably|eibly)$/.test(o))).toBe(true); }
+    for (const q of draws(1)) { expect(q.options).toHaveLength(2); expect(q.options.every(o => /^(able|ible)$/.test(o))).toBe(true); expect(q.answer).toMatch(/^(able|ible)$/); }
+    for (const q of draws(2)) { expect(q.options).toHaveLength(2); expect(q.options.every(o => /^(ably|ibly)$/.test(o))).toBe(true); }
     const d3 = draws(3);
-    for (const q of d3) expect(q.options).toHaveLength(3);
+    for (const q of d3) expect(q.options).toHaveLength(q.answer === 'eable' || q.options.includes('eable') ? 3 : 2);
     expect(d3.some(q => q.answer === 'eable')).toBe(true);
     expect(d3.some(q => q.answer === 'ibly')).toBe(true);
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d, 60)) {
@@ -69,6 +72,6 @@ describe('y5-able (#1220)', () => {
   it('the option inventory is pinned', () => {
     const seen = new Set<string>();
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d)) seen.add([...q.options].sort().join('|'));
-    expect([...seen].sort()).toEqual(['able|eable', 'able|eable|ible', 'able|ible', 'ably|eably', 'ably|eably|ibly', 'ably|eibly|ibly', 'ably|ibly', 'eable|ible', 'eibly|ibly'].sort());
+    expect([...seen].sort()).toEqual(['able|eable|ible', 'able|ible', 'ably|ibly'].sort());
   });
 });

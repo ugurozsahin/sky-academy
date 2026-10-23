@@ -14,7 +14,7 @@ export const BANK: [Op[], string, string][] = [
   [['+', '+'], 'A school had #, then got # and #.', 'Stickers?'],
   [['-', '+'], 'A shop had #. # sold, # added.', 'Tins now?'],
   [['-', '-'], 'A lorry held #. # then # left.', 'Boxes left?'],
-  [['+', '+'], 'A choir sold #, then # and #.', 'Tickets?'],
+  [['+', '+'], 'A choir sold #, then # and #.', 'Tickets in all?'],
   [['+', '-'], 'A park had #. # came, # left.', 'People now?'],
   [['-', '+'], 'A bakery made #. # sold, # baked.', 'Buns now?'],
   [['+', '-'], 'A club has #. # join, # leave.', 'Members now?'],
