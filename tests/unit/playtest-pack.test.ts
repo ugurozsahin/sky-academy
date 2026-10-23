@@ -5,9 +5,11 @@ import { CATALOGUE } from './helpers/catalogue-file';
 import { RUNTIME, resolveGame } from '../../src/config/resolve';
 import { MAX_RELAUNCHES, RELAUNCH_DELAY } from '../../src/game/bubbles';
 import { createSim } from './sim/harness';
+import { promptHTML } from '../../src/ui/hud';
+import { TOPICS, type Difficulty } from '../../src/curriculum';
 import {
   ABOUT, FRAME_CLAMP_MS, KEYPAD_PACKS, buildMetrics, cardShare, countWords, flightMetrics, frameStats, labelReach, newReach,
-  parseArgs, plannedPacks, promptKeys, promptStep, reachStep, speechMode, type PromptRow, type ReachBubble, type ReachRecording,
+  parseArgs, plannedPacks, promptKeys, promptStep, reachStep, speechMode, type PromptQuestion, type PromptRow, type ReachBubble, type ReachRecording,
   type Recorded, type Sample,
 } from '../../scripts/playtest-metrics.mjs';
 
@@ -288,36 +290,38 @@ describe('the reach recorder on the real Arena (#2251)', () => {
 });
 
 describe('whether the question line is fixed over the stage, on a stub session (#2250)', () => {
-  /** What the page's tick sees, frame by frame: `questionsAsked` and `state()`'s stage and prompt. */
-  const record = (frames: [asked: number, stage: number, prompt: string | undefined, listen?: string][], step = promptStep) => {
+  /** What the page's tick sees, frame by frame: `questionsAsked`, `state()`'s stage and prompt, and the question's own fields. */
+  const record = (frames: [asked: number, stage: number, prompt: string | undefined, listen?: string, q?: PromptQuestion][], step = promptStep) => {
     const rows: PromptRow[] = [];
-    for (const [asked, stage, prompt, listen] of frames) step(rows, asked, { stage, prompt }, listen);
+    for (const [asked, stage, prompt, listen, q] of frames) step(rows, asked, { stage, prompt }, { listen, ...q });
     return rows;
   };
   const order = 'Smallest to biggest!';
 
   it('keeps one row per question, not per frame, and skips the frames with no line', () => {
     const rows = record([[0, 1, undefined], [1, 1, order], [1, 1, order], [1, 1, order], [2, 1, order], [2, 1, order], [2, 1, undefined], [3, 1, order]]);
-    expect(rows).toEqual([[1, 1, order, false], [2, 1, order, false], [3, 1, order, false]]);
+    expect(rows).toEqual([[1, 1, order, false, true], [2, 1, order, false, true], [3, 1, order, false, true]]);
   });
 
   it('runs as the page runs it: from its own source text, with no module scope to lean on', () => {
-    const frames: [number, number, string | undefined, string?][] = [[1, 1, order], [1, 1, order], [2, 1, order, 'six'], [3, 1, undefined]];
+    const frames: [number, number, string | undefined, string?, PromptQuestion?][] = [[1, 1, order], [1, 1, order], [2, 1, order, 'six'], [3, 1, 'Next', undefined, { sequence: ['a'] }], [4, 1, undefined]];
     const fromSource = new Function(`return ${promptStep}`)() as typeof promptStep;
     expect(record(frames, fromSource)).toEqual(record(frames));
   });
 
-  it('a sequence game whose line is the same every question is fixed, though the screen hides it once slicing starts', () => {
-    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 1, order], [4, 1, order]]))).toEqual({ promptFixed: true, promptWaves: 4 });
+  it('a sequence game whose line is the same every question is fixed, read from the game\'s state though its card never shows it', () => {
+    const seq = { sequence: ['1', '5', '6'] };
+    expect(promptKeys(record([[1, 1, order, undefined, seq], [2, 1, order, undefined, seq], [3, 1, order, undefined, seq], [4, 1, order, undefined, seq]])))
+      .toEqual({ promptFixed: true, promptWaves: 4, promptShown: false });
   });
 
   it('a line that differs on any question of the stage is not fixed', () => {
-    expect(promptKeys(record([[1, 1, '6 + 1 = ?'], [2, 1, '8 + 0 = ?'], [3, 1, '2 + 5 = ?']]))).toEqual({ promptFixed: false, promptWaves: 3 });
+    expect(promptKeys(record([[1, 1, '6 + 1 = ?'], [2, 1, '8 + 0 = ?'], [3, 1, '2 + 5 = ?']]))).toEqual({ promptFixed: false, promptWaves: 3, promptShown: true });
     expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 1, 'Biggest to smallest!']])).promptFixed, 'even only the last').toBe(false);
   });
 
   it('a line that changes within one question is not fixed either', () => {
-    expect(promptKeys(record([[1, 1, order], [1, 1, 'Now the next one'], [2, 1, order]]))).toEqual({ promptFixed: false, promptWaves: 2 });
+    expect(promptKeys(record([[1, 1, order], [1, 1, 'Now the next one'], [2, 1, order]]))).toEqual({ promptFixed: false, promptWaves: 2, promptShown: true });
   });
 
   it('a fixed line is not vouched for when the voice never started and a question had a listen line, which a voiceless card shows', () => {
@@ -328,7 +332,7 @@ describe('whether the question line is fixed over the stage, on a stub session (
   });
 
   it('compares the stage the pack played only, not a stage the result moved on to', () => {
-    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 2, 'Biggest to smallest!']]))).toEqual({ promptFixed: true, promptWaves: 2 });
+    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 2, 'Biggest to smallest!']]))).toEqual({ promptFixed: true, promptWaves: 2, promptShown: true });
   });
 
   it('fails a pack that read fewer than two questions, rather than write a value nobody compared', () => {
@@ -352,9 +356,79 @@ describe('whether the question line is fixed over the stage, on a stub session (
   it('the page runs the very recorder tested here, each frame, and hands its rows over after the stage result', () => {
     const pack = read('scripts/playtest-pack.mjs');
     expect(pack).toContain('window.__promptStep = ${promptStep};');
-    expect(pack).toContain('window.__promptStep(pk.lines, s.session.questionsAsked, st, s.session.current?.listen);');
+    expect(pack, 'the whole question, so the recorder sees its listen line and whether its card shows the line (#2265)').toContain('window.__promptStep(pk.lines, s.session.questionsAsked, st, s.session.current);');
     expect(pack, 'the rows start empty').toContain('prompts: [], lines: [],');
     expect(pack.indexOf('played.lines = await page.evaluate(() => window.__pk.lines);'), 'read once play() has reached the result').toBeGreaterThan(pack.indexOf('const played = await play('));
+  });
+});
+
+/**
+ * #2265: a plain sequence card (a `sequence` with no `build` and no `anyOrder`) draws only the slots, so its
+ * question line is heard, never read. The pack records that per question, and the skill leaves an unshown line
+ * out of the need.
+ */
+describe('whether the card shows the question line at all (#2265)', () => {
+  const step = (rows: PromptRow[], asked: number, prompt: string, q: PromptQuestion, stage = 1) => promptStep(rows, asked, { stage, prompt }, q);
+  const keys = (qs: PromptQuestion[], stage2?: PromptQuestion) => {
+    const rows: PromptRow[] = [];
+    qs.forEach((q, i) => step(rows, i + 1, `Line ${i}`, q));
+    if (stage2) step(rows, qs.length + 1, 'Stage two', stage2, 2);
+    return promptKeys(rows);
+  };
+  const seq = { sequence: ['c', 'a', 't'] };
+
+  it('a plain sequence question is not shown; a build, an any-order or a plain question is', () => {
+    const rows: PromptRow[] = [];
+    step(rows, 1, 'Slice the next three letters after b', seq);
+    step(rows, 2, '3 + 4 = ?', { sequence: ['7'], build: { template: '_' } });
+    step(rows, 3, 'Slice every even number', { sequence: ['2', '4'], anyOrder: true });
+    step(rows, 4, '6 + 1 = ?', {});
+    step(rows, 5, 'Find the word you hear', { listen: 'cat' });
+    expect(rows.map(r => r[4])).toEqual([false, true, true, true, true]);
+  });
+
+  it('is false only when no question of the played stage showed it, whatever promptFixed says', () => {
+    expect(keys([seq, seq, seq])).toMatchObject({ promptShown: false, promptFixed: false });
+    expect(keys([seq, {}, seq]).promptShown, 'one question that shows it puts the line in the need').toBe(true);
+    expect(keys([seq, seq], {}).promptShown, 'a later stage the result moved on to is not counted').toBe(false);
+  });
+
+  it('is written into every pack, with its definition', () => {
+    const screen = { H, card: null, speakVisible: false, prompt: 'x', answer: 'c', hasLives: true, hint: null, slow: false, wide: false, sequence: false, anyOrder: false, visual: null, lives: 3, mode: 'mission' };
+    const lines: PromptRow[] = [];
+    step(lines, 1, 'Spell it', seq); step(lines, 2, 'Spell it', seq);
+    const rec: Recorded = { screen, samples: null, frames: [], labels: [], promptAt: null, speech: null, extra: {}, lines };
+    const m = buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec, shots: [], maxRelaunches: MAX_RELAUNCHES });
+    expect([m.promptShown, m.promptFixed]).toEqual([false, true]);
+    expect(ABOUT.promptShown).toMatch(/plain sequence/);
+    expect(ABOUT.promptFixed, 'the old wording is gone').not.toMatch(/once slicing starts/);
+  });
+
+  // Driven by the real generators and the real card renderer: the recorder's rule must say what promptHTML draws,
+  // for every bubble topic and difficulty, so a card that starts or stops showing its line fails here.
+  it('agrees with promptHTML on every bubble topic\'s questions: the line\'s words are on the card exactly when it says shown', () => {
+    const decode = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+    const words = (p: string) => p.match(/\p{L}[\p{L}'’-]*/gu) ?? [];
+    let a = 2265;
+    const rng = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const seen = { shown: 0, unshown: 0 }, wrong: string[] = [];
+    for (const t of TOPICS.filter(x => (x.input ?? 'bubbles') === 'bubbles')) {
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (let i = 0; i < 12; i++) {
+          const q = t.gen(d, rng), ws = words(q.prompt);
+          if (!ws.length) continue;                    // no words: nothing to read either way
+          const rows: PromptRow[] = [];
+          promptStep(rows, 1, { stage: 1, prompt: q.prompt }, q);
+          const card = decode(promptHTML(q, 0));
+          const onCard = ws.every(w => card.includes(w));
+          seen[rows[0][4] ? 'shown' : 'unshown']++;
+          if (onCard !== rows[0][4]) wrong.push(`${t.id} d${d}: "${q.prompt}" recorded ${rows[0][4] ? 'shown' : 'unshown'}, card "${card.trim()}"`);
+        }
+      }
+    }
+    expect(wrong.slice(0, 5)).toEqual([]);
+    expect(seen.unshown, 'the sweep reached plain sequence cards').toBeGreaterThan(100);
+    expect(seen.shown, 'and cards that show their line').toBeGreaterThan(1000);
   });
 });
 
@@ -389,7 +463,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   };
   const rec: Recorded = {
     screen, samples: fly([{ id: 1, label: '7', launch: 100, vy: -600, g: 250 }, { id: 2, label: '8', launch: 500, vy: -600, g: 250 }], 9000),
-    frames: [0, 16, 33], labels: ['7', '8'], promptAt: 50, extra: {}, lines: [[1, 1, '6 + 1 = ?', false], [2, 1, '8 + 0 = ?', false]],
+    frames: [0, 16, 33], labels: ['7', '8'], promptAt: 50, extra: {}, lines: [[1, 1, '6 + 1 = ?', false, true], [2, 1, '8 + 0 = ?', false, true]],
     speech: { text: 'Adding! 6 plus 1 equals what', at: 60, start: 80, end: 2880, error: null },
   };
   const settings: Record<string, unknown> = { ...resolveGame('y1-add', 'year1').settings };   // what scripts/playtest-pack.mjs passes, so a key the skill cites (#2245: airTime) is the real one
@@ -426,7 +500,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
   it('holds the keys the skill lists in prose, #2214 asks for and the #2205 comment names', () => {
     for (const k of ['settings.lives', 'settings.gentle', 'settings.speeds', 'settings.diffs', 'input', 'prompt', 'promptWords', 'speechOffered',
       'answersPerWave', 'bubbleRadiusPx', 'launchToApexMs', 'aboveCardMs.min', 'slowestBubble', 'fastestBubble', 'cardShareOfScreen', 'slow', 'wide',
-      'speech', 'speechAutoplays', 'speechMs', 'promptFixed', 'promptWaves']) expect(at(k), k).not.toBeUndefined();
+      'speech', 'speechAutoplays', 'speechMs', 'promptFixed', 'promptWaves', 'promptShown']) expect(at(k), k).not.toBeUndefined();
     expect(m.speech).toBe('auto');
     expect(m.speechMs).toBe(2800);
     expect(m.promptWords).toBe(0);
