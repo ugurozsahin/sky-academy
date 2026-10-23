@@ -73,6 +73,13 @@ describe('y3-money (#1099)', () => {
     }
   });
 
+  it('at most one wrong option keeps the answer\'s pence, so the pence are never skippable (#2277)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d, 2277_100, 1000)) {
+      const keep = c.options.filter(o => o !== c.answer && pence(o) % 100 === pence(c.answer) % 100);
+      expect(keep.length, `${c.prompt} → ${c.options.join(' / ')}`).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('ladder shape: d1 shows 2–4 coins, d2 uses both operations, d3 uses both notes with prices over £1 and is slow', () => {
     for (const c of draws(1, 1099_800)) {
       const v = c.visual as { type: string; coins: number[] };

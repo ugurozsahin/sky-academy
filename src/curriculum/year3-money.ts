@@ -16,12 +16,14 @@ function decoys(answer: number, wrongOp: number | null): number[] {
   const fill = [5, -5, 20, -20, 1, -1, 15, -15, 30, -30].map(x => answer + x);
   const pool = [...new Set([...slips, ...fill].filter(ok))];
   const out: number[] = [];
+  // At most one decoy keeps the answer's pence (#2277): with 1p + 20p + £2 on the table, £1, £2 and £3 and 21p would test only the pound coin.
+  const room = (v: number) => v % 100 !== answer % 100 || !out.some(o => o % 100 === answer % 100);
   // The same last digit and the same leading digit as the answer must each appear among the decoys.
   for (const test of [(v: number) => last(v) === last(answer), (v: number) => lead(v) === lead(answer)]) {
-    const hit = out.some(test) ? undefined : pool.find(v => test(v) && !out.includes(v));
+    const hit = out.some(test) ? undefined : pool.find(v => test(v) && !out.includes(v) && room(v));
     if (hit !== undefined) out.push(hit);
   }
-  for (const v of pool) if (out.length < 3 && !out.includes(v)) out.push(v);
+  for (const v of pool) if (out.length < 3 && !out.includes(v) && room(v)) out.push(v);
   return out;
 }
 
