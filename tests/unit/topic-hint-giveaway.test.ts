@@ -43,7 +43,7 @@ describe('hints do not name the answer (#2274)', () => {
       for (let s = 0; s < 200; s++) {
         const q = topic.gen(d, rng(s)), hint = q.hint;
         // Only the division cards: the decimal cards' "divide the top by the bottom" teaches the method, not the answer.
-        if (!hint || !/÷|Which division/.test(q.prompt)) continue;
+        if (!hint || !/as a fraction|Which division/.test(q.prompt)) continue;
         hints++;
         expect(hint).not.toMatch(/\b(top|bottom|numerator|denominator)\b/i);
       }
