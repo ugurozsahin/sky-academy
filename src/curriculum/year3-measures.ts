@@ -25,15 +25,16 @@ function card(rng: Rng, unit: string, answer: number, cands: number[], prompt: s
   return { prompt, answer: `${n(answer)} ${unit}`, options: shuffle(rng, [`${n(answer)} ${unit}`, ...wrong]), say, hint: 'Slice the right measurement', hintIsData: false, ...extra };
 }
 
+// `icon` puts the thing being measured on the card: the number line alone draws no pencil, flour or jug (#2271).
 const SCALES = [
-  { unit: 'mm', top: 50, prompt: 'How long is the pencil?' },
-  { unit: 'g', top: 500, prompt: 'How heavy is the flour?' },
-  { unit: 'ml', top: 500, prompt: 'How much juice is in the jug?' },
+  { unit: 'mm', top: 50, prompt: 'How long is the pencil?', icon: '📏' },
+  { unit: 'g', top: 500, prompt: 'How heavy is the flour?', icon: '🌾' },
+  { unit: 'ml', top: 500, prompt: 'How much juice is in the jug?', icon: '🥛' },
 ];
 
 function readScale(rng: Rng): Question {
-  const { unit, top, prompt } = pick(rng, SCALES), step = top / 5, mark = step * ri(rng, 1, 4), half = step / 2;
-  return card(rng, unit, mark, [mark - step, mark + step, mark - half, mark + half], prompt, `${prompt} The scale goes from 0 to ${top} ${WORD[unit]}.`,
+  const { unit, top, prompt, icon } = pick(rng, SCALES), step = top / 5, mark = step * ri(rng, 1, 4), half = step / 2;
+  return card(rng, unit, mark, [mark - step, mark + step, mark - half, mark + half], `${icon} ${prompt}`, `${prompt} The scale goes from 0 to ${top} ${WORD[unit]}.`,
     { visual: { type: 'numberline', from: 0, to: top, step, mark, ends: true }, hint: 'Slice the number at the ?' });
 }
 

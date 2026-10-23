@@ -22,12 +22,12 @@ describe('y6-areaperim (#1243)', () => {
     }
   });
 
-  it('d1: exactly one option has the shown rectangle\'s area, and the same-perimeter decoy is on every card', () => {
-    for (const q of draw(1)) {
-      const shown = rect(/^Same area as (.+)\?$/.exec(q.prompt)![1]);
-      expect(q.options.filter(o => areaOf(rect(o)) === areaOf(shown)), q.prompt).toEqual([q.answer]);
-      expect(q.options.some(o => o !== q.answer && perimOf(rect(o)) === perimOf(shown)), q.prompt).toBe(true);
-      expect(perimOf(rect(q.answer)), q.prompt).not.toBe(perimOf(shown));
+  it('d1 (#2276): every card asks a perimeter; exactly one option has the longest, and all share the stated area', () => {
+    for (const q of draw(1, 200)) {
+      const m = /^All have area (\d+) cm²\. Longest perimeter\?$/.exec(q.prompt)!;
+      for (const o of q.options) expect(areaOf(rect(o)), q.prompt).toBe(Number(m[1]));
+      const top = Math.max(...q.options.map(o => perimOf(rect(o))));
+      expect(q.options.filter(o => perimOf(rect(o)) === top), q.prompt).toEqual([q.answer]);
     }
   });
 

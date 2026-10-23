@@ -94,3 +94,15 @@ describe('y3-measures (#1097)', () => {
     });
   }
 });
+
+describe('the measured thing is on the card (#2271)', () => {
+  const ICON: Record<string, string> = { mm: '📏', g: '🌾', ml: '🥛' };
+  it('each scale prompt leads with its instrument\'s icon and its spoken line is the same words without it', () => {
+    for (const q of draws(1)) {
+      const icon = ICON[q.answer.split(' ')[1]];
+      expect(q.prompt.startsWith(`${icon} `), q.prompt).toBe(true);
+      expect(q.say).toContain(q.prompt.slice(icon.length + 1));
+      expect(q.say).not.toContain(icon);
+    }
+  });
+});
