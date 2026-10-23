@@ -10,6 +10,8 @@ const NAME: Record<number, string> = { 2: 'halves', 3: 'thirds', 4: 'quarters', 
 const lab = (n: number, d: number) => `${n}/${d}`;
 /** A tick's written label: whole numbers are written 1 and 2, every other tick as a fraction. */
 const tick = (k: number, d: number) => (k === 0 ? '0' : k === d ? '1' : k === 2 * d ? '2' : lab(k, d));
+/** Only the whole numbers are written: the child counts the gaps to place a fraction, rather than continuing a printed pattern (#2274). */
+const anchor = (k: number, d: number) => (k % d === 0 ? tick(k, d) : '');
 
 /** Three decoys, none worth the answer or each other: the neighbouring ticks, ticks counted instead of gaps, top and bottom swapped. */
 function decoys(t: number, d: number, rng: Rng): string[] {
@@ -26,7 +28,7 @@ function read(d: Difficulty, rng: Rng): Question {
   if (d === 1) t = ri(rng, 1, den - 1);
   else { s = ri(rng, Math.max(1, den - 4), Math.min(den - 1, 2 * den - 5)); do t = ri(rng, s, s + 5); while (t === den || t === 2 * den); }
   const to = d === 1 ? den : s + 5, labels: string[] = [];
-  for (let k = s; k <= to; k++) labels.push(k === t ? '?' : tick(k, den));
+  for (let k = s; k <= to; k++) labels.push(k === t ? '?' : anchor(k, den));
   const where = d === 1 ? `from zero to one in ${NAME[den]}` : `in ${NAME[den]}, past one`;
   const answer = lab(t, den), ds = decoys(t, den, rng);
   return {
@@ -45,7 +47,7 @@ function lettered(rng: Rng): Question {
   const answer = letters[spots.indexOf(k)], f = ks2Say(lab(k, den));
   return {
     prompt: `Which letter is at ${lab(k, den)}?`, say: `The line goes from zero to one in ${NAME[den]}. Which letter is at ${f}?`, answer,
-    options: letters, visual: { type: 'numberline', from: 0, to: den, step: 1, labels: Array.from({ length: den + 1 }, (_, i) => tick(i, den)), marks },
+    options: letters, visual: { type: 'numberline', from: 0, to: den, step: 1, labels: Array.from({ length: den + 1 }, (_, i) => anchor(i, den)), marks },
     hint: 'Slice the letter', hintIsData: false,
   };
 }
