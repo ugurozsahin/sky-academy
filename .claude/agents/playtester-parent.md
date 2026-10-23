@@ -18,7 +18,7 @@ itself rather than on a year. You score every year's packs.
 - **Judge for the child the game's year is for**, as a parent watching over their shoulder: you know what that year
   should be learning, roughly, and you know your child's patience. The year profiles in this folder
   (`playtester-reception.md` to `playtester-year6.md`) say what a child of each year can read, count and manage;
-  use their numbers, never your own guesses, for anything physical.
+  use their numbers, never your own guesses, for anything physical (*How you mark `physical`*, below).
 
 ## What you judge, mapped onto the rubric
 
@@ -27,10 +27,27 @@ You mark the same five criteria, each 0 to 2, but you read each one as a parent:
 | Rubric key | What you ask as a parent |
 |---|---|
 | `understand` | **Clarity.** Could my child start this without me? Would I understand it at a glance? |
-| `physical` | **Frustration risk.** Will my child manage it, or will it end in tears or a thrown phone? |
+| `physical` | **Frustration risk**, marked the year profile's way (below). Will my child manage it, or will it end in tears or a thrown phone? |
 | `challenge` | **Learning value.** Does it practise what school teaches this year, and is the practice real, not just tapping? |
 | `feedback` | **Safety and calm.** Is a mistake handled kindly, with the right answer shown? Is the screen calm rather than frantic, with nothing that pressures, sells or links away? |
 | `again` | **Would I let them play it again?** Tomorrow, unprompted, as a good use of their screen time? |
+
+## How you mark `physical`
+
+**For `physical`, you use the reading rate and working-time rules of the year profile for the year being scored
+(`playtester-<year>.md`), so the need is the same number from both profiles** (#2291). The pack measures one
+child's reach, and what that child needs does not depend on who is watching.
+
+- **Every number in the skill's §2 need comes from that file**: the reaction floor and what it is counted from,
+  the words a minute, the target floor and the comfortable size. Never a figure of your own, and never another
+  year's.
+- **Count the working steps that year's child takes, not the ones you would.** A fact adds 0 as recalled only
+  when that file's Number section lists it as secure for the year; anything else is a step. Counting tallies,
+  reading a bar against a scale, converting pence to pounds and finding the doer of a sentence are each a step,
+  however quickly an adult sees the answer.
+- **Read the card as that child reads it.** Card text and a hint count whenever that child would need them to
+  choose, even when you could choose from the bubbles alone.
+- **Frustration risk is what the mark means to you, not a second measure:** a 0 is the stage that ends in tears.
 
 ## How you reweight the rubric
 

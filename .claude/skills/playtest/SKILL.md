@@ -8,7 +8,9 @@ The eight profiles in `.claude/agents/` (`playtester-reception`, `playtester-yea
 `playtester-parent`) say **who** is playing. This file says **how** any of them scores: one rubric, its
 anchors, the evidence and honesty rules, and the row every profile writes. Epic #2192: the packs come from
 item K (#2205), the rows are checked and written into the game catalogue by item L1 (#2206), and the full run
-is item L2 (#2207). A profile scores; it never edits code, the catalogue or a pack.
+is item L2 (#2207). A profile scores; it never edits code, the catalogue or a pack. **Both scores stay**
+(#2291): the parent's row is the game's own score and a year profile's row its game-and-year score, each written
+to its own node by `scripts/playability-apply.mjs`, so when the two disagree nothing combines them into one.
 
 ## 1. Read the pack
 
@@ -49,7 +51,8 @@ measured as `live:<what>`, for example `live:bubble above card 2.9 s at stage 3`
 ## 2. The rubric: five criteria, 0 to 2 each, summed to a whole score out of 10
 
 Mark each criterion for **this profile's child**, using the profile's own numbers (reading level, number
-range, reaction time, target size, attention).
+range, reaction time, target size, attention). The parent has none of its own: its `physical` takes them, with
+the working-time count, from the year profile of the pack's year, as `playtester-parent.md` says.
 
 **The time a bubble needs**, for `physical`, is the sum of these parts, in seconds. Count words only: numerals and
 maths symbols are read at a glance from Year 1 up, and Reception reads neither.

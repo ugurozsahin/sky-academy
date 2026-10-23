@@ -54,15 +54,28 @@ export function uniqueWords(text: string, whole: string): string[] {
   return [...new Set(wordsOf(text))].filter(w => w.length >= 3 && w.length <= 9 && all.filter(x => x === w.toLowerCase()).length === 1);
 }
 
-const MARK_BUBBLES = { 1: ['(', ')', '.'], 2: ['(', ')', ',', DASH] } as const;
+/** Both marks replaced by `_`, spaced the same for every kind, so neither a half to mirror nor the spacing gives the pair away (#2274). */
+export const bothGapped = ([before, inside, rest]: Row): string => `${before} _ ${inside} _${rest}`;
+/** A pair as one bubble label, e.g. `( )`; the decoys are pairs that never fence off a parenthesis. */
+export const pairLabel = (kind: Kind): string => MARKS[kind].join(' ');
+export const PAIR_DECOYS: readonly string[] = ['. .', '? ?', '! !', ': :'];
 
-function missingCard(d: 1 | 2, rng: Rng): Question {
+function pairCard(rng: Rng): Question {
+  const row = pick(rng, BANK), kind = pick(rng, KINDS);
+  const decoys = shuffle(rng, [...PAIR_DECOYS]).slice(0, 2);
+  return wordQ(rng, 'Which pair of marks is missing?', pairLabel(kind), decoys, {
+    visual: { type: 'sentence', text: bothGapped(row) },
+    say: `${spoken(row)} Which pair of punctuation marks is missing?`, hint: 'The pair fences off the extra words.', hintIsData: false,
+  });
+}
+
+function missingCard(rng: Rng): Question {
   const row = pick(rng, BANK);
-  const kind: Kind = d === 1 ? 'bracket' : pick(rng, KINDS);
+  const kind: Kind = 'bracket';
   const side = rng() < 0.5 ? 'open' : 'close';
   const [open, close] = MARKS[kind];
   const answer = side === 'open' ? open : close; // the mark the child slices is the one the `_` replaced
-  return wordQ(rng, 'Which mark is missing?', answer, [...MARK_BUBBLES[d]], {
+  return wordQ(rng, 'Which mark is missing?', answer, ['(', ')', '.'], {
     visual: { type: 'sentence', text: gapped(row, kind, side) },
     say: `${spoken(row)} Which punctuation mark is missing?`, hint: 'Marks come in pairs.', hintIsData: false,
   });
@@ -79,4 +92,4 @@ function insideCard(rng: Rng): Question {
   });
 }
 
-export const y5Parenthesis: Generator = (d: Difficulty, rng: Rng): Question => (d === 3 ? insideCard(rng) : missingCard(d, rng));
+export const y5Parenthesis: Generator = (d: Difficulty, rng: Rng): Question => (d === 3 ? insideCard(rng) : d === 2 ? pairCard(rng) : missingCard(rng));
