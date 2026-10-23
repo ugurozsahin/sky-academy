@@ -41,7 +41,8 @@ export const outcomeHintHTML = (kind: Outcome, answer: string): string =>
     ? `<b class="ok">✓ ${esc(answer)}</b> — that's right!`
     : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is <b class="ok">${esc(answer)}</b>`;
 
-export interface HudEls { lives: HTMLElement; qcard: HTMLElement; prompt: HTMLElement; hint: HTMLElement }
+/** `outcome` (#2286) is the line under `hint` that carries the verdict when the hint is the card's own values; optional so a card without it keeps the old one-line behaviour. */
+export interface HudEls { lives: HTMLElement; qcard: HTMLElement; prompt: HTMLElement; hint: HTMLElement; outcome?: HTMLElement }
 
 /**
  * Write the line under the prompt (#36; moved here from play-session.ts with #893's second caller, since
@@ -58,9 +59,10 @@ export interface HudEls { lives: HTMLElement; qcard: HTMLElement; prompt: HTMLEl
  * have given a 16px line back to every one of those cards in landscape and pushed the arena down with it
  * (`arena.topInset`, `play-session.ts`) — the space the media query exists to reclaim (PR #430 review, round 1).
  */
-export function setHint(els: Pick<HudEls, 'hint'>, text: string, own = false) {
+export function setHint(els: Pick<HudEls, 'hint' | 'outcome'>, text: string, own = false) {
   els.hint.textContent = text;
   els.hint.classList.toggle('own', own);
+  if (els.outcome) els.outcome.innerHTML = '';
 }
 
 /**
@@ -211,6 +213,9 @@ export function createHud(els: HudEls, lives: number, audible: () => boolean) {
       // through `.qcard.good .hint`, so nothing renders differently — but without this the element claims to
       // be the question's own values while showing "✓ red — that's right!", and anything that later keys off
       // `.own` (a colour, a size) would silently reach the outcome text of every measure card.
+      // #2286: a hint the card is answered from (`own`) is kept, and the verdict goes on its own line below it,
+      // so a wrong slice does not hide the values the child needed to see why.
+      if (els.outcome && els.hint.classList.contains('own')) { els.outcome.innerHTML = outcomeHintHTML(kind, q.answer); return; }
       els.hint.classList.remove('own');
       els.hint.innerHTML = outcomeHintHTML(kind, q.answer);
     },

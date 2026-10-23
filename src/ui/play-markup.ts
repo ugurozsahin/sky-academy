@@ -25,6 +25,7 @@ export function playMarkup(m: MarkupOpts): string {
         <div class="prompt" id="prompt"></div>
         <div class="vis-wrap" id="vis"></div>
         <div class="hint" id="hint"></div>
+        <div class="hint outcome" id="outcome" aria-live="polite"></div>
       </div>
       ${bubbles ? '' : inputMarkup(m.input)}
       <div class="toast" id="toast" aria-live="polite"></div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORRECTION_LINE_MAX, correctionLine, createHud, heartCount, hintText, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import { CORRECTION_LINE_MAX, correctionLine, createHud, heartCount, hintText, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptHTML, promptMode, setHint, stageHTML } from '../../src/ui/hud';
 import { traceFeedback, type TraceResult } from '../../src/game/tracing';
 import { MODES, type Mode } from '../../src/game/modes';
 import { TOPICS, type Difficulty, type Question } from '../../src/curriculum';
@@ -396,5 +396,43 @@ describe('hearts follow ModeSpec.hasLives (#1117)', () => {
   });
   it('mission, Sky Storm and Boss draw year.lives hearts as before', () => {
     for (const m of ['mission', 'endless', 'boss'] as const) expect(draw(m, 3), m).toBe(livesHTML(3, 3));
+  });
+});
+
+// #2286: a wrong slice used to overwrite the hint, and for a data hint that hint is the only place the values
+// being compared appear. The verdict now has its own line under it.
+describe('a data hint survives the verdict (#2286)', () => {
+  const el = () => {
+    const classes = new Set<string>();
+    return {
+      innerHTML: '', textContent: '', classes,
+      classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c), contains: (c: string) => classes.has(c), toggle: (c: string, on: boolean) => (on ? classes.add(c) : classes.delete(c)) },
+    } as unknown as HTMLElement & { classes: Set<string> };
+  };
+  const measure: Question = {
+    prompt: 'Which holds more?', answer: 'red', options: ['red', 'blue'],
+    hint: 'red jug: 300 ml · blue jug: 100 ml', hintIsData: true,
+  };
+  for (const kind of ['correct', 'wrong', 'miss'] as const) {
+    it(`${kind}: the values stay and the verdict goes on the outcome line`, () => {
+      const els = { lives: el(), qcard: el(), prompt: el(), hint: el(), outcome: el() };
+      const hud = createHud(els, 3, () => true);
+      setHint(els, measure.hint!, true);
+      hud.showOutcome(kind, measure);
+      expect(els.hint.textContent).toBe('red jug: 300 ml · blue jug: 100 ml');
+      expect(els.hint.classes.has('own')).toBe(true);
+      expect(els.outcome.innerHTML).toBe(outcomeHintHTML(kind, 'red'));
+      setHint(els, 'next', false);
+      expect(els.outcome.innerHTML, 'the next question starts with no verdict line').toBe('');
+    });
+  }
+
+  it('an instruction hint still gives way to the verdict, as before', () => {
+    const els = { lives: el(), qcard: el(), prompt: el(), hint: el(), outcome: el() };
+    const hud = createHud(els, 3, () => true);
+    setHint(els, 'Slice the ending', false);
+    hud.showOutcome('wrong', { prompt: 'x', answer: 's', options: ['s', 'es'] });
+    expect(els.hint.innerHTML).toBe(outcomeHintHTML('wrong', 's'));
+    expect(els.outcome.innerHTML).toBe('');
   });
 });

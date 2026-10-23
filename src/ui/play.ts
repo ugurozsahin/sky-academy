@@ -31,7 +31,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   render(playMarkup({ input, glow: av.glow, title, sprint, villainMode, boss, showTutorial: !d.tutorialSeen }), 'bg-play');
 
   const els = {
-    lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'),
+    lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'), outcome: $('#outcome'),
     overlay: $('#overlay'), qcard: $('#qcard'), speak: $('#speak'),
   };
   let arena: Arena | null = null; let paused = false; const pad = mountPad(input, () => session, scaled);   // #884: mirrors the Pause overlay; #1119: the number pad

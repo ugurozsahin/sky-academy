@@ -739,6 +739,25 @@ test.describe('Sharpwise', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
+  // #2286: the verdict used to overwrite the hint, and in a measure game the hint is the only place the values being
+  // compared appear. Both lines are on the card after a wrong slice: the values, then the verdict below them.
+  test('a wrong slice in a measure game keeps the values on the card beside the verdict (#2286)', async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-length');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    const seen = await page.evaluate(() => {
+      const hint = document.querySelector('#hint') as HTMLElement, before = hint.textContent ?? '';
+      window.__sna.wrong();
+      const out = document.querySelector('#outcome') as HTMLElement;
+      return { before, hint: hint.textContent ?? '', outcome: out.textContent ?? '', shown: getComputedStyle(out).display };
+    });
+    expect(seen.hint, 'the values are still there after the slice').toBe(seen.before);
+    expect(seen.hint).toMatch(/: ?\d+ ?(cm|m|g|kg|ml)\b/);
+    expect(seen.outcome).toContain('The answer is');
+    expect(seen.shown).not.toBe('none');
+  });
+
   // #893: the right answer is told, not only shown, so a pre-reader gets the correction too — never in Ninja
   // Sprint, whose pace has no room for it (`hud.ts`'s `speakCorrection`). `y2-tables` answers a bare number,
   // so `correctionLine` is never null here.
