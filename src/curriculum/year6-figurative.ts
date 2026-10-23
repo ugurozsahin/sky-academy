@@ -82,8 +82,10 @@ export const y6Figurative: Generator = (d: Difficulty, rng: Rng): Question => {
   const item = pick(rng, pool);
   const letters = devices.map(v => LETTER[v]);
   const ask = d === 1 ? 'Is this a simile or a metaphor?' : 'Is this a simile, a metaphor or personification?';
-  return wordQ(rng, d === 1 ? KEY_D1 : KEY, LETTER[item.device], letters.filter(l => l !== LETTER[item.device]), {
-    visual: { type: 'sentence', text: item.text }, say: `${item.text} ${ask}`,
-    hint: 'Is there a like or an as?', hintIsData: false,
-  });
+  const prompt = d === 1 ? KEY_D1 : KEY, wrong = letters.filter(l => l !== LETTER[item.device]);
+  const extra = { visual: { type: 'sentence', text: item.text } as const, say: `${item.text} ${ask}` };
+  // Only difficulty 1 keeps the like/as test: with three devices it would hand over the simile (#2274).
+  return d === 1
+    ? wordQ(rng, prompt, LETTER[item.device], wrong, { ...extra, hint: 'Is there a like or an as?', hintIsData: false })
+    : wordQ(rng, prompt, LETTER[item.device], wrong, extra);
 };
