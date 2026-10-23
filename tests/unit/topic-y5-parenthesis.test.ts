@@ -72,6 +72,7 @@ describe('y5-parenthesis (#1226)', () => {
       const text = (q.visual as { text: string }).text;
       expect(count(text, '_'), text).toBe(2);
       expect(text).not.toMatch(/[(),–]/);
+      expect(BANK.map(bothGapped), text).toContain(text);
       expect(q.options).toHaveLength(3);
       expect(q.options.filter(o => KINDS.some(k => pairLabel(k) === o))).toEqual([q.answer]);
       seen.add(KINDS.find(k => pairLabel(k) === q.answer)!);
@@ -105,10 +106,11 @@ describe('y5-parenthesis (#1226)', () => {
 
 describe('y5-parenthesis: no half of the pair is left to mirror (#2274)', () => {
   it('d2 hides both marks, so the mirror trick has nothing to copy; the NC statement (brackets, dashes or commas) is kept', () => {
-    for (const row of BANK) for (const kind of KINDS) {
-      const g = bothGapped(row, kind);
+    for (const row of BANK) {
+      const g = bothGapped(row);
       expect(count(g, '_'), g).toBe(2);
       expect(g).not.toMatch(/[(),–]/);
+      expect(g).toMatch(/ _ .+ _ /); // identical shape for every kind: the spacing leaks nothing
     }
   });
 });

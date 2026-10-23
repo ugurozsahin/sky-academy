@@ -54,11 +54,8 @@ export function uniqueWords(text: string, whole: string): string[] {
   return [...new Set(wordsOf(text))].filter(w => w.length >= 3 && w.length <= 9 && all.filter(x => x === w.toLowerCase()).length === 1);
 }
 
-/** The sentence with both marks of the pair replaced by `_`, so no half is left to mirror (#2274). */
-export function bothGapped(row: Row, kind: Kind): string {
-  const [a, , m, , z] = pieces(row, kind);
-  return `${a}_${m}_${z}`;
-}
+/** Both marks replaced by `_`, spaced the same for every kind, so neither a half to mirror nor the spacing gives the pair away (#2274). */
+export const bothGapped = ([before, inside, rest]: Row): string => `${before} _ ${inside} _${rest}`;
 /** A pair as one bubble label, e.g. `( )`; the decoys are pairs that never fence off a parenthesis. */
 export const pairLabel = (kind: Kind): string => MARKS[kind].join(' ');
 export const PAIR_DECOYS: readonly string[] = ['. .', '? ?', '! !', ': :'];
@@ -67,7 +64,7 @@ function pairCard(rng: Rng): Question {
   const row = pick(rng, BANK), kind = pick(rng, KINDS);
   const decoys = shuffle(rng, [...PAIR_DECOYS]).slice(0, 2);
   return wordQ(rng, 'Which pair of marks is missing?', pairLabel(kind), decoys, {
-    visual: { type: 'sentence', text: bothGapped(row, kind) },
+    visual: { type: 'sentence', text: bothGapped(row) },
     say: `${spoken(row)} Which pair of punctuation marks is missing?`, hint: 'The pair fences off the extra words.', hintIsData: false,
   });
 }
