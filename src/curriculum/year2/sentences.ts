@@ -47,6 +47,8 @@ export const SENTENCE_TYPES: ReadonlyArray<readonly [string, SentenceType]> = [
  * d1 is the pair a Year 1 child already meets (a sentence that tells you something, a sentence that asks);
  * d2 adds the command, which shares its full stop with the statement; d3 adds the exclamation.
  *
+ * The final mark is shown as `_` so "?" never gives the answer away (#2274); the words and their order decide it.
+ *
  * The bubbles are the types unlocked so far, not all four, so d1 is a two-way choice rather than a guess
  * between words the child has not been taught yet.
  */
@@ -54,7 +56,7 @@ export const y2SentenceType: Generator = (d, rng) => {
   const allowed = SENTENCE_TYPE_NAMES.slice(0, d === 1 ? 2 : d === 2 ? 3 : 4);
   const [sent, type] = pick(rng, SENTENCE_TYPES.filter(e => allowed.includes(e[1])));
   return wordQ(rng, 'What kind of sentence is this?', type, allowed.filter(n => n !== type), {
-    visual: { type: 'sentence', text: sent }, say: `${sent} What kind of sentence is this?`,
+    visual: { type: 'sentence', text: sent.replace(/[.?!]$/, '_') }, say: `${sent} What kind of sentence is this?`,
     hint: 'Does it tell, ask, order or exclaim?', hintIsData: false,
   });
 };
