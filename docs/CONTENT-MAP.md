@@ -400,7 +400,7 @@ Generated from the registry: 343 topics. A strand counts as covered only when a 
 | Missing Angles (`y6-missingangles`) | Y6 Geometry: missing angles in shapes, on lines, vertically opposite (6M43, 6M45) | mixed | Slices the answer | generated | yes |
 | Parts of a Circle (`y6-circles`) | Y6 Geometry: radius, diameter and circumference (6M44) | mixed | Slices the answer | generated | yes |
 | Four-Quadrant Coordinates (`y6-coords`) | Y6 Geometry: describe positions on the full coordinate grid, all four quadrants (6M46) | mixed | Slices the answer | generated | yes |
-| Reflect in the Axes (`y6-transform`) | Y6 Geometry: translate and reflect in the axes (6M47) | mixed | Slices the answer | generated | yes |
+| Translate and Reflect (`y6-transform`) | Y6 Geometry: translate and reflect in the axes (6M47) | mixed | Slices the answer | generated | yes |
 | Pie Charts (`y6-pie`) | Y6 Statistics: interpret pie charts and use them to solve problems (6M48) | mixed | Slices the answer | generated | yes |
 | Line and Conversion Graphs (`y6-graphs`) | Y6 Statistics: interpret line graphs and conversion graphs (6M48) | mixed | Slices the answer | generated | yes |
 | The Mean (`y6-mean`) | Y6 Statistics: calculate and interpret the mean as an average (6M49) | mixed | Slices the answer | generated | no |

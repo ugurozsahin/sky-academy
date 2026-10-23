@@ -128,7 +128,9 @@ export function promptStep(rows, asked, st, q) {
   if (!st?.prompt || asked < 1) return;
   const last = rows[rows.length - 1];
   if (last && last[0] === asked && last[2] === st.prompt) return;
-  rows.push([asked, st.stage, st.prompt, !!q?.listen, !(q?.sequence && !q.build && !q.anyOrder)]);
+  // Self-contained (the pack stringifies it into the page): `cardRepeatsPrompt` in src/ui/hud.ts is the rule, #2314 — the card prints the text, so the line is not drawn.
+  const repeats = !q?.sequence && (q?.visual?.type === 'word' || q?.visual?.type === 'sentence') && q.visual.text === q.prompt;
+  rows.push([asked, st.stage, st.prompt, !!q?.listen, !(q?.sequence && !q.build && !q.anyOrder) && !repeats]);
 }
 
 /**
