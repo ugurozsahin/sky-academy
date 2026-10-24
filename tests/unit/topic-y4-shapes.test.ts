@@ -120,7 +120,12 @@ describe('y4-shapes (#1154)', () => {
     const r = rng(11); let yes = 0; const N = 600;
     for (let i = 0; i < N; i++) {
       const q = t.gen(1, r);
-      expect(q.visual).toBeUndefined();
+      // the statement is drawn: one unlettered polygon in the middle third (#2271)
+      const drawn = polys(q);
+      expect(drawn).toHaveLength(1);
+      expect(drawn[0].label).toBeUndefined();
+      expect(Math.min(...drawn[0].pts.map(p => p[0]))).toBeGreaterThanOrEqual(35);
+      expect(Math.max(...drawn[0].pts.map(p => p[0]))).toBeLessThanOrEqual(64);
       // the key follows the statement: Yes exactly when the asked term is the statement's own shape
       const st = STATEMENTS.find(x => q.prompt.startsWith(`A ${x.noun} has ${x.has}. Is it `))!, asked = q.prompt.match(/Is it (?:an? )?([a-z-]+)\?$/)![1];
       expect(st, q.prompt).toBeTruthy();
