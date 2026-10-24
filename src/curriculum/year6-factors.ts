@@ -23,7 +23,7 @@ function primes(rng: Rng): Question {
   const k = ri(rng, 2, 3), targets = shuffle(rng, PRIMES).slice(0, k);
   const odd = pick(rng, ODD_COMPOSITES), decoys = [1, odd];
   for (const x of shuffle(rng, COMPOSITES)) if (decoys.length < 7 - k && !decoys.includes(x)) decoys.push(x);
-  return anyOrderQ(rng, 'Slice every prime number', targets.map(String), decoys.map(String), { say: 'Slice every prime number', ...hint });
+  return anyOrderQ(rng, 'Slice every prime number', targets.map(String), decoys.map(String), { say: 'Slice every prime number', why: 'A prime has exactly two factors: 1 and itself.', ...hint });
 }
 
 /** d2: common factors of two numbers from 12–60; 3–4 are targets, with factors of only one number as decoys. */
@@ -40,7 +40,7 @@ function commonFactors(rng: Rng): Question {
   decoys.push(none[0]);
   for (const x of [...shuffle(rng, only), ...none]) if (targets.length + decoys.length < total && !decoys.includes(x)) decoys.push(x);
   const say = `Slice every common factor of ${a} and ${b} that you can see`;
-  return anyOrderQ(rng, say, targets.map(String), decoys.map(String), { say, ...hint });
+  return anyOrderQ(rng, say, targets.map(String), decoys.map(String), { say, why: `A common factor divides both ${a} and ${b} exactly.`, ...hint });
 }
 
 /** d3: every common multiple of two numbers up to 60 (2–4 of them); decoys are multiples of only one of the two. */
@@ -54,7 +54,7 @@ function commonMultiples(rng: Rng): Question {
     if (l !== Math.max(a, b) && l >= 15 && l <= 30 && a !== b) break;
   } while (true);
   const total = ri(rng, 6, 7), decoys = shuffle(rng, only).slice(0, total - common.length);
-  return anyOrderQ(rng, `Slice every common multiple of ${a} and ${b} up to 60`, common.map(String), decoys.map(String), { say: `Slice every common multiple of ${a} and ${b} up to 60`, ...hint });
+  return anyOrderQ(rng, `Slice every common multiple of ${a} and ${b} up to 60`, common.map(String), decoys.map(String), { say: `Slice every common multiple of ${a} and ${b} up to 60`, why: `A common multiple is in both the ${a} and ${b} times tables.`, ...hint });
 }
 
 export const y6Factors: Generator = (d: Difficulty, rng): Question => (d === 1 ? primes : d === 2 ? commonFactors : commonMultiples)(rng);

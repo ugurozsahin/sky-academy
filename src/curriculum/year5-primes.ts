@@ -10,6 +10,8 @@ export const isPrime = (k: number): boolean => {
   for (let i = 2; i * i <= k; i++) if (k % i === 0) return false;
   return true;
 };
+const TWO_FACTORS = 'A prime has exactly two factors: 1 and itself.';
+const leastFactor = (k: number): number => { let i = 2; while (k % i) i++; return i; };
 const hint = { hint: 'Slice them all', hintIsData: false } as const;
 const PRIMES = Array.from({ length: 99 }, (_, i) => i + 2).filter(isPrime);
 const LOOK_PRIME = [1, 9, 15, 21, 27, 33, 39, 49, 51, 57, 63, 69, 77, 81, 87, 91, 93];
@@ -19,7 +21,7 @@ const COMPOSITES = Array.from({ length: 99 }, (_, i) => i + 2).filter(x => !isPr
 function recall(rng: Rng): Question {
   const answer = pick(rng, PRIMES.filter(p => p <= 19)), look = pick(rng, [1, 9, 15]);
   const rest = shuffle(rng, Array.from({ length: 20 }, (_, i) => i + 1).filter(x => !isPrime(x) && x !== look)).slice(0, 2);
-  return wordQ(rng, 'Which is a prime number?', `${answer}`, [look, ...rest].map(String), { say: 'Which is a prime number?' });
+  return wordQ(rng, 'Which is a prime number?', `${answer}`, [look, ...rest].map(String), { say: 'Which is a prime number?', why: `${answer} has only two factors: 1 and ${answer}.` });
 }
 
 /** d2: "Slice every prime number": 2–4 primes, at least one look-prime decoy (51, 57, 91, 1…), the rest composites. */
@@ -27,7 +29,7 @@ function primes(rng: Rng): Question {
   const k = ri(rng, 2, 4), targets = shuffle(rng, PRIMES).slice(0, k);
   const decoys = [pick(rng, LOOK_PRIME)];
   for (const x of shuffle(rng, [...LOOK_PRIME, ...COMPOSITES])) if (decoys.length < 6 - k && !decoys.includes(x)) decoys.push(x);
-  return anyOrderQ(rng, 'Slice every prime number', targets.map(String), decoys.map(String), { say: 'Slice every prime number', ...hint });
+  return anyOrderQ(rng, 'Slice every prime number', targets.map(String), decoys.map(String), { say: 'Slice every prime number', why: TWO_FACTORS, ...hint });
 }
 
 /** d2: "Which number is composite?": an odd composite not ending in 5, beside three primes, one sharing its last digit. */
@@ -35,7 +37,7 @@ function composite(rng: Rng): Question {
   const c = pick(rng, LOOK_PRIME.filter(x => x > 1 && x % 5 !== 0));
   const same = pick(rng, PRIMES.filter(p => p % 10 === c % 10));
   const others = shuffle(rng, PRIMES.filter(p => p !== same)).slice(0, 2);
-  return wordQ(rng, 'Which number is composite?', `${c}`, [same, ...others].map(String), { say: 'Which number is composite?' });
+  return wordQ(rng, 'Which number is composite?', `${c}`, [same, ...others].map(String), { say: 'Which number is composite?', why: `${c} = ${leastFactor(c)} × ${c / leastFactor(c)}, so it is not prime.` });
 }
 
 /** d3: "Slice every prime factor of 60" (n ≤ 100, 2–3 distinct prime factors). Decoys: composite factors of n, then primes that are not factors. */
@@ -47,7 +49,7 @@ function primeFactors(rng: Rng): Question {
   const others = shuffle(rng, PRIMES.filter(p => n % p !== 0 && p < 30));
   const decoys = [...compFactors.slice(0, 3), ...others].slice(0, 6 - k);
   if (decoys.length === 6 - k && !decoys.some(isPrime)) decoys[decoys.length - 1] = others[0];
-  return anyOrderQ(rng, `Slice every prime factor of ${n}`, targets.map(String), decoys.map(String), { say: `Slice every prime factor of ${n}`, ...hint });
+  return anyOrderQ(rng, `Slice every prime factor of ${n}`, targets.map(String), decoys.map(String), { say: `Slice every prime factor of ${n}`, why: `Only ${pf.join(', ')} are prime and divide ${n} exactly.`, ...hint });
 }
 
 export const y5Primes: Generator = (d: Difficulty, rng): Question => {
