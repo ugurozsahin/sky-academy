@@ -67,15 +67,27 @@ export function decoyValues(rng: Rng, answer: number, misconceptions: readonly n
   return out;
 }
 
+/** [text, ...]: `{m}` boxes of `{a}` things. The partition is the hint, not the card (#2276). */
+export const GROUPS: readonly string[] = [
+  '{m} boxes hold {a} pencils each. How many pencils?',
+  '{m} bags hold {a} marbles each. How many marbles?',
+  '{m} shelves hold {a} books each. How many books?',
+  '{m} trays hold {a} buns each. How many buns?',
+  '{m} jars hold {a} sweets each. How many sweets?',
+  '{m} packs hold {a} stickers each. How many stickers?',
+];
+
 function distributive(rng: Rng): Question {
   const t = ri(rng, 2, 9), u = ri(rng, 1, 9), m = ri(rng, 3, 9), a = t * 10 + u;
   const tp = t * 10 * m, up = u * m, whole = a * m;
   const head = `${a} × ${m} = ${t * 10} × ${m} + ${u} × ${m}`;
   const partial = rng() < 0.5;
-  const prompt = partial ? `${head} = ${f(tp)} + ?` : `${a} × ${m} = ${f(tp)} + ${f(up)} = ?`;
+  const prompt = partial ? `${head} = ${f(tp)} + ?` : pick(rng, GROUPS).replace('{m}', f(m)).replace('{a}', f(a));
   const answer = partial ? up : whole;
   const wrong = partial ? [tp, whole] : [tp, up];
-  return wordQ(rng, prompt, f(answer), decoyValues(rng, answer, wrong).map(f), { say: ks2Say(prompt) });
+    const options = decoyValues(rng, answer, wrong).map(f);
+  return partial ? wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt) })
+    : wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt), hint: 'Split into tens and ones, multiply each', hintIsData: false });
 }
 
 function scaling(rng: Rng): Question {

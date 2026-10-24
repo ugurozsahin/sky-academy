@@ -3,7 +3,7 @@ import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { AVOID } from '../../src/curriculum/util';
 import { sayIsSafe } from '../../src/curriculum/ks2say';
-import { SCALING, COUNTING, decoyValues } from '../../src/curriculum/year4-story-md';
+import { SCALING, COUNTING, GROUPS, decoyValues } from '../../src/curriculum/year4-story-md';
 import { cardBudgetProblem } from './helpers/card-budget';
 import { rLblProblem } from './helpers/r-lbl';
 
@@ -30,16 +30,25 @@ describe('y4-story-md (#1141)', () => {
     const forms = new Set<string>();
     let secondOffered = 0;
     for (const q of draw(1, 400)) {
-      const m = q.prompt.match(/^(\d+) × (\d) = (?:(\d+) × \d \+ (\d) × \d = ([\d,]+) \+ \?|([\d,]+) \+ ([\d,]+) = \?)$/)!;
+      const w = q.prompt.match(/^(\d) .* hold (\d+) .* each\./);
+      if (w) {
+        // #2276: the card asks the problem in words; the partition is only the hint.
+        forms.add('worded');
+        const k = Number(w[1]), a = Number(w[2]), t = Math.floor(a / 10) * 10, u = a % 10;
+        expect(q.hint).toBe('Split into tens and ones, multiply each');
+        expect(val(q.answer)).toBe(a * k); expect(q.options.map(val)).toContain(t * k);
+        if (q.options.map(val).includes(u * k)) secondOffered++;
+        continue;
+      }
+      const m = q.prompt.match(/^(\d+) × (\d) = (?:(\d+) × \d \+ (\d) × \d = ([\d,]+) \+ \?)$/)!;
       expect(m, q.prompt).toBeTruthy();
       const a = Number(m[1]), k = Number(m[2]), t = Math.floor(a / 10) * 10, u = a % 10;
       expect(t).toBeGreaterThanOrEqual(20); expect(u).toBeGreaterThanOrEqual(1);
       expect(k).toBeGreaterThanOrEqual(3); expect(k).toBeLessThanOrEqual(9);
       if (m[3]) { forms.add('partial'); expect(Number(m[3])).toBe(t); expect(Number(m[4])).toBe(u); expect(val(m[5])).toBe(t * k); expect(val(q.answer)).toBe(u * k); expect(q.options.map(val)).toContain(t * k); if (q.options.map(val).includes(a * k)) secondOffered++; }
-      else { forms.add('whole'); expect(val(m[6])).toBe(t * k); expect(val(m[7])).toBe(u * k); expect(val(q.answer)).toBe(a * k); expect(q.options.map(val)).toContain(t * k); if (q.options.map(val).includes(u * k)) secondOffered++; }
       expect(val(q.answer)).toBeLessThanOrEqual(891);
     }
-    expect(forms).toEqual(new Set(['partial', 'whole']));
+    expect(forms).toEqual(new Set(['partial', 'worded']));
     expect(secondOffered, 'the whole product on a partial card, the second partial on a whole card').toBeGreaterThan(40);
   });
 
@@ -118,7 +127,7 @@ describe('y4-story-md (#1141)', () => {
   it('both banks have at least six templates; no word, in any template, is crude (#642/#324) or a personal name', () => {
     expect(SCALING.length).toBeGreaterThanOrEqual(6);
     expect(COUNTING.filter(r => r[1] === 'cor').length + COUNTING.filter(r => r[1] === 'add').length).toBeGreaterThanOrEqual(6);
-    const words = new Set([...SCALING.map(r => r[1]), ...COUNTING.map(r => r[0])].flatMap(t => t.toLowerCase().match(/[a-z]+/g) ?? []));
+    const words = new Set([...SCALING.map(r => r[1]), ...GROUPS, ...COUNTING.map(r => r[0])].flatMap(t => t.toLowerCase().match(/[a-z]+/g) ?? []));
     for (const w of words) { expect(EXCLUDE, w).not.toContain(w); expect(AVOID, w).not.toContain(w); }
     for (const name of ['mia', 'sam', 'ana', 'jo', 'ben', 'tom', 'kim', 'lee', 'ria']) expect(words.has(name), name).toBe(false);
   });
