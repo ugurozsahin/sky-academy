@@ -54,8 +54,9 @@ export const SENTENCE_TYPES: ReadonlyArray<readonly [string, SentenceType]> = [
  */
 export const y2SentenceType: Generator = (d, rng) => {
   const allowed = SENTENCE_TYPE_NAMES.slice(0, d === 1 ? 2 : d === 2 ? 3 : 4);
-  const [sent, type] = pick(rng, SENTENCE_TYPES.filter(e => allowed.includes(e[1])));
-  return wordQ(rng, 'What kind of sentence is this?', type, allowed.filter(n => n !== type), {
+  // #2322: d1 sentences are 4 to 5 words, and the card asks in two words (the voice still asks in full)
+  const [sent, type] = pick(rng, SENTENCE_TYPES.filter(e => allowed.includes(e[1]) && (d > 1 || (e[0].split(' ').length >= 4 && e[0].split(' ').length <= 5))));
+  return wordQ(rng, 'What kind?', type, allowed.filter(n => n !== type), {
     visual: { type: 'sentence', text: sent.replace(/[.?!]$/, '_') }, say: `${sent} What kind of sentence is this?`,
     hint: 'Does it tell, ask, order or exclaim?', hintIsData: false,
   });
@@ -135,4 +136,4 @@ const Y2_SENTS: Sent[][] = [
   [['If it rains, we will stay inside.', '☂️'], ['You can play when you have finished.', '🎮'], ['The bird sang because it was happy.', '🐦'], ['We can walk or take the bus.', '🚌'], ['The dragon roared and the village shook.', '🐉'], ['I know that the snow is cold.', '🧣'], ['Please tidy your room before dinner.', '🧹'], ['The clever fox found a secret path.', '🦊'], ['Everybody cheered when our team scored.', '⚽'], ['After lunch we painted colourful pictures.', '🎨']],
 ];
 const Y2_DECOYS = ['because', 'when', 'and', 'but', 'quickly', 'happy', 'tiny', 'huge', 'garden', 'school', 'dragon', 'river', 'shiny', 'after', 'before', 'yellow', 'kite', 'mouse'];
-export const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 1);
+export const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 0);

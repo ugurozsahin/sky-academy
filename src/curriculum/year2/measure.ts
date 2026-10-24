@@ -49,13 +49,10 @@ export const y2Temp: Generator = (d, rng) => {
     return wordQ(rng, `Temperature of ${thing}?`, `${t}°C`, ds, { say: `About what temperature is ${thing}?` });
   }
   const warmer = rng() < 0.5;
-  const [ca, cb] = shuffle(rng, ['the town', 'the hill', 'the beach', 'the park', 'the wood', 'the lake']).slice(0, 2);
   let a = ri(rng, 0, 35), b = a; while (b === a) b = ri(rng, 0, 35);
-  const first = warmer ? a > b : a < b;
-  // `hintIsData`, for the same reason as `measureCompare()`: the options are the two places, so the
-  // temperatures live in this line and nowhere else on the card (#328).
-  // `visual`: the two readings as bars, so there is something to compare (#2271)
-  return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, hintIsData: true, visual: barVisual([ca, cb], [a, b]), say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });
+  const [ta, tb] = [`${a}°C`, `${b}°C`], first = warmer ? a > b : a < b;
+  // #2322: the two temperatures are the bubbles (no place names to read); the bars draw them and the voice says them
+  return wordQ(rng, `Which is ${warmer ? 'warmer' : 'colder'}?`, first ? ta : tb, [first ? tb : ta], { hint: warmer ? 'Warmer is the bigger number' : 'Colder is the smaller number', hintIsData: false, visual: barVisual([ta, tb], [a, b]), say: `${a} degrees or ${b} degrees. Which is ${warmer ? 'warmer' : 'colder'}?` });
 };
 // Y2 statistics (#8). Each survey is three categories the child picks out by emoji, so the chart can be read
 // without reading the words — the labels carry the emoji and so does the prompt.

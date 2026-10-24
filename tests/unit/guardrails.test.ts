@@ -921,7 +921,6 @@ describe('guard rails', () => {
     expect(hits, "a new or changed ' · ' hint/listen line — check it is genuinely unordered before updating this list").toEqual([
       "/src/curriculum/util.ts: hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,",
       "/src/curriculum/util.ts: return wordQ(rng, '🔊 Listen!', g, ds, { say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}`, hintIsData: false });",
-      "/src/curriculum/year2/measure.ts: return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, hintIsData: true, visual: barVisual([ca, cb], [a, b]), say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });",
     ]);
   });
 
