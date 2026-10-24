@@ -73,4 +73,11 @@ describe('y6-lists (#1282)', () => {
       expect(rLblProblem(q), q.options.join()).toBeNull();
     }
   });
+
+  it('a gap question shows the finished sentence as its why, so a bare mark is read in context (#2278)', () => {
+    for (const d of [1, 2] as Difficulty[]) for (const q of draws(d, 100)) {
+      expect(q.why, text(q)).toBe(text(q).replace('_', q.answer));
+      expect(q.why).not.toContain('_');
+    }
+  });
 });

@@ -45,13 +45,15 @@ const HINT = 'Look at the clause before the gap and at the list after it.';
 function colon(rng: () => number): Question {
   const [clause, items] = pick(rng, LIST_INTROS);
   const text = `${clause} _ ${joinList(items)}.`;
-  return wordQ(rng, SAY, ':', [',', ';'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false });
+  return wordQ(rng, SAY, ':', [',', ';'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false,
+    why: text.replace('_', ':') });   // #2278: a bare ':' is a tiny glyph, so the outcome line shows it in its sentence
 }
 
 function semicolon(rng: () => number): Question {
   const [clause, [a, b, c]] = pick(rng, COMMA_ITEMS);
   const text = `${clause}: ${a} _ ${b}; and ${c}.`;
-  return wordQ(rng, SAY, ';', [',', ':'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false });
+  return wordQ(rng, SAY, ';', [',', ':'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false,
+    why: text.replace('_', ';') });
 }
 
 /** The (first letter is a capital, ends with a full stop) signature the d3 oracle compares. */
