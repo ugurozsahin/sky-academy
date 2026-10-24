@@ -267,12 +267,18 @@ export function coinSVG(p: number): string {
 }
 
 /** The clock card's face: Arabic numerals, or Roman ones when `roman` is set (#1078). */
-const clockFace = (v: { h: number; m: number; roman?: true }) => (v.roman ? romanClockSVG : clockSVG)(v.h, v.m);
+const clockFace = (v: { h: number; m: number; roman?: true; marks?: true }) => (v.roman ? romanClockSVG(v.h, v.m) : clockSVG(v.h, v.m, v.marks));
 
-export function clockSVG(h: number, m: number): string {
+/** Sixty minute marks, longer at each five, for a face read to the minute (#2278). */
+const minuteMarks = (): string => `<g stroke="#2a3a7a" stroke-width="0.9">${Array.from({ length: 60 }, (_, i) => {
+  const a = i * 6 * Math.PI / 180, r1 = i % 5 === 0 ? 42.5 : 43.5, s = Math.sin(a), c = Math.cos(a);
+  return `<line x1="${(50 + r1 * s).toFixed(1)}" y1="${(50 - r1 * c).toFixed(1)}" x2="${(50 + 45.5 * s).toFixed(1)}" y2="${(50 - 45.5 * c).toFixed(1)}" class="tick"/>`;
+}).join('')}</g>`;
+
+export function clockSVG(h: number, m: number, marks?: boolean): string {
   const ha = ((h % 12) + m / 60) * 30, ma = m * 6;
   const nums = Array.from({ length: 12 }, (_, i) => { const a = (i + 1) * 30 * Math.PI / 180; return `<text x="${(50 + 36 * Math.sin(a)).toFixed(1)}" y="${(50 - 36 * Math.cos(a) + 4).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700">${i + 1}</text>`; }).join('');
-  return `<svg viewBox="0 0 100 100" class="clock"><circle cx="50" cy="50" r="47" class="face"/>${nums}
+  return `<svg viewBox="0 0 100 100" class="clock"><circle cx="50" cy="50" r="47" class="face"/>${marks ? minuteMarks() : ''}${nums}
   <line x1="50" y1="50" x2="${(50 + 22 * Math.sin(ha * Math.PI / 180)).toFixed(1)}" y2="${(50 - 22 * Math.cos(ha * Math.PI / 180)).toFixed(1)}" class="hour"/>
   <line x1="50" y1="50" x2="${(50 + 32 * Math.sin(ma * Math.PI / 180)).toFixed(1)}" y2="${(50 - 32 * Math.cos(ma * Math.PI / 180)).toFixed(1)}" class="min"/><circle cx="50" cy="50" r="3" class="pin"/></svg>`;
 }

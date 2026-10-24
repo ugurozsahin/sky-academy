@@ -29,7 +29,7 @@ export type Visual =
   | { type: 'dots'; n: number }                          // subitising dots (random arrangement)
   | { type: 'array'; rows: number; cols: number }        // multiplication array
   | { type: 'coins'; coins: number[] }                   // pence values, 100 = £1, 200 = £2, 500/1000 = £5/£10 notes
-  | { type: 'clock'; h: number; m: number; roman?: true }
+  | { type: 'clock'; h: number; m: number; roman?: true; marks?: true }
   | { type: 'fraction'; parts: number; shaded: number; shape?: 'circle' | 'bar'; stack?: { parts: number; shaded: number }[] }
   // mark = hidden number shown as ?; labels = one printed text per tick ("3/4", "0.3"); marks = letters A-D on the tick whose value is `at`
   | { type: 'numberline'; from: number; to: number; mark?: number; step?: number; labels?: string[]; marks?: { label: string; at: number }[]; ends?: boolean }

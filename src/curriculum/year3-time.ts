@@ -44,7 +44,7 @@ function clockCard(d: Difficulty, rng: () => number, roman = false): Question {
   const sfx: Sfx | undefined = d === 2 ? pick(rng, ['am', 'pm'] as const) : undefined;
   const answer = t12(h, m, sfx), { named, spare } = clockDecoys(h, m, sfx);
   const prompt = sfx ? `It is the ${partOfDay(h, sfx)}. What time is it?` : 'What time is it?';
-  return { prompt, say: speak(prompt), answer, options: build(answer, named, spare, rng), visual: roman ? { type: 'clock', h, m, roman: true } : { type: 'clock', h, m } };
+  return { prompt, say: speak(prompt), answer, options: build(answer, named, spare, rng), visual: roman ? { type: 'clock', h, m, roman: true } : { type: 'clock', h, m, marks: true } };
 }
 
 /** d2 vocabulary: "Which time is just after noon?" — the same four labels, so the answer is the whole question. */
