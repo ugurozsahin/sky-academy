@@ -31,7 +31,7 @@ function dirFor(rng: Rng, deg: number): number {
 }
 
 const drawn = (rng: Rng, deg: number): { visual: { type: 'geometry'; parts: GeoPart[] } } =>
-  ({ visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir: dirFor(rng, deg), deg, len: pick(rng, [12, 14, 16]) }] } });
+  ({ visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir: dirFor(rng, deg), deg, len: pick(rng, [24, 26, 28]) }] } });   // ≥ 120 px across at 390 px (#2278)
 
 function kindCard(rng: Rng): Question {
   const r = rng();

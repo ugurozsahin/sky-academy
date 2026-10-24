@@ -110,7 +110,7 @@ export const y3Angles: Generator = (d: Difficulty, rng: Rng): Question => {
     const dir = right && rng() < 0.7 ? pick(rng, [20, 35, 50, 65, 125, 140, 205, 220, 305, 320]) : step5(rng, 0, 355);
     return {
       ...q('Is this a right angle?'), answer: right ? 'Yes' : 'No', options: shuffle(rng, ['Yes', 'No']), wide: true,
-      visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir, deg }] }, hint: 'Slice Yes or No', hintIsData: false,
+      visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir, deg, len: 26 }] }, hint: 'Slice Yes or No', hintIsData: false,
     };
   }
   if (d === 2) return angleCards(rng, pick(rng, ['right', 'less', 'greater'] as const));
