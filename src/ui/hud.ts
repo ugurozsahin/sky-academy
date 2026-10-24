@@ -220,7 +220,7 @@ export function createHud(els: HudEls, lives: number, audible: () => boolean) {
     drawHp(hp: number, max: number) { const h = $('#hp'); if (h) { h.style.width = `${Math.round(100 * hp / max)}%`; h.classList.toggle('low', hp <= 3); } },
     showOutcome(kind: Outcome, q: Question) {
       els.qcard.classList.remove('good', 'bad'); els.qcard.classList.add(kind === 'correct' ? 'good' : 'bad');
-      if (!q.sequence && promptMode(q, audible()) === 'hear') els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);   // a `read` card keeps its listen words
+      if (!q.sequence && !cardRepeatsPrompt(q) && promptMode(q, audible()) === 'hear') els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);   // a `read` card keeps its listen words; a card that holds the prompt keeps the line empty (#2314)
       // The outcome line is this screen's words, so it drops the `own` mark `setHint` above
       // put there for a data-carrying hint (#328 review, note 1). Today the media query un-hides it anyway
       // through `.qcard.good .hint`, so nothing renders differently — but without this the element claims to
