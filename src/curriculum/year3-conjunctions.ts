@@ -63,6 +63,8 @@ export const CLASS_BANK: ClassRow[] = [
 const CLASSES: WordClass[] = ['conjunction', 'preposition', 'adverb'];
 const CONJ_ROWS = GAP_BANK.filter(r => r[3] === 'conjunction');
 
+/** #2322: d1 reads at most 8 words (the gap counts as one). */
+const SHORT_CONJ_ROWS = CONJ_ROWS.filter(r => r[0].split(' ').length <= 8);
 const gap = (rng: Rng, rows: GapRow[], nDecoys: number): Question => {
   const [s, answer, decoys] = pick(rng, rows);
   return wordQ(rng, s, answer, shuffle(rng, decoys).slice(0, nDecoys), {
@@ -78,4 +80,4 @@ const wordClass = (rng: Rng): Question => {
 };
 
 export const y3Conjunctions: Generator = (d: Difficulty, rng) =>
-  d === 1 ? gap(rng, CONJ_ROWS, 2) : d === 2 || rng() < 0.5 ? gap(rng, GAP_BANK, 3) : wordClass(rng);
+  d === 1 ? gap(rng, SHORT_CONJ_ROWS, 2) : d === 2 || rng() < 0.5 ? gap(rng, GAP_BANK, 3) : wordClass(rng);

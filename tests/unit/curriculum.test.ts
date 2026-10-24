@@ -253,7 +253,7 @@ describe('curriculum ranges', () => {
         expect(q.options.length).toBeGreaterThan(words.length);                       // at least one decoy
         const bare = (w: string) => w.toLowerCase().replace(/[.!?,]/g, '');
         for (const o of q.options.filter(o => !words.includes(o))) expect(words.map(bare), q.answer).not.toContain(bare(o));
-        expect(q.visual?.type).toBe(d === 1 || id === 'r-sentence' ? 'sentence' : 'word');   // shown vs. spoken-only
+        expect(q.visual?.type).toBe(id === 'r-sentence' ? 'sentence' : 'word');   // #2322: only Reception reads the sentence; Y1/Y2 listen from d1
       }
     }
   });
@@ -362,7 +362,7 @@ describe('curriculum ranges', () => {
     // of them silently stops producing a comparison card — a future verb the regex below does not list
     // (`weighs`, `measures`) would drop that topic out with the other six still carrying the total.
     const perTopic = new Map<string, number>();
-    for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp']) {
+    for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity']) {
       const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 31);
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 150; i++) {
         const q = t.gen(d, r);
@@ -379,7 +379,7 @@ describe('curriculum ranges', () => {
     // Measured floor per topic: y2-length/mass/capacity are the thinnest (177–188 over these 450 draws,
     // the comparison branch is one of three `kind`s and one of two forms within it); y1's three topics and
     // y2-temp are all well above (321–450).
-    for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp'])
+    for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity'])
       expect(perTopic.get(id), `${id} produced no comparison card this sweep saw`).toBeGreaterThan(100);
   });
   it('measureCompare (#324 item 5): the out-of-step call the issue names no longer type-checks', () => {
@@ -665,7 +665,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
           // at a real card could not have caught #418 even on the topics it did cover.
           expect(AVOID.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}, which no card may show`).toBe(false);
         }
-        expect(q.options.length, q.prompt).toBe(4);
+        expect(q.options.length, q.prompt).toBe(4 - Number(id === 'y1-spelling'));   // #2322: y1-spelling offers three letter bubbles
         // The exemption above rests on this: drop the emoji from an r-sounds card and `_un` beside nothing
         // really is ambiguous, so the exemption must go red rather than quietly widen.
         if (id === 'r-sounds') {
@@ -2149,7 +2149,7 @@ describe('a hint is instruction text unless the generator says it is data (#328,
   const DRAWS = 300;
   /** The shape both data-carrying generators write: `<thing>: <number><unit>`, joined by ` · `. */
   const DATA_SHAPE = /^[^:·]+: ?-?\d+( ?(cm|m|g|kg|ml|l|°C) · |, )/;
-  const EXPECTED = ['y1-capacity', 'y1-length', 'y1-mass', 'y2-capacity', 'y2-length', 'y2-mass', 'y2-temp', 'y3-measures', 'y6-mean'];
+  const EXPECTED = ['y1-capacity', 'y1-length', 'y1-mass', 'y2-capacity', 'y2-length', 'y2-mass', 'y3-measures', 'y6-mean'];   // y2-temp left in #2322: its bubbles are the readings
   /**
    * #468 item 1: `DATA_SHAPE` only recognises today's two generators' literal `<thing>: <n><unit> · ` form,
    * so a future data-carrying hint written in any other shape (prose, `p`/`£`, a spelled-out unit, `, `
