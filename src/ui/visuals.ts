@@ -251,6 +251,9 @@ export function noteSVG(p: (typeof NOTES)[number]): string {
   return `<svg viewBox="0 0 96 48" class="coin note" style="width:76px"><rect x="3" y="3" width="90" height="42" rx="5" fill="${fill}" stroke="${ink}" stroke-width="3"/><rect x="11" y="11" width="74" height="26" rx="3" fill="none" stroke="${ink}" stroke-width="1.5" opacity="0.55"/><text x="48" y="31" text-anchor="middle" font-size="20" font-weight="700" fill="${ink}">${label}</text></svg>`;
 }
 
+/** The smallest coin drawn, in CSS px, and the label inks: a 5p at 44 px and a mid-tone label were hard to read on a phone (#2278). */
+export const COIN_MIN_PX = 56;
+const coinInk = (p: number) => p === 1 || p === 2 ? '#3d2209' : p >= 100 ? '#4a3708' : '#2f3542';
 const coinColours = (p: number) => p === 1 || p === 2 ? ['#c9803a', '#7a4a1c'] : p >= 100 ? ['#e6c250', '#8a6d1f'] : ['#d5d9e2', '#7d8594'];
 const COIN_RADIUS: Record<number, number> = { 1: 22, 2: 26, 5: 20, 10: 25, 20: 24, 50: 28, 100: 24 };
 /** The 20p and 50p are seven-sided; every other coin is round. */
@@ -263,7 +266,7 @@ function coinShape(p: number, r: number): string {
 export function coinSVG(p: number): string {
   if (isNote(p)) return noteSVG(p);
   const gold = coinColours(p), label = coinLabel(p), r = COIN_RADIUS[p] ?? 28;
-  return `<svg viewBox="0 0 64 64" class="coin" style="width:${r * 2.2}px"><g fill="${gold[0]}" stroke="${gold[1]}" stroke-width="2.5">${coinShape(p, r)}</g>${p === 200 ? `<circle cx="32" cy="32" r="18" fill="#e6c250" stroke="#8a6d1f" stroke-width="2"/>` : ''}<text x="32" y="37" text-anchor="middle" font-size="${label.length > 2 ? 15 : 18}" font-weight="700" fill="${gold[1]}">${label}</text></svg>`;
+  return `<svg viewBox="0 0 64 64" class="coin" style="width:${Math.max(r * 2.2, COIN_MIN_PX).toFixed(1).replace(/\.0$/, '')}px"><g fill="${gold[0]}" stroke="${gold[1]}" stroke-width="2.5">${coinShape(p, r)}</g>${p === 200 ? `<circle cx="32" cy="32" r="18" fill="#e6c250" stroke="#8a6d1f" stroke-width="2"/>` : ''}<text x="32" y="37" text-anchor="middle" font-size="${label.length > 2 ? 15 : 18}" font-weight="700" fill="${coinInk(p)}">${label}</text></svg>`;
 }
 
 /** The clock card's face: Arabic numerals, or Roman ones when `roman` is set (#1078). */
