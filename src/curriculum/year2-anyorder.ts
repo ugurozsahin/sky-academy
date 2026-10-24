@@ -47,8 +47,9 @@ function yesNo(rng: Rng, op: '+' | '−' | '×' | '÷', d: Difficulty): Question
     do { a = ri(rng, 1, max); b = ri(rng, 1, max); } while (a === b || (op === '+' && a + b > max));
     if (op === '−' && a < b) [a, b] = [b, a];
   }
-  const prompt = `Is ${a} ${op} ${b} the same as ${b} ${op} ${a}?`;
-  return wordQ(rng, prompt, op === '+' || op === '×' ? 'Yes' : 'No', ['Yes', 'No'], { say: symSay(prompt.replace(/\?$/, '')), hint: 'Swap the two numbers', hintIsData: false });
+  // #2322: both sums side by side as numerals and a two-word question; the voice still says the whole sentence
+  const spoken = `Is ${a} ${op} ${b} the same as ${b} ${op} ${a}`;
+  return wordQ(rng, `Same answer? ${a} ${op} ${b} | ${b} ${op} ${a}`, op === '+' || op === '×' ? 'Yes' : 'No', ['Yes', 'No'], { say: symSay(spoken), hint: 'Swap the two numbers', hintIsData: false });
 }
 
 export const y2AnyOrder: Generator = (d, rng) => {

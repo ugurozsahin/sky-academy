@@ -13,7 +13,7 @@ const evalX = (s: string): number => {
   const [a, b] = [Number(m[1]), Number(m[3])];
   return m[2] === '+' ? a + b : m[2] === '−' ? a - b : m[2] === '×' ? a * b : a / b;
 };
-const yesNo = (p: string) => p.match(/^Is (\d+ [+−×÷] \d+) the same as (\d+ [+−×÷] \d+)\?$/);
+const yesNo = (p: string) => p.match(/^Same answer\? (\d+ [+−×÷] \d+) \| (\d+ [+−×÷] \d+)$/);
 const same = (p: string) => p.match(/^Which is the same as (.+)\?$/);
 
 describe('y2-anyorder (#999)', () => {
