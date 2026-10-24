@@ -34,6 +34,19 @@ describe('y3-time (#1077)', () => {
     for (let h = 0; h < 24; h++) expect(t24(h, 5)).toMatch(/^([01]\d|2[0-3]):05$/);
   });
 
+  it('the Arabic clock cards carry minute marks, the Roman ones do not (#2278)', () => {
+    let arabic = 0;
+    for (const d of [1, 2] as const) for (const q of draws(d, 7)) {
+      const v = q.visual as { type: string; marks?: true; roman?: true } | undefined;
+      if (v?.type === 'clock') { arabic++; expect(v.marks).toBe(true); expect(v.roman).toBeUndefined(); }
+    }
+    for (const q of draws(3, 7)) {
+      const v = q.visual as { type: string; marks?: true; roman?: true } | undefined;
+      if (v?.roman) expect(v.marks).toBeUndefined();
+    }
+    expect(arabic).toBeGreaterThan(0);
+  });
+
   it('d1/d2 clock cards: the answer equals the visual h:mm, and the 12-hour hand is 1–12', () => {
     for (const d of [1, 2] as Difficulty[]) for (const q of draws(d, 1077_100 + d)) {
       if (!q.visual) continue;
