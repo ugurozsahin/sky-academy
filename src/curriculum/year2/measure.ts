@@ -89,7 +89,8 @@ type Survey = (typeof SURVEYS)[number];
 
 /** The counts for a Stats card and the two rows `more` compares. Bounded, and each re-roll keeps `kind`, `step` and `ask` as generated. */
 function statsCounts(rng: Rng, survey: Survey, kind: string, step: number, ask: string): { counts: number[]; i: number; j: number } {
-  const roll = () => survey.rows.map(() => ri(rng, 1, kind === 'block' ? 9 : 6) * step);
+  // A tally reads 5 to 10 (#2281): below five there is no five-bar gate, so it is Reception counting; ten is the phone row budget.
+  const roll = () => survey.rows.map(() => kind === 'tally' ? ri(rng, 5, 10) : ri(rng, 1, kind === 'block' ? 9 : 6) * step);
   let counts = roll();
   const [i, j] = shuffle(rng, [0, 1, 2]).slice(0, 2);
   const degenerate = () => ask === 'most'

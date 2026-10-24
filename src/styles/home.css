@@ -332,7 +332,7 @@
      shrinks the LAYOUT box, which is the whole point; a transform would shrink the picture and leave the bar
      just as tall. The factor is what makes the pool's tallest visual, the 120px clock, fit the budget.
      A tall landscape screen restores the base budget and scales nothing — see below. */
-  .duel-q { --duel-vis: 100px; --duel-zoom: 0.62; }   /* the zoom below, as a number, for a visual that bounds its own width by the budget (the pie, #1954) */
+  .duel-q { --duel-vis: 100px; --duel-zoom: 0.62; --duel-geo: 125px; }   /* the zoom below, as a number, for a visual that bounds its own width by the budget (the pie, #1954) */
   .duel-q .vis-wrap { display: flex; justify-content: center; }
   /* KNOWN TRADE, measured rather than assumed (raised as a note on PR #394's round-2 review). `zoom` scales the
      painted result while viewport units still resolve against the unzoomed viewport, so it walks through
@@ -342,7 +342,7 @@
      breaks the bound above. On a 390px-tall screen both cannot be had, and which one gives was the owner's call:
      DECIDED 2026-10-18 (#683), keep `zoom: 0.62` (star 11.6px, arenas above that bound). Nothing is CROPPED either way — the budget
      fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
-  .duel-q .vis { margin: 0; zoom: 0.62; }
+  .duel-q .vis { margin: 0; zoom: 0.62; } .duel-q svg.geo { width: min(var(--duel-geo, 220px), max(200px, 60vw)) !important; }   /* #2350 */
   .duel-q .symgrid { width: clamp(120px, 34vw, 150px); height: auto; max-height: calc((var(--duel-vis) - 4px) / 0.62); }   /* #1538, #1642: the zoom shrinks the budget */
   /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
      both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
@@ -361,7 +361,7 @@
   /* The base budget again, restated only to override the short band's 100px above — the cascade reaches both
      rules on a tall landscape screen and the later one wins. Nothing is scaled here: a clock question is one
      where reading the face IS the question, and a tablet has the height to show it whole. */
-  .duel-q { --duel-vis: 160px; --duel-zoom: 1; }
+  .duel-q { --duel-vis: 160px; --duel-zoom: 1; --duel-geo: 220px; }
   .duel-q .vis { zoom: 1; } .duel-q .symgrid { max-height: calc(var(--duel-vis) - 4px); }
   .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); }
 }
