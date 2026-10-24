@@ -1,5 +1,5 @@
 // y4-shapes (#1154): classify triangles and quadrilaterals by their properties (NC 4M34).
-// d1 a property in words, "is it an X?" (Yes / No); d2 three lettered triangles, "Which is the isosceles triangle?";
+// d1 a property in words, "is it an X?" (Yes / No), beside a drawing of the shape described; d2 three lettered triangles, "Which is the isosceles triangle?";
 // d3 three lettered quadrilaterals. The picture is the `geometry` visual's `polygon` part, drawn from exact vertices.
 // `IS_A` keeps definition disputes off every card (inclusive v exclusive: a square is a rectangle in some schools and not
 // in others): the answer is always the shape of exactly the asked class, and a decoy is never a member of it.
@@ -59,7 +59,7 @@ const THE: Record<Cls, string> = { ...TERM, equilateral: 'the equilateral triang
 const LETTERS = ['A', 'B', 'C'], CELLS = [2, 35, 68], W = 29, TOP = 6, H = 48;
 
 /** `tpl` turned a random multiple of 90°, maybe mirrored, scaled to fit cell `i` (exact coordinates, 2 decimals) and lettered. */
-function draw(rng: Rng, tpl: Tpl, i: number): Poly {
+function draw(rng: Rng, tpl: Tpl, i: number, lettered = true): Poly {
   const turns = Math.floor(rng() * 4), mirror = rng() < 0.5;
   let pts = tpl.pts.map(([x, y]): Pt => mirror ? [-x, y] : [x, y]);
   for (let k = 0; k < turns; k++) pts = pts.map(([x, y]): Pt => [-y, x]);
@@ -67,7 +67,8 @@ function draw(rng: Rng, tpl: Tpl, i: number): Poly {
   const [x0, y0] = [Math.min(...xs), Math.min(...ys)], [w, h] = [Math.max(...xs) - x0, Math.max(...ys) - y0];
   const s = Math.min(W / w, H / h) * (0.75 + 0.25 * rng()), r2 = (n: number) => Math.round(n * 100) / 100;
   const [ox, oy] = [CELLS[i] + (W - w * s) / 2, TOP + (H - h * s) / 2];
-  const out: Poly = { kind: 'polygon', pts: pts.map(([x, y]): Pt => [r2(ox + (x - x0) * s), r2(oy + (y - y0) * s)]), label: LETTERS[i] };
+  const out: Poly = { kind: 'polygon', pts: pts.map(([x, y]): Pt => [r2(ox + (x - x0) * s), r2(oy + (y - y0) * s)]) };
+  if (lettered) out.label = LETTERS[i];
   if (tpl.ticks) out.ticks = tpl.ticks;
   if (tpl.right) out.right = tpl.right;
   return out;
@@ -112,6 +113,9 @@ export const y4Shapes: Generator = (d: Difficulty, rng: Rng): Question => {
     const s = pick(rng, STATEMENTS), yes = rng() < 0.5, term = yes ? s.yes : pick(rng, s.no);
     return {
       ...statement(s, term), answer: yes ? 'Yes' : 'No', options: shuffle(rng, ['Yes', 'No']), wide: true,
+      // the shape the statement describes, drawn in the middle cell with no letter: the child checks the property against a picture (#2271).
+      // Drawn the same way every time (first template, upright): the repeat key reads a polygon's points, so a re-rolled turn would make one statement look new.
+      visual: { type: 'geometry', parts: [draw(() => 0.2, SHAPES[s.yes][0], 1, false)] },
       hint: 'Check each property', hintIsData: false,
     };
   }
