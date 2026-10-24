@@ -4,6 +4,7 @@
 // Reception/Year 2 live in util.ts.
 import type { Generator, Topic, Difficulty } from './types';
 import { y1PositionRow } from './y1-position-row';
+import { TRICKY, trickyGap } from './tricky-gaps';
 import { spellChoiceQ, y1SpellRules2 } from './year1-spell';
 import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
@@ -442,10 +443,9 @@ const y1Alien: Generator = (d, rng) => {
   });
 };
 const y1Spelling: Generator = (d, rng) => {
-  const w = pick(rng, Y1_CEW.filter(x => x.length >= (d === 1 ? 2 : 3) && x.length <= (d === 3 ? 6 : 4)));
+  const w = pick(rng, Y1_CEW.filter(x => x in TRICKY && x.length >= (d === 1 ? 2 : 3) && x.length <= (d === 3 ? 6 : 4)));
   if (d === 3 && rng() < 0.5) return spellQ(rng, w, undefined, 3);
-  const idx = ri(rng, 0, w.length - 1);
-  return gapQ(rng, w, idx, gapLetters(w, idx), undefined, `Which letter is missing from the word ${w}?`);
+  return trickyGap(rng, w);
 };
 /**
  * Year 1 spelling rules (#990): ff/ll/ss/zz/ck after a short vowel, n before k, -tch and the -ve ending
