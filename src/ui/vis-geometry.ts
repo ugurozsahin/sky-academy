@@ -103,5 +103,5 @@ export function geometrySVG(v: Extract<Visual, { type: 'geometry' }>): string {
     if (!partOk(p)) { console.warn('geometry visual: a part has a bad number, index or size — skipped'); return ''; }
     return partSVG(p);
   }).join('');
-  return `<div class="vis"><svg viewBox="0 0 100 70" class="geo" style="width:min(clamp(200px,60vw,220px),var(--duel-geo,220px));height:auto">${body}</svg></div>`;
+  return `<div class="vis"><svg viewBox="0 0 100 70" class="geo" style="width:clamp(200px,60vw,220px);height:auto">${body}</svg></div>`;
 }

@@ -342,7 +342,7 @@
      breaks the bound above. On a 390px-tall screen both cannot be had, and which one gives was the owner's call:
      DECIDED 2026-10-18 (#683), keep `zoom: 0.62` (star 11.6px, arenas above that bound). Nothing is CROPPED either way — the budget
      fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
-  .duel-q .vis { margin: 0; zoom: 0.62; }
+  .duel-q .vis { margin: 0; zoom: 0.62; } .duel-q svg.geo { width: min(var(--duel-geo, 220px), max(200px, 60vw)) !important; }   /* #2350 */
   .duel-q .symgrid { width: clamp(120px, 34vw, 150px); height: auto; max-height: calc((var(--duel-vis) - 4px) / 0.62); }   /* #1538, #1642: the zoom shrinks the budget */
   /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
      both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
