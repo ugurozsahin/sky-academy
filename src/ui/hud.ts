@@ -116,6 +116,9 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
 /** A degree sign never wraps onto a line of its own (#2278): a word joiner (U+2060) ties it to the character before it. */
 export const keepDegrees = (html: string) => html.replace(/(\S)°/g, '$1\u2060°');
 
+/** The ÷ sign reads as a bigger, bolder mark than the + beside it (#2278): `.op-div` (`src/styles/play.css`) sizes it up; same characters, so the text and the spoken line are unchanged. */
+export const markDivide = (html: string) => html.replace(/÷/g, '<span class="op-div">÷</span>');
+
 /** #2314: the card already prints this question's text (a `word` or `sentence` visual equal to the prompt), so the question line does not print it a second time. */
 export const cardRepeatsPrompt = (q: Question): boolean => !q.sequence && (q.visual?.type === 'word' || q.visual?.type === 'sentence') && q.visual.text === q.prompt;
 
@@ -138,7 +141,7 @@ export const cardRepeatsPrompt = (q: Question): boolean => !q.sequence && (q.vis
  */
 export function promptHTML(q: Question, done: number, reveal = false, remaining?: readonly string[]): string {
   if (cardRepeatsPrompt(q)) return '';
-  if (!q.sequence) return keepDegrees(esc(reveal && q.listen ? q.listen : q.prompt));
+  if (!q.sequence) return markDivide(keepDegrees(esc(reveal && q.listen ? q.listen : q.prompt)));
   if (q.build) return buildPromptHTML(q.prompt, q.build.template, q.sequence, done);
   if (q.anyOrder) {
     const left = new Set(remaining ?? q.sequence);

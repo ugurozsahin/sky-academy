@@ -15,7 +15,8 @@ const page = read('website/curriculum/index.html');
 const REGEN = 'run `npm run content-map` and commit website/curriculum/index.html';
 const main = page.match(/<main\b[\s\S]*<\/main>/)![0];
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-const topics = (year?: string, subject?: string) => TOPICS.filter(t => (!year || t.year === year) && (!subject || t.subject === subject));
+/** The site publishes only what the catalogue shows; the owner switched y1-contractions off on #2281. */
+const topics = (year?: string, subject?: string) => TOPICS.filter(t => t.id !== 'y1-contractions' && (!year || t.year === year) && (!subject || t.subject === subject));
 const word = (n: number) => `${n} ${n === 1 ? 'topic' : 'topics'}`;
 /** The year cards: one `<li>` each in the `.years` list, with its link, its name and its text. */
 const cards = () => {
@@ -39,7 +40,7 @@ describe('the curriculum hub is generated, never hand-kept (#2089, #2161)', () =
 describe('the hub\'s numbers are the game\'s own (#2161)', () => {
   it('says how many topics there are, and how many in maths and in English, in plain text', () => {
     const lede = text(main.match(/<p class="lede">[\s\S]*?<\/p>/)![0]).trim();
-    expect(lede).toBe(`Sharpwise has ${TOPICS.length} maths and English topics, from Reception to Year 6: ${topics('', 'maths').length} in maths and ${topics('', 'writing').length} in English.`);
+    expect(lede).toBe(`Sharpwise has ${topics().length} maths and English topics, from Reception to Year 6: ${topics('', 'maths').length} in maths and ${topics('', 'writing').length} in English.`);
   });
   it('gives each year card its own maths and English counts', () => {
     const got = cards();
@@ -50,7 +51,7 @@ describe('the hub\'s numbers are the game\'s own (#2161)', () => {
   });
   it('puts the same counts in the description, for search results', () => {
     const description = page.match(/<meta name="description" content="([^"]+)">/)![1];
-    expect(description).toContain(`${TOPICS.length} maths and English topics`);
+    expect(description).toContain(`${topics().length} maths and English topics`);
     expect(description).toContain(`${topics('', 'maths').length} in maths and ${topics('', 'writing').length} in English`);
   });
 });

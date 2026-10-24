@@ -102,7 +102,8 @@ describe('resolveGame applies the layers in order, last wins (#2194)', () => {
   it("with the committed file every game resolves to its year's settings", () => {
     const off = Object.entries(RUNTIME.games).flatMap(([id, g]) => Object.keys(g.years).map((y) => [id, y as YearId] as const))
       .filter(([id, y]) => JSON.stringify(resolveGame(id, y)) !== JSON.stringify({ visible: true, settings: resolveYear(y) }));
-    expect(off.map(([id]) => id)).toEqual([]);
+    expect(off.map(([id]) => id), 'only the game the owner switched off on #2281').toEqual(['y1-contractions']);
+    expect(resolveGame('y1-contractions', 'year1').visible).toBe(false);
   });
 });
 

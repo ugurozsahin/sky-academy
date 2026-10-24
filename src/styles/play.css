@@ -250,7 +250,7 @@
     gap: 2px;
   }
 }
-/* phones: the title needs the room; the name stays in the aria-label */
+.prompt .op-div { font-size: 1.25em; font-weight: 900; line-height: 1; vertical-align: -.06em; padding: 0 .05em; }  /* #2278: ÷ is not mistaken for + */
 .prompt { font-size: clamp(28px, 7vw, 44px); font-weight: 700; margin: 4px 0 2px; text-shadow: 0 2px 0 #0008; letter-spacing: var(--q-ls, .02em); line-height: var(--q-lh); }
 .prompt .seq span { display: inline-block; min-width: .8em; margin: 0 .06em; border-bottom: 3px solid #ffffff55; }
 .prompt .seq .got { color: var(--good); border-color: var(--good); }
