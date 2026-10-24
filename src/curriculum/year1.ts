@@ -31,7 +31,7 @@ const bondsQ = (rng: () => number, total: number) => {
   const a = ri(rng, 0, total);
   const missingLeft = rng() < 0.4;
   const p = missingLeft ? `? + ${a} = ${total}` : `${a} + ? = ${total}`;
-  return numQ(rng, p, total - a, { min: 0, max: 20, ...q(p), visual: total <= 10 ? { type: 'tenframe', n: a } : undefined });
+  return numQ(rng, p, total - a, { min: 0, max: 20, ...q(p), why: `${a} + ${total - a} = ${total}`, visual: total <= 10 ? { type: 'tenframe', n: a } : undefined });   // #2316: the whole bond, written out
 };
 /**
  * #922: the reverse form — "Which makes T?" with four sums on the bubbles. Decoys sum to T±1 or T±2 (never T,
@@ -43,7 +43,7 @@ const bondsPickQ = (rng: () => number, total: number) => {
   const near = [total - 2, total - 1, total + 1, total + 2].filter(s => s >= 0 && s <= 20);
   const sums = shuffle(rng, near).concat(total >= 3 ? [total - 3] : []).slice(0, 3);
   const answer = sum(total);
-  return wordQ(rng, `Which makes ${total}?`, answer, sums.map(sum), { say: `Which two numbers make ${total}?` });
+  return wordQ(rng, `Which makes ${total}?`, answer, sums.map(sum), { say: `Which two numbers make ${total}?`, why: `${answer} = ${total}` });
 };
 const y1Bonds: Generator = (d, rng) => {
   const total = d === 1 ? 10 : d === 2 ? pick(rng, [10, 12, 15]) : 20;

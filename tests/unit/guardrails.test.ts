@@ -132,7 +132,7 @@ describe('guard rails', () => {
       .flatMap(([f, s]) => code(s).split('\n').filter(l => /\bels\.hint\.(?:textContent|innerHTML)\s*\+?=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
     expect(writers, 'route a new hint write through setHint() or showOutcome(), never a direct assignment').toEqual([
       '/src/ui/hud.ts: els.hint.textContent = text;',
-      '/src/ui/hud.ts: els.hint.innerHTML = outcomeHintHTML(kind, q.answer, q.spelt);',
+      '/src/ui/hud.ts: els.hint.innerHTML = outcomeHintHTML(kind, q.answer, q.spelt, q.why);',
     ]);
   });
 

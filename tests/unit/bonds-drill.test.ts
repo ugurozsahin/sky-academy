@@ -24,6 +24,9 @@ const originalFrom = (rng: () => number, total: number) => {
   return numQ(rng, p, total - a, { min: 0, max: 20, ...q(p), visual: total <= 10 ? { type: 'tenframe', n: a } : undefined });
 };
 
+/** #2316: a card gained a `why`; everything else about it must be the bytes it had. */
+const noWhy = <T extends object>(c: T): Omit<T, 'why'> => { const { why: _why, ...rest } = c as T & { why?: string }; return rest; };
+
 describe('number-bond drills (#917)', () => {
   it('are the two Year 1 drills, in the chooser list only', () => {
     expect(drillsFor('year1', 'maths').map(t => t.id)).toEqual(['y1-bonds-10', 'y1-bonds-20', 'y1-doubles-halves']);
@@ -42,7 +45,7 @@ describe('number-bond drills (#917)', () => {
   });
   it('y1-bonds gives byte-identical cards to before at d1 (#922 adds a reverse form at d2–d3 only)', () => {
     const gen = topicById('y1-bonds')!.gen;
-    for (let seed = 1; seed <= 300; seed++) expect(gen(1, rngOf(seed))).toEqual(before(1, rngOf(seed)));
+    for (let seed = 1; seed <= 300; seed++) expect(noWhy(gen(1, rngOf(seed)))).toEqual(before(1, rngOf(seed)));
   });
   it('y1-bonds d2–d3: the original cards keep their totals (10/12/15 at d2, 20 at d3) and bytes (#922)', () => {
     const gen = topicById('y1-bonds')!.gen;
@@ -53,7 +56,7 @@ describe('number-bond drills (#917)', () => {
         const total = d === 2 ? pick(r, [10, 12, 15]) : 20;
         if (r() < 1 / 3) continue;
         kept++;
-        expect(gen(d, rngOf(seed))).toEqual(originalFrom(r, total));
+        expect(noWhy(gen(d, rngOf(seed)))).toEqual(originalFrom(r, total));
       }
       expect(kept).toBeGreaterThan(300);
     }

@@ -123,6 +123,7 @@ interface QuestionCore {
   fact?: string;          // a times-table fact as shown ('9×6'; '6×9' is another): what the fact record keys on (#1122). Only `a × b = ?` / missing-factor cards, both factors 2–12
   listWord?: string;      // a statutory-list card's word (the entry's first form), what the word record keys on (#1289)
   spelt?: string;         // #2277: the right spelling, when `answer` is a misspelling — the outcome line shows it, so the child sees the word done properly
+  why?: string;           // #2316: one short line saying why the answer is right (about 8 words in KS1, 14 in KS2), shown and spoken after a wrong slice or a miss, never before the child answers
   noSayAnswer?: boolean;  // #893/#982: this card's answer must never be spoken as the wrong/miss correction line (a pseudo-word)
 }
 
