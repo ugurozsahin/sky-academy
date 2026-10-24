@@ -14,6 +14,11 @@ describe('symSay: "?" is "what" only for a missing value (#2275)', () => {
     'Is this a right angle?', 'How many days in a leap year?', 'Seats left?', '29, 31, 33. What comes next?',
     'What is the missing number? 4 plus 3', 'Is 5 plus 3 equals 8?', 'What is 3 plus 4?', 'How much is 10p?',
   ])('a worded question keeps its "?": %s', (a) => { expect(symSay(a)).toBe(a); });
+  it('a "?" before a closing quote ends the speech and is kept; a gap "?" in quotes is still "what" (#2278)', () => {
+    expect(symSay('Mum asked, “Are you ready?”')).toBe('Mum asked, “Are you ready?”');
+    expect(symSay('“Can I help you?” asked Gran.')).toBe('“Can I help you?” asked Gran.');
+    expect(symSay('Mum asked, “Are you ready _”'.replace('_', '?'))).toBe('Mum asked, “Are you ready what ”');
+  });
   it('a question ending after a sum keeps its "?"', () => { expect(symSay('What is 3 + 4?')).toBe('What is 3 plus 4?'); });
   it('a "?" mid-prompt before a sum is kept', () => { expect(symSay('What is the missing number? 4 + 3')).toBe('What is the missing number? 4 plus 3'); });
   it('Is 5 + 3 = 8? keeps its question mark', () => { expect(symSay('Is 5 + 3 = 8?')).toBe('Is 5 plus 3 equals 8?'); });
