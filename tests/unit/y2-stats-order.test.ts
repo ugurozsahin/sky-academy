@@ -37,4 +37,13 @@ describe('y2-stats-order: slice the chart categories from most to least (#1006)'
       for (const row of v.rows) expect(text, 'never states a count').not.toMatch(new RegExp(`\\b${row.n}\\b`));
     }
   });
+  it('difficulty 1: every tally row is 5 to 10, so a five-bar gate is always shown (#2281)', () => {
+    const r = rng(2281);
+    for (let i = 0; i < 300; i++) {
+      for (const row of (t.gen(1, r).visual as Chart).rows) {
+        expect(row.n).toBeGreaterThanOrEqual(5);
+        expect(row.n).toBeLessThanOrEqual(10);
+      }
+    }
+  });
 });

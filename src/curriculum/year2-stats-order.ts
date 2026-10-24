@@ -16,12 +16,14 @@ export const y2StatsOrder: Generator = (d, rng) => {
   const survey = pick(rng, SURVEYS);
   const kind = d === 1 ? 'tally' : d === 2 ? 'pictogram' : 'block';
   const step = kind === 'pictogram' ? pick(rng, [2, 5]) : 1;
-  const roll = () => survey.rows.map(() => ri(rng, 1, kind === 'block' ? 9 : 6) * step);
+  // A tally reads 5 to 10 (#2281): below five there is no five-bar gate, so it is Reception counting.
+  const lo = kind === 'tally' ? 5 : 1;
+  const roll = () => survey.rows.map(() => ri(rng, lo, kind === 'block' ? 9 : kind === 'tally' ? 10 : 6) * step);
   const tied = (c: number[]) => new Set(c).size < c.length;
 
   let counts = roll();
   for (let tries = 0; tries < 20 && tied(counts); tries++) counts = roll();
-  if (tied(counts)) counts = survey.rows.map((_, k) => (k + 1) * step);   // the terminator: distinct by construction
+  if (tied(counts)) counts = survey.rows.map((_, k) => (k + lo) * step);   // the terminator: distinct by construction
 
   const rows = survey.rows.map(([icon, name], k) => ({ label: `${icon} ${name}`, n: counts[k] }));
   const visual: Question['visual'] = kind === 'pictogram'
