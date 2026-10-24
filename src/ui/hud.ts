@@ -36,10 +36,12 @@ export function stageHTML(name: string, segs: readonly ('good' | 'bad' | '')[], 
 }
 
 /** The outcome hint under the question card: a tick for a right answer, else the answer named. */
-export const outcomeHintHTML = (kind: Outcome, answer: string): string =>
-  kind === 'correct'
-    ? `<b class="ok">✓ ${esc(answer)}</b> — that's right!`
-    : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is <b class="ok">${esc(answer)}</b>`;
+export const outcomeHintHTML = (kind: Outcome, answer: string, spelt?: string): string => {
+  const word = spelt ? esc(spelt) : '';   // #2277: a misspelling answer also names the right spelling
+  return kind === 'correct'
+    ? `<b class="ok">✓ ${esc(answer)}</b> — that's right!${spelt ? ` It is spelt <b class="ok">${word}</b>.` : ''}`
+    : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is <b class="ok">${esc(answer)}</b>${spelt ? `, spelt <b class="ok">${word}</b>` : ''}`;
+};
 
 /** `outcome` (#2286) is the line under `hint` that carries the verdict when the hint is the card's own values; optional so a card without it keeps the old one-line behaviour. */
 export interface HudEls { lives: HTMLElement; qcard: HTMLElement; prompt: HTMLElement; hint: HTMLElement; outcome?: HTMLElement }
@@ -222,9 +224,9 @@ export function createHud(els: HudEls, lives: number, audible: () => boolean) {
       // `.own` (a colour, a size) would silently reach the outcome text of every measure card.
       // #2286: a hint the card is answered from (`own`) is kept, and the verdict goes on its own line below it,
       // so a wrong slice does not hide the values the child needed to see why.
-      if (els.outcome && els.hint.classList.contains('own')) { els.outcome.innerHTML = outcomeHintHTML(kind, q.answer); return; }
+      if (els.outcome && els.hint.classList.contains('own')) { els.outcome.innerHTML = outcomeHintHTML(kind, q.answer, q.spelt); return; }
       els.hint.classList.remove('own');
-      els.hint.innerHTML = outcomeHintHTML(kind, q.answer);
+      els.hint.innerHTML = outcomeHintHTML(kind, q.answer, q.spelt);
     },
     /** The correction line after a wrong slice or a miss (#893) — the caller skips this in Ninja Sprint, whose pace leaves it no room. */
     speakCorrection(q: Question, topicId: string | undefined) {

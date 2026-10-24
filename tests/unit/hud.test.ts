@@ -68,6 +68,11 @@ describe('outcomeHintHTML (#36 — the outcome reveal under the question card)',
   it('a miss reads that it flew away', () => {
     expect(plain(outcomeHintHTML('miss', '12'))).toBe('It flew away! The answer is 12');
   });
+  it('a misspelling answer also shows the right spelling (#2277)', () => {
+    expect(plain(outcomeHintHTML('wrong', 'prety', 'pretty'))).toBe('✗ Not this time. The answer is prety, spelt pretty');
+    expect(plain(outcomeHintHTML('miss', 'prety', 'pretty'))).toBe('It flew away! The answer is prety, spelt pretty');
+    expect(plain(outcomeHintHTML('correct', 'prety', 'pretty'))).toBe("✓ prety — that's right! It is spelt pretty.");
+  });
   it('escapes HTML in the answer', () => {
     expect(outcomeHintHTML('wrong', '5 < 8')).toContain('5 &lt; 8');
     expect(outcomeHintHTML('correct', '5 < 8')).not.toContain('5 < 8');
