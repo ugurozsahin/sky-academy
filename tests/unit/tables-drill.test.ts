@@ -18,6 +18,9 @@ const before: Generator = (d, rng) => {
   const p = `? × ${table} = ${n * table}`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) });
 };
 
+/** #2316: a card gained a `why`; everything else about it must be the bytes it had. */
+const noWhy = <T extends object>(c: T): Omit<T, 'why'> => { const { why: _why, ...rest } = c as T & { why?: string }; return rest; };
+
 describe('times-table drills (#916)', () => {
   it('are the three Year 2 drills, in the chooser list only', () => {
     expect(drillsFor('year2', 'maths').map(t => t.id)).toEqual(expect.arrayContaining(['y2-tables-2', 'y2-tables-5', 'y2-tables-10']));
@@ -36,7 +39,7 @@ describe('times-table drills (#916)', () => {
   });
   it('y2-tables gives byte-identical d1 cards to before for the same seed (the reverse form is d2–d3 only, #923)', () => {
     const now = topicById('y2-tables')!.gen;
-    for (const d of [1 as Difficulty]) for (let seed = 1; seed <= 200; seed++) expect(now(d, rngOf(seed))).toEqual(before(d, rngOf(seed)));
+    for (const d of [1 as Difficulty]) for (let seed = 1; seed <= 200; seed++) expect(noWhy(now(d, rngOf(seed)))).toEqual(before(d, rngOf(seed)));
   });
   it('tablesQ is the one factory the mixed topic calls', () => {
     expect(tablesQ(1, rngOf(3), 5).prompt).toMatch(/5/);
