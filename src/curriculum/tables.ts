@@ -4,11 +4,11 @@ import { ri, pick, numQ, q, wordQ, shuffle } from './util';
 
 /** One 2×, 5× or 10× card for `table`: d1 multiply, d2 adds divide, d3 adds the missing factor. */
 export const tablesQ = (d: Difficulty, rng: () => number, table: number): Question => {
-  const n = ri(rng, 1, 12);
+  const n = ri(rng, 1, 12), why = `${n} × ${table} = ${n * table}`;   // #2316: every card's reason is the multiplication fact behind it
   const kind = d === 3 ? ri(rng, 0, 2) : d === 2 ? ri(rng, 0, 1) : 0;
-  if (kind === 0) { const p = rng() < 0.5 ? `${n} × ${table} = ?` : `${table} × ${n} = ?`; return numQ(rng, p, n * table, { min: 0, max: 120, ...q(p), distractors: [n * table + table, n * table - table, n * table + 1] }); }
-  if (kind === 1) { const p = `${n * table} ÷ ${table} = ?`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) }); }
-  const p = `? × ${table} = ${n * table}`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) });
+  if (kind === 0) { const p = rng() < 0.5 ? `${n} × ${table} = ?` : `${table} × ${n} = ?`; return numQ(rng, p, n * table, { min: 0, max: 120, ...q(p), distractors: [n * table + table, n * table - table, n * table + 1], why }); }
+  if (kind === 1) { const p = `${n * table} ÷ ${table} = ?`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p), why }); }
+  const p = `? × ${table} = ${n * table}`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p), why });
 };
 /**
  * #923: the reverse form — "Which makes P?" with four facts on the bubbles. Decoys keep the answer's table and
@@ -18,7 +18,7 @@ export const tablesQ = (d: Difficulty, rng: () => number, table: number): Questi
 export const tablesPickQ = (rng: () => number, table: number): Question => {
   const n = ri(rng, 1, 12), p = n * table;
   const near = shuffle(rng, [n - 1, n + 1]).concat(shuffle(rng, [n - 2, n + 2, n + 3, n - 3])).filter(a => a >= 1 && a <= 12);
-  return wordQ(rng, `Which makes ${p}?`, `${n} × ${table}`, near.slice(0, 3).map(a => `${a} × ${table}`), { say: `Which fact makes ${p}?` });
+  return wordQ(rng, `Which makes ${p}?`, `${n} × ${table}`, near.slice(0, 3).map(a => `${a} × ${table}`), { say: `Which fact makes ${p}?`, why: `${n} × ${table} = ${p}` });
 };
 /**
  * #1127: Year 4's reverse forms — "Which makes P?" / "Which makes Q?" with four calculations on the bubbles, both

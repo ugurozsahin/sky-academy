@@ -758,6 +758,22 @@ test.describe('Sharpwise', () => {
     expect(seen.shown).not.toBe('none');
   });
 
+  // #2316: a wrong slice in a bonds game says why on the line under the answer, and the card still fits a 390×844 phone.
+  test('a wrong slice in y1-bonds shows the why line under the answer (#2316)', async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-bonds');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    const seen = await page.evaluate(() => {
+      window.__sna.wrong();
+      const hint = document.querySelector('#hint') as HTMLElement;
+      return { text: hint.textContent ?? '', fits: document.documentElement.scrollWidth <= document.documentElement.clientWidth };
+    });
+    expect(seen.text).toContain('The answer is');
+    expect(seen.text).toMatch(/\d+ \+ \d+ = 10/);
+    expect(seen.fits).toBe(true);
+  });
+
   // #893: the right answer is told, not only shown, so a pre-reader gets the correction too — never in Ninja
   // Sprint, whose pace has no room for it (`hud.ts`'s `speakCorrection`). `y2-tables` answers a bare number,
   // so `correctionLine` is never null here.
