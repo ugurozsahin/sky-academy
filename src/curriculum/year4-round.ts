@@ -4,7 +4,7 @@
 // makes: rounded the wrong way, and rounded to the wrong place. A number exactly halfway rounds up.
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
-import { dec, fmt, roundTo as roundDec } from './ks2num';
+import { dec, fmt, roundTo as roundDec, roundWhy } from './ks2num';
 
 const fmtN = (n: number) => fmt(dec(n, 0));
 const PLACE_WORD: Record<number, string> = { 10: 'ten', 100: 'hundred', 1000: 'thousand' };
@@ -47,7 +47,7 @@ export const y4RoundCard = (d: Difficulty, rng: Rng): Question => {
   const answer = roundDec(dec(n, 0), p).v;
   const word = PLACE_WORD[p];
   return wordQ(rng, `${fmtN(n)} to the nearest ${p === 10 ? '10' : fmtN(p)}?`, fmtN(answer), roundDecoys(n, p, answer, rng).map(fmtN),
-    { say: `Round ${fmtN(n)} to the nearest ${word}.`, hint: 'Slice the rounded number', hintIsData: false });
+    { say: `Round ${fmtN(n)} to the nearest ${word}.`, hint: 'Slice the rounded number', hintIsData: false, why: roundWhy(n, p) });
 };
 
 /** Two multiples of 1,000, each at least 3,000 from the answer and from each other, never 0 or 10,000. */
@@ -64,7 +64,7 @@ function lineCard(rng: Rng): Question {
   return wordQ(rng, 'Which number is about here?', fmtN(mark), lineDecoys(k, rng).map(fmtN), {
     visual: { type: 'numberline', from: 0, to: MAX, step: 1000, mark, ends: true, labels: LABELS },
     say: 'The line goes from 0 to 10,000. Which number is at the question mark?',
-    hint: 'Slice the number at the ?', hintIsData: false,
+    hint: 'Slice the number at the ?', hintIsData: false, why: `The ? sits at ${fmtN(mark)}.`,
   });
 }
 

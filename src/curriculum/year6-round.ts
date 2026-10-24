@@ -5,7 +5,7 @@
 // wrong way and rounded at the wrong place.
 import type { Difficulty, Generator, Question } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
-import { dec, fmt } from './ks2num';
+import { dec, fmt, roundWhy, type RoundUnit } from './ks2num';
 import { ks2Say } from './ks2say';
 
 const MAX = 10000000;
@@ -55,5 +55,5 @@ export const y6Round: Generator = (d, rng): Question => {
   const answer = roundTo(n, p);
   const prompt = d === 3 ? pick(rng, CONTEXTS)(fmtN(n), fmtN(p)) : `Round ${fmtN(n)} to the nearest ${fmtN(p)}`;
   const say = ks2Say(d === 3 ? prompt.replace(/Nearest [\d,]+\?$/, `Round to the nearest ${PLACE_WORD[p]}`) : `Round ${fmtN(n)} to the nearest ${PLACE_WORD[p]}`);
-  return wordQ(rng, prompt, fmtN(answer), decoys(n, p, answer, rng).map(fmtN), { say });
+  return wordQ(rng, prompt, fmtN(answer), decoys(n, p, answer, rng).map(fmtN), { say, why: roundWhy(n, p as RoundUnit) });
 };
