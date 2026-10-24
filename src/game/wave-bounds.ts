@@ -12,6 +12,11 @@ import { BOX_EPSILON } from './box-watch';
 
 /** The most of the box the question card may take from the flight — the same cap `Arena.reanchor` applies. */
 export const TOP_INSET_MAX = 0.5;
+/** A tall, narrow box (a phone held upright) can give a tall card more, so `y5-transform`'s 534 px card on 844 px no longer
+ *  caps the card line at 422 and lets an arc end behind it (#2278); 0.35 of the box still flies. Landscape keeps `TOP_INSET_MAX`. */
+export const TALL_INSET_MAX = 0.65, TALL_BOX = 1.6;
+/** The most of an `W`×`H` box the card may take: `TALL_INSET_MAX` of a box at least `TALL_BOX` times as tall as it is wide. */
+export const insetMax = (W: number, H: number) => H * (H >= W * TALL_BOX ? TALL_INSET_MAX : TOP_INSET_MAX);
 /** The least and most of the box a bubble may rise, as shares of its height. */
 export const RISE_MIN = 0.25, RISE_MAX = 0.95;
 
@@ -65,8 +70,8 @@ export function holdUnderCard(bubbles: readonly { y: number; vy: number; g: numb
  * scaled with the box — and never more than `TOP_INSET_MAX` of it. The card does not scale with the box, so a
  * live read is the true line; a scaled one (the duel's fixed 8 px, a test arena) is the best guess there is.
  */
-export function nextInset(live: number | undefined, old: number, sy: number, H: number) {
-  return Math.min(live !== undefined && Number.isFinite(live) ? live : old * sy, H * TOP_INSET_MAX);
+export function nextInset(live: number | undefined, old: number, sy: number, W: number, H: number) {
+  return Math.min(live !== undefined && Number.isFinite(live) ? live : old * sy, insetMax(W, H));
 }
 
 /** Whether a measured rect is a different box from the whole-px `W`×`H` the arena holds: by `BOX_EPSILON`, the
