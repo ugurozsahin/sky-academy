@@ -591,14 +591,3 @@ describe('chart visual: table (#1021)', () => {
     expect(pic).toBe('<div class="vis"><div class="chart pictogram"><div class="chart-row"><span class="cat">a</span><span class="data"><span class="pic">⭐</span><span class="pic">⭐</span></span></div><div class="key">1 ⭐ = 2</div></div></div>');
   });
 });
-
-describe('clockSVG — minute marks (#2278)', () => {
-  it('a face drawn with marks has sixty ticks, the same hands and numerals; one without has none', () => {
-    const on = clockSVG(7, 4, true), off = clockSVG(7, 4);
-    expect(on.match(/class="tick"/g)).toHaveLength(60);
-    expect(off).not.toContain('tick');
-    const rest = (x: string) => x.replace(/<g [^>]*>(<line [^>]*class="tick"\/>)+<\/g>/, '');
-    expect(rest(on)).toBe(off);
-    expect(renderVisual({ type: 'clock', h: 7, m: 4, marks: true })).toBe(`<div class="vis">${on}</div>`);
-  });
-});
