@@ -11,7 +11,7 @@ const MAX = 999999;
 const f = (n: number) => fmt(dec(n, 0));
 const first = (s: string) => s[0];
 
-interface Card { prompt: string; spoken: string; answer: number; named: number[]; }
+interface Card { prompt: string; spoken: string; answer: number; named: number[]; cap?: number; }
 
 /** The card text for `a ± b = ?`, with the place, exchange and (optionally) compensation decoys. */
 function calc(a: number, b: number, add: boolean, diff = 0): Card {
@@ -33,15 +33,18 @@ function missing(a: number, b: number, add: boolean, rng: Rng): Card {
   return { prompt: `${f(a)} ${sign} ? = ${f(c)}`, spoken: `${f(a)} ${add ? 'plus' : 'minus'} what number makes ${f(c)}`, answer: b, named: [a + c, c - b, b * 10, b / 10] };
 }
 
-function draw(d: Difficulty, rng: Rng): Card {
-  if (d === 1) {
-    if (pick(rng, [true, false])) {
-      const add = pick(rng, [true, false]), b = ri(rng, 1, 9) * 1000;
-      return add ? calc(ri(rng, 1, 90) * 1000, b, true) : calc(ri(rng, 10, 99) * 1000, b, false);
-    }
-    const add = pick(rng, [true, false]), b = ri(rng, 2, 9) * 1000, n = add ? ri(rng, 10001, 90999) : ri(rng, 11001, 98999);
-    return calc(n, b, add);
+function draw1(rng: Rng): Card {
+  if (pick(rng, [true, false])) {
+    const add = pick(rng, [true, false]), b = ri(rng, 1, 9) * 1000;
+    return add ? calc(ri(rng, 1, 90) * 1000, b, true) : calc(ri(rng, 10, 99) * 1000, b, false);
   }
+  const add = pick(rng, [true, false]), b = ri(rng, 2, 9) * 1000, n = add ? ri(rng, 10001, 90999) : ri(rng, 11001, 98999);
+  return calc(n, b, add);
+}
+
+function draw(d: Difficulty, rng: Rng): Card {
+  // d1 stays within 100,000, so no option may be a digit longer than the answer.
+  if (d === 1) return { ...draw1(rng), cap: 99999 };
   if (d === 2) {
     const u = pick(rng, [1000, 10000]), add = pick(rng, [true, false]);
     if (add) { const a = ri(rng, 2, 900000 / u) * u, b = ri(rng, 2, Math.floor((MAX - a) / u)) * u; return calc(a, b, true); }
@@ -60,7 +63,7 @@ function draw(d: Difficulty, rng: Rng): Card {
 
 /** Misconception decoys first; then one that shares the answer's last digit, and one its leading digit, so neither gives it away. */
 function options(c: Card, rng: Rng): number[] {
-  const ok = (v: number, out: number[]) => Number.isInteger(v) && v >= 0 && v <= MAX && v !== c.answer && !out.includes(v);
+  const ok = (v: number, out: number[]) => Number.isInteger(v) && v >= 0 && v <= (c.cap ?? MAX) && v !== c.answer && !out.includes(v);
   const out: number[] = [];
   for (const v of c.named) if (out.length < 3 && ok(v, out)) out.push(v);
   const share = (v: number, g: (s: string) => string) => g(String(v)) === g(String(c.answer));
