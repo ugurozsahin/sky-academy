@@ -1360,7 +1360,7 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
         // symbols, the visible row length, not the raw count) — neither had a budget, so raising either roll
         // stayed green while running a row off a phone.
         if (v.kind === 'block') expect(row.n, 'a block row must stay short enough to fit a phone').toBeLessThanOrEqual(10);
-        if (v.kind === 'tally') expect(row.n, 'a tally row must stay short enough to fit a phone').toBeLessThanOrEqual(10);
+        if (v.kind === 'tally') expect(row.n, 'a tally row is 5-10: a five-bar gate (#2281) and a phone row').toBeLessThanOrEqual(10), expect(row.n).toBeGreaterThanOrEqual(5);
         if (v.kind === 'pictogram') {
           expect(row.n / v.each, 'a pictogram row (n / each symbols drawn) must stay short enough to fit a phone')
             .toBeLessThanOrEqual(10);
