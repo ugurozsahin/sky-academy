@@ -2552,7 +2552,7 @@ test.describe('Sharpwise', () => {
     expect(await page.evaluate(() => window.__sna.arena.frozen)).toBe(true);
     expect(await page.evaluate(() => window.__sna.arena.bubbles.some((b: any) => b.mark === 'good' && !b.dead))).toBe(true);
     await expect(page.locator('.qcard.good .prompt .ans')).toHaveText(expected);
-    await expect(page.locator('.qcard.good .hint')).toContainText("that's right");
+    await expect(page.locator('.qcard.good .hint', { hasText: "that's right" })).toHaveCount(1);   // #2286: a card with its own values keeps `.hint` and puts the verdict in `.hint.outcome`, so match the verdict line, not "the" hint
     await page.waitForFunction(() => window.__sna.state().index === 1 && !window.__sna.state().waiting);
     expect(Date.now() - t0).toBeGreaterThanOrEqual(1200);                       // a real pause before the next question
     await expect(page.locator('.qcard')).not.toHaveClass(/good|bad/);
@@ -2561,7 +2561,7 @@ test.describe('Sharpwise', () => {
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
     const marks = await page.evaluate(() => window.__sna.arena.bubbles.filter((b: any) => !b.dead && b.mark).map((b: any) => b.mark).sort());
     expect(marks).toEqual(['bad', 'good']);
-    await expect(page.locator('.qcard.bad .hint')).toContainText('The answer is');
+    await expect(page.locator('.qcard.bad .hint', { hasText: 'The answer is' })).toHaveCount(1);
     expect(await page.evaluate(() => window.__sna.answer())).toBe(false);          // input is ignored while the outcome shows
     await page.waitForFunction(() => window.__sna.state().index === 2 && !window.__sna.state().waiting);
   });
