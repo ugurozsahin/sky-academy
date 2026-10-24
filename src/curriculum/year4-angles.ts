@@ -65,7 +65,7 @@ export const y4Angles: Generator = (d: Difficulty, rng: Rng): Question => {
     const deg = want === 'Acute' ? ACUTE(rng) : want === 'Right' ? 90 : OBTUSE(rng);
     return {
       ...q('Is this angle acute, right or obtuse?'), answer: angleClass(deg), options: shuffle(rng, NAMES.slice()), wide: true,
-      visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir: dirFor(rng, deg), deg, len: pick(rng, [10, 12, 14, 16]) }] },
+      visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir: dirFor(rng, deg), deg, len: pick(rng, [24, 26, 28]) }] },
       hint: 'Slice the right word', hintIsData: false,
     };
   }
