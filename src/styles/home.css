@@ -343,6 +343,7 @@
      DECIDED 2026-10-18 (#683), keep `zoom: 0.62` (star 11.6px, arenas above that bound). Nothing is CROPPED either way — the budget
      fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
   .duel-q .vis { margin: 0; zoom: 0.62; }
+  .duel-q { --duel-geo: 125px; }   /* the geometry drawing (y4-shapes beside a two-line prompt, #2350): the bar is over budget at 640x360 at full width */
   .duel-q .symgrid { width: clamp(120px, 34vw, 150px); height: auto; max-height: calc((var(--duel-vis) - 4px) / 0.62); }   /* #1538, #1642: the zoom shrinks the budget */
   /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
      both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
@@ -361,7 +362,7 @@
   /* The base budget again, restated only to override the short band's 100px above — the cascade reaches both
      rules on a tall landscape screen and the later one wins. Nothing is scaled here: a clock question is one
      where reading the face IS the question, and a tablet has the height to show it whole. */
-  .duel-q { --duel-vis: 160px; --duel-zoom: 1; }
+  .duel-q { --duel-vis: 160px; --duel-zoom: 1; --duel-geo: 220px; }
   .duel-q .vis { zoom: 1; } .duel-q .symgrid { max-height: calc(var(--duel-vis) - 4px); }
   .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); }
 }
