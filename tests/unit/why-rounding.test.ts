@@ -20,4 +20,10 @@ describe('the rounding why matches the answer (#2317)', () => {
       expect(checked).toBeGreaterThan(300);
     });
   }
+  it('the y4 number-line card says where the ? is, and that is its answer', () => {
+    const t = TOPICS.find(x => x.id === 'y4-round')!;
+    const lines = Array.from({ length: 200 }, (_, s) => t.gen(3, rngOf((s + 1) * 104729 + 3))).filter(q => q.why?.startsWith('Each gap'));
+    expect(lines.length).toBeGreaterThan(10);
+    for (const q of lines) expect(q.why).toContain(q.answer);
+  });
 });

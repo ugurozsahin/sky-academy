@@ -314,6 +314,8 @@ describe('roundWhy (#2317)', () => {
   it.each([
     [45, 10, 'The ones digit is 5, so round up.'],
     [44, 10, 'The ones digit is 4, so round down.'],
+    [345672, 100, 'The tens digit is 7, so round up.'],
+    [345672, 10000, 'The thousands digit is 5, so round up.'],
     [345672, 1000, 'The hundreds digit is 6, so round up.'],
     [345472, 1000, 'The hundreds digit is 4, so round down.'],
     [345672, 100000, 'The ten thousands digit is 4, so round down.'],
@@ -323,4 +325,5 @@ describe('roundWhy (#2317)', () => {
   ] as const)('%s to %s: %s', (n, unit, said) => {
     expect(roundWhy(n, unit)).toBe(said);
   });
+  it('throws for a unit with no place name', () => { expect(() => roundWhy(345672, 5)).toThrow(); });
 });
