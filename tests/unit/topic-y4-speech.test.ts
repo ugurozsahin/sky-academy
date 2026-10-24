@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
-import { AVOID } from '../../src/curriculum/util';
+import { AVOID, symSay } from '../../src/curriculum/util';
 import { STATEMENTS, QUESTIONS, EXCLAMATIONS } from '../../src/curriculum/year4-speech';
 
 function rng(seed: number) {
@@ -94,5 +94,25 @@ describe('y4-speech (#1167)', () => {
     let hit = false;
     for (let s = 1; s <= 600; s++) { const q = topic.gen(3, rng(s * 23)); if (textOf(q).startsWith('“') && q.answer === '?') hit = true; }
     expect(hit).toBe(true);
+  });
+
+  it('the why line is the sentence with the answer in the gap, so a bare mark is read in context (#2278)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (let s = 1; s <= 200; s++) {
+      const q = topic.gen(d, rng(s * 29 + d));
+      expect(q.why, textOf(q)).toBe(textOf(q).replace('_', q.answer));
+      expect(q.why).not.toContain('_');
+    }
+  });
+
+  it('the spoken why keeps a question mark that ends the speech, in every form (#2278)', () => {
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let s = 1; s <= 200; s++) {
+      const q = topic.gen(d, rng(s * 31 + d));
+      const spoken = symSay(q.why!);
+      expect(spoken, q.why).not.toMatch(/what/);
+      if (q.answer === '?') { seen++; expect(spoken, q.why).toMatch(/\?”/); }
+    }
+    expect(seen).toBeGreaterThan(50);
+    expect(symSay('Mum asked, “Are you ready?”')).toBe('Mum asked, “Are you ready?”');
   });
 });

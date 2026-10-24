@@ -27,7 +27,8 @@ const say = (text: string) => text.replace(/[“”]/g, '').replace('_', ' blank
 export const y4Speech: Generator = (d, rng) => {
   const form = d === 1 ? 0 : d === 2 ? 1 : pick(rng, [0, 1, 2, 2]);
   const make = (text: string, answer: string, marks: string[], hint: string) => wordQ(rng, 'Which mark goes in the gap?', answer,
-    marks.filter(m => m !== answer), { visual: { type: 'sentence', text }, say: say(text), hint, hintIsData: false });
+    marks.filter(m => m !== answer), { visual: { type: 'sentence', text }, say: say(text), hint, hintIsData: false,
+      why: text.replace('_', answer) });   // #2278: a bare ',' is a tiny glyph, so the outcome line shows it in its sentence
   if (form === 0) {
     const [who, verb, words, end] = pick(rng, d === 1 ? [...STATEMENTS, ...QUESTIONS, ...EXCLAMATIONS] : [...STATEMENTS, ...QUESTIONS]);
     return make(`${who} ${verb}_ “${words}${end}”`, ',', d === 1 ? MARKS : [',', '.', '?'], 'What follows the words that tell us who is speaking?');
