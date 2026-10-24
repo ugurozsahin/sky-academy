@@ -1,14 +1,14 @@
 // Year 2 words: spelling, contractions, suffixes, homophones, tracing. Split out of year2.ts (#1416); index.ts re-exports every name.
 import { type Generator } from '../types';
 import { spokenGap } from '../spoken-gap';
-import { ri, pick, shuffle, wordQ, gapLetters, gapQ, spellQ, Y1_CEW, Y2_CEW } from '../util';
+import { pick, shuffle, wordQ, spellQ, Y1_CEW, Y2_CEW } from '../util';
+import { TRICKY, trickyGap } from '../tricky-gaps';
 
 // ---------- Year 2 writing ----------
 export const y2Spelling: Generator = (d, rng) => {
-  const w = pick(rng, Y2_CEW.filter(x => x.length <= (d === 1 ? 5 : d === 2 ? 7 : 10)));
+  const w = pick(rng, Y2_CEW.filter(x => x in TRICKY && x.length <= (d === 1 ? 5 : d === 2 ? 7 : 10)));
   if (d === 3 && rng() < 0.4) return spellQ(rng, w, undefined, 3);
-  const idx = ri(rng, 0, w.length - 1);
-  return gapQ(rng, w, idx, gapLetters(w, idx), undefined, `Which letter is missing from the word ${w}?`);
+  return trickyGap(rng, w);
 };
 export const CONTRACTIONS: [string, string][] = [['do not', "don't"], ['cannot', "can't"], ['is not', "isn't"], ['I am', "I'm"], ['it is', "it's"], ['you are', "you're"], ['we will', "we'll"], ['did not', "didn't"], ['has not', "hasn't"], ['they are', "they're"], ['I will', "I'll"], ['could not', "couldn't"]];
 export const y2Contractions: Generator = (d, rng) => {
