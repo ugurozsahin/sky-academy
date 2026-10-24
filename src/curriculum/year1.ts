@@ -15,6 +15,7 @@ import {
   gapLetters, gapQ, spellQ, sentGen, type Sent, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
 } from './util';
+import { y1When } from './year1-when';
 import { spokenGap } from './spoken-gap';
 import { syllableQ } from './syllables';
 import { storyQ } from './story';
@@ -354,30 +355,6 @@ const y1Months: Generator = (d, rng) => {
   const i = ri(rng, 0, 11), after = rng() < 0.5, ans = MONTHS[(i + (after ? 1 : 11)) % 12];
   return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` });
 };
-/** "My Day" (#979): two fixed ordered lists; the answer is the list neighbour, never wrapping. */
-const DAY_PARTS = ['morning', 'afternoon', 'evening'];
-const DAY_PART_EMOJI = ['🌅', '☀️', '🌇'];
-const DAY_WORDS = ['yesterday', 'today', 'tomorrow'];
-const y1When: Generator = (d, rng) => {
-  const hint = { hint: 'Slice the word', hintIsData: false };
-  const kind = d === 1 ? 0 : d === 2 ? ri(rng, 0, 2) : ri(rng, 1, 3);
-  const first = 'Which part of the day comes first?';
-  if (d === 1 && rng() < 0.25) return wordQ(rng, first, DAY_PARTS[0], DAY_PARTS.slice(1), { say: first, ...hint });  // keeps d1 above the suite's variety floor
-  if (kind === 0) {                                              // strip with one day part hidden
-    const gap = ri(rng, 0, 2), ans = DAY_PARTS[gap];
-    const text = DAY_PART_EMOJI.map((e, i) => (i === gap ? '_' : e)).join(' ');
-    return wordQ(rng, 'Which part of the day is missing?', ans, DAY_PARTS.filter(x => x !== ans), { visual: { type: 'strip', text }, say: 'Which part of the day is missing? Morning, afternoon or evening?', ...hint });
-  }
-  const parts = d === 2 ? kind === 2 : rng() < 0.5;              // d2: kind 1 = word cards, kind 2 = day parts
-  const list = parts ? DAY_PARTS : DAY_WORDS, other = parts ? DAY_WORDS : DAY_PARTS;
-  const decoys = (ans: string) => [...shuffle(rng, list.filter(x => x !== ans)), ...shuffle(rng, other)];
-  if (parts && rng() < 0.3) {
-    return wordQ(rng, first, DAY_PARTS[0], decoys(DAY_PARTS[0]), { say: first, ...hint });
-  }
-  const after = rng() < 0.5, i = after ? ri(rng, 0, 1) : ri(rng, 1, 2), ans = list[after ? i + 1 : i - 1];
-  const q2 = `What comes ${after ? 'after' : 'before'} ${list[i]}?`;
-  return wordQ(rng, q2, ans, decoys(ans), { say: q2, ...hint });
-};
 const y1Balance: Generator = (d, rng) => {
   if (d === 1) { const a = ri(rng, 1, 9), b = ri(rng, 1, 10 - a); return rng() < 0.5 ? balanceQ(rng, `${a} + ${b}`, '?', a + b, 20) : balanceQ(rng, '?', `${a} + ${b}`, a + b, 20); }
   const a = ri(rng, 1, 15), b = ri(rng, 1, 20 - a), total = a + b;
@@ -445,7 +422,9 @@ const y1Alien: Generator = (d, rng) => {
 const y1Spelling: Generator = (d, rng) => {
   const w = pick(rng, Y1_CEW.filter(x => x in TRICKY && x.length >= (d === 1 ? 2 : 3) && x.length <= (d === 3 ? 6 : 4)));
   if (d === 3 && rng() < 0.5) return spellQ(rng, w, undefined, 3);
-  return trickyGap(rng, w);
+  const q = trickyGap(rng, w);                                   // #2322: three letter bubbles, not four
+  const drop = q.options.find(o => o !== q.answer)!;
+  return { ...q, options: q.options.filter(o => o !== drop) };
 };
 /**
  * Year 1 spelling rules (#990): ff/ll/ss/zz/ck after a short vowel, n before k, -tch and the -ve ending
@@ -474,7 +453,8 @@ const y1SpellRules: Generator = (d, rng) => {
 const y1Plurals: Generator = (d, rng) => {
   const S: [string, string][] = [['cat', 's'], ['dog', 's'], ['book', 's'], ['hat', 's'], ['car', 's'], ['tree', 's'], ['fox', 'es'], ['box', 'es'], ['bus', 'es'], ['dish', 'es'], ['bench', 'es'], ['wish', 'es'], ['glass', 'es'], ['brush', 'es']];
   const [w, suf] = pick(rng, d === 1 ? S.filter(x => x[1] === 's') : S);
-  return wordQ(rng, `one ${w}, two ${w}__`, suf, ['s', 'es', 'ies'], { visual: { type: 'word', text: `${w}_` }, say: `One ${w}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
+  // #2322: two bubbles (s, es) until d3, which adds ies; "two cat__" is the whole sentence, the word is on the card
+  return wordQ(rng, `two ${w}__`, suf, d === 3 ? ['s', 'es', 'ies'] : ['s', 'es'], { visual: { type: 'word', text: `${w}_` }, say: `One ${w}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
 };
 /** [root, ending, sentence]. The sentence alone decides the ending (#2272); `tests/unit/topic-suffix-fit.test.ts` pins each one. */
 export const Y1_SUFFIX: ReadonlyArray<readonly [string, string, string]> = [['jump', 'ing', 'She is jump___ now.'], ['play', 'ed', 'Yesterday he play___.'], ['walk', 'ing', 'I am walk___ to school.'], ['look', 'ed', 'We look___ at the sky.'], ['fast', 'er', 'A car is fast___ than a bike.'], ['tall', 'est', 'It is the tall___ tree of all.'], ['help', 'ing', 'Dad is help___ me.'], ['kick', 'ed', 'He kick___ the ball yesterday.'], ['kind', 'er', 'Mia is kind___ than Sam.'], ['small', 'est', 'It is the small___ mouse of all.']];
@@ -526,7 +506,7 @@ const Y1_SENTS: Sent[][] = [
   [['The cat and the dog play.', '🐱'], ['We ran and jumped in the park.', '🌳'], ['I like apples and pears.', '🍎'], ['Is it a bird or an aeroplane?', '✈️'], ['She sang and we all clapped.', '🎤'], ['The boat rocked and the fish jumped.', '⛵'], ['Put on your coat and hat.', '🧥'], ['What a lovely sunny day!', '☀️'], ['He fell but he was fine.', '🩹'], ['We can swim or hop today.', '🏊']],
 ];
 const Y1_DECOYS = ['dog', 'cat', 'play', 'red', 'big', 'run', 'jump', 'fish', 'moon', 'park', 'cake', 'ship', 'hat', 'blue', 'fast', 'sing', 'apple', 'coat'];
-const y1Sentence = sentGen(Y1_SENTS, Y1_DECOYS, [2, 2, 2], 1);       // Y1/Y2: sentence shown at d1 only, then listen & build
+const y1Sentence = sentGen(Y1_SENTS, Y1_DECOYS, [2, 2, 2], 0);       // Y1/Y2: sentence shown at d1 only, then listen & build
 const y1Trace: Generator = (d, rng) => {
   if (d === 3) { const [w, e] = pick(rng, CVC); return { prompt: `Trace: ${w}`, say: `Trace the word ${w}`, answer: w, options: [w], visual: { type: 'word', text: w, emoji: e } }; }
   const l = pick(rng, LETTERS);

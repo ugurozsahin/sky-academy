@@ -30,12 +30,14 @@ describe('measure games draw what they compare (#2271)', () => {
     let seen = 0;
     for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
       const q = y2Temp(d, r);
-      if (!q.hintIsData) continue;
+      if (!q.visual) continue;                         // the estimate branch draws nothing
       seen++;
       const v = q.visual;
       if (v?.type !== 'chart' || v.kind !== 'bar') throw new Error('no bar chart');
       expect(v.rows.map(x => x.label).sort()).toEqual([...q.options].sort());
-      for (const row of v.rows) expect(q.hint).toContain(`${row.label}: ${row.n}°C`);
+      const warmer = /warmer/.test(q.prompt), temps = v.rows.map(x => x.n);
+      expect(q.answer, q.prompt).toBe(`${warmer ? Math.max(...temps) : Math.min(...temps)}°C`);
+      for (const row of v.rows) expect(row.label).toBe(`${row.n}°C`);                // #2322: the bubbles are the readings
     }
     expect(seen).toBeGreaterThan(100);
   });

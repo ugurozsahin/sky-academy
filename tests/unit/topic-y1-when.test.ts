@@ -10,6 +10,10 @@ const topic = TOPICS.find(t => t.id === 'y1-when')!;
 const PARTS = ['morning', 'afternoon', 'evening'], WORDS = ['yesterday', 'today', 'tomorrow'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DRAWS = 300;
+// #2322: a card whose bubbles are all day parts shows them as pictures; the tests below read them back as words
+const PICS: Record<string, string> = { '🌅': 'morning', '☀️': 'afternoon', '🌇': 'evening' };
+const unpic = (o: string) => PICS[o] ?? o;
+const gen = (d: Difficulty, r: () => number) => { const q = topic.gen(d, r); return { ...q, answer: unpic(q.answer), options: q.options.map(unpic) }; };
 
 describe('y1-when (#979)', () => {
   it('is registered under Year 1 maths', () => {
@@ -21,7 +25,7 @@ describe('y1-when (#979)', () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       const r = rng(9790 + d);
       for (let i = 0; i < DRAWS; i++) {
-        const q = topic.gen(d, r);
+        const q = gen(d, r);
         const where = `d${d} draw ${i}: ${q.prompt}`;
         const m = /^What comes (after|before) (\w+)\?$/.exec(q.prompt);
         if (m) {
@@ -48,7 +52,7 @@ describe('y1-when (#979)', () => {
     const r = rng(9791), hidden: Record<string, number> = { morning: 0, afternoon: 0, evening: 0 };
     let strips = 0;
     for (let i = 0; i < DRAWS; i++) {
-      const q = topic.gen(1, r);
+      const q = gen(1, r);
       expect([...q.options].sort()).toEqual([...PARTS].sort());
       if ((q.visual as { type?: string } | undefined)?.type !== 'strip') continue;
       strips++;
@@ -64,7 +68,7 @@ describe('y1-when (#979)', () => {
     for (const d of [2, 3] as Difficulty[]) {
       const r = rng(9780 + d);
       for (let i = 0; i < DRAWS; i++) {
-        const q = topic.gen(d, r);
+        const q = gen(d, r);
         if (q.visual) continue;
         const own = PARTS.includes(q.answer) ? PARTS : WORDS;
         const where = `d${d} draw ${i}: ${q.prompt}`;
@@ -78,7 +82,7 @@ describe('y1-when (#979)', () => {
     for (const d of [2, 3] as Difficulty[]) {
       const r = rng(9795 + d), lists = new Set<string>();
       for (let i = 0; i < DRAWS; i++) {
-        const q = topic.gen(d, r);
+        const q = gen(d, r);
         lists.add(PARTS.includes(q.answer) ? 'parts' : 'words');
         if (d === 3) expect(q.visual).toBeUndefined();
         expect(q.options.filter(o => o === q.answer)).toHaveLength(1);
@@ -91,7 +95,7 @@ describe('y1-when (#979)', () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       const r = rng(9799 + d);
       for (let i = 0; i < DRAWS; i++) {
-        const q = topic.gen(d, r);
+        const q = gen(d, r);
         for (const text of [q.prompt, ...q.options]) {
           for (const name of [...DAYS, ...MONTHS]) expect(text).not.toContain(name);
         }
