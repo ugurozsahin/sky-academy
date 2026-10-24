@@ -95,4 +95,12 @@ describe('y4-speech (#1167)', () => {
     for (let s = 1; s <= 600; s++) { const q = topic.gen(3, rng(s * 23)); if (textOf(q).startsWith('“') && q.answer === '?') hit = true; }
     expect(hit).toBe(true);
   });
+
+  it('the why line is the sentence with the answer in the gap, so a bare mark is read in context (#2278)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (let s = 1; s <= 200; s++) {
+      const q = topic.gen(d, rng(s * 29 + d));
+      expect(q.why, textOf(q)).toBe(textOf(q).replace('_', q.answer));
+      expect(q.why).not.toContain('_');
+    }
+  });
 });
