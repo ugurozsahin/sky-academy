@@ -6,7 +6,7 @@
 // No decoy is worth the answer, so 4 is never offered beside 4.0. The answer shares its last printed digit with a decoy (#1058).
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, wordQ, numberWord } from './util';
-import { addDec, subDec, compareDec, dec, fmt, roundTo, type Dec } from './ks2num';
+import { addDec, subDec, compareDec, dec, fmt, roundTo, roundWhy, type Dec } from './ks2num';
 import { ks2Say } from './ks2say';
 
 const HINT = 'Look at the digit after the place you are rounding to: five or more rounds up';
@@ -58,7 +58,7 @@ function card(rng: Rng, n: Dec, target: 0 | 1, kind: Kind): Question {
   const answer = target === 0 ? roundTo(n, 1) : roundTo(n, 0.1);
   const given = (kind === 'money' ? '£' : '') + fmt(n, { fixedDp: n.dp });
   const prompt = target === 1 ? `Round ${given} to one decimal place.` : `Round ${given} to the nearest ${kind === 'money' ? 'pound' : 'whole number'}.`;
-  return wordQ(rng, prompt, show(answer, kind), decoys(n, answer, target, kind), { say: kind === 'money' ? moneySay(n) : ks2Say(prompt), hint: HINT, hintIsData: false });
+  return wordQ(rng, prompt, show(answer, kind), decoys(n, answer, target, kind), { say: kind === 'money' ? moneySay(n) : ks2Say(prompt), hint: HINT, hintIsData: false, why: roundWhy(n, target === 0 ? 1 : 0.1) });
 }
 
 export const y5RoundDec: Generator = (level: Difficulty, rng) => {

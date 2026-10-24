@@ -4,7 +4,7 @@
 // Decoys are the slips a child makes: rounded the wrong way (the other neighbouring multiple) and rounded at the wrong place.
 import type { Difficulty, Generator, Question } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
-import { dec, fmt } from './ks2num';
+import { dec, fmt, roundWhy } from './ks2num';
 import { ks2Say } from './ks2say';
 
 const MAX = 1000000;
@@ -55,5 +55,5 @@ export const y5Round: Generator = (d, rng): Question => {
   const answer = roundTo(n, p);
   const prompt = `Round ${fmtN(n)} to the nearest ${fmtN(p)}`;
   const say = ks2Say(`Round ${fmtN(n)} to the nearest ${PLACE_WORD[p]}`);
-  return wordQ(rng, prompt, fmtN(answer), decoys(n, p, answer, rng).map(fmtN), { say });
+  return wordQ(rng, prompt, fmtN(answer), decoys(n, p, answer, rng).map(fmtN), { say, why: roundWhy(n, p) });
 };

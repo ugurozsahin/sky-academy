@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
-import { dec, addDec, subDec, mulDecByInt, mulPow10, divPow10, compareDec, fmt, parseNum, roundTo, digitAt, digitValue } from '../../src/curriculum/ks2num';
+import { dec, addDec, subDec, mulDecByInt, mulPow10, divPow10, compareDec, fmt, parseNum, roundTo, digitAt, digitValue, roundWhy } from '../../src/curriculum/ks2num';
 import type { Place, RoundUnit } from '../../src/curriculum/ks2num';
 
 // Deterministic RNG (mulberry32) — same construction as curriculum.test.ts, kept local so this file has
@@ -308,4 +308,22 @@ describe('ks2num', () => {
       expect(compareDec(parseNum(label)!, d)).toBe(0);
     });
   });
+});
+
+describe('roundWhy (#2317)', () => {
+  it.each([
+    [45, 10, 'The ones digit is 5, so round up.'],
+    [44, 10, 'The ones digit is 4, so round down.'],
+    [345672, 100, 'The tens digit is 7, so round up.'],
+    [345672, 10000, 'The thousands digit is 5, so round up.'],
+    [345672, 1000, 'The hundreds digit is 6, so round up.'],
+    [345472, 1000, 'The hundreds digit is 4, so round down.'],
+    [345672, 100000, 'The ten thousands digit is 4, so round down.'],
+    [5600000, 1000000, 'The hundred thousands digit is 6, so round up.'],
+    [dec(346, 2), 1, 'The tenths digit is 4, so round down.'],
+    [dec(365, 2), 0.1, 'The hundredths digit is 5, so round up.'],
+  ] as const)('%s to %s: %s', (n, unit, said) => {
+    expect(roundWhy(n, unit)).toBe(said);
+  });
+  it('throws for a unit with no place name', () => { expect(() => roundWhy(345672, 5)).toThrow(); });
 });
