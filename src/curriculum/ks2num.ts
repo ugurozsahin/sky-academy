@@ -136,11 +136,12 @@ export function digitAt(n: Dec | number, place: Place): number {
   return scaled % 10;
 }
 
-const PLACE_NAME: Record<number, string> = { 100000: 'hundred thousands', 10000: 'ten thousands', 1000: 'thousands', 100: 'hundreds', 10: 'tens', 1: 'ones', 0.1: 'tenths', 0.01: 'hundredths' };
+const PLACE_NAME: Partial<Record<number, string>> = { 100000: 'hundred thousands', 10000: 'ten thousands', 1000: 'thousands', 100: 'hundreds', 10: 'tens', 1: 'ones', 0.1: 'tenths', 0.01: 'hundredths' };
 /** #2317: the reason a rounding is right — the digit one place below `unit` decides, 5 or more rounds up. */
-export function roundWhy(n: Dec | number, unit: RoundUnit): string {
-  const place = (unit === 0.1 ? 0.01 : unit / 10) as Place, d = digitAt(n, place);
-  return `The ${PLACE_NAME[place]} digit is ${d}, so round ${d >= 5 ? 'up' : 'down'}.`;
+export function roundWhy(n: Dec | number, unit: number): string {
+  const place = (unit === 0.1 ? 0.01 : unit / 10) as Place, d = digitAt(n, place), name = PLACE_NAME[place];
+  if (!name) throw new Error(`roundWhy: no place name for ${place}`);
+  return `The ${name} digit is ${d}, so round ${d >= 5 ? 'up' : 'down'}.`;
 }
 
 /** `digitAt(n, place) * place` — e.g. `digitValue(345672, 1000)` is 5,000. */

@@ -64,7 +64,7 @@ function lineCard(rng: Rng): Question {
   return wordQ(rng, 'Which number is about here?', fmtN(mark), lineDecoys(k, rng).map(fmtN), {
     visual: { type: 'numberline', from: 0, to: MAX, step: 1000, mark, ends: true, labels: LABELS },
     say: 'The line goes from 0 to 10,000. Which number is at the question mark?',
-    hint: 'Slice the number at the ?', hintIsData: false, why: `The ? sits at ${fmtN(mark)}.`,
+    hint: 'Slice the number at the ?', hintIsData: false, why: `Each gap is 1,000; the ? is at ${fmtN(mark)}.`,
   });
 }
 
