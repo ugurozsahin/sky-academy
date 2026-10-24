@@ -5,7 +5,7 @@
 // every event handler, the physics update and the render loop live here, unmoved.
 import { gentleRelaunchSet } from './gentleRelaunch';   // #742: which bubbles a gentle relaunch brings back together
 import { watchBox } from './box-watch'; import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
-import type { Rng } from '../curriculum/types'; import { boxMoved, holdUnderCard, nextInset, TOP_INSET_MAX } from './wave-bounds';   // #2184
+import type { Rng } from '../curriculum/types'; import { boxMoved, holdUnderCard, insetMax, nextInset } from './wave-bounds';   // #2184
 import {
   hittable, GOOD, RELAUNCH_DELAY, MAX_RELAUNCHES, COLLIDE,
   layoutWave, reanchorBubble, bubbleRadius, resolveCollisions,
@@ -45,7 +45,7 @@ export interface ArenaOpts {
 export class Arena {
   private ctx: CanvasRenderingContext2D;
   W = 0; H = 0; dpr = 1; private inset = 120;
-  get topInset() { return Math.min(this.inset, this.H * TOP_INSET_MAX); } set topInset(v: number) { if (Number.isFinite(v)) this.inset = v; holdUnderCard(this.bubbles, this.topInset, this.H); }   // #2184: the card line, at most half the box — no apex rises past topInset + r, even one already up
+  get topInset() { return Math.min(this.inset, insetMax(this.W, this.H)); } set topInset(v: number) { if (Number.isFinite(v)) this.inset = v; holdUnderCard(this.bubbles, this.topInset, this.H); }   // #2184: the card line, at most half the box — no apex rises past topInset + r, even one already up
   bubbles: Bubble[] = [];
   private particles: Particle[] = [];
   shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
@@ -134,7 +134,7 @@ export class Arena {
     for (const t of this.trail) { t.x *= sx; t.y *= sy; }
     // The question card moves too, and its measured bottom is what bounds the next wave's apex
     // (`play-session.ts` re-measures on the next question; this keeps the one in between in the box).
-    this.topInset = nextInset(this.measureInset?.(), this.inset, sy, to.H);   // #2184: read live where it can be — the card does not scale with the box
+    this.topInset = nextInset(this.measureInset?.(), this.inset, sy, to.W, to.H);   // #2184: read live where it can be — the card does not scale with the box
     for (const s of this.strokes.values()) s.stale = true;   // #331/#463: every stroke's `lastPt` is in the OLD,
     // unrescaled box, so each one's next move must re-seat its anchor rather than draw from a stale point
   }

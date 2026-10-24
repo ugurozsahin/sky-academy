@@ -2,7 +2,7 @@
 // layout, bubble-to-bubble collision, label fitting, and the offscreen sprite caches drawBubble draws from.
 // Nothing here touches a canvas event or the render loop — `Arena` still owns those.
 import { shuffle } from '../curriculum/util'; import type { Rng } from '../curriculum/types';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
-import { boundedRise, TOP_INSET_MAX } from './wave-bounds'; import { bySpeed, TIMING } from '../config/resolve'; import type { DefaultSettings } from '../config/catalogue';   // #2184: the bounds every arc is held to; #2194: air time and stagger per speed, from src/config/catalogue.json
+import { boundedRise, insetMax } from './wave-bounds'; import { bySpeed, TIMING } from '../config/resolve'; import type { DefaultSettings } from '../config/catalogue';   // #2184: the bounds every arc is held to; #2194: air time and stagger per speed, from src/config/catalogue.json
 
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
@@ -315,7 +315,7 @@ function planBubble(p: { label: string; k: number; idx: number; size: number; pe
  * derives from T), never the clock. Bubbles come back in launch order, so `bubbles[k]` is the k-th to rise.
  */
 export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: number, rng: Rng): WavePlan {
-  const { W, H } = geom, topInset = Math.min(geom.topInset, H * TOP_INSET_MAX);   // #2184: a card past half the box (KS2, landscape) left a negative rise
+  const { W, H } = geom, topInset = Math.min(geom.topInset, insetMax(W, H));   // #2184: a card past half the box (KS2, landscape) left a negative rise; #2278: a tall box allows more
   const n = o.labels.length, r = waveRadius(W, H, !!o.wide, n);
   const T = bySpeed((o.timing ?? TIMING).airTime, o.speed) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
   const apexMin = topInset + r + 10, usable = H - apexMin - r;
