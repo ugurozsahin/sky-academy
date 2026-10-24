@@ -89,7 +89,8 @@ describe('parent dashboard summary', () => {
       endless: { year1: 120 }, sprint: { year1: 15 }, boss: { year1: 2 }, memory: { year1: 1 }, training: { year1: 3 },
       coins: 70, stickers: ['volt', 'blaze'], streak: { last: '2026-09-06', days: 4 },
     };
-    const sm = parentSummary(data, CORE_TOPICS, YEARS, STICKER_IDS.length, new Date(), CORE_TOPICS);
+    const SHOWN = CORE_TOPICS.filter(t => t.id !== 'y1-contractions'); // switched off by the owner, #2281
+    const sm = parentSummary(data, SHOWN, YEARS, STICKER_IDS.length, new Date(), SHOWN);
 
     expect(sm.totalAnswered).toBe(50 + 20 + 5 + 3);
     expect(sm.totalCorrect).toBe(45 + 6 + 3 + 2);

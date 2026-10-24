@@ -12,6 +12,9 @@ import { islandMenu, islandSubjects } from '../../src/ui/home';
 import { load } from '../../src/storage';
 import { SOURCES, code } from './helpers/sources';
 
+/** Switched off in the committed file by the owner (#2281); every baseline below is "before the catalogue" minus these. */
+const OFF = ['y1-contractions'];
+const CORE = CORE_TOPICS.filter(t => !OFF.includes(t.id));
 type Mut = { years: Record<string, { visible: 'auto' | boolean }>; games: Record<string, { visible: boolean; years: Record<string, { visible: boolean }> }> };
 /** A test copy of the committed runtime catalogue, edited. */
 const copy = (edit: (c: Mut) => void): RuntimeCatalogue => { const c = structuredClone(RUNTIME) as unknown as Mut; edit(c); return c as unknown as RuntimeCatalogue; };
@@ -25,7 +28,7 @@ const FED = (y: YearId) => ['train', 'endless', ...(y === 'year4' ? ['mtc', 'mtc
 
 /** Today's lists, as they were before the catalogue (#915, #1039, #1234): the baseline the committed file must equal. */
 const before = {
-  topicsFor: (y: YearId, s?: Topic['subject']) => CORE_TOPICS.filter(t => t.year === y && (!s || t.subject === s)),
+  topicsFor: (y: YearId, s?: Topic['subject']) => CORE.filter(t => t.year === y && (!s || t.subject === s)),
   drillsFor: (y: YearId, s?: Topic['subject']) => TOPICS.filter(t => t.drill && t.year === y && (!s || t.subject === s)),
   grammarPool: (n: number) => GRAMMAR.filter(id => Number(id[1]) <= n).map(topicById).filter((t): t is Topic => !!t && !t.drill && t.subject === 'writing' && answerableBy(t, 'mixed')),
 };
@@ -46,13 +49,13 @@ describe('with the committed catalogue every list is exactly today\'s (#2196)', 
   });
   it('listedTopics, the grammar pools, Tables Check and every island-menu row', () => {
     const shown = new Set(shownYears().map(y => y.id));
-    expect(ids(listedTopics())).toEqual(ids(CORE_TOPICS.filter(t => shown.has(t.year))));
+    expect(ids(listedTopics())).toEqual(ids(CORE.filter(t => shown.has(t.year))));
     for (const n of [5, 6]) expect(ids(grammarPool(`year${n}` as YearId))).toEqual(ids(before.grammarPool(n)));
     expect(mtcOffered()).toBe(true);
     for (const y of YEARS) expect(ids(menu(islandMenu, load, y).filter(r => r.feeds)), y.id).toEqual(FED(y.id));
   });
   it('isGameShown is true for every registry game on its own year, and agrees with topicsFor/drillsFor', () => {
-    expect(TOPICS.filter(t => !isGameShown(t.id, t.year)).map(t => t.id)).toEqual([]);
+    expect(TOPICS.filter(t => !isGameShown(t.id, t.year)).map(t => t.id)).toEqual(OFF);
     const listed = new Set(ids(YEARS.flatMap(y => [...topicsFor(y.id), ...drillsFor(y.id)])));
     expect(TOPICS.filter(t => listed.has(t.id) !== isGameShown(t.id, t.year)).map(t => t.id)).toEqual([]);
   });
@@ -125,7 +128,7 @@ describe('a hidden maths game and a hidden writing game leave every list and poo
     const { parentSummary } = await import('../../src/game/parents');
     const st = await import('../../src/storage');
     const { islandComplete } = await import('../../src/storage/stickers');
-    expect(ids(cur.listedTopics())).toEqual(without(CORE_TOPICS));
+    expect(ids(cur.listedTopics())).toEqual(without(CORE));
     st.reset();
     for (const t of before.topicsFor('year4')) st.recordTopic(t.id, HIDDEN.includes(t.id) ? 3 : 1, 5);
     const d = st.load();
@@ -135,7 +138,7 @@ describe('a hidden maths game and a hidden writing game leave every list and poo
     expect(islandComplete(d.progress, 'year4'), 'island complete without the hidden two').toBe(true);
     expect(masterProgress(cur.shownYears().map(y => cur.topicsFor(y.id)), d.progress)).toMatchObject({ done: 1 });
     const sm = parentSummary(d, cur.listedTopics(), cur.shownYears(), 0, new Date(), cur.listedTopics());
-    expect([sm.topicsTotal, sm.starsEarned], 'the grown-ups\' summary').toEqual([CORE_TOPICS.length - 2, shownY4]);
+    expect([sm.topicsTotal, sm.starsEarned], 'the grown-ups\' summary').toEqual([CORE.length - 2, shownY4]);
     expect(st.ACHIEVEMENTS.find(a => a.id === 'terra')!.progress({ ...d, progress: Object.fromEntries(HIDDEN.map(id => [id, d.progress[id]])) }).done, 'Star 5 topics').toBe(0);
     expect(HIDDEN.map(id => st.load().progress[id]?.stars), 'never removed').toEqual([3, 3]);
     expect([cur.TOPICS.length, cur.TOPICS.findIndex(t => t.id === 'y4-tables')], 'TOPICS stays whole, in order').toEqual([TOPICS.length, TOPICS.findIndex(t => t.id === 'y4-tables')]);

@@ -18,6 +18,9 @@ import * as shown from '../../src/curriculum/catalogue-shown';
 const pub = publishedOnly({ topics: TOPICS, years: YEARS, catalogue: catalogueJson as never, shown });
 const input = { topics: pub.topics, years: pub.years, strands, tipFor, banks };
 const built = buildContentMap(input);
+/** Games the owner has switched off in the committed catalogue (#2281); the website publishes none of them. */
+const HIDDEN = ['y1-contractions'];
+const PUBLISHED = TOPICS.filter(t => !HIDDEN.includes(t.id));
 const REGEN = 'run `npm run content-map` and commit docs/content-map.json and docs/CONTENT-MAP.md';
 
 describe('content map is generated, never hand-kept', () => {
@@ -25,17 +28,17 @@ describe('content map is generated, never hand-kept', () => {
   it('docs/CONTENT-MAP.md equals the registry', () => { expect(read('docs/CONTENT-MAP.md'), REGEN).toBe(built.md); });
   it('every registry topic appears exactly once, with a non-empty nc', () => {
     const map = JSON.parse(built.json);
-    expect(map.topics.map((t: { id: string }) => t.id)).toEqual(TOPICS.map(t => t.id));
-    expect(new Set(map.topics.map((t: { id: string }) => t.id)).size).toBe(TOPICS.length);
+    expect(map.topics.map((t: { id: string }) => t.id)).toEqual(PUBLISHED.map(t => t.id));
+    expect(new Set(map.topics.map((t: { id: string }) => t.id)).size).toBe(PUBLISHED.length);
     for (const t of TOPICS) expect(t.nc.trim(), t.id).not.toBe('');
   });
   it('the counts come from the registry, not from the file', () => {
     const map = JSON.parse(read('docs/content-map.json'));
-    expect(map.topicCount).toBe(TOPICS.length);
+    expect(map.topicCount).toBe(PUBLISHED.length);
     for (const y of YEARS) {
       const row = map.byYear.find((r: { year: string }) => r.year === y.id);
-      expect(row.maths, y.id).toBe(TOPICS.filter(t => t.year === y.id && t.subject === 'maths').length);
-      expect(row.writing, y.id).toBe(TOPICS.filter(t => t.year === y.id && t.subject === 'writing').length);
+      expect(row.maths, y.id).toBe(PUBLISHED.filter(t => t.year === y.id && t.subject === 'maths').length);
+      expect(row.writing, y.id).toBe(PUBLISHED.filter(t => t.year === y.id && t.subject === 'writing').length);
     }
   });
 });
@@ -77,18 +80,18 @@ describe('docs/CURRICULUM.md and the registry agree both ways (#669)', () => {
 
 describe('the website publishes only what the catalogue shows (#2201)', () => {
   const hide = (mut: (c: any) => void) => { const c = JSON.parse(JSON.stringify(catalogueJson)); mut(c); return publishedOnly({ topics: TOPICS, years: YEARS, catalogue: c, shown }); };
-  it('the committed catalogue hides nothing', () => {
-    expect(pub.topics.length).toBe(TOPICS.length);
+  it('the committed catalogue hides only the games the owner switched off (#2281)', () => {
+    expect(TOPICS.filter(t => !pub.topics.includes(t)).map(t => t.id)).toEqual(HIDDEN);
     expect(pub.years.map(y => y.id)).toEqual(YEARS.map(y => y.id));
   });
   it('a hidden game is absent from the map, and its siblings stay', () => {
-    const gone = TOPICS.find(t => t.year === 'year1' && !t.drill)!;
+    const gone = PUBLISHED.find(t => t.year === 'year1' && !t.drill)!;
     const p = hide(c => { c.games[gone.id].visible = false; });
     expect(p.topics.map(t => t.id)).not.toContain(gone.id);
-    expect(p.topics.length).toBe(TOPICS.length - 1);
+    expect(p.topics.length).toBe(PUBLISHED.length - 1);
     const map = JSON.parse(buildContentMap({ ...input, topics: p.topics, years: p.years }).json);
     expect(map.topics.map((t: { id: string }) => t.id)).not.toContain(gone.id);
-    expect(map.topicCount).toBe(TOPICS.length - 1);
+    expect(map.topicCount).toBe(PUBLISHED.length - 1);
   });
   it('a hidden year is absent: no byYear row, so no year page, and none of its topics', () => {
     const p = hide(c => { c.years.year2.visible = false; });

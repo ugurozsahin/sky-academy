@@ -1,6 +1,6 @@
 {
  "generated": "scripts/content-map.mjs",
- "topicCount": 343,
+ "topicCount": 342,
  "byYear": [
   {
    "year": "reception",
@@ -12,7 +12,7 @@
    "year": "year1",
    "title": "Year 1",
    "maths": 30,
-   "writing": 20
+   "writing": 19
   },
   {
    "year": "year2",
@@ -1308,27 +1308,6 @@
    "tip": "Lay out 10 spoons and ask how many more make 10.",
    "strands": [
     "y1-m-as"
-   ]
-  },
-  {
-   "id": "y1-contractions",
-   "title": "Joined-up Words",
-   "year": "year1",
-   "subject": "writing",
-   "nc": "Y1 Word Reading: contractions (I'm, I'll, we'll)",
-   "mode": "mixed",
-   "input": "bubbles",
-   "difficulties": [
-    1,
-    2,
-    3
-   ],
-   "stages": 5,
-   "questionBank": "generated",
-   "hasVisual": true,
-   "tip": "Choose three words a night: look, cover, write, check, and then say what makes each one tricky.",
-   "strands": [
-    "y1-e-word-reading"
    ]
   },
   {
@@ -8103,7 +8082,6 @@
    ],
    "source": "https://www.gov.uk/government/publications/national-curriculum-in-england-english-programmes-of-study",
    "topics": [
-    "y1-contractions",
     "y1-alien",
     "y1-soundhunt"
    ]

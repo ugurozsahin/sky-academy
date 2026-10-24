@@ -13,6 +13,8 @@ const read = (p: string) => readFileSync(p, 'utf8');
 const map: ContentMap = JSON.parse(read('docs/content-map.json'));
 const home = read('website/index.html');
 const fileOf = (id: YearId) => `website/curriculum/${yearSlug(id)}/index.html`;
+/** The site publishes only what the catalogue shows; the owner switched this game off on #2281. */
+const PUBLISHED = TOPICS.filter(t => t.id !== 'y1-contractions');
 const REGEN = 'run `npm run content-map` and commit website/curriculum/';
 /** The details element in the teachers' section (#2160), never the header's menu (#2159); '' when there is none. */
 const teachers = (html: string) => {
@@ -31,7 +33,7 @@ describe('one page per school year, generated from the content map (#2090)', () 
   it('lists every registry topic of its year, and no other, each once', () => {
     for (const y of YEARS) {
       const listed = terms(read(fileOf(y.id))).map(t => t.dt);
-      expect(listed.sort(), y.id).toEqual(TOPICS.filter(t => t.year === y.id).map(t => esc(t.title)).sort());
+      expect(listed.sort(), y.id).toEqual(PUBLISHED.filter(t => t.year === y.id).map(t => esc(t.title)).sort());
     }
   });
   it('gives each its own title and description, naming the year', () => {
@@ -212,7 +214,7 @@ describe('the year pages carry the teachers\' detail, collapsed (#2160)', () => 
     const inMap = map.topics.map(t => `${t.year} | ${esc(t.title)} | ${esc(t.nc)}`);
     expect(new Set(onPages).size, 'no row twice').toBe(onPages.length);
     expect(onPages.sort()).toEqual(inMap.sort());
-    expect(onPages, 'and the registry has as many topics').toHaveLength(TOPICS.length);
+    expect(onPages, 'and the registry has as many topics').toHaveLength(PUBLISHED.length);
     expect(onPages, 'escaped once, read against a known row rather than esc()').toContain('year3 | Mental Adding and Subtracting | Y3 A&amp;S: 3-digit number and 1s, 10s, 100s mentally (3M7)');
   });
   it('gives each table a caption first, column headers, and a row header on every data row', () => {
