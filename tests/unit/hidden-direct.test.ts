@@ -30,7 +30,7 @@ const codeFor = async (id: string, seed = 7) => {
 describe('with the committed catalogue nothing is blocked (#2197)', () => {
   it('no game is hidden, and a challenge code for y4-tables still plays', async () => {
     const { gameHidden } = await import('../../src/game/hidden-game');
-    expect(TOPICS.filter(t => gameHidden(t))).toEqual([]);
+    expect(TOPICS.filter(t => gameHidden(t)).map(t => t.id), 'only the game the owner switched off on #2281').toEqual(['y1-contractions']);
     const { enterCode } = await import('../../src/game/challenge-run');
     expect('error' in enterCode((await codeFor('y4-tables')).code)).toBe(false);
   });

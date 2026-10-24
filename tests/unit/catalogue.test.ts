@@ -48,9 +48,11 @@ describe('catalogue overrides nothing yet (#2193)', () => {
   });
 
   it('every game and game-year node is visible and inherits everything', () => {
-    const notDefault = Object.entries(CATALOGUE.games).filter(([, g]) => !g.visible || Object.keys(g.settings).length
-      || Object.keys(g.groupSettings).length || Object.values(g.years).some((n) => !n?.visible || Object.keys(n.settings).length));
+    const switchedOff = ['y1-contractions']; // the owner's decision on #2281: a Year 2 statement, not Year 1's
+    const notDefault = Object.entries(CATALOGUE.games).filter(([id, g]) => !g.visible || Object.keys(g.settings).length
+      || Object.keys(g.groupSettings).length || Object.values(g.years).some((n) => (!n?.visible && !switchedOff.includes(id)) || Object.keys(n.settings).length));
     expect(notDefault.map(([id]) => id)).toEqual([]);
+    for (const id of switchedOff) expect(Object.values(CATALOGUE.games[id].years).map((n) => n?.visible), id).toEqual([false]);
   });
 
   it('the stage arrays are as long as the session runs them, and STAGE_NAMES names every stage', () => {

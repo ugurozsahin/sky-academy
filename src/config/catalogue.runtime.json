@@ -898,7 +898,7 @@
       "groupSettings": {},
       "years": {
         "year1": {
-          "visible": true,
+          "visible": false,
           "settings": {}
         }
       }
