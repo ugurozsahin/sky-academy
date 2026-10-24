@@ -15,13 +15,15 @@ type Mut = { years: Record<string, { visible: 'auto' | boolean }>; games: Record
 const copy = (edit: (c: Mut) => void): Catalogue => { const c = structuredClone(CATALOGUE) as unknown as Mut; edit(c); return c as unknown as Catalogue; };
 const allMedia = (cat: Catalogue) => [...Object.values(cat.years), ...Object.values(cat.games)]
   .flatMap(n => [n.media.thumbnail.src, ...n.media.screenshots.map(s => s.src)]);
+/** Switched off in the committed catalogue (#2281): not shown, and its pictures are withheld from the site. */
+const OFF = ['y1-contractions'];
 const core = (year: YearId, subject: 'maths' | 'writing') => TOPICS.filter(t => t.year === year && t.subject === subject && !t.drill);
 
 describe('what the catalogue shows (src/curriculum/catalogue-shown.ts)', () => {
   it('with the committed file: exactly the islands the map shows today, and every game on them, drills included', () => {
     const shown = catalogueShown(CATALOGUE, TOPICS);
     expect(shown.years).toEqual(shownYears().map(y => y.id));
-    const onShown = TOPICS.filter(t => shown.years.includes(t.year)).map(t => t.id);
+    const onShown = TOPICS.filter(t => shown.years.includes(t.year) && !OFF.includes(t.id)).map(t => t.id);
     expect([...shown.games].sort()).toEqual([...onShown].sort());
     expect(shown.games.length, 'the registry has drills, and the catalogue holds them').toBeGreaterThan(TOPICS.filter(t => !t.drill && shown.years.includes(t.year)).length);
   });
@@ -77,8 +79,9 @@ describe('the media plan (scripts/game-media.mjs)', () => {
   it('with the committed file: every media src published, none withheld, islands then games captured', () => {
     const shown = catalogueShown(CATALOGUE, TOPICS);
     const plan = mediaPlan(CATALOGUE, shown);
-    expect([...plan.publish].sort()).toEqual([...allMedia(CATALOGUE)].sort());
-    expect(plan.withheld).toEqual([]);
+    const offSrcs = OFF.flatMap(id => allMedia({ years: {}, games: { [id]: CATALOGUE.games[id] } } as unknown as Catalogue));
+    expect([...plan.publish].sort()).toEqual(allMedia(CATALOGUE).filter(s => !offSrcs.includes(s)).sort());
+    expect([...plan.withheld].sort()).toEqual([...offSrcs].sort());
     expect(plan.ids).toEqual([...shown.years, ...shown.games]);
   });
   it('a hidden game and a hidden island are withheld; every src is in exactly one list', () => {
@@ -152,9 +155,9 @@ describe('the command line', () => {
     expect(out.stdout.trim()).toBe(mediaPlan(CATALOGUE, catalogueShown(CATALOGUE, TOPICS)).ids.join(','));
   }, 60_000);
   it('check exits 0 when every picture is served as WebP, 1 with the failures named otherwise', async () => {
-    mode = {}; fallback = webp;
+    mode = Object.fromEntries(OFF.flatMap(id => allMedia({ years: {}, games: { [id]: CATALOGUE.games[id] } } as unknown as Catalogue)).map(src => [src, { status: 404 }])); fallback = webp;
     expect((await run(['check', base])).status).toBe(0);
-    fallback = { status: 404 };
+    mode = {}; fallback = { status: 404 };
     const bad = await run(['check', base]);
     expect(bad.status).toBe(1);
     expect(bad.stderr).toMatch(/^FAIL .*status 404/m);

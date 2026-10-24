@@ -70,7 +70,7 @@ Maths:
 - y1-balance — = as balance: `a + b = ? + c`, `a − b = ? + c`, `a + b = ? − c` within 20
 
 Writing:
-- y1-contractions — Joined-up Words (reading): the contraction shown, slice the two words it stands for; one-expansion bank only (no he's/she's/it's/I'd/we'd); d3 shows it in a sentence
+- y1-contractions — Joined-up Words (reading): the contraction shown, slice the two words it stands for; one-expansion bank only (no he's/she's/it's/I'd/we'd); d3 shows it in a sentence **Hidden in Year 1 (`games.y1-contractions.years.year1.visible: false`, owner, #2281): apostrophes for missing letters are Year 2 spelling, which `y2-contractions` covers; the code stays and the switch can be undone.**
 - y1-digraphs
 - y1-alien — Real or Alien?: decode a printed word (not by ear), phonics screening check practice; d1 phase 3, d2 phase 4 adjacent consonants, d3 phase 5 alternatives, half "slice the alien 👾"
 - y1-soundhunt — Sound Hunt by ear: d1 phase 3, d2 phase 5 alternatives ay/ou/ie/ea/oy/ir/ue/aw/wh/ph/ew/oe/au, d3 adds split digraphs a-e/i-e/o-e/u-e
