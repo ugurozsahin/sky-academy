@@ -6,7 +6,7 @@
 // a zero put in the wrong place when reading words.
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
-import { dec, fmt, wordsFor } from './ks2num';
+import { dec, fmt, wordsFor, columnName } from './ks2num';
 import { ks2Say } from './ks2say';
 
 const MAX = 1000000;
@@ -28,7 +28,7 @@ function valueCard(rng: Rng, digits: number): Question {
     const { c, k } = pick(rng, places), d = Number(c);
     const others = Array.from({ length: digits }, (_, j) => j).filter(j => j !== k).map(j => d * 10 ** j);
     const prompt = `What is the value of the ${c} in ${fmtN(n)}?`;
-    return wordQ(rng, prompt, fmtN(d * 10 ** k), shuffle(rng, others).slice(0, 3).map(fmtN), { say: ks2Say(prompt) });
+    return wordQ(rng, prompt, fmtN(d * 10 ** k), shuffle(rng, others).slice(0, 3).map(fmtN), { say: ks2Say(prompt), why: `The ${c} is in the ${columnName(10 ** k)} place, so it is worth ${fmtN(d * 10 ** k)}` });
   }
 }
 
@@ -40,7 +40,7 @@ function countCard(rng: Rng, steps: number[], lo: number, hi: number): Question 
     const decoys = three(rng, answer, [n - sign * step], [n + sign * step * 10, n + sign * (step / 10), n - sign * (step / 10)], [n + sign * step * 100, n + sign * 2 * step, n - sign * 2 * step, n + sign * 3 * step, n - sign * 3 * step]);
     if (decoys.length < 3) continue;
     const prompt = `What is ${fmtN(step)} ${up ? 'more' : 'less'} than ${fmtN(n)}?`;
-    return wordQ(rng, prompt, fmtN(answer), decoys, { say: ks2Say(prompt) });
+    return wordQ(rng, prompt, fmtN(answer), decoys, { say: ks2Say(prompt), why: `${fmtN(n)} ${up ? '+' : '-'} ${fmtN(step)} = ${fmtN(answer)}` });
   }
 }
 
@@ -62,7 +62,7 @@ function wordsCard(rng: Rng): Question {
     const decoys = three(rng, answer, [], slips, fill);
     if (decoys.length < 3) continue;
     const prompt = `In digits: ${words}`;
-    return wordQ(rng, prompt, fmtN(answer), decoys, { say: prompt });
+    return wordQ(rng, prompt, fmtN(answer), decoys, { say: prompt, why: `A zero holds each empty place: ${fmtN(answer)}` });
   }
 }
 
@@ -73,7 +73,7 @@ function rankCard(rng: Rng): Question {
     while (nums.size < 4) nums.add(head + ri(rng, 0, 9999));
     const opts = [...nums], second = [...opts].sort((a, b) => b - a)[1], last = second % 10;
     if (!opts.some(v => v !== second && v % 10 === last)) continue;
-    return wordQ(rng, 'Which number is the second largest?', fmtN(second), opts.filter(v => v !== second).map(fmtN), { say: 'Which number is the second largest?' });
+    return wordQ(rng, 'Which number is the second largest?', fmtN(second), opts.filter(v => v !== second).map(fmtN), { say: 'Which number is the second largest?', why: `Biggest first: ${[...opts].sort((a, b) => b - a).map(fmtN).join(' > ')}` });
   }
 }
 
@@ -82,7 +82,7 @@ function greaterCard(rng: Rng): Question {
   const answer = ri(rng, 999991, MAX), x = answer % 10;
   const decoys = [999980 + x, ...shuffle(rng, [999909, 999099, 990999, 909999, 999900, 999000]).slice(0, 2)];
   const prompt = 'Which number is greater than 999,990?';
-  return wordQ(rng, prompt, fmtN(answer), decoys.map(fmtN), { say: prompt });
+  return wordQ(rng, prompt, fmtN(answer), decoys.map(fmtN), { say: prompt, why: `${fmtN(answer)} is more than 999,990` });
 }
 
 export const y5Pv: Generator = (d: Difficulty, rng): Question => {
