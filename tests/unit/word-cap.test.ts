@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { TOPICS, YEARS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
-import { wideFor } from '../../src/curriculum/util';
-import { capWordBubbles, hintOnce, waveOptsFor, WORD_CAP_YEARS, MAX_WORD_BUBBLES_KS1 } from '../../src/ui/wave-opts';
+import { capApplies, isWordSet, capWordBubbles, hintOnce, waveOptsFor, WORD_CAP_YEARS, MAX_WORD_BUBBLES_KS1 } from '../../src/ui/wave-opts';
 
 // #2315: Reception to Year 2 word games launch at most three word bubbles a wave.
 function rngFor(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -30,10 +28,28 @@ describe('capWordBubbles (#2315)', () => {
     const q = { prompt: 'p', answer: 'four', options: ['one', 'two', 'three', 'four'] };
     expect(waveOptsFor(q, { labels: q.options, speed: 1 }, undefined, false, undefined, true).wide).toBe(true);
   });
-  it('the play screen passes the flag from the year and routes the hint through hintOnce', () => {
-    const src = readFileSync('src/ui/play-session.ts', 'utf8');
-    expect(src).toContain('WORD_CAP_YEARS.has(opts.year.id))');
-    expect(src).toContain('hintOnce(c.opts.year.id, q, hintText(');
+  it('only plain word sets are capped: numbers, money, time and measures are left alone (#2315 review 5)', () => {
+    for (const set of [['100', '120', '130', '140'], ['10p', '20p', '5p', '50p'], ['£1.50', '£2', '£1', '£5'], ['3:30', '4:30', '3:00', '12:00'], ['12 cm', '10 cm', '5 cm', '20 cm']]) {
+      expect(isWordSet(set), set.join()).toBe(false);
+      expect(capWordBubbles(set, set[0]), set.join()).toEqual(set);
+    }
+    expect(isWordSet(['ice cream', "can't", 'well-known', 'cat'])).toBe(true);
+  });
+  it('a sequence or an options-are-content question is never capped (#2315 review 6)', () => {
+    const base = { prompt: 'p', answer: 'one', options: ['one', 'two', 'three', 'four'] };
+    expect(capApplies(base, base.options)).toBe(true);
+    expect(capApplies({ ...base, sequence: ['one'] }, base.options)).toBe(false);
+    expect(capApplies({ ...base, optionsAreContent: true }, base.options)).toBe(false);
+    expect(waveOptsFor({ ...base, optionsAreContent: true }, { labels: base.options, speed: 1 }, undefined, false, undefined, true).labels).toEqual(base.options);
+  });
+  it('the cap and the hint share one predicate, so a capped wave and a quiet hint agree', () => {
+    const q = { prompt: 'p', answer: 'one', options: ['one', 'two', 'three', 'four'] };
+    expect(hintOnce('year1', q, 'x', { shownHint: { line: 'x', q: { ...q } } })).toBe('');
+    const money = { prompt: 'p', answer: '10p', options: ['10p', '20p', '5p', '50p'] };
+    expect(hintOnce('year1', money, 'x', { shownHint: { line: 'x', q: { ...money } } })).toBe('x');
+  });
+  it('the bomb a villain game adds after the cap is intended: a capped wave can carry four bubbles (play-session.ts launchWave)', () => {
+    expect(capWordBubbles(['one', 'two', 'three', 'four'], 'one').length + 1).toBe(MAX_WORD_BUBBLES_KS1 + 1);
   });
 });
 
@@ -46,8 +62,8 @@ describe('Reception to Year 2 waves carry at most three word bubbles (#2315)', (
       const w = waveOptsFor(q, { labels: q.options, speed: 1 }, undefined, false, undefined, true);
       if (q.sequence) { expect(w.labels, `${t.id} sequence untouched`).toEqual(q.options); continue; }
       expect(w.labels, `${t.id} keeps the answer`).toContain(q.answer);
-      if (wideFor(w.labels)) expect(w.labels.length, `${t.id} d${d} seed ${s}`).toBeLessThanOrEqual(MAX_WORD_BUBBLES_KS1);
-      if (!wideFor(q.options)) expect(w.labels, `${t.id} numbers untouched`).toEqual(q.options);
+      if (capApplies(q, q.options)) expect(w.labels.length, `${t.id} d${d} seed ${s}`).toBeLessThanOrEqual(MAX_WORD_BUBBLES_KS1);
+      if (!capApplies(q, q.options)) expect(w.labels, `${t.id} not a plain word set: untouched`).toEqual(q.options);
       if (w.labels.length < q.options.length) capped++;
     }
     expect(capped, 'the cap actually bites somewhere').toBeGreaterThan(0);
@@ -81,13 +97,14 @@ describe('hintOnce: the fixed instruction shows before wave 1 only (#2315)', () 
   it('a changed instruction is a new one and shows', () => {
     const st = { shownHint: null as { line: string; q: typeof word } | null };
     hintOnce('year2', word, 'Slice the ending', st);
-    expect(hintOnce('year2', word, 'Slice the beginning', st)).toBe('Slice the beginning');
+    const other = { ...word };
+    expect(hintOnce('year2', other, 'Slice the beginning', st), 'a different question object with a different line').toBe('Slice the beginning');
   });
   it('keeps number games, data hints, sequences and Years 3 to 6 on every wave', () => {
     const st = { shownHint: { line: 'x', q: num } };
     expect(hintOnce('year1', num, 'x', st)).toBe('x');
     expect(hintOnce('year1', { ...word, hint: 'x', hintIsData: true }, 'x', st)).toBe('x');
     expect(hintOnce('year1', { ...word, sequence: ['a'] }, 'x', st)).toBe('x');
-    expect(hintOnce('year4' as const, word, 'x', st)).toBe('x');
+    expect(hintOnce(YEARS[4].id, word, 'x', st)).toBe('x');
   });
 });
