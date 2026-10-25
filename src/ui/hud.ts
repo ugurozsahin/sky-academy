@@ -36,12 +36,16 @@ export function stageHTML(name: string, segs: readonly ('good' | 'bad' | '')[], 
     + `<small class="q" aria-hidden="true">${index + 1}/${total}</small>`;
 }
 
+/** An answer that is one or two symbols and no letter or digit: a shape (▲ ■) or a mark (, : ÷). */
+const BARE_GLYPH = /^[^\p{L}\p{N}\s]{1,2}$/u;
+
 /** The outcome hint under the question card: a tick for a right answer, else the answer named. */
 export const outcomeHintHTML = (kind: Outcome, answer: string, spelt?: string, why?: string): string => {
   const word = spelt ? esc(spelt) : '';   // #2277: a misspelling answer also names the right spelling
+  const ans = BARE_GLYPH.test(answer) ? `<b class="ok glyph">${esc(answer)}</b>` : `<b class="ok">${esc(answer)}</b>`;   // #2278: a lone shape or mark is drawn larger than the line
   return kind === 'correct'
-    ? `<b class="ok">✓ ${esc(answer)}</b> — that's right!${spelt ? ` It is spelt <b class="ok">${word}</b>.` : ''}`
-    : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is <b class="ok">${esc(answer)}</b>${spelt ? `, spelt <b class="ok">${word}</b>` : ''}${why ? `<br>${esc(why)}` : ''}`;   // #2316: the generator's reason, on its own line
+    ? `<b class="ok">✓</b> ${ans} — that's right!${spelt ? ` It is spelt <b class="ok">${word}</b>.` : ''}`
+    : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is ${ans}${spelt ? `, spelt <b class="ok">${word}</b>` : ''}${why ? `<br>${esc(why)}` : ''}`;   // #2316: the generator's reason, on its own line
 };
 
 /** `outcome` (#2286) is the line under `hint` that carries the verdict when the hint is the card's own values; optional so a card without it keeps the old one-line behaviour. */
