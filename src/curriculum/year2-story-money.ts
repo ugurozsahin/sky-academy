@@ -5,6 +5,7 @@ import type { Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ, coinLabel } from './util';
 
 export const ITEMS = ['pencil', 'rubber', 'apple', 'sticker', 'ruler', 'banana', 'balloon', 'biscuit', 'lolly', 'comic'];
+const EMOJI: Record<string, string> = { pencil: '✏️', rubber: '🎁', apple: '🍎', sticker: '⭐', ruler: '📏', banana: '🍌', balloon: '🎈', biscuit: '🍪', lolly: '🧁', comic: '📖' };
 const a = (item: string) => (/^[aeiou]/.test(item) ? 'an ' : 'a ') + item;
 const spoken = (p: number) => (p === 100 ? 'a pound' : p === 1 ? 'a penny' : `${p} pence`);
 const cap1 = (s: string) => s.replace(/^./, c => c.toUpperCase());
@@ -19,26 +20,27 @@ function basket(rng: Rng, lo: number, hi: number, step: number, cap: number) {
 }
 
 export const y2StoryMoney: Generator = (d, rng): Question => {
-  let prompt: string, say: string, ans: number, prices: number[];
+  let prompt: string, say: string, ans: number, prices: number[], items: string[];
   if (d === 1) {
     const { x, y, p, q } = basket(rng, 1, 50, 1, 100);
-    prompt = cap1(`${a(x)} costs ${coinLabel(p)} and ${a(y)} costs ${coinLabel(q)}. How much altogether?`);
-    say = cap1(`${a(x)} costs ${spoken(p)} and ${a(y)} costs ${spoken(q)}. How much altogether?`);
-    ans = p + q; prices = [p, q];
+    // d1 (#2323) is at most 8 words, spoken and written alike.
+    prompt = cap1(`${a(x)} ${coinLabel(p)}, ${a(y)} ${coinLabel(q)}. How much?`);
+    say = cap1(`${a(x)} ${spoken(p)}, ${a(y)} ${spoken(q)}. How much?`);
+    ans = p + q; prices = [p, q]; items = [x, y];
   } else if (d === 2) {
     const item = pick(rng, ITEMS), p = 5 * ri(rng, 1, 9);
     prompt = `You pay 50p for ${a(item)} costing ${coinLabel(p)}. How much change?`;
     say = `You pay ${spoken(50)} for ${a(item)} costing ${spoken(p)}. How much change?`;
-    ans = 50 - p; prices = [p];
+    ans = 50 - p; prices = [p]; items = [item];
   } else {
     const { x, y, p, q } = basket(rng, 5, 50, 5, 95);
     prompt = `You pay £1 for ${a(x)} at ${coinLabel(p)} and ${a(y)} at ${coinLabel(q)}. How much change?`;
     say = `You pay ${spoken(100)} for ${a(x)} at ${spoken(p)} and ${a(y)} at ${spoken(q)}. How much change?`;
-    ans = 100 - p - q; prices = [p, q];
+    ans = 100 - p - q; prices = [p, q]; items = [x, y];
   }
   // d3's main decoy forgets an item (the change from £1 for the dearer one alone); then ±5, ±10 and the prices.
   const forgot = d === 3 ? [100 - Math.max(...prices)] : [];
   const pool = [...forgot, ...shuffle(rng, [ans + 5, ans - 5, ans + 10, ans - 10, ...prices]), ans + 15, ans - 15, ans + 20];
   const ok = pool.filter((n, i) => n > 0 && n <= 100 && n !== ans && pool.indexOf(n) === i);
-  return wordQ(rng, prompt, coinLabel(ans), ok.slice(0, 3).map(coinLabel), { say });
+  return wordQ(rng, prompt, coinLabel(ans), ok.slice(0, 3).map(coinLabel), { say, visual: { type: 'word', text: items.join(' + '), emoji: items.map(i => EMOJI[i]).join(' ') } });
 };

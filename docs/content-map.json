@@ -1894,7 +1894,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Add the prices of two snacks in your head, then take one away to check the answer.",
    "strands": [
     "y2-m-as"
@@ -2126,7 +2126,7 @@
    ],
    "stages": 5,
    "questionBank": "generated",
-   "hasVisual": false,
+   "hasVisual": true,
    "tip": "Let your child pay with real coins at the shop and work out the change together.",
    "strands": [
     "y2-m-measure"

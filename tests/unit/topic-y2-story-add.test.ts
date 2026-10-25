@@ -15,7 +15,7 @@ describe('y2-story-add (#994)', () => {
       for (let i = 0; i < DRAWS; i++) {
         const q = y2StoryAdd(d, rng);
         const [a, b] = nums(q.prompt);
-        const row = BANK.find(t => q.prompt.startsWith(t[1].split('#')[0]))!;
+        const row = BANK.find(t => q.prompt.startsWith(d === 1 ? '' : t[1].split('#')[0]) && (d !== 1 || q.prompt.includes(` ${t[1].match(/# (\w+)/)?.[1]}.`)))!;
         const tail = (t: string) => t.split('#')[1].trim().replace(/\.$/, '');
         const isAdd = q.prompt.includes(` ${tail(row[2])}.`) && !q.prompt.includes(` ${tail(row[3])}.`);
         if (!isAdd) expect(q.prompt).toContain(` ${tail(row[3])}.`);
