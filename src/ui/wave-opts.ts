@@ -1,4 +1,4 @@
-import type { Question } from '../curriculum';
+import type { Question, YearId } from '../curriculum';
 import type { WaveOpts } from '../game/arena';
 import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow rule wordQ uses, not a second one
 
@@ -25,7 +25,7 @@ export function waveOptsFor(q: Question, info: { labels: string[]; speed: number
 /** Most word bubbles one wave carries in Reception to Year 2 (#2315): three words is what a child of five to seven reads before they fall. */
 export const MAX_WORD_BUBBLES_KS1 = 3;
 /** Years the cap above applies to. */
-export const WORD_CAP_YEARS: ReadonlySet<string> = new Set(['reception', 'year1', 'year2']);
+export const WORD_CAP_YEARS: ReadonlySet<YearId> = new Set<YearId>(['reception', 'year1', 'year2']);
 
 /** The wave's labels with a word set trimmed to three, the answer always kept, the survivors in their shuffled order. Number sets (no label over two characters) are untouched. */
 export function capWordBubbles(labels: string[], answer: string): string[] {
@@ -38,10 +38,11 @@ export function capWordBubbles(labels: string[], answer: string): string[] {
 
 /**
  * The hint line for a question (#2315): a fixed instruction (not the card's own data) is shown on the first wave of a
- * Reception to Year 2 word game and returns '' after, since it never changes. `state.shownHint` remembers what was shown.
+ * Reception to Year 2 word game and returns '' after, since it never changes. `state.shownHint` remembers the line and the question that showed it.
  */
-export function hintOnce(year: string, q: Question, line: string, state: { shownHint: string | null }): string {
+export function hintOnce(year: YearId, q: Question, line: string, state: { shownHint: { line: string; q: Question } | null }): string {
   if (!WORD_CAP_YEARS.has(year) || (!!q.hint && !!q.hintIsData) || q.sequence || !wideFor(q.options)) return line;
-  if (state.shownHint === line) return '';
-  state.shownHint = line; return line;
+  if (state.shownHint?.q === q) return line;   // a re-render of the question that earned the line (voice change, respawn) keeps it
+  if (state.shownHint?.line === line) return '';
+  state.shownHint = { line, q }; return line;
 }

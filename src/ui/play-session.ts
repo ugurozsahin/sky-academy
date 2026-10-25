@@ -157,7 +157,7 @@ interface BeatState {
   earlyPayout: ResultPayout | null;
   activeQuestion: Question | null;
   // `holdOpen` mirrors the pause overlay; `readThrough`: verdict arrived after the bubbles launched, so no peek (#65).
-  holdOpen: boolean; readThrough: boolean; shownHint: string | null;   // #2315: the fixed instruction already shown this game
+  holdOpen: boolean; readThrough: boolean; shownHint: { line: string; q: Question } | null;   // #2315: the fixed instruction already shown this game
   prevLives: number;
   // #44: false only until Fredoka is usable (or the capped wait gives up); the first wave waits for it.
   fontsReady: boolean;

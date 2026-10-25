@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TOPICS } from '../../src/curriculum';
+import { readFileSync } from 'node:fs';
+import { TOPICS, YEARS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { wideFor } from '../../src/curriculum/util';
 import { capWordBubbles, hintOnce, waveOptsFor, WORD_CAP_YEARS, MAX_WORD_BUBBLES_KS1 } from '../../src/ui/wave-opts';
@@ -19,7 +20,21 @@ describe('capWordBubbles (#2315)', () => {
     expect(capWordBubbles(['1', '2', '3', '4'], '2')).toEqual(['1', '2', '3', '4']);
     expect(capWordBubbles(['cat', 'dog', 'hen'], 'cat')).toEqual(['cat', 'dog', 'hen']);
   });
-  it('applies to Reception, Year 1 and Year 2 only', () => { expect([...WORD_CAP_YEARS].sort()).toEqual(['reception', 'year1', 'year2']); });
+  it('applies to Reception, Year 1 and Year 2 only, and those ids are real years', () => {
+    expect([...WORD_CAP_YEARS].sort()).toEqual(['reception', 'year1', 'year2']);
+    expect(YEARS.filter(y => WORD_CAP_YEARS.has(y.id)).map(y => y.id)).toEqual(['reception', 'year1', 'year2']);
+  });
+  it('keeps the survivors in their order and the card wide', () => {
+    expect(capWordBubbles(['one', 'two', 'three', 'four'], 'two')).toEqual(['one', 'two', 'three']);
+    expect(capWordBubbles(['one', 'two', 'three', 'four'], 'four')).toEqual(['one', 'two', 'four']);
+    const q = { prompt: 'p', answer: 'four', options: ['one', 'two', 'three', 'four'] };
+    expect(waveOptsFor(q, { labels: q.options, speed: 1 }, undefined, false, undefined, true).wide).toBe(true);
+  });
+  it('the play screen passes the flag from the year and routes the hint through hintOnce', () => {
+    const src = readFileSync('src/ui/play-session.ts', 'utf8');
+    expect(src).toContain('WORD_CAP_YEARS.has(opts.year.id))');
+    expect(src).toContain('hintOnce(c.opts.year.id, q, hintText(');
+  });
 });
 
 describe('Reception to Year 2 waves carry at most three word bubbles (#2315)', () => {
@@ -49,21 +64,30 @@ describe('hintOnce: the fixed instruction shows before wave 1 only (#2315)', () 
   const word = { prompt: 'p', answer: 'ous', options: ['ous', 'ious', 'eous'] };
   const num = { prompt: 'p', answer: '4', options: ['4', '5', '3'] };
   it('shows a Year 1 word game’s instruction once, then returns nothing', () => {
-    const st = { shownHint: null as string | null };
+    const st = { shownHint: null as { line: string; q: typeof word } | null };
     expect(hintOnce('year1', word, 'Slice the ending', st)).toBe('Slice the ending');
-    expect(hintOnce('year1', word, 'Slice the ending', st)).toBe('');
-    expect(hintOnce('year1', word, 'Slice the ending', st)).toBe('');
+    expect(hintOnce('year1', { ...word }, 'Slice the ending', st)).toBe('');
+    expect(hintOnce('year1', { ...word }, 'Slice the ending', st)).toBe('');
+  });
+  it('a re-render of the question that showed it keeps the line (voice change, respawn)', () => {
+    const st = { shownHint: null as { line: string; q: typeof word } | null };
+    expect(hintOnce('year1', word, 'Slice the ending', st)).toBe('Slice the ending');
+    expect(hintOnce('year1', word, 'Slice the ending', st)).toBe('Slice the ending');
+    const second = { ...word };
+    expect(hintOnce('year1', second, 'Slice the ending', st)).toBe('');
+    expect(hintOnce('year1', second, 'Slice the ending', st)).toBe('');
+    expect(hintOnce('year1', word, 'Slice the ending', st), 'wave 1 again after wave 2 is still its own').toBe('Slice the ending');
   });
   it('a changed instruction is a new one and shows', () => {
-    const st = { shownHint: null as string | null };
+    const st = { shownHint: null as { line: string; q: typeof word } | null };
     hintOnce('year2', word, 'Slice the ending', st);
     expect(hintOnce('year2', word, 'Slice the beginning', st)).toBe('Slice the beginning');
   });
   it('keeps number games, data hints, sequences and Years 3 to 6 on every wave', () => {
-    const st = { shownHint: 'x' };
+    const st = { shownHint: { line: 'x', q: num } };
     expect(hintOnce('year1', num, 'x', st)).toBe('x');
     expect(hintOnce('year1', { ...word, hint: 'x', hintIsData: true }, 'x', st)).toBe('x');
     expect(hintOnce('year1', { ...word, sequence: ['a'] }, 'x', st)).toBe('x');
-    expect(hintOnce('year4', word, 'x', st)).toBe('x');
+    expect(hintOnce('year4' as const, word, 'x', st)).toBe('x');
   });
 });
