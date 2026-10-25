@@ -55,10 +55,16 @@ export function barChartSVG(v: BarChart): string {
 /** The x of point `i` of `count` — the centre of its slot, so a label sits under its marker exactly. */
 export const pointX = (f: AxisFrame, count: number, i: number) => r2(f.left + barSlot(f, count) * (i + 0.5));
 
+/** What each axis counts (#2278, "unlabelled axes"). Both sit inside the plot, in the corners a rising line leaves empty, so the graph keeps its height. */
+export function axisTitles(f: AxisFrame, base: number, xTitle?: string, yTitle?: string): string {
+  const t = (x: number, y: number, anchor: string, s: string) => `<text class="axis-title" x="${x}" y="${y}" text-anchor="${anchor}" font-size="${AXIS_FS}" font-weight="700" fill="var(--text)">${esc(s)}</text>`;
+  return (yTitle ? t(f.left + 6, f.top + AXIS_FS, 'start', yTitle) : '') + (xTitle ? t(f.w - f.right - 2, r2(base - 6), 'end', xTitle) : '');
+}
+
 /** Points joined by straight segments on the same axis (Y4 time graphs, #1156); each point has a visible marker, a circle with a ring, so it never reads by colour alone. */
 export function lineChartSVG(v: LineChart): string {
   const f = AXIS_FRAME;
-  const { step, max, rows } = v;
+  const { step, max, rows, xTitle, yTitle } = v;
   if (!(Number.isInteger(step) && step > 0 && Number.isInteger(max) && max > 0 && max % step === 0 && max / step <= 10 && rows.length >= 2 && rows.length <= 6)) {
     console.warn(`line chart: axis step ${step}, max ${max}, ${rows.length} points is not drawable (whole steps up to 10, 2-6 points) — drew nothing`);
     return '';
@@ -73,5 +79,5 @@ export function lineChartSVG(v: LineChart): string {
   const marks = pts.map((p, i) =>
     `<circle class="pt" cx="${p.x}" cy="${p.y}" r="4.5" fill="var(--ink)" stroke="var(--accent-2)" stroke-width="2.5"/>`
     + `<text x="${p.x}" y="${r2(base + AXIS_FS + 4 + (i % 2 ? drop : 0))}" text-anchor="middle" font-size="${AXIS_FS}" font-weight="700" fill="var(--text)">${esc(p.label)}</text>`).join('');
-  return `<div class="vis"><svg viewBox="0 0 ${f.w} ${f.h + drop}" role="img" aria-label="Line graph" style="width:240px;max-width:100%;height:auto;display:block;overflow:visible">${axisSVG(f, max, step)}${path}${marks}</svg></div>`;
+  return `<div class="vis"><svg viewBox="0 0 ${f.w} ${f.h + drop}" role="img" aria-label="Line graph" style="width:240px;max-width:100%;height:auto;display:block;overflow:visible">${axisSVG(f, max, step)}${path}${marks}${axisTitles(f, base, xTitle, yTitle)}</svg></div>`;
 }
