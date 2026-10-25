@@ -100,7 +100,7 @@
 @keyframes qshake { 20% { transform: translateX(-8px); } 45% { transform: translateX(7px); } 70% { transform: translateX(-4px); } }
 .prompt .ans { color: var(--good); text-shadow: 0 0 16px #66e07d99, 0 2px 0 #0008; display: inline-block; animation: pop .35s cubic-bezier(.2, 1.4, .4, 1); }
 .qcard.good .hint, .qcard.bad .hint { color: #f4f6ff; font-size: 16px; } .hint .ok { color: var(--good); font-size: 1.15em; }
-.toast.bad { font-size: 20px; } .qcard .hint.outcome:empty { display: none; }
+.toast.bad { font-size: 20px; } .qcard .hint.outcome:empty { display: none; } .hint .ok.glyph { font-size: 2em; line-height: 1; }   /* #2278 */
 @keyframes qpulse { 40% { transform: scale(1.03); box-shadow: 0 0 0 5px color-mix(in srgb, var(--glow) 55%, transparent), 0 10px 30px #0006; } }
 /* first-play tutorial: a hand swipes through a demo bubble, which pops */
 .tutorial {
