@@ -214,12 +214,12 @@ for (const width of [360, 1280]) {
           .filter(el => !el.closest('.nav-years'))
           .map(el => { const r = el.getBoundingClientRect(); return [el.className || el.tagName, Math.round(r.x), Math.round(r.y), Math.round(r.width)]; }));   // not height: the Curriculum item's own <li> grows with its list
         const before = await boxes();
-        expect(before.length, 'the header elements it measures').toBeGreaterThan(2);
+        expect(before.length, 'the header elements it measures').toBe(11);
         await page.locator('.site-nav details.nav-years > summary').click();
         await expect(page.locator('.site-nav details.nav-years a').first()).toBeVisible();
         expect(await boxes(), 'no brand, nav item or Play now moved').toEqual(before);
         const { scroll, view } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
-        expect(scroll, 'no sideways scroll').toBe(view);
+        expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(view);
       });
     }
   });

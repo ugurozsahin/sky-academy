@@ -24,10 +24,16 @@ const rules = [...css.matchAll(/([^{}]*\.nav-years[^{}]*)\{([^}]*)\}/g)].map(m =
 /**
  * #2170: the two rules above (nothing lies over the page, hover opens nothing) read only rules that name .nav-years,
  * so a rule reaching the same list by another route would have passed. `reaches` is every selector that could match
- * the nested list or its disclosure: .nav-years, any details/summary/::details-content, and a li or ul under .site-nav.
+ * the nested list or its disclosure: .nav-years, any details/summary/::details-content, any bare ul or li, and a ul or li under the header or its nav
+ * (.site-header, .site-nav, .wrap, nav, header). A ul or li under any other class is page content, not the list.
  */
 const flat = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ selector: m[1].trim(), body: m[2] }));
-const reaches = (part: string) => /\.nav-years|\bdetails\b|\bsummary\b|details-content/.test(part) || /\.site-nav\b[^,]*\b(li|ul)\b/.test(part);
+const reaches = (part: string) => {
+  const sel = part.trim(), lists = /(^|[\s>+~(])(ul|li)\b/.test(sel);
+  return /\.nav-years|\bdetails\b|\bsummary\b|details-content/.test(sel)
+    || (lists && !/[.#]/.test(sel))                                              // ul, li, ul ul, nav li:hover ul
+    || (lists && /^(\.site-nav|\.site-header|\.wrap|nav|header)\b/.test(sel));  // .site-header ul, .wrap ul, nav ul
+};
 const reached = flat.filter(r => r.selector.split(',').some(s => reaches(s)));
 const opensOnHover = (selector: string, body: string) => selector.split(',').some(s => reaches(s) && (
   /:hover[^,]*(\bul\b|\bli\b|details-content)/.test(s) || (/\b(details|nav-years)\b[^\s,>+~]*:hover/.test(s) && /\b(display|content-visibility|visibility|height|max-height)\s*:/.test(body))));
@@ -36,7 +42,7 @@ const onlyScripted = (selector: string) => selector.split(',').every(s => s.trim
 
 describe('the rail reaches every rule that could touch the nested list (#2170)', () => {
   it('reads the rules it is meant to judge', () => {
-    expect(reached.length, 'rules reaching the list').toBeGreaterThan(rules.length - 1);
+    for (const r of rules) expect(reached.map(x => x.selector), 'every .nav-years rule is read').toContain(r.selector);
     expect(reached.map(r => r.selector)).toContain('.site-nav ul');
     expect(reached.map(r => r.selector)).toContain('.site-nav .nav-years ul ul');
   });
@@ -48,10 +54,14 @@ describe('the rail reaches every rule that could touch the nested list (#2170)',
   });
   it('what it reads, and what it refuses (mutations)', () => {
     for (const s of ['.site-nav li ul', '.site-nav details ul', '.site-nav details', '.site-nav ul ul', 'details > summary + ul']) expect(reaches(s), s).toBe(true);
-    for (const s of ['.site-nav a', '.site-header .wrap', '.btn']) expect(reaches(s), s).toBe(false);
+    for (const s of ['.site-nav a', '.btn', '.hero h1', '.facts div']) expect(reaches(s), s).toBe(false);
     expect(flat.some(r => r.selector.startsWith('@media')), 'a media prelude is not a rule').toBe(false);
-    expect(onlyScripted('.site-nav li ul') && overlays('position: absolute'), 'position: absolute on .site-nav li ul').toBe(false);
-    expect(onlyScripted('.site-nav details ul')).toBe(false);
+    expect(overlays('position: absolute'), 'position: absolute is an overlay').toBe(true);
+    for (const s of ['.site-nav li ul', '.site-nav details ul', '.site-header ul', 'nav ul', '.wrap ul', 'ul ul', 'ul', 'li', 'nav li:hover ul']) {
+      expect(reaches(s), `${s} reaches the list`).toBe(true);
+      expect(onlyScripted(s), `${s} may not lie over the page`).toBe(false);
+    }
+    expect(opensOnHover('nav li:hover ul', 'display: block'), 'hover on a li opening its ul').toBe(true);
     expect(opensOnHover('.site-nav details:hover::details-content', 'content-visibility: visible')).toBe(true);
     expect(opensOnHover('.nav-years:hover > ul', 'display: block')).toBe(true);
     expect(opensOnHover('.site-nav details:hover ul', 'display: block')).toBe(true);
@@ -61,8 +71,13 @@ describe('the rail reaches every rule that could touch the nested list (#2170)',
   // behaviour; these hold the two declarations that produce it, so the failure names the line).
   it('the in-flow list takes no width of its own, and the header row stays top-aligned from 900px', () => {
     expect(flat.find(r => r.selector === '.site-nav .nav-years > ul')?.body).toMatch(/contain:\s*inline-size/);
-    const at = css.indexOf('@media (min-width: 900px)', css.indexOf('.site-nav div.nav-years > ul {'));
-    expect(css.slice(at).match(/\.site-header \.wrap\s*\{[^}]*align-items:\s*start/), 'align-items: start on .site-header .wrap at 900px').not.toBeNull();
+    const anchor = css.indexOf('.site-nav div.nav-years > ul {');
+    expect(anchor, 'the scripted list rule it anchors on').toBeGreaterThan(-1);
+    const at = css.indexOf('@media (min-width: 900px)', anchor);
+    expect(at, 'the 900px block after it').toBeGreaterThan(-1);
+    let depth = 0, end = at;
+    for (let i = css.indexOf('{', at); i < css.length; i++) { depth += css[i] === '{' ? 1 : css[i] === '}' ? -1 : 0; if (depth === 0) { end = i; break; } }
+    expect(css.slice(at, end).match(/\.site-header \.wrap\s*\{[^}]*align-items:\s*start/), 'align-items: start on .site-header .wrap in that block').not.toBeNull();
   });
 });
 
