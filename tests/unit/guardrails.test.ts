@@ -2272,10 +2272,8 @@ describe('the chart visual\'s CSS structure cannot go missing without a red test
 
     const tal = bare.match(/\.chart\s+\.tal\s*\{([^}]*)\}/)?.[1];
     expect(tal, 'a .chart .tal rule must exist').toBeTruthy();
-    expect(tal, '.tal must stay position: relative, or its ::after gate stroke positions against the wrong box')
-      .toMatch(/position:\s*relative/);
-    expect(tal, '.tal must stay white-space: nowrap, or as a flex item "||||" breaks into four lines (#2278)')
-      .toMatch(/white-space:\s*nowrap/);
+    expect([/position:\s*relative/, /white-space:\s*nowrap/].map(r => r.test(tal!)), '.tal must stay position: relative (the ::after anchor) and white-space: nowrap (#2278: a flex item breaks "||||" into four lines)')
+      .toEqual([true, true]);
 
     const gate = bare.match(/\.chart\s+\.tal\.fifth::after\s*\{([^}]*)\}/)?.[1];
     expect(gate, 'a .chart .tal.fifth::after rule must exist — a tally of five renders identically to four without it')
