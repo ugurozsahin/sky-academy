@@ -75,7 +75,7 @@ export const y4WhichOp: Generator = (d, rng): Question => {
     const { a, b } = numbersFor(op, d, rng);
     const prompt = text.replace('{a}', f(a)).replace('{b}', f(b));
     if (prompt.length > 72) continue; // three lines at 390 px (#1051)
-    const card = wordQ(rng, prompt, op, OPS.filter(o => o !== op), { say: ks2Say(`${prompt} Which operation solves it?`), hint: 'Which operation solves it?', hintIsData: false });
+    const card = wordQ(rng, prompt, op, OPS.filter(o => o !== op), { say: `${ks2Say(prompt.replace(/\?$/, ''))}? Which operation solves it?`, hint: 'Which operation solves it?', hintIsData: false });
     return { ...card, options: [...OPS], wide: false };
   }
 };
