@@ -20,13 +20,21 @@ function pickDecoys(rng: Rng, answer: Frac, first: Frac[], rest: Frac[]): string
   return chosen.slice(0, 3).map(lab);
 }
 
+/** The working: tops added or taken away over one bottom, the smaller bottom converted first (#2317). */
+function why(op: Op, a: Frac, b: Frac, answer: Frac): string {
+  const D = answer.d, x = a.n * (D / a.d), y = b.n * (D / b.d), top = op === '+' ? x + y : x - y;
+  const tail = top >= D ? ` = ${lab(answer)}` : '';
+  if (a.d === b.d) return `Same bottom, so ${op === '+' ? 'add' : 'take away'} the tops: ${x}/${D} ${op} ${y}/${D} = ${top}/${D}${tail}`;
+  return `Make the bottoms ${D}: ${x}/${D} ${op} ${y}/${D} = ${top}/${D}${tail}`;
+}
+
 function card(rng: Rng, op: Op, a: Frac, b: Frac, answer: Frac, extra: Frac[], hint: string, prefix = ''): Question {
   const sum = `${prefix}${lab(a)} ${op} ${lab(b)}`;
   const tb = op === '+' ? f(a.n + b.n, a.d + b.d) : f(Math.abs(a.n - b.n), Math.abs(a.d - b.d));
   const D = answer.d, other = op === '+' ? Math.abs(a.n * (D / a.d) - b.n * (D / b.d)) : a.n * (D / a.d) + b.n * (D / b.d);
   const rest = [f(op === '+' ? a.n + b.n : Math.abs(a.n - b.n), D), f(other, D), f(answer.n + 1, D), f(answer.n - 1, D), f(answer.n, D + 1), f(answer.n + 2, D), f(answer.n - 2, D), f(answer.n, D - 1), f(answer.n + 1, D + 1), ...extra];
   const decoys = pickDecoys(rng, answer, [tb], rest);
-  return wordQ(rng, `${sum} = ?`, lab(answer), decoys, { say: ks2Say(`${sum} = ?`).replace(/^./, c => c.toUpperCase()), hint, hintIsData: false });
+  return wordQ(rng, `${sum} = ?`, lab(answer), decoys, { say: ks2Say(`${sum} = ?`).replace(/^./, c => c.toUpperCase()), hint, hintIsData: false, why: why(op, a, b, answer) });
 }
 
 /** Two fractions over bottoms `b` and `d`, and their sum or difference over the larger one, kept when `inRange(top, bottom)` says so. */
@@ -65,7 +73,8 @@ function mixedTakeAway(rng: Rng): Question {
   const d = ri(rng, 3, 12), a = ri(rng, 1, d - 2), c = ri(rng, a + 1, d - 1), ans = f(d + a - c, d);
   const sum = `1 ${a}/${d} − ${c}/${d}`;
   const decoys = pickDecoys(rng, ans, [], [f(c - a, d), f(a + c, d), f(d - c, d), f(d + a + c, d), f(ans.n + 1, d), f(ans.n - 1, d), f(c, d), f(ans.n + 2, d), f(ans.n, d + 1)]);
-  return wordQ(rng, `${sum} = ?`, lab(ans), decoys, { say: ks2Say(`${sum} = ?`).replace(/^./, ch => ch.toUpperCase()), hint: 'Write 1 as a fraction with the same bottom first', hintIsData: false });
+  return wordQ(rng, `${sum} = ?`, lab(ans), decoys, { say: ks2Say(`${sum} = ?`).replace(/^./, ch => ch.toUpperCase()), hint: 'Write 1 as a fraction with the same bottom first', hintIsData: false,
+    why: `1 ${a}/${d} = ${d + a}/${d}, so ${d + a}/${d} − ${c}/${d} = ${lab(ans)}` });
 }
 
 export const y5FracAdd: Generator = (level: Difficulty, rng) =>
