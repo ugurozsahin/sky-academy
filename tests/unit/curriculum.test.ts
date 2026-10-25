@@ -20,6 +20,9 @@ import { solve } from './helpers/ks2-oracle';
 import { genericTopicSuite } from './helpers/generic-topic-suite';
 import { isKs2 } from '../../src/curriculum/key-stage'; import { subjectTopics } from '../../src/game/pools';   // #1325: the island's own pool predicate, not a copy
 
+/** Letter bubbles a spelling-gap card offers (#2322): y1-spelling three, two at d1; the others four. */
+const gapBubbles = (id: string, d: number) => id !== 'y1-spelling' ? 4 : d === 1 ? 2 : 3;
+
 const N = 150;
 
 // Deterministic RNG (mulberry32)
@@ -665,7 +668,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
           // at a real card could not have caught #418 even on the topics it did cover.
           expect(AVOID.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}, which no card may show`).toBe(false);
         }
-        expect(q.options.length, q.prompt).toBe(4 - Number(id === 'y1-spelling') - Number(id === 'y1-spelling' && d === 1));   // #2322: y1-spelling offers three letter bubbles, two at d1
+        expect(q.options.length, q.prompt).toBe(gapBubbles(id, d));   // #2322: y1-spelling offers three letter bubbles, two at d1
         // The exemption above rests on this: drop the emoji from an r-sounds card and `_un` beside nothing
         // really is ambiguous, so the exemption must go red rather than quietly widen.
         if (id === 'r-sounds') {
