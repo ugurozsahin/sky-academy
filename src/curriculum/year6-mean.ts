@@ -21,7 +21,7 @@ const last = (s: string) => s.replace(/\D/g, '').slice(-1);
  * One card. `ans` and every candidate are scaled by `10 ** dp`. The first candidate is the named total slip and is always kept;
  * an answer in #1058's leak scope (20 or more, or a decimal) also gets one decoy sharing its last digit and one its leading digit.
  */
-function card(rng: Rng, dp: number, ans: number, named: number[], extra: Pick<Question, 'prompt' | 'say'> & { hint: string }): Question {
+function card(rng: Rng, dp: number, ans: number, named: number[], extra: Pick<Question, 'prompt' | 'say' | 'why'> & { hint: string }): Question {
   const label = (v: number) => fmt(dec(v, dp));
   const ok = (v: number) => Number.isInteger(v) && v >= 1 && v !== ans;
   const ds = [...new Set([named[0], ...shuffle(rng, named.slice(1))].filter(ok))].slice(0, 3);
@@ -39,7 +39,7 @@ function card(rng: Rng, dp: number, ans: number, named: number[], extra: Pick<Qu
       swap([1, -1, 2, -2, 3, -3, 4, -4].map(t => ans + t).find(v => ok(v) && !ds.includes(v) && lead(label(v)) === lead(al) && last(label(v)) !== last(al)), last);
   }
   for (let s = 2; ds.length < 3; s++) for (const v of [ans + s, ans - s]) if (ok(v) && !ds.includes(v) && ds.length < 3) ds.push(v);
-  return wordQ(rng, extra.prompt, label(ans), ds.map(label), { say: extra.say, hint: extra.hint, hintIsData: true });
+  return wordQ(rng, extra.prompt, label(ans), ds.map(label), { say: extra.say, hint: extra.hint, hintIsData: true, why: extra.why });
 }
 
 /** `n` values in 1..max whose sum is exactly `total`, smallest first, so one set of numbers is one card; null when the draw does not fit. */
@@ -58,6 +58,7 @@ function meanCard(rng: Rng, xs: number[], dp: number, ctx: { label: string; ask:
   const named = [total * k, total * k / (n - 1), median(xs) * k, (Math.max(...xs) - Math.min(...xs)) * k, Math.max(...xs) * k];
   return card(rng, dp, total * k / n, named, {
     prompt: small ? 'Mean of the numbers?' : ctx.ask,
+    why: `Total ${total} ÷ ${n} = ${fmt(dec(total * k / n, dp))}`,
     hint: `${small ? 'Numbers' : ctx.label}: ${list(xs)}`,
     say: `${small ? 'The numbers are' : `The ${ctx.say} are`} ${spoken(xs)}. What is the mean?`,
   });
@@ -71,6 +72,7 @@ function missing(rng: Rng): Question {
     const ks = known.reduce((a, b) => a + b, 0);
     return card(rng, 0, x, [n * m, m, ks, ks / (n - 1)], {
       prompt: 'The missing number?',
+      why: `${n} × ${m} = ${n * m}, minus ${ks} leaves ${x}`,
       hint: `Mean ${m} of ${n} numbers. Known: ${list(known)}`,
       say: `The mean of ${n} numbers is ${m}. ${spoken(known)} are three of them. What is the other number?`.replace('three', ['', '', 'two', 'three', 'four'][n - 1]),
     });

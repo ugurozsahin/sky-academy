@@ -29,7 +29,7 @@ function stackCard(rng: Rng): Question {
   const decoys = [...new Set(cands.filter(c => c.n >= 1 && !equal(c, top)).map(lab))].filter(s => s !== ans);
   return wordQ(rng, 'Same amount! What fraction is the bottom bar?', ans, decoys,
     { visual: { type: 'fraction', parts: top.d, shaded: top.n, shape: 'bar', stack: [{ parts: top.d, shaded: top.n }, { parts: d, shaded: m }] },
-      say: 'The bars show the same amount. What fraction of the bottom bar is shaded?', hint: 'Count the shaded parts on the bottom bar', hintIsData: false });
+      say: 'The bars show the same amount. What fraction of the bottom bar is shaded?', hint: 'Count the shaded parts on the bottom bar', hintIsData: false, why: `Top and bottom both × ${m}: ${lab(top)} = ${ans}` });
 }
 
 /** 2–3 family members and 2 decoys: one shares a target's bottom without its value, one is a classic slip. */
@@ -49,7 +49,7 @@ function sliceCard(rng: Rng, names: Frac[]): Question {
   for (const t of shuffle(rng, targets)) { if (decoys.length >= 2) break; take([{ n: t.n + 2, d: t.d }, { n: t.n - 2, d: t.d }, { n: t.n, d: t.d + 1 }]); }
   const nm = lab(name);
   return anyOrderQ(rng, `Slice every fraction equal to ${nm}`, targets.map(lab), decoys,
-    { say: `Slice every fraction equal to ${ks2Say(nm)}`, hint: 'Slice them all', hintIsData: false });
+    { say: `Slice every fraction equal to ${ks2Say(nm)}`, hint: 'Slice them all', hintIsData: false, why: [nm, ...[...targets].sort((a, b) => a.d - b.d).map(lab)].join(' = ') });
 }
 
 /** d3 one card in four: "2/3 = ?/12". */
@@ -59,7 +59,7 @@ function missingCard(rng: Rng): Question {
   const pool = [name.n + (D - name.d), k, ans + 1, ans - 1, ans + 2, ans - 2, D - ans];
   const decoys = [...new Set(pool.filter(v => v >= 1 && v !== ans))].map(String);
   return wordQ(rng, `${lab(name)} = ?/${D}`, String(ans), decoys,
-    { say: `${cap(ks2Say(lab(name)))} equals what over ${numberWord(D)}?`, hint: 'Multiply the top by what the bottom was multiplied by', hintIsData: false });
+    { say: `${cap(ks2Say(lab(name)))} equals what over ${numberWord(D)}?`, hint: 'Multiply the top by what the bottom was multiplied by', hintIsData: false, why: `Top and bottom both × ${k}: ${lab(name)} = ${ans}/${D}` });
 }
 
 export const y4FracEquiv: Generator = (level: Difficulty, rng) => {

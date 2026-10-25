@@ -5,7 +5,7 @@ import { y4Round } from './year4-round';
 import { y4Roman } from './year4-roman';
 import type { Difficulty, Generator, Question, Topic } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
-import { dec, fmt, digitAt } from './ks2num';
+import { dec, fmt, digitAt, columnName } from './ks2num';
 import { y4Negative } from './year4-negative';
 
 // Hand-built `Question`s: options must be comma-formatted via `fmt()` ("4,456"), never `numQ`'s bare String().
@@ -86,7 +86,7 @@ function digitValueQ(d: Difficulty, rng: () => number): Question {
   const dg = ds[place];
   const answer = dg * POW[place];
   const options = shuffle(rng, POW.map(p => dg * p)).map(fmtN);
-  return { prompt: `In ${fmtN(n)}, what is the ${dg} worth?`, say: `In ${fmtN(n)}, what is the ${dg} worth?`, answer: fmtN(answer), options };
+  return { prompt: `In ${fmtN(n)}, what is the ${dg} worth?`, say: `In ${fmtN(n)}, what is the ${dg} worth?`, answer: fmtN(answer), options, why: `The ${dg} is in the ${columnName(POW[place])} place, so it is worth ${fmtN(answer)}` };
 }
 
 /** d2 pair: same thousands digit, one or two other columns differ; one card in five is equal. */
@@ -100,8 +100,10 @@ function compareQ(rng: () => number): Question {
     }
   }
   const ans = a < b ? '<' : a > b ? '>' : '=';
+  const differ = POW.map((_, i) => 3 - i).find(i => digitAt(a, POW[i]) !== digitAt(b, POW[i]));   // #2317: the biggest column where the two differ decides
+  const why = differ === undefined ? 'Every digit matches, so they are equal' : `Biggest place that differs is ${columnName(POW[differ])}: ${digitAt(a, POW[differ])} is ${a < b ? 'less' : 'more'} than ${digitAt(b, POW[differ])}`;
   const say = `${fmtN(a)} compared with ${fmtN(b)}. Less than, greater than, or equal?`;
-  return wordQ(rng, `${fmtN(a)} ? ${fmtN(b)}`, ans, ['<', '>', '='], { say, hint: 'Slice the correct sign', hintIsData: false });
+  return wordQ(rng, `${fmtN(a)} ? ${fmtN(b)}`, ans, ['<', '>', '='], { say, hint: 'Slice the correct sign', hintIsData: false, why });
 }
 
 /** d3: four numbers sharing a thousands digit, sliced smallest first. `answer` is a space join: "4,305" has a comma. */
@@ -111,7 +113,7 @@ function orderPvQ(rng: () => number): Question {
   while (set.size < 4) set.add(th + ri(rng, 0, 999));
   const sorted = [...set].sort((x, y) => x - y).map(fmtN);
   const shown = shuffle(rng, sorted);
-  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(' '), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false };
+  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(' '), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false, why: 'Same thousands, so compare the hundreds, then tens' };
 }
 
 export const y4PlaceValue: Generator = (d, rng) => d === 3 ? orderPvQ(rng) : d === 2 && rng() < 0.5 ? compareQ(rng) : digitValueQ(d, rng);

@@ -21,19 +21,22 @@ function decoys(ans: Frac, d: number, tb: Frac, other: Frac, rng: Rng): string[]
   return out.slice(0, 3).map(lab);
 }
 
-const card = (prompt: string, spoken: string, ans: Frac, ds: string[], rng: Rng): Question =>
-  ({ prompt, say: spoken, answer: lab(ans), options: shuffle(rng, [lab(ans), ...ds]), hint: 'Slice the answer', hintIsData: false });
+const card = (prompt: string, spoken: string, ans: Frac, ds: string[], rng: Rng, why: string): Question =>
+  ({ prompt, say: spoken, answer: lab(ans), options: shuffle(rng, [lab(ans), ...ds]), hint: 'Slice the answer', hintIsData: false, why });
+
+/** The sum with the bottom kept: 3/8 + 2/8 = 5/8 (a whole reads 8/8 = 1). */
+const sum = (a: number, b: number, d: number) => `${a}/${d} + ${b}/${d} = ${a + b}/${d}${a + b === d ? ' = 1' : ''}`;
 
 function add(d: number, a: number, b: number, rng: Rng): Question {
   const ans = f(a + b, d);
   return card(`${a}/${d} + ${b}/${d} = ?`, `${cap(say(a, d))} plus ${say(b, d)} equals what?`, ans,
-    decoys(ans, d, f(a + b, 2 * d), f(Math.abs(a - b) || a + 1, d), rng), rng);
+    decoys(ans, d, f(a + b, 2 * d), f(Math.abs(a - b) || a + 1, d), rng), rng, `Same bottoms, so add the tops: ${sum(a, b, d)}`);
 }
 
 function sub(d: number, x: number, y: number, rng: Rng): Question {
   const ans = f(x - y, d);
   return card(`${x}/${d} − ${y}/${d} = ?`, `${cap(say(x, d))} take away ${say(y, d)} equals what?`, ans,
-    decoys(ans, d, f(x - y, 2 * d), f(x + y > d ? x : x + y, d), rng), rng);
+    decoys(ans, d, f(x - y, 2 * d), f(x + y > d ? x : x + y, d), rng), rng, `Same bottoms, so take the tops away: ${x}/${d} − ${y}/${d} = ${x - y}/${d}`);
 }
 
 /** d3: `a/d + ? = c/d` or `? − a/d = c/d`, answered with the missing fraction. */
@@ -42,16 +45,17 @@ function missing(rng: Rng): Question {
   if (rng() < 0.5) {
     const c = ri(rng, 2, d), a = ri(rng, 1, c - 1), ans = f(c - a, d);
     return card(`${a}/${d} + ? = ${lab(f(c, d))}`, `${cap(say(a, d))} plus what equals ${c === d ? 'one whole' : say(c, d)}?`, ans,
-      decoys(ans, d, f(c, d + a), f(a + c > d ? c : a + c, d), rng), rng);
+      decoys(ans, d, f(c, d + a), f(a + c > d ? c : a + c, d), rng), rng, `${c} − ${a} = ${c - a} tops, so ${a}/${d} + ${c - a}/${d} = ${lab(f(c, d))}`);
   }
   const a = ri(rng, 1, d - 2), c = ri(rng, 1, d - a), ans = f(a + c, d);
-  return card(`? − ${a}/${d} = ${c}/${d}`, `What minus ${say(a, d)} equals ${say(c, d)}?`, ans, decoys(ans, d, f(c, d + a), f(Math.abs(c - a) || c + 1, d), rng), rng);
+  return card(`? − ${a}/${d} = ${c}/${d}`, `What minus ${say(a, d)} equals ${say(c, d)}?`, ans, decoys(ans, d, f(c, d + a), f(Math.abs(c - a) || c + 1, d), rng), rng,
+    `${a} + ${c} = ${a + c} tops, so ${a + c}/${d} − ${a}/${d} = ${c}/${d}`);
 }
 
 /** d3: two parts that make exactly one whole, answer `1`. */
 function whole(rng: Rng): Question {
   const d = ri(rng, 3, 10), a = ri(rng, 1, d - 1), b = d - a, ans = f(d, d);
-  return card(`${a}/${d} + ${b}/${d} = ?`, `${cap(say(a, d))} plus ${say(b, d)} equals what?`, ans, decoys(ans, d, f(d, 2 * d), f(Math.abs(a - b) || 1, d), rng), rng);
+  return card(`${a}/${d} + ${b}/${d} = ?`, `${cap(say(a, d))} plus ${say(b, d)} equals what?`, ans, decoys(ans, d, f(d, 2 * d), f(Math.abs(a - b) || 1, d), rng), rng, `Same bottoms, so add the tops: ${sum(a, b, d)}`);
 }
 
 export const y3FracAdd: Generator = (level: Difficulty, rng) => {

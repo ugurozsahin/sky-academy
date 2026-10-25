@@ -4,7 +4,7 @@
 // inner place only (so the last digit never gives the answer away).
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
-import { dec, fmt, wordsFor } from './ks2num';
+import { dec, fmt, wordsFor, columnName } from './ks2num';
 
 const fmtN = (n: number) => fmt(dec(n, 0));
 const dedupe = (answer: number, xs: number[]) => [...new Set(xs)].filter(v => v !== answer);
@@ -19,7 +19,7 @@ function valueCard(rng: Rng): Question {
     // One place left, one place right, face value; then two places either side when one of those is a repeat or out of range.
     const decoys = dedupe(answer, [k + 1, k - 1, 0, k + 2, k - 2, k + 3, k - 3].filter(j => j >= 0 && j <= 6).map(j => digit * 10 ** j)).slice(0, 3);
     const prompt = `What is the value of the ${c} in ${fmtN(n)}?`;
-    return wordQ(rng, prompt, fmtN(answer), decoys.map(fmtN), { say: prompt });
+    return wordQ(rng, prompt, fmtN(answer), decoys.map(fmtN), { say: prompt, why: `The ${c} is in the ${columnName(10 ** k)} place, so it is worth ${fmtN(answer)}` });
   }
 }
 
@@ -43,7 +43,7 @@ function wordsCard(rng: Rng): Question {
     const decoys = dedupe(n, [...dropped, added, ...shuffle(rng, swaps), n * 10, n % 10 === 0 ? n / 10 : n + 10 ** ri(rng, 0, 5)]).slice(0, 3);
     if (decoys.length < 3) continue;
     const prompt = `In digits: ${words}`;
-    return wordQ(rng, prompt, fmtN(n), decoys.map(fmtN), { say: prompt });
+    return wordQ(rng, prompt, fmtN(n), decoys.map(fmtN), { say: prompt, why: `A zero holds each empty place: ${fmtN(n)}` });
   }
 }
 
@@ -61,7 +61,8 @@ function compareCard(rng: Rng): Question {
     if (nums.size < 4) continue;
     const opts = [...nums], greatest = rng() < 0.5, answer = greatest ? Math.max(...opts) : Math.min(...opts);
     const prompt = greatest ? 'Which is the greatest?' : 'Which is the smallest?';
-    return wordQ(rng, prompt, fmtN(answer), opts.filter(v => v !== answer).map(fmtN), { say: prompt, optionsAreContent: true });
+    const first = [...String(opts[0])].findIndex((c, i) => opts.some(v => String(v)[i] !== c));   // #2317: the leftmost column where they differ decides
+    return wordQ(rng, prompt, fmtN(answer), opts.filter(v => v !== answer).map(fmtN), { say: prompt, optionsAreContent: true, why: `Compare from the left: the ${columnName(10 ** (6 - first))} digit decides` });
   }
 }
 
