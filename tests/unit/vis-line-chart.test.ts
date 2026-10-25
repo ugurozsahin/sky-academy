@@ -59,4 +59,10 @@ describe('line graph visual (#1156)', () => {
     titles.forEach(t => { expect(Number(t[3])).toBeGreaterThanOrEqual(13); expect(Number(t[1])).toBeLessThanOrEqual(F.w); expect(Number(t[2])).toBeLessThan(F.h - F.bottom); });
     expect(renderVisual(line([2, 6, 10]))).not.toContain('axis-title');
   });
+
+  it('a y title alone draws exactly one title, as the time graph does (#2278)', () => {
+    const html = renderVisual({ ...line([2, 6, 10]), yTitle: 'km' });
+    expect(html.match(/<text class="axis-title"/g)).toHaveLength(1);
+    expect(html).toContain('>km<');
+  });
 });

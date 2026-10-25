@@ -124,4 +124,14 @@ describe('y6-graphs (#1250)', () => {
       expect(s.units / s.counted, `units d${d}`).toBeLessThanOrEqual(0.3); expect(s.leading / s.counted, `leading d${d}`).toBeLessThanOrEqual(0.3);
     }
   });
+
+  it('names the axes: the conversion graph km across and miles up, the time graph km up only (#2278)', () => {
+    let conv = 0, time = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
+      const v = chart(q);
+      if (isConv(v.rows)) { conv++; expect(v).toMatchObject({ xTitle: 'km', yTitle: 'miles' }); }
+      else { time++; expect(v.yTitle).toBe('km'); expect(v.xTitle).toBeUndefined(); }
+    }
+    expect(conv).toBeGreaterThan(0); expect(time).toBeGreaterThan(0);
+  });
 });
