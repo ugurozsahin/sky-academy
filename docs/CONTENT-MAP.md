@@ -124,7 +124,7 @@ Generated from the registry: 342 topics. A strand counts as covered only when a 
 | Related Facts (`y2-related`) | Y2 A&S: derive and use related facts up to 100 | mixed | Slices the answer | generated | yes |
 | Three Numbers (`y2-three`) | Y2 A&S: add three 1-digit | mixed | Slices the answer | generated | no |
 | Missing Number (`y2-inverse`) | Y2 A&S: inverse, missing number | mixed | Slices the answer | generated | no |
-| Story Sums (`y2-story-add`) | Y2 A&S: solve problems with addition and subtraction in context | mixed | Slices the answer | generated | no |
+| Story Sums (`y2-story-add`) | Y2 A&S: solve problems with addition and subtraction in context | mixed | Slices the answer | generated | yes |
 | Swap It Round (`y2-anyorder`) | Y2 A&S, M&D: addition and multiplication can be done in any order; subtraction and division cannot | mixed | Slices the answer | generated | no |
 | 2, 5, 10 Times Tables (`y2-tables`) | Y2 M&D: 2, 5, 10 tables ×÷ | mixed | Slices the answer | generated | no |
 | 2× table (`y2-tables-2`) | Y2 M&D: 2 times table | drill | Slices the answer | generated | no |
@@ -135,7 +135,7 @@ Generated from the registry: 342 topics. A strand counts as covered only when a 
 | Fractions (`y2-fractions`) | Y2 Fractions: 1/3 1/4 2/4 3/4 | mixed | Slices the answer | generated | yes |
 | Same Fraction (`y2-equiv`) | Y2 Fractions: equivalence of 2/4 and 1/2 | mixed | Slices the answer | generated | yes |
 | Money £ and p (`y2-money`) | Y2 Measurement: money, change | mixed | Slices the answer | generated | yes |
-| Shop Stories (`y2-story-money`) | Y2 Measurement: money problems in a practical context, including change | mixed | Slices the answer | generated | no |
+| Shop Stories (`y2-story-money`) | Y2 Measurement: money problems in a practical context, including change | mixed | Slices the answer | generated | yes |
 | Coin Combinations (`y2-coincombo`) | Y2 Measurement: find different combinations of coins that equal the same amounts of money | mixed | Slices the answer | generated | no |
 | Telling Time (`y2-time`) | Y2 Measurement: time to 5 min | mixed | Slices the answer | generated | yes |
 | Number Words (`y2-words`) | Y2 NPV: numbers to 100 in words | mixed | Slices the answer | generated | yes |

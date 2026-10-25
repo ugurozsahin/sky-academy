@@ -30,7 +30,7 @@ function squareCard(rng: Rng): Question {
   const rows = full * 10;
   const cands = [k + 10 <= 99 ? k + 10 : k - 10, 100 - k, rows, k - 10, k + 10].filter(v => v >= 1 && v <= 99).map(pc);
   return wordQ(rng, 'What percentage is shaded?', ans, three(ans, cands, ['25%', '50%', '75%', '10%'], [pc(k + 10), pc(k - 10)]),
-    { visual: { type: 'symmetry', grid, mirror: false }, say: 'What percentage is shaded?', hint: 'Count the shaded squares', hintIsData: false });
+    { visual: { type: 'symmetry', grid, mirror: false }, say: 'What percentage is shaded?', hint: 'Count the shaded squares', hintIsData: false, why: `${k} squares out of 100 are shaded: ${k}/100 = ${ans}` });
 }
 
 /** d2: three kinds of card, picked by the caller. */
@@ -39,20 +39,20 @@ function overHundred(rng: Rng): Question {
   const ans = String(p);
   const cands = [p + 10, 100 - p, swap, p - 10, p + 1].filter(v => v >= 1 && v <= 99 && v !== p).map(String);
   return wordQ(rng, `${pc(p)} = ?/100`, ans, three(ans, cands, ['1', '99', '10', '50'], [String(p + 10), String(p - 10)].filter(s => +s >= 1)),
-    { say: `${says(p)} is how many out of one hundred?`, hint: 'Per cent means out of one hundred', hintIsData: false });
+    { say: `${says(p)} is how many out of one hundred?`, hint: 'Per cent means out of one hundred', hintIsData: false, why: `Per cent means out of 100, so ${pc(p)} = ${p}/100` });
 }
 function asDecimal(rng: Rng): Question {
   const p = ri(rng, 2, 98), ans = fmt(dec(p, 2));
   const slips = [fmt(dec(p, 1)), fmt(dec(p, 3)), String(p)];
   return wordQ(rng, `Write ${pc(p)} as a decimal.`, ans, three(ans, slips, [fmt(dec(p + 10, 2))], [fmt(dec(p + 10, 2)), fmt(dec(p - 10, 2))]),
-    { say: `Write ${says(p)} as a decimal.`, hint: 'Divide by one hundred: move each digit two places right', hintIsData: false });
+    { say: `Write ${says(p)} as a decimal.`, hint: 'Divide by one hundred: move each digit two places right', hintIsData: false, why: `${pc(p)} = ${p} ÷ 100 = ${ans}` });
 }
 function decimalToPc(rng: Rng): Question {
   const p = rng() < 0.5 ? ri(rng, 1, 9) * 10 : ri(rng, 2, 98), ans = pc(p);
   const slips = [`${fmt(dec(p, 1))}%`, `${p * 10}%`, `${fmt(dec(p, 2))}%`];
   const cands = [...new Set(slips)].filter(c => c !== ans);
   return wordQ(rng, `${fmt(dec(p, 2))} = ?%`, ans, three(ans, cands, [pc(p + 10), pc(p - 10 > 0 ? p - 10 : p + 20)], [pc(p + 10), pc(p - 10)]),
-    { say: `${ks2Say(fmt(dec(p, 2)))} equals what per cent?`, hint: 'Multiply by one hundred', hintIsData: false });
+    { say: `${ks2Say(fmt(dec(p, 2)))} equals what per cent?`, hint: 'Multiply by one hundred', hintIsData: false, why: `${fmt(dec(p, 2))} × 100 = ${ans}` });
 }
 
 /** The fractions Year 5 knows by heart, and the tenths/twentieths/twenty-fifths/fiftieths that scale to hundredths. */
@@ -66,13 +66,13 @@ function fractionToPc(rng: Rng): Question {
   const [n, d] = ncFraction(rng), p = n * 100 / d, ans = pc(p);
   const slips = [...(`${n}${d}`.length < 4 ? [`${n}${d}%`] : []), pc(n), pc(100 - p), `${p / 10}%`].filter(c => c !== ans && Number.isFinite(parseFloat(c)));
   return wordQ(rng, `${n}/${d} = ?%`, ans, three(ans, slips, [pc(p + 10), pc(p - 10 > 0 ? p - 10 : p + 20), '1%', '99%'], [pc(p + 10), pc(p - 10)]),
-    { say: `${ks2Say(`${n}/${d}`)} equals what per cent?`, hint: 'Make the bottom number a hundred', hintIsData: false });
+    { say: `${ks2Say(`${n}/${d}`)} equals what per cent?`, hint: 'Make the bottom number a hundred', hintIsData: false, why: `${n}/${d} = ${p}/100 (× ${100 / d} on top and bottom) = ${ans}` });
 }
 function fractionToDecimal(rng: Rng): Question {
   const [n, d] = ncFraction(rng), p = n * 100 / d, ans = fmt(dec(p, 2));
   const slips = [fmt(dec(p, 1)), fmt(dec(p, 3)), ...(`${n}${d}`.length < 4 ? [`0.${n}${d}`.replace(/0+$/, '')] : [])];
   return wordQ(rng, `${n}/${d} = ? Give it as a decimal.`, ans, three(ans, slips, [fmt(dec(p + 10, 2))], [fmt(dec(p + 10, 2)), fmt(dec(p - 10, 2))]),
-    { say: `${ks2Say(`${n}/${d}`)} equals what decimal?`, hint: 'Make the bottom number a hundred, then write it as a decimal', hintIsData: false });
+    { say: `${ks2Say(`${n}/${d}`)} equals what decimal?`, hint: 'Make the bottom number a hundred, then write it as a decimal', hintIsData: false, why: `${n}/${d} = ${p}/100 (× ${100 / d} on top and bottom) = ${ans}` });
 }
 
 export const y5Percent: Generator = (level: Difficulty, rng) => {
