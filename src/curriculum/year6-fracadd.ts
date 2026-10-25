@@ -75,11 +75,11 @@ function mixed(rng: Rng): Question {
     if (plus) {
       const f = add(a.f, b.f);
       if (f.n >= f.d) named.push(ans({ n: answer.n - answer.d, d: answer.d }));
-      why = `Fractions: ${x}/${L} + ${y}/${L} = ${x + y}/${L}${x + y >= L ? ', carry the 1' : ''}`;
+      why = `Fractions: ${x}/${L} + ${y}/${L} = ${x + y}/${L}${x + y >= L ? ', carry the 1' : ''}, giving ${ans(answer)}`;
     } else {
       const f = sub(a.f, b.f);
       if (f.n < 0) named.push(ans(fromMixed(a.whole - b.whole, { n: -f.n, d: f.d })));
-      why = x < y ? `Swap a whole for ${L}/${L}: ${x + L}/${L} − ${y}/${L} = ${x + L - y}/${L}` : `Fractions: ${x}/${L} − ${y}/${L} = ${x - y}/${L}`;
+      why = x < y ? `Swap a whole for ${L}/${L}: ${x + L}/${L} − ${y}/${L} = ${x + L - y}/${L}, giving ${ans(answer)}` : `Fractions: ${x}/${L} − ${y}/${L} = ${x - y}/${L}, giving ${ans(answer)}`;
     }
     return card(rng, a, b, plus, answer, named,
       plus ? 'Add the wholes, add the fractions, then carry' : 'Take the wholes, then the fractions: swap a whole for fractions if you need to', why);
