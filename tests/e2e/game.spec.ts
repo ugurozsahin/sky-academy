@@ -1159,6 +1159,27 @@ test.describe('Sharpwise', () => {
     await expect(page.locator('#endless small')).toContainText('best 0');
   });
 
+  // #2278: the results box clips what overhangs `.scroll`, so the avatar's speech bubble lost its right edge on a
+  // phone ("Zap! Super shar"). The bubble must sit inside the scroll box, whatever the praise line's length.
+  for (const width of [390, 360]) {
+    test(`the results speech bubble stays inside the results box at ${width} px wide (#2278)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await seedPlayer(page);
+      await page.click('.island[data-year="year2"]');
+      await page.click('#relaxed');
+      await page.click('.topic[data-mixed]');
+      await expect(page.locator('.play')).toBeVisible();
+      for (let i = 0; i < 10; i++) await solveCurrent(page);
+      const results = page.locator('.results');
+      await expect(results).toBeVisible();
+      await page.evaluate(() => { document.querySelector('.results .speech')!.textContent = 'Lightning fast, Ada! Super sharp slicing today!'; });
+      const speech = (await results.locator('.speech').boundingBox())!;
+      const box = (await results.locator('.scroll').boundingBox())!;
+      expect(speech.x + speech.width, 'the bubble must not overhang the scroll box that clips it').toBeLessThanOrEqual(box.x + box.width);
+      expect(speech.x, 'nor start left of it').toBeGreaterThanOrEqual(box.x);
+    });
+  }
+
   // #897: a pre-reader taps a topic and is dropped straight into the first question with no spoken name —
   // the topic's title now folds into that first question's own utterance, one `say()`, so a separate, earlier
   // line naming the topic cannot be cancelled by the question that follows it (`duel.ts`'s hand-over does the
