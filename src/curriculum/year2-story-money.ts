@@ -4,8 +4,8 @@
 import type { Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ, coinLabel } from './util';
 
-export const ITEMS = ['pencil', 'rubber', 'apple', 'sticker', 'ruler', 'banana', 'balloon', 'biscuit', 'lolly', 'comic'];
-const EMOJI: Record<string, string> = { pencil: '✏️', rubber: '🎁', apple: '🍎', sticker: '⭐', ruler: '📏', banana: '🍌', balloon: '🎈', biscuit: '🍪', lolly: '🧁', comic: '📖' };
+export const ITEMS = ['pencil', 'loaf', 'apple', 'sticker', 'ruler', 'banana', 'balloon', 'biscuit', 'ice-cream', 'comic'] as const;
+const EMOJI: Record<(typeof ITEMS)[number], string> = { pencil: '✏️', loaf: '🍞', apple: '🍎', sticker: '⭐', ruler: '📏', banana: '🍌', balloon: '🎈', biscuit: '🍪', 'ice-cream': '🍦', comic: '📖' };
 const a = (item: string) => (/^[aeiou]/.test(item) ? 'an ' : 'a ') + item;
 const spoken = (p: number) => (p === 100 ? 'a pound' : p === 1 ? 'a penny' : `${p} pence`);
 const cap1 = (s: string) => s.replace(/^./, c => c.toUpperCase());
@@ -42,5 +42,5 @@ export const y2StoryMoney: Generator = (d, rng): Question => {
   const forgot = d === 3 ? [100 - Math.max(...prices)] : [];
   const pool = [...forgot, ...shuffle(rng, [ans + 5, ans - 5, ans + 10, ans - 10, ...prices]), ans + 15, ans - 15, ans + 20];
   const ok = pool.filter((n, i) => n > 0 && n <= 100 && n !== ans && pool.indexOf(n) === i);
-  return wordQ(rng, prompt, coinLabel(ans), ok.slice(0, 3).map(coinLabel), { say, visual: { type: 'word', text: items.join(' + '), emoji: items.map(i => EMOJI[i]).join(' ') } });
+  return wordQ(rng, prompt, coinLabel(ans), ok.slice(0, 3).map(coinLabel), { say, visual: { type: 'word', text: items.join(' + '), emoji: items.map(i => EMOJI[i as (typeof ITEMS)[number]]).join(' ') } });
 };

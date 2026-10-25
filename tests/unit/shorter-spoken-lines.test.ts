@@ -17,6 +17,16 @@ describe('shorter spoken lines (#2323)', () => {
       const q = gen(id)(1, rng(i + 1));
       expect(words(q.prompt), q.prompt).toBeLessThanOrEqual(8);
       expect(q.visual, q.prompt).toBeTruthy();
+      // Spoken, the amounts say "pence" in full (a speech engine misreads "47p"), so the money line may run to 10.
+      expect(words(q.say!), q.say).toBeLessThanOrEqual(id === 'y2-story-money' ? 10 : 8);
+    }
+  });
+  it.each(['y2-story-add', 'y2-story-money'])('%s pictures always carry an emoji', id => {
+    for (const d of [1, 2, 3] as const) for (let i = 0; i < 100; i++) {
+      const v = gen(id)(d, rng(i + 1)).visual as { type: string; emoji?: string; text?: string };
+      expect(v.type).toBe('word');
+      expect(v.emoji, id).toMatch(/\S/);
+      expect(v.emoji, id).not.toContain('undefined');
     }
   });
   it.each(['y2-story-add', 'y2-story-money'])('%s carries a picture at every difficulty', id => {

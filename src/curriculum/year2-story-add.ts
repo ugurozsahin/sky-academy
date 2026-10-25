@@ -11,10 +11,10 @@ export const BANK: [string, string, string, string, string, string, string][] = 
   ['', 'A park has # trees.', '# are planted.', '# are cut down.', 'How many now?', '🌳', 'trees'],
   ['', 'A box has # beads.', '# more go in.', '# come out.', 'How many now?', '🔵', 'beads'],
   ['', 'A class has # pencils.', '# more are bought.', '# are lost.', 'How many now?', '✏️', 'pencils'],
-  ['cm', 'A rope is # long.', '# is added.', '# is cut off.', 'How long now?', '🪁', 'rope'],
-  ['m', 'A track is # long.', '# is added.', '# is closed.', 'How long now?', '🏃', 'track'],
+  ['cm', 'A rope is # long.', '# is added.', '# is cut off.', 'How long now?', '📏', 'rope'],
+  ['m', 'A track is # long.', '# is added.', '# is closed.', 'How long now?', '📏', 'track'],
   ['ml', 'A jug has # of milk.', '# is added.', '# is drunk.', 'How much now?', '🥛', 'milk'],
-  ['g', 'A bag has # of flour.', '# is added.', '# is used.', 'How much now?', '📦', 'flour'],
+  ['g', 'A bag has # of flour.', '# is added.', '# is used.', 'How much now?', '🥣', 'flour'],
   ['kg', 'A sack has # of rice.', '# is added.', '# is sold.', 'How much now?', '🌾', 'rice'],
   ['l', 'A tank has # of water.', '# is added.', '# is used.', 'How much now?', '💧', 'water'],
 ];
