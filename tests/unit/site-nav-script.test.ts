@@ -70,7 +70,9 @@ describe('website/nav.js opens the Curriculum menu and does nothing else (#2174)
     expect(cases.map(([name]) => name), 'one case per forbidden entry').toEqual(FORBIDDEN.map(([name]) => name));
     for (const [name, line] of cases) expect(reaches(`${nav}\n${line.replace(/'[^']*[/:][^']*'/g, "'x'")};`), line).toContain(name);
     expect(reaches("const a = 'https://example.com';")).toEqual(['string "https://example.com"']);
-    for (const line of ['caches.open(n)', 'navigator.storage.estimate()', 'fetchLater(u)', 'box.style.cssText = c']) expect(reaches(line), line).not.toEqual([]);
+    for (const [name, line] of [['other storage or fetch', 'caches.keys()'], ['other storage or fetch', 'navigator.storage.estimate()'], ['other storage or fetch', 'fetchLater(u)'],
+      ['style written', 'rule.cssText = c']]) expect(reaches(line), line).toContain(name);
+    // Known limit: a key built in a variable (const k = 'fe' + 'tch'; window[k]) passes the computed-member rule; only reading the script can see it.
     expect(reaches("const a = '/x.js';")).toEqual(['string "/x.js"']);
     expect(reaches('const a = `https://x.com/${b}`;'), 'a template with a substitution').toContain('string "`${`"');
     expect(reaches("box.setAttribute('aria-controls', list.id); const open = 1; String(open);"), 'what nav.js itself does').toEqual([]);
