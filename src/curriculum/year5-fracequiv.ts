@@ -26,7 +26,7 @@ function barCard(rng: Rng): Question {
   const decoys = [...new Set(cands.filter(c => c.n >= 1 && c.d >= 1 && !equal(c, target)).map(lab))];
   return wordQ(rng, `${shaded} of ${parts} parts are shaded. Which fraction is the same?`, lab(ans), decoys,
     { visual: { type: 'fraction', parts, shaded, shape: 'bar' }, say: `${numberWord(shaded)} of the ${numberWord(parts)} parts are shaded. Which fraction is the same?`,
-      hint: 'Divide the top and bottom by the same number', hintIsData: false });
+      hint: 'Divide the top and bottom by the same number', hintIsData: false, why: `Top and bottom both ÷ ${gcd(shaded, parts)}: ${lab(target)} = ${lab(ans)}` });
 }
 
 /** Three decoys for a whole-number answer; a big answer whose last digit no decoy shares swaps its last decoy for answer ± 10 (#1058). */
@@ -41,7 +41,7 @@ function missingCard(rng: Rng, from: Frac, to: number): Question {
   }
   const from_ = lab(from);
   return wordQ(rng, `${from_} = ?/${to}`, String(ans), pool.map(String),
-    { say: `${cap(ks2Say(from_))} equals what over ${numberWord(to)}?`, hint: 'Multiply the top by what the bottom was multiplied by', hintIsData: false });
+    { say: `${cap(ks2Say(from_))} equals what over ${numberWord(to)}?`, hint: 'Multiply the top by what the bottom was multiplied by', hintIsData: false, why: `Top and bottom both × ${k}: ${from_} = ${ans}/${to}` });
 }
 
 /** d2: a bottom of at most 24, reached by multiplying; d3 tenths and hundredths both ways. */
@@ -56,7 +56,7 @@ function hundredthsCard(rng: Rng): Question {
   const pool: number[] = [];
   for (const v of [top, ans * 100, ans + 1, ans - 1, ans + 10, ans + 2]) if (v >= 1 && v !== ans && v <= 100 && !pool.includes(v) && pool.length < 3) pool.push(v);
   return wordQ(rng, `${top}/100 = ?/10`, String(ans), pool.map(String),
-    { say: `${cap(ks2Say(`${top}/100`))} equals what over ten?`, hint: 'Divide the top and bottom by the same number', hintIsData: false });
+    { say: `${cap(ks2Say(`${top}/100`))} equals what over ten?`, hint: 'Divide the top and bottom by the same number', hintIsData: false, why: `Top and bottom both ÷ 10: ${top}/100 = ${ans}/10` });
 }
 
 /** Three equal fractions with a bottom of at most 20, and one that is a near miss. */
@@ -68,7 +68,7 @@ function oddCard(rng: Rng): Question {
     .filter(c => c.n < c.d && c.d <= 20 && !equal(c, base));
   const odd = pick(rng, slips), nm = lab(base);
   return wordQ(rng, `Which fraction is not equal to ${nm}?`, lab(odd), same.map(lab),
-    { say: `Which fraction is not equal to ${ks2Say(nm)}?`, hint: 'Three of them are the same size', hintIsData: false });
+    { say: `Which fraction is not equal to ${ks2Say(nm)}?`, hint: 'Three of them are the same size', hintIsData: false, why: `${lab(odd)} is a different size from ${nm}` });
 }
 
 export const y5FracEquiv: Generator = (level: Difficulty, rng) => {
