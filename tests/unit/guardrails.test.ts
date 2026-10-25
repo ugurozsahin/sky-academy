@@ -2234,7 +2234,7 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
 /**
  * #137 item 1: the tally chart's "gate stroke" — the diagonal line across a group of four uprights that turns
  * `||||` into a five — is drawn entirely in `::after`, which a unit test cannot see rendered, only read as
- * text. The existing generator test pins the *class* `tal five` and the four uprights; none of it can tell
+ * text. The existing generator test pins the *class* `tal fifth` and the four uprights; none of it can tell
  * whether the pseudo-element that actually draws the fifth mark still exists, still has a visible stroke, or
  * is still positioned inside its own `.tal`. Six mutations proved this gap (the issue's own table): deleting
  * the rule, retargeting it to a class nothing emits, collapsing the stroke to zero width, dropping
@@ -2272,11 +2272,11 @@ describe('the chart visual\'s CSS structure cannot go missing without a red test
 
     const tal = bare.match(/\.chart\s+\.tal\s*\{([^}]*)\}/)?.[1];
     expect(tal, 'a .chart .tal rule must exist').toBeTruthy();
-    expect(tal, '.tal must stay position: relative, or its ::after gate stroke positions against the wrong box')
-      .toMatch(/position:\s*relative/);
+    expect([/position:\s*relative/, /white-space:\s*nowrap/].map(r => r.test(tal!)), '.tal must stay position: relative (the ::after anchor) and white-space: nowrap (#2278: a flex item breaks "||||" into four lines)')
+      .toEqual([true, true]);
 
-    const gate = bare.match(/\.chart\s+\.tal\.five::after\s*\{([^}]*)\}/)?.[1];
-    expect(gate, 'a .chart .tal.five::after rule must exist — a tally of five renders identically to four without it')
+    const gate = bare.match(/\.chart\s+\.tal\.fifth::after\s*\{([^}]*)\}/)?.[1];
+    expect(gate, 'a .chart .tal.fifth::after rule must exist — a tally of five renders identically to four without it')
       .toBeTruthy();
 
     const width = gate!.match(/border-top:\s*([\d.]+)px/)?.[1];
