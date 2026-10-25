@@ -27,12 +27,12 @@ function simplest(rng: Rng): Question {
     const seen = new Set([lab(ans)]), ds: string[] = [];
     for (const f of named) if (!seen.has(lab(f)) && !(equal(f, ans) && gcd(f.n, f.d) === 1)) { seen.add(lab(f)); ds.push(lab(f)); }
     return wordQ(rng, `Write ${lab(start)} in its simplest form`, lab(ans), ds.slice(0, 3),
-      { say: `Write ${ks2Say(lab(start))} in its simplest form.`, hint: 'Divide top and bottom by the same number', hintIsData: false });
+      { say: `Write ${ks2Say(lab(start))} in its simplest form.`, hint: 'Divide top and bottom by the same number', hintIsData: false, why: `Top and bottom both ÷ ${k}: ${lab(start)} = ${lab(ans)}` });
   }
 }
 
 /** Three decoys from `named` (the first is always kept); an answer of 20+ also gets one sharing its last digit and one its leading digit (#1058). */
-function numberCard(rng: Rng, ans: number, named: number[], prompt: string, say: string, hint: string): Question {
+function numberCard(rng: Rng, ans: number, named: number[], prompt: string, say: string, hint: string, why: string): Question {
   const ok = (v: number) => Number.isInteger(v) && v >= 2 && v !== ans;
   const ds = [...new Set(named.filter(ok))].slice(0, 3);
   const fresh = (v: number | undefined) => v !== undefined && ok(v) && !ds.includes(v);
@@ -47,7 +47,7 @@ function numberCard(rng: Rng, ans: number, named: number[], prompt: string, say:
     }
   }
   for (let s = 1; ds.length < 3; s++) for (const v of [ans + s, ans - s]) if (ok(v) && !ds.includes(v) && ds.length < 3) ds.push(v);
-  return wordQ(rng, prompt, String(ans), ds.map(String), { say, hint, hintIsData: false });
+  return wordQ(rng, prompt, String(ans), ds.map(String), { say, hint, hintIsData: false, why });
 }
 
 /** d2: "3/4 = ?/12" (the numerator) or the smallest common denominator of two fractions (needs a shared factor, so the product is a decoy). */
@@ -57,7 +57,8 @@ function commonDenominator(rng: Rng): Question {
       const b = ri(rng, 2, 12), a = ri(rng, 1, b - 1), k = ri(rng, 2, 6), D = b * k;
       if (gcd(a, b) !== 1 || D > 60) continue;
       return numberCard(rng, a * k, [a, a + D - b, D], `${a}/${b} = ?/${D}`,
-        `${ks2Say(`${a}/${b}`)} is the same as what over ${D}?`, 'Multiply top and bottom by the same number');
+        `${ks2Say(`${a}/${b}`)} is the same as what over ${D}?`, 'Multiply top and bottom by the same number',
+        `Top and bottom both × ${k}: ${a}/${b} = ${a * k}/${D}`);
     }
   }
   for (;;) {
@@ -68,7 +69,7 @@ function commonDenominator(rng: Rng): Question {
     if (pa === undefined || qa === undefined || p + q === L) continue;
     const [x, y] = rng() < 0.5 ? [`${pa}/${p}`, `${qa}/${q}`] : [`${qa}/${q}`, `${pa}/${p}`];
     return numberCard(rng, L, [p * q, Math.max(p, q), p + q], `Smallest common denominator of ${x} and ${y}?`,
-      `What is the smallest common denominator of ${ks2Say(x)} and ${ks2Say(y)}?`, 'Find the smallest number both bottoms go into');
+      `What is the smallest common denominator of ${ks2Say(x)} and ${ks2Say(y)}?`, 'Find the smallest number both bottoms go into', `${p} and ${q} both go into ${L}, and nothing smaller`);
   }
 }
 
@@ -88,7 +89,7 @@ function greatest(rng: Rng): Question {
     if (!items.some(i => i !== win && (i.f.d === maxD || i.f.n === maxN))) continue;
     const word = big ? 'greatest' : 'smallest', labels = items.map(i => i.label);
     return { prompt: `Which fraction is the ${word}?`, say: `Which fraction is the ${word}? ${labels.map(l => ks2Say(l)).join(', ')}.`, answer: win.label,
-      options: shuffle(rng, labels), optionsAreContent: true, wide: true, hint: `Slice the ${word} fraction`, hintIsData: false };
+      options: shuffle(rng, labels), optionsAreContent: true, wide: true, hint: `Slice the ${word} fraction`, hintIsData: false, why: `In order: ${sorted.map(i => i.label).join(' < ')}` };
   }
 }
 
