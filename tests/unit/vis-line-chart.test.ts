@@ -51,4 +51,18 @@ describe('line graph visual (#1156)', () => {
     expect(html).toContain('aria-label="Bar chart"');
     expect(html.match(/<rect /g)).toHaveLength(2);
   });
+
+  it('names the axes when asked, inside the plot and at the readable floor (#2278)', () => {
+    const html = renderVisual({ ...line([2, 6, 10]), xTitle: 'km', yTitle: 'miles' });
+    const titles = [...html.matchAll(/<text class="axis-title" x="([\d.]+)" y="([\d.]+)"[^>]*font-size="(\d+)"[^>]*>([^<]+)</g)];
+    expect(titles.map(t => t[4])).toEqual(['miles', 'km']);
+    titles.forEach(t => { expect(Number(t[3])).toBeGreaterThanOrEqual(13); expect(Number(t[1])).toBeLessThanOrEqual(F.w); expect(Number(t[2])).toBeLessThan(F.h - F.bottom); });
+    expect(renderVisual(line([2, 6, 10]))).not.toContain('axis-title');
+  });
+
+  it('a y title alone draws exactly one title, as the time graph does (#2278)', () => {
+    const html = renderVisual({ ...line([2, 6, 10]), yTitle: 'km' });
+    expect(html.match(/<text class="axis-title"/g)).toHaveLength(1);
+    expect(html).toContain('>km<');
+  });
 });

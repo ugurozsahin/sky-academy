@@ -62,6 +62,14 @@ describe('outcomeHintHTML (#36 — the outcome reveal under the question card)',
     expect(h).toContain('7');
     expect(plain(h)).toBe("✓ 7 — that's right!");
   });
+  it('a lone shape or mark is drawn large, a word or number is not (#2278)', () => {
+    for (const g of ['▲', '■', ',', ':', '÷']) {
+      expect(outcomeHintHTML('wrong', g), g).toContain(`<b class="ok glyph">${g}</b>`);
+      expect(outcomeHintHTML('correct', g), g).toContain(`<b class="ok glyph">${g}</b>`);
+    }
+    for (const a of ['7', 'cube', '12p', '3.5']) expect(outcomeHintHTML('wrong', a), a).not.toContain('glyph');
+    expect(plain(outcomeHintHTML('correct', '▲'))).toBe("✓ ▲ — that's right!");
+  });
   it('a wrong answer names the right one', () => {
     expect(plain(outcomeHintHTML('wrong', 'cube'))).toBe('✗ Not this time. The answer is cube');
   });

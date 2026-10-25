@@ -12,7 +12,7 @@ export const miles = (km: number): number => km * MILES_PER_8KM / 8;
 export const km = (mi: number): number => mi * 8 / MILES_PER_8KM;
 
 type Line = Extract<NonNullable<Question['visual']>, { type: 'chart'; kind: 'line' }>;
-const convGraph = (): Line => ({ type: 'chart', kind: 'line', rows: KM.map(k => ({ label: String(k), n: miles(k) })), step: 5, max: 25 });
+const convGraph = (): Line => ({ type: 'chart', kind: 'line', rows: KM.map(k => ({ label: String(k), n: miles(k) })), step: 5, max: 25, xTitle: 'km', yTitle: 'miles' });
 
 /** Four options: the named slips first; for an answer of 20 or more a decoy sharing its last digit and one sharing its leading digit (#1058). */
 function numCard(rng: Rng, prompt: string, answer: number, named: number[], extra: Partial<Question>): Question {
@@ -50,7 +50,7 @@ const oclock = (i: number) => `${numberWord((7 + i) % 12 + 1)} o'clock`;
 /** d2: a cyclist's distance so far, hourly; how far in one hour. Every reading is a multiple of 5 km. */
 function cyclist(rng: Rng): Question {
   const count = ri(rng, 5, 6), picked = shuffle(rng, Array.from({ length: 8 }, (_, i) => (i + 1) * 5)).slice(0, count - 1).sort((a, b) => a - b), n = [0, ...picked];
-  const s = ri(rng, 0, count - 2), a = n[s + 1] - n[s], visual: Line = { type: 'chart', kind: 'line', rows: n.map((v, i) => ({ label: hh(i), n: v })), step: 5, max: 40 };
+  const s = ri(rng, 0, count - 2), a = n[s + 1] - n[s], visual: Line = { type: 'chart', kind: 'line', rows: n.map((v, i) => ({ label: hh(i), n: v })), step: 5, max: 40, yTitle: 'km' };
   const from = hh(s), to = hh(s + 1);
   return numCard(rng, `Cyclist: how far from ${from} to ${to}? (km)`, a, [n[s + 1], n[s] + n[s + 1], a + 5, Math.max(5, a - 5)], {
     visual, say: `The graph shows how far a cyclist has gone. How far did the cyclist go from ${oclock(s)} to ${oclock(s + 1)}, in kilometres?`, hint: 'Take the first reading from the second', });
