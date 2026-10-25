@@ -212,10 +212,10 @@ const rBalance: Generator = (d, rng) => {
   const emoji = pick(rng, OBJECTS);
   if (d < 3) {
     const n = ri(rng, 1, d === 1 ? 5 : 10);
-    return balanceQ(rng, `${n}`, '?', n, 10, { pans: [emoji.repeat(n), '?'], say: `Count the objects. How many make the scales balance?` });
+    return balanceQ(rng, `${n}`, '?', n, 10, { pans: [emoji.repeat(n), '?'], say: 'Make it balance! How many?' });
   }
   const a = ri(rng, 3, 10), b = ri(rng, 1, a - 1);
-  return balanceQ(rng, `${a}`, `${b} + ?`, a - b, 10, { pans: [emoji.repeat(a), `${emoji.repeat(b)} + ?`], say: `${a} on the left, ${b} on the right. How many more make it balance?`, distractors: [a, b] });
+  return balanceQ(rng, `${a}`, `${b} + ?`, a - b, 10, { pans: [emoji.repeat(a), `${emoji.repeat(b)} + ?`], say: 'Make it balance! How many?', distractors: [a, b] });
 };
 
 // ---------- Reception writing ----------
