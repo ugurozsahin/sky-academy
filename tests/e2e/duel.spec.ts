@@ -3,6 +3,8 @@ import type { Page } from '@playwright/test';
 import { DUEL_HANDOVER, duelPool } from '../../src/game/duel';
 import { POOL_CARDS, type Card } from '../unit/helpers/duel-cards';
 import { topicById, topicsFor, YEARS } from '../../src/curriculum';
+// Budget: the 77 storage reads and writes the last slice makes today. It only ever goes down (guardrails.md).
+const STORAGE_OPS_CEILING = 77;
 import { dailyChallenges } from '../../src/game/dojo';
 import { SAVE_VERSION } from '../../src/storage';
 import type { DuelHooks } from '../../src/ui/hooks';
@@ -1663,13 +1665,19 @@ test.describe('Ninja Duel', () => {
     await page.waitForFunction(() => window.__sna.state().round === 10);
     await page.waitForFunction(p => { const s = window.__sna.state(); return !s.decided && !s.ended && window.__sna.bubbles(p).some(b => b.label === s.answer); }, 'a');
     const afterHit = await page.evaluate(() => {
+      // Count the storage round trips the handler makes: the work is deterministic, the clock is not (#2376).
+      let storageOps = 0;
+      const proto = Storage.prototype, get = proto.getItem, set = proto.setItem;
+      proto.getItem = function (k: string) { storageOps++; return get.call(this, k); };
+      proto.setItem = function (k: string, v: string) { storageOps++; return set.call(this, k, v); };
       const t0 = performance.now();
       const ok = window.__sna.answer('a');
       const ms = performance.now() - t0;            // the slice's whole task, commit included (#375 round 2, B3)
+      proto.getItem = get; proto.setItem = set;
       const s = window.__sna.state();
       (document.querySelector('#pause') as HTMLButtonElement).click();
       (document.querySelector('#quit') as HTMLButtonElement).click();
-      return { ok, ms, ...s };
+      return { ok, ms, storageOps, ...s };
     });
     expect(afterHit, 'the winning slice commits in its own task, not on a timer')
       .toMatchObject({ ok: true, round: 10, decided: true, ended: false, coins: 10, taught: { hits: 10, tries: 10 } });
@@ -1680,8 +1688,8 @@ test.describe('Ninja Duel', () => {
     // Observed headless over four runs: 1.5, 2.2, 2.7, 4.4 ms. One frame at 60 fps is 16.7 ms, and this task
     // runs once per match. The render loop itself is held separately by `game.spec.ts`'s "still renders at
     // speed" rail, which reads fps=60.3 ratio=1.00 on this head — unchanged, since no arena code moved.
-    console.log(`[guard rail] last-slice task = ${afterHit.ms.toFixed(1)} ms (commit included)`);
-    expect(afterHit.ms, 'the commit must not cost the slice its frame').toBeLessThan(16);
+    console.log(`[guard rail] last-slice task = ${afterHit.ms.toFixed(1)} ms, ${afterHit.storageOps} storage ops (commit included)`);
+    expect(afterHit.storageOps, 'the commit stays within its storage round trips').toBeLessThanOrEqual(STORAGE_OPS_CEILING);
     await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
     // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
     await expect(page.locator('.duel-end')).toHaveCount(0);
