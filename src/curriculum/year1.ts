@@ -91,11 +91,11 @@ const y1Story: Generator = (d, rng) => {
   }
   if (kind === 1) {
     const a = ri(rng, 4, max), b = ri(rng, 2, a - 2), answer = a - b;
-    const p = `${a} ${bank.noun} ${bank.place}. ${b} ${bank.leave}. How many now?`;
+    const p = `${a} ${bank.noun}${d === 1 ? '' : ' ' + bank.place}. ${b} ${bank.leave}. How many${d === 1 ? '' : ' now'}?`;
     return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -b }, distractors: [a + b, a, answer + 1, answer - 1] });
   }
   const a = ri(rng, 2, max - 2), b = ri(rng, 2, max - a), answer = a + b;
-  const p = `${a} ${bank.noun} ${bank.place}. ${b} ${bank.join}. How many now?`;
+  const p = `${a} ${bank.noun}${d === 1 ? '' : ' ' + bank.place}. ${b} ${bank.join}. How many${d === 1 ? '' : ' now'}?`;
   return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: b }, distractors: [Math.abs(a - b), Math.max(a, b), answer + 1, answer - 1] });
 };
 const y1Sub: Generator = (d, rng) => {

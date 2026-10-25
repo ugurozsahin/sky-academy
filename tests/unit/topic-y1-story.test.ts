@@ -20,7 +20,7 @@ const DIFFICULTIES: Difficulty[] = [1, 2, 3];
  * the three kinds apart in a test without depending on how many digits happen to appear elsewhere in the
  * prompt (review finding: the prompt's own digit positions are not a safe thing to key an oracle on).
  */
-const isMissingPart = (prompt: string) => !prompt.endsWith('How many now?');
+const isMissingPart = (prompt: string) => prompt.includes(' are left.');
 
 describe('y1-story (#981): one-step Year 1 problems in a spoken story', () => {
   it('the oracle holds on every sampled card: the answer re-derives from the visual', () => {
@@ -149,5 +149,14 @@ describe('y1-story (#981): one-step Year 1 problems in a spoken story', () => {
       }
     }
     expect(sawAboveTen).toBe(true);
+  });
+
+  it('d1 prompts are at most 8 words, and say the same (#2323)', () => {
+    const words = (t: string) => t.trim().split(/\s+/).length;
+    for (let i = 0; i < 200; i++) {
+      const q = topic.gen(1, rng(7981 + i));
+      expect(words(q.prompt), q.prompt).toBeLessThanOrEqual(8);
+      expect(q.say, q.prompt).toBe(q.prompt);
+    }
   });
 });
