@@ -68,7 +68,7 @@ const SHORT_CONJ_ROWS = CONJ_ROWS.filter(r => r[0].split(' ').length <= 7);
 const gap = (rng: Rng, rows: GapRow[], nDecoys: number, short = false): Question => {
   const [s, answer, decoys] = pick(rng, rows);
   return wordQ(rng, short ? 'Which word fits?' : s, answer, shuffle(rng, decoys).slice(0, nDecoys), {
-    visual: { type: 'sentence', text: s }, say: s.replace('___', 'blank'), hint: 'Which word makes sense?', hintIsData: false,
+    visual: { type: 'sentence', text: s }, say: s.replace('___', 'blank'), hint: 'Which word makes sense?', hintIsData: false, ...(short ? { slip: `Which word fits? ${s}` } : {}),
   });
 };
 
