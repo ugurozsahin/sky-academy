@@ -4740,15 +4740,15 @@ test.describe('Sharpwise', () => {
     // screen, so both were green throughout. This measures the real boxes.
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="year2"]');
-    // The theme is drawn at random; re-enter until the 3-D board comes up, which is the deck at issue.
-    let theme = '';
-    for (let tries = 0; tries < 60 && theme !== 'shapes'; tries++) {
-      await page.click('#memory');
-      await expect(page.locator('.card').first()).toBeVisible();
-      theme = await page.evaluate(() => window.__sna.theme as string);
-      if (theme !== 'shapes') await page.click('#back');
-    }
-    expect(theme, 'a 3-D shapes board came up inside 60 draws').toBe('shapes');
+    await expect(page.locator('#memory')).toBeVisible();
+    // Rig only the theme draw (the first Math.random call on the Memory screen, src/ui/memory.ts): the stub
+    // restores the real function inside that call, so the deck draw right after it stays random. 'shapes' is
+    // third of the seven Year 2 themes; the assertion below fails loudly if the order drifts (#2128).
+    await page.evaluate(() => { const real = Math.random; Math.random = () => { Math.random = real; return 2.5 / 7; }; });
+    await page.click('#memory');
+    await expect(page.locator('.card').first()).toBeVisible();
+    const theme = await page.evaluate(() => window.__sna.theme as string);
+    expect(theme, 'the 3-D shapes board came up on the first draw').toBe('shapes');
     // The count comes from the DECK, not a literal 10 (#372 review round 2, note 2): this is a rail about
     // GEOMETRY, and a literal would turn it red for a curriculum reason the moment a shape table grew.
     const cards = await page.evaluate(() => window.__sna.memory.pairs.length * 2);
