@@ -47,7 +47,7 @@ function fracMissing(rng: Rng): Question {
   const prompt = top ? `${lab(base)} = ?/${big.d}` : `${lab(base)} = ${big.n}/?`;
   const say = top ? `${cap(ks2Say(lab(base)))} is the same as how many ${ks2Say(`1/${big.d}`).replace(/^one /, '')}s?`
     : `${cap(ks2Say(lab(base)))} is the same as ${WORD[big.n]} over what?`;
-  return { prompt, say, answer: String(answer), options: shuffle(rng, [answer, ...ds].map(String)), hint: 'Slice the missing number', hintIsData: false };
+  return { prompt, say, answer: String(answer), options: shuffle(rng, [answer, ...ds].map(String)), hint: 'Slice the missing number', hintIsData: false, why: `Top and bottom both × ${k}: ${lab(base)} = ${lab(big)}` };
 }
 
 export const y3FracEquiv: Generator = (d: Difficulty, rng) => {
@@ -57,9 +57,10 @@ export const y3FracEquiv: Generator = (d: Difficulty, rng) => {
   const shown = bigger ? big : base, ans = bigger ? base : big;
   const options = shuffle(rng, [lab(ans), ...fracDecoys(ans, shown, rng)]);
   const say = ks2Say(lab(shown));
+  const k = big.d / base.d, why = bigger ? `Top and bottom both ÷ ${k}: ${lab(shown)} = ${lab(ans)}` : `Top and bottom both × ${k}: ${lab(shown)} = ${lab(ans)}`;
   const q: Question = d === 1
-    ? { prompt: 'Which fraction is the same as the shaded part?', say: `${cap(say)} ${shown.n > 1 ? 'are' : 'is'} shaded. Which fraction is the same?`, answer: lab(ans), options, visual: { type: 'fraction', parts: shown.d, shaded: shown.n, shape: 'bar' }, hint: 'Slice the equal fraction', hintIsData: false }
-    : { prompt: `Which is equal to ${lab(shown)}?`, say: `Which fraction is equal to ${say}?`, answer: lab(ans), options, hint: 'Slice the equal fraction', hintIsData: false };
+    ? { prompt: 'Which fraction is the same as the shaded part?', say: `${cap(say)} ${shown.n > 1 ? 'are' : 'is'} shaded. Which fraction is the same?`, answer: lab(ans), options, visual: { type: 'fraction', parts: shown.d, shaded: shown.n, shape: 'bar' }, hint: 'Slice the equal fraction', hintIsData: false, why }
+    : { prompt: `Which is equal to ${lab(shown)}?`, say: `Which fraction is equal to ${say}?`, answer: lab(ans), options, hint: 'Slice the equal fraction', hintIsData: false, why };
   return q;
 };
 
