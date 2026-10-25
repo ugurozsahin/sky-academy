@@ -21,4 +21,22 @@ describe('missSlips (#938): SessionResult.misses → the shape recordGameEnd() s
     ]);
   });
   it('is empty for no misses', () => { expect(missSlips([])).toEqual([]); });
+  it('a d1 conjunction card keeps its sentence in the slip, not only "Which word fits?" (#2322)', () => {
+    const t = topicById('y3-conjunctions')!, q = t.gen(1, rng(2322));
+    const sentence = (q.visual as { text: string }).text;
+    const [slip] = missSlips([{ topic: t.id, q, picked: null }]);
+    expect(slip.prompt).toBe(`${q.prompt} ${sentence}`);
+    expect(slip.prompt).toContain('___');
+  });
+  it('a card that prints its sentence in the prompt, or sets no slip, is stored as its prompt — no topic outside the d1 conjunction card changes (#2322)', () => {
+    const q = topicById('y3-conjunctions')!.gen(2, rng(7));
+    expect(q.slip).toBeUndefined();
+    expect(missSlips([{ topic: 'y3-conjunctions', q, picked: 'x' }])[0].prompt).toBe(q.prompt);
+    // y1-punct d1 draws a blank prompt plus a visual sentence: the slip must stay the prompt, never `prompt + visual`
+    for (const id of ['y1-punct', 'y2-sentencetype', 'y3-speech']) {
+      const c = topicById(id)!.gen(1, rng(11));
+      expect(c.slip).toBeUndefined();
+      expect(missSlips([{ topic: id, q: c, picked: null }])[0].prompt).toBe(c.listen ?? c.prompt);
+    }
+  });
 });

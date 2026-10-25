@@ -38,8 +38,8 @@ describe('y1-plurals bubbles (#2322)', () => {
 });
 
 describe('y1-spelling gap cards (#2322)', () => {
-  it('d1/d2 gaps offer three letter bubbles with the answer among them', () => {
-    for (const d of [1, 2] as Difficulty[]) for (const q of gen('y1-spelling', d, 200)) {
+  it('d2 gaps offer three letter bubbles with the answer among them', () => {
+    for (const q of gen('y1-spelling', 2, 200)) {
       expect(q.options).toHaveLength(3);
       expect(q.options).toContain(q.answer);
     }
@@ -60,12 +60,24 @@ describe('y2-sentencetype d1 (#2322)', () => {
 });
 
 describe('y3-conjunctions d1 (#2322)', () => {
-  it('reads at most 8 words and draws from a non-empty pool of every conjunction', () => {
+  it('reads at most 7 words and draws from a non-empty pool of every conjunction', () => {
     const seen = new Set<string>();
     for (const q of gen('y3-conjunctions', 1)) {
-      expect(q.prompt.split(' ').length).toBeLessThanOrEqual(8);
+      expect(q.prompt).toBe('Which word fits?');
+      expect((q.visual as { text: string }).text.split(' ').length).toBeLessThanOrEqual(7);
       seen.add(q.answer);
     }
     expect(seen.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('words per wave at d1, the rest of the one-third cut (#2322)', () => {
+  // prompt + printed visual text + bubbles, whitespace tokens, 400 seeded draws; before (#2363's table): 6.0 / 20.1 / 12.0
+  const words = (id: string) => gen(id, 1).reduce((n, q) => n + [q.prompt, (q.visual as { text?: string } | undefined)?.text ?? '', ...q.options].join(' ').split(/\s+/).filter(Boolean).length, 0) / 400;
+  it.each([['y1-spelling', 6.0], ['y3-conjunctions', 20.1], ['y2-anyorder', 12.0]] as const)('%s reads a third less than before', (id, before) => {
+    expect(words(id)).toBeLessThanOrEqual(before * 2 / 3 + 1e-9);
+  });
+  it('y1-spelling d1 offers two letters, d2 three', () => {
+    for (const q of gen('y1-spelling', 1, 200)) { expect(q.options).toHaveLength(2); expect(q.options).toContain(q.answer); }
   });
 });

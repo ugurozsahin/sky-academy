@@ -13,7 +13,11 @@ const evalX = (s: string): number => {
   const [a, b] = [Number(m[1]), Number(m[3])];
   return m[2] === '+' ? a + b : m[2] === '−' ? a - b : m[2] === '×' ? a * b : a / b;
 };
-const yesNo = (p: string) => p.match(/^Same answer\? (\d+ [+−×÷] \d+) \| (\d+ [+−×÷] \d+)$/);
+// #2322: the card is one line, "18−14 = 14−18?"; the groups come back spaced ("18 − 14") as the checks below read them
+const yesNo = (p: string) => {
+  const m = p.match(/^(\d+)([+−×÷])(\d+) = (\d+)([+−×÷])(\d+)\?$/);
+  return m && [m[0], `${m[1]} ${m[2]} ${m[3]}`, `${m[4]} ${m[5]} ${m[6]}`];
+};
 const same = (p: string) => p.match(/^Which is the same as (.+)\?$/);
 
 describe('y2-anyorder (#999)', () => {

@@ -120,3 +120,6 @@ export const NO_REPEATED_SET = new Set([
   'y2-spell-tion d1', 'y2-spell-tion d2', 'y2-spell-tion d3', // #1013: same bank shape as y2-spell-c, each word carries its own decoys
   'y2-spell-more d1', 'y2-spell-more d2', 'y2-spell-more d3', // #1014: same bank shape as y2-spell-tion, each word carries its own decoys
 ]);
+
+/** Letter bubbles a spelling-gap card offers (#2322): y1-spelling three, two at d1; the others four. */
+export const gapBubbles = (id: string, d: number) => id !== 'y1-spelling' ? 4 : d === 1 ? 2 : 3;

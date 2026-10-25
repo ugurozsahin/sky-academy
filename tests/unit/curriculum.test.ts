@@ -15,7 +15,7 @@ import type { SentenceType } from '../../src/curriculum/year2';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
-import { NO_REPEATED_SET, Y2_GENS, Y2_IDS } from './helpers/topic-lists';
+import { NO_REPEATED_SET, Y2_GENS, Y2_IDS, gapBubbles } from './helpers/topic-lists';
 import { solve } from './helpers/ks2-oracle';
 import { genericTopicSuite } from './helpers/generic-topic-suite';
 import { isKs2 } from '../../src/curriculum/key-stage'; import { subjectTopics } from '../../src/game/pools';   // #1325: the island's own pool predicate, not a copy
@@ -665,7 +665,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
           // at a real card could not have caught #418 even on the topics it did cover.
           expect(AVOID.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}, which no card may show`).toBe(false);
         }
-        expect(q.options.length, q.prompt).toBe(4 - Number(id === 'y1-spelling'));   // #2322: y1-spelling offers three letter bubbles
+        expect(q.options.length, q.prompt).toBe(gapBubbles(id, d));   // #2322: y1-spelling offers three letter bubbles, two at d1
         // The exemption above rests on this: drop the emoji from an r-sounds card and `_un` beside nothing
         // really is ambiguous, so the exemption must go red rather than quietly widen.
         if (id === 'r-sounds') {
