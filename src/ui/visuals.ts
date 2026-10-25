@@ -223,7 +223,7 @@ function chartRow(kind: 'pictogram' | 'tally' | 'block' | 'table', n: number, ea
   if (kind === 'block') return Array.from({ length: n }, () => '<i class="blk"></i>').join('');
   if (kind === 'pictogram') return Array.from({ length: n / each }, () => `<span class="pic">${icon}</span>`).join('');
   let html = '';
-  for (let i = 0; i < Math.floor(n / 5); i++) html += '<span class="tal five">||||</span>';
+  for (let i = 0; i < Math.floor(n / 5); i++) html += '<span class="tal gate">||||</span>';
   const rest = n % 5;
   if (rest) html += `<span class="tal">${'|'.repeat(rest)}</span>`;
   return html;

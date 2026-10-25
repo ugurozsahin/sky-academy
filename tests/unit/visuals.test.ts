@@ -368,12 +368,17 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
     }
   });
 
+  it('a tally group never carries the ten-frame\'s `five` class (#2278, #2328)', () => {
+    const h = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'x', n: 12 }] });
+    expect(h).not.toMatch(/class="[^"]*\bfive\b/);
+  });
+
   it('a tally groups in fives, and the fifth mark is the gate stroke rather than a fifth upright', () => {
     const h = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: '🐶 dogs', n: 7 }] });
-    expect(count(h, /class="tal five"/g)).toBe(1);             // one complete gate
-    expect(h).toContain('<span class="tal five">||||</span>'); // four uprights; the stroke is drawn in CSS
+    expect(count(h, /class="tal gate"/g)).toBe(1);             // one complete gate
+    expect(h).toContain('<span class="tal gate">||||</span>'); // four uprights; the stroke is drawn in CSS
     expect(h).toContain('<span class="tal">||</span>');        // and the remaining two
-    expect(count(renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'x', n: 10 }] }), /class="tal five"/g)).toBe(2);
+    expect(count(renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'x', n: 10 }] }), /class="tal gate"/g)).toBe(2);
     expect(renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'x', n: 5 }] })).not.toContain('<span class="tal">');
   });
 
@@ -385,7 +390,7 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
 
   it('a tally draws each row its own marks, not the chart total', () => {
     const h = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'a', n: 7 }, { label: 'b', n: 3 }] });
-    expect(perRow(h, /class="tal five"/g)).toEqual([1, 0]);
+    expect(perRow(h, /class="tal gate"/g)).toEqual([1, 0]);
     expect(perRow(h, /class="tal"/g)).toEqual([1, 1]);
   });
 
@@ -584,7 +589,7 @@ describe('chart visual: table (#1021)', () => {
   });
   it('leaves the tally, block and pictogram output unchanged', () => {
     const tally = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'a', n: 6 }] });
-    expect(tally).toBe('<div class="vis"><div class="chart tally"><div class="chart-row"><span class="cat">a</span><span class="data"><span class="tal five">||||</span><span class="tal">|</span></span></div></div></div>');
+    expect(tally).toBe('<div class="vis"><div class="chart tally"><div class="chart-row"><span class="cat">a</span><span class="data"><span class="tal gate">||||</span><span class="tal">|</span></span></div></div></div>');
     const block = renderVisual({ type: 'chart', kind: 'block', rows: [{ label: 'a', n: 2 }] });
     expect(block).toBe('<div class="vis"><div class="chart block"><div class="chart-row"><span class="cat">a</span><span class="data"><i class="blk"></i><i class="blk"></i></span></div></div></div>');
     const pic = renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 4 }], each: 2, icon: '⭐' });

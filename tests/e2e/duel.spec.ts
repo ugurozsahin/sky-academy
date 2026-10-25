@@ -834,7 +834,7 @@ test.describe('Ninja Duel', () => {
     const wrap = document.querySelector('#vis') as HTMLElement;
     const cs = getComputedStyle(wrap);
     // Real descendant boxes, NOT `scrollHeight - clientHeight`. `scrollHeight` is an integer, so a 0.5px
-    // threshold is finer than the metric — and worse, it counts the LAYOUT OVERFLOW of `.tal.five::after`, the
+    // threshold is finer than the metric — and worse, it counts the LAYOUT OVERFLOW of `.tal.gate::after`, the
     // rotated tally stroke, which is decoration and not something a child counts. A real tally chart reads 2-21
     // that way while every countable mark is painted and no element's box passes the wrap's edge.
     const wrapBox = wrap.getBoundingClientRect();
