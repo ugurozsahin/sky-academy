@@ -13,7 +13,7 @@ import type { Arena } from '../game/arena';
 import type { DojoOutcome } from '../game/dojo';
 import { Session, type SessionEvents, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed'; import { cardInset } from '../game/wave-bounds';   // #32: test-only time compression; #2184: the card line
-import { waveOptsFor } from './wave-opts';
+import { waveOptsFor, hintOnce, WORD_CAP_YEARS } from './wave-opts';
 import { canHear, haptic, hush, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate'; import { firstQuestionLine, type ResultCandidate } from './results';   // #897; one line: at its #714 cap
 import { createFactLog } from '../fact-record';
@@ -157,7 +157,7 @@ interface BeatState {
   earlyPayout: ResultPayout | null;
   activeQuestion: Question | null;
   // `holdOpen` mirrors the pause overlay; `readThrough`: verdict arrived after the bubbles launched, so no peek (#65).
-  holdOpen: boolean; readThrough: boolean;
+  holdOpen: boolean; readThrough: boolean; shownHint: string | null;   // #2315: the fixed instruction already shown this game
   prevLives: number;
   // #44: false only until Fredoka is usable (or the capped wait gives up); the first wave waits for it.
   fontsReady: boolean;
@@ -215,8 +215,7 @@ function renderQuestion(c: BeatCtx, q: Question, launched: boolean): boolean {
   // Both halves: the generator says this hint is data, AND it is the hint that reached the card. The second
   // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
   // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
-  const line = hintText(q, { reveal, tracing: deps.tracing, keypad: !!deps.startPad });
-  setHint(els, line, !!q.hint && !!q.hintIsData);
+  setHint(els, hintOnce(c.opts.year.id, q, hintText(q, { reveal, tracing: deps.tracing, keypad: !!deps.startPad }), st), !!q.hint && !!q.hintIsData);
   return false;
 }
 
@@ -254,7 +253,7 @@ function questionCallbacks(c: BeatCtx) {
 function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: string, peeking: boolean) {
   const { opts, deps, st, session } = c, { els } = deps;
   const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
-  const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle, opts.year.timing);
+  const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle, opts.year.timing, WORD_CAP_YEARS.has(opts.year.id));
   const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
   const storyLine = !!q.story && !peeking, myWave = st.waveId;   // #1352: holdForStory speaks a story's line
   const spawn = () => {
@@ -396,7 +395,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   const mission = opts.mode === 'mission' && !opts.deck;   // only missions show the stage pill and its segments; a deck run (#930) counts plainly instead
   const st: BeatState = {
     lastOutcome: 'none', waveId: 0, revealUntil: 0, earlyPayout: null, activeQuestion: null,
-    holdOpen: false, readThrough: false, prevLives: opts.year.lives, fontsReady: false,
+    holdOpen: false, readThrough: false, shownHint: null, prevLives: opts.year.lives, fontsReady: false,
   };
   fontReady().then(() => { st.fontsReady = true; });
   const c = {

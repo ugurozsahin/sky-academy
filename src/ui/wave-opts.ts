@@ -14,9 +14,34 @@ import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow
  * function otherwise has no reason to take: it only ever affects a non-sequence question's single
  * `gentleTarget`, so a scenario that does not care about it can go on calling this with three arguments.
  * `remaining` (#919) defaults to the whole sequence: omitted means "nothing sliced yet", not "nothing left". */
-export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean, timing?: WaveOpts['timing']): WaveOpts {
+export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean, timing?: WaveOpts['timing'], capWords?: boolean): WaveOpts {
+  const labels = capWords && !q.sequence ? capWordBubbles(info.labels, q.answer) : info.labels;
   return {
-    labels: info.labels, speed: info.speed, wide: !!q.wide || wideFor(info.labels), colours: q.colours,
+    labels, speed: info.speed, wide: !!q.wide || wideFor(labels), colours: q.colours,
     ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined, timing,
   };
+}
+
+/** Most word bubbles one wave carries in Reception to Year 2 (#2315): three words is what a child of five to seven reads before they fall. */
+export const MAX_WORD_BUBBLES_KS1 = 3;
+/** Years the cap above applies to. */
+export const WORD_CAP_YEARS: ReadonlySet<string> = new Set(['reception', 'year1', 'year2']);
+
+/** The wave's labels with a word set trimmed to three, the answer always kept, the survivors in their shuffled order. Number sets (no label over two characters) are untouched. */
+export function capWordBubbles(labels: string[], answer: string): string[] {
+  if (labels.length <= MAX_WORD_BUBBLES_KS1 || !wideFor(labels)) return labels;
+  let drop = labels.length - MAX_WORD_BUBBLES_KS1;
+  const out: string[] = [];
+  for (let i = labels.length - 1; i >= 0; i--) { if (drop > 0 && labels[i] !== answer) { drop--; continue; } out.unshift(labels[i]); }
+  return out;
+}
+
+/**
+ * The hint line for a question (#2315): a fixed instruction (not the card's own data) is shown on the first wave of a
+ * Reception to Year 2 word game and returns '' after, since it never changes. `state.shownHint` remembers what was shown.
+ */
+export function hintOnce(year: string, q: Question, line: string, state: { shownHint: string | null }): string {
+  if (!WORD_CAP_YEARS.has(year) || (!!q.hint && !!q.hintIsData) || q.sequence || !wideFor(q.options)) return line;
+  if (state.shownHint === line) return '';
+  state.shownHint = line; return line;
 }
