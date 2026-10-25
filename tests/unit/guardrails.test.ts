@@ -2275,8 +2275,8 @@ describe('the chart visual\'s CSS structure cannot go missing without a red test
     expect(tal, '.tal must stay position: relative, or its ::after gate stroke positions against the wrong box')
       .toMatch(/position:\s*relative/);
 
-    const gate = bare.match(/\.chart\s+\.tal\.gate::after\s*\{([^}]*)\}/)?.[1];
-    expect(gate, 'a .chart .tal.gate::after rule must exist — a tally of five renders identically to four without it')
+    const gate = bare.match(/\.chart\s+\.tal\.fifth::after\s*\{([^}]*)\}/)?.[1];
+    expect(gate, 'a .chart .tal.fifth::after rule must exist — a tally of five renders identically to four without it')
       .toBeTruthy();
 
     const width = gate!.match(/border-top:\s*([\d.]+)px/)?.[1];

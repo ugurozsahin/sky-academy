@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 /**
  * #1943, Apple's Kids Category (App Review 1.3): nothing may take a child out of the app unless it sits behind a
- * parental gate. Every outbound call in `src/` is listed here with the reason it is safe; a new one fails this test
+ * parental fifth. Every outbound call in `src/` is listed here with the reason it is safe; a new one fails this test
  * until someone reads it and adds it, with its reason.
  */
 const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e =>
