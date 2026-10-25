@@ -38,7 +38,7 @@ function pairCard(d: Difficulty, rng: Rng): Question {
   const hi = d === 3 ? 144 : 12;
   for (const dx of shuffle(rng, [-2, -1, 1, 2])) for (const dy of shuffle(rng, [-2, -1, 1, 2])) add([Math.min(a + dx, hi), Math.min(b + dy, hi)]);
   return wordQ(rng, `Which is a factor pair of ${t}?`, label(rng, [a, b]), decoys.map(p => label(rng, p)),
-    { say: `Which pair of numbers multiplies to make ${t}?` });
+    { say: `Which pair of numbers multiplies to make ${t}?`, why: `${a} × ${b} = ${t}` });
 }
 
 /** "x × y × z = y × ?": the outer two make 10, 20 or 100, so swapping the order lets the child pair them. */
@@ -57,7 +57,7 @@ function swapCard(rng: Rng): Question {
   if (ans >= 20) { take(pool.find(v => lead(v) === lead(ans))); take(pool.find(v => v % 10 === ans % 10)); }
   for (const v of pool) take(v);
   return wordQ(rng, `${x} × ${y} × ${z} = ${y} × ?`, String(ans), chosen.map(String),
-    { say: `${numberWord(x)} times ${numberWord(y)} times ${numberWord(z)} equals ${numberWord(y)} times what?` });
+    { say: `${numberWord(x)} times ${numberWord(y)} times ${numberWord(z)} equals ${numberWord(y)} times what?`, why: `${x} × ${z} = ${ans}, so pair them first.` });
 }
 
 export function y4FactorPairs(d: Difficulty, rng: Rng): Question {
