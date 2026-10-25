@@ -5,7 +5,7 @@ import { MODES, type Mode, type ModeCtx, type ModeSpec } from './modes';
 import type { AnswerTally } from '../storage';
 import type { Slip } from '../save-records';
 export { repeatKey } from './repeat-key';
-import { repeatKey } from './repeat-key';
+import { repeatKey, slipPrompt } from './repeat-key';
 import { sameNumber } from './typed';
 import { weightedPick } from './sensei';
 
@@ -46,7 +46,7 @@ export interface Miss { topic: string; q: Question; picked: string | null }
  *  `misses` is newest-*last* (`recordMiss`'s own doc, just above) — reversed here the same way `fixDeck`
  *  reverses it, so what `recordGameEnd` prepends is newest-first, matching every other reader of `Slip`. */
 export const missSlips = (misses: readonly Miss[]): Omit<Slip, 'at'>[] =>
-  [...misses].reverse().map(m => ({ topic: m.topic, prompt: m.q.listen ?? m.q.prompt, answer: m.q.answer, picked: m.picked ?? '' }));
+  [...misses].reverse().map(m => ({ topic: m.topic, prompt: m.q.listen ?? slipPrompt(m.q), answer: m.q.answer, picked: m.picked ?? '' }));
 export interface SessionResult { mode: Mode; stage: number; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[]; elapsedMs?: number }
 
 /**

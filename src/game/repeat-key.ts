@@ -171,3 +171,6 @@ export function drawFresh(draw: () => Question, prevQuestion: Question | null, t
   for (let i = 0; i < tries && prevKey !== null && repeatKey(q) === prevKey; i++) q = draw();
   return { q, gaveUp: prevKey !== null && repeatKey(q) === prevKey };
 }
+
+/** What a grown-ups "Recent slip" prints for a card: a sentence shown only in its `sentence` visual, under a fixed prompt ("Which word fits?", #2322), is kept. */
+export const slipPrompt = (q: Question): string => q.visual?.type === 'sentence' && !q.prompt.includes(q.visual.text) ? `${q.prompt} ${q.visual.text}` : q.prompt;

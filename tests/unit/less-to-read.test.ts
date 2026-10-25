@@ -39,7 +39,7 @@ describe('y1-plurals bubbles (#2322)', () => {
 
 describe('y1-spelling gap cards (#2322)', () => {
   it('d2 gaps offer three letter bubbles with the answer among them', () => {
-    for (const d of [2] as Difficulty[]) for (const q of gen('y1-spelling', d, 200)) {
+    for (const q of gen('y1-spelling', 2, 200)) {
       expect(q.options).toHaveLength(3);
       expect(q.options).toContain(q.answer);
     }
@@ -60,7 +60,7 @@ describe('y2-sentencetype d1 (#2322)', () => {
 });
 
 describe('y3-conjunctions d1 (#2322)', () => {
-  it('reads at most 8 words and draws from a non-empty pool of every conjunction', () => {
+  it('reads at most 7 words and draws from a non-empty pool of every conjunction', () => {
     const seen = new Set<string>();
     for (const q of gen('y3-conjunctions', 1)) {
       expect(q.prompt).toBe('Which word fits?');

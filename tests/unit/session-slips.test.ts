@@ -21,4 +21,15 @@ describe('missSlips (#938): SessionResult.misses → the shape recordGameEnd() s
     ]);
   });
   it('is empty for no misses', () => { expect(missSlips([])).toEqual([]); });
+  it('a d1 conjunction card keeps its sentence in the slip, not only "Which word fits?" (#2322)', () => {
+    const t = topicById('y3-conjunctions')!, q = t.gen(1, rng(2322));
+    const sentence = (q.visual as { text: string }).text;
+    const [slip] = missSlips([{ topic: t.id, q, picked: null }]);
+    expect(slip.prompt).toBe(`${q.prompt} ${sentence}`);
+    expect(slip.prompt).toContain('___');
+  });
+  it('a card that already prints its sentence in the prompt is not doubled', () => {
+    const q = topicById('y3-conjunctions')!.gen(2, rng(7));
+    expect(missSlips([{ topic: 'y3-conjunctions', q, picked: 'x' }])[0].prompt).toBe(q.prompt);
+  });
 });
