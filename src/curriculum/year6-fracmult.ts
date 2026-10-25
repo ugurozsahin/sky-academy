@@ -9,8 +9,11 @@ import { ks2Say } from './ks2say';
 
 const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
 const lab = (f: Frac) => `${f.n}/${f.d}`;
-/** Tops times tops, bottoms times bottoms, then the simplified product. */
-const why = (a: Frac, b: Frac, ans: Frac) => `Tops ${a.n}×${b.n}=${a.n * b.n}, bottoms ${a.d}×${b.d}=${a.d * b.d}, so ${lab(ans)}`;
+/** Tops times tops, bottoms times bottoms, then the product, shown simplified when it needed it. */
+const why = (a: Frac, b: Frac, ans: Frac) => {
+  const n = a.n * b.n, d = a.d * b.d;
+  return `Tops ${a.n}×${b.n}=${n}, bottoms ${a.d}×${b.d}=${d}, so ${gcd(n, d) > 1 ? `${n}/${d} = ` : ''}${lab(ans)}`;
+};
 const bigger = (x: Frac, y: Frac) => (x.n * y.d >= y.n * x.d ? x : y);
 
 /** Fills three distinct decoys from the named slips, then from the answer's neighbours. None equals the answer in value, except `unsimplified`
