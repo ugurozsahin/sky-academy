@@ -84,3 +84,11 @@ for (const [path, status] of walked) {
     expect(broken, `${path} links to pages that do not answer 200`).toEqual([]);
   });
 }
+
+// #2172: the year links on the hub are held to a 44 px tap target by CSS alone (`.years h3 a`, min-height var(--tap)).
+test('/curriculum/ at 360 px: every year link is at least 44 px tall', async ({ page }) => {
+  await page.goto(site.origin + '/curriculum/', { waitUntil: 'load' });
+  const heights = await page.$$eval('.years h3 a', as => as.map(a => a.getBoundingClientRect().height));
+  expect(heights.length, 'the hub lists a link for each year').toBeGreaterThanOrEqual(7);
+  expect(Math.min(...heights), 'a year link under 44 px is a hard tap on a phone').toBeGreaterThanOrEqual(44);
+});

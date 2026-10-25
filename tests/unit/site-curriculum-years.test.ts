@@ -134,9 +134,16 @@ describe('the year pages speak plainly (#2090, the shorthand in #2123)', () => {
     expect(html).toContain('<li>&lt;u&gt;tip&lt;/u&gt;</li>');
     expect(html).not.toMatch(/<[biu]>/);
   });
+  it('escapes a curriculum area\'s name too: the <h3>, the caption and the gap list print it as text (#2172)', () => {
+    const y = map.byYear[0], first = map.coverage.find(c => c.years.includes(y.year))!;
+    const odd = { ...map, coverage: map.coverage.map(c => (c === first ? { ...c, name: 'Area <u>x</u>' } : c)) };
+    const html = renderYearPage(odd, y, home);
+    expect(html).toContain('Area &lt;u&gt;x&lt;/u&gt;');
+    expect(html).not.toContain('<u>x</u>');
+  });
 });
 
-describe('the year pages agree with /curriculum/ (#2090)', () => {
+describe('the year pages put each topic under its curriculum area, and the teachers\' tables keep the map\'s rows (#2090)', () => {
   const areaOf = (id: string) => esc(map.coverage.find(c => c.id === id)!.name.replace(/^Years? [\d–-]+ /, ''));
   it('puts every topic under the curriculum area of its first strand', () => {
     for (const y of map.byYear) {
