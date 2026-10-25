@@ -246,7 +246,7 @@ function breadcrumbs(year) {
 
 /**
  * The teachers' detail on a year page (#2160), collapsed so a parent reads the plain words first: this year's
- * tables from /curriculum/ (`subjectTable`, the same rows) and the parts of the curriculum no topic names yet.
+ * topics with their National Curriculum objectives, one table per subject (`subjectTable`), and the parts of the curriculum no topic names yet.
  */
 function forTeachers(map, year, framework) {
   const t = esc(year.title), gaps = gapsOf(map, year);
