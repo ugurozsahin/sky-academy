@@ -1,5 +1,5 @@
 // The grown-ups gate as a question in front of one action (#1943): Kids Category (App Review 1.3) keeps a child away
-// from the system share sheet unless a parental fifth stands in front of it. The same maths question as the grown-ups
+// from the system share sheet unless a parental gate stands in front of it. The same maths question as the grown-ups
 // screen, reusing its markup; `true` only when it is answered, `false` when the child backs out.
 import { checkGate, gateChallenge } from '../game/parents';
 import { isKs2, shownYears } from '../curriculum';
@@ -34,7 +34,7 @@ export function askGrownUp(what: string): Promise<boolean> {
 }
 
 /**
- * #1943: a system share sheet reaches other apps, so Kids Category wants a parental fifth in front of it. It is offered
+ * #1943: a system share sheet reaches other apps, so Kids Category wants a parental gate in front of it. It is offered
  * only when the caller's gate lets it through, and the default says no, so a caller that forgets the gate cannot
  * share. Asked once, and only when a share sheet exists at all. Save, view and download are never gated.
  */
