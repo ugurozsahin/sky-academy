@@ -71,7 +71,7 @@ describe('y3-conjunctions (#1108)', () => {
   it('d1: conjunction answers only, 3 bubbles', () => {
     for (const c of draws(1)) {
       expect(c.options).toHaveLength(3);
-      const row = GAP_BANK.find(r => r[0] === c.prompt && r[1] === c.answer);
+      const row = GAP_BANK.find(r => r[0] === (c.visual as { text: string }).text && r[1] === c.answer);
       expect(row?.[3], c.prompt).toBe('conjunction');
       expect(c.options, c.prompt).toContain(c.answer);
       for (const o of c.options) expect([row![1], ...row![2]], o).toContain(o);
