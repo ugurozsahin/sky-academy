@@ -222,5 +222,18 @@ for (const width of [360, 1280]) {
         expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(view);
       });
     }
+    // #2180: each key-stage label is one line tall, so "Key Stage 2" is never split.
+    test('each key-stage label in the open panel is one line tall', async ({ page }) => {
+      await page.goto(`${site.origin}/`);
+      await page.locator('.site-nav details.nav-years > summary').click();
+      for (const label of ['Reception and Key Stage 1', 'Key Stage 2']) {
+        const p = page.locator('.site-nav details.nav-years p', { hasText: label });
+        await expect(p).toBeVisible();
+        const { h, lh } = await p.evaluate(el => ({ h: el.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(el).lineHeight) }));
+        expect(h, `${label} on one line`).toBeLessThanOrEqual(lh + 1);
+      }
+      const { scroll, view } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
+      expect(scroll, 'no sideways scroll').toBeLessThanOrEqual(view);
+    });
   });
 }

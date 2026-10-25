@@ -119,6 +119,7 @@ main:focus { outline: none; }   /* the skip link's target: focus lands there, th
 }
 .site-nav .nav-years ul ul { display: block; margin: 0; }
 .site-nav .nav-years p { margin: 8px 10px 2px; color: var(--muted); font-size: .875rem; font-weight: 600; }
+.site-nav details.nav-years p { white-space: nowrap; }   /* #2180: no-script panel shrinks to its widest link; keep each key-stage label whole */
 .site-nav .nav-years a { display: flex; padding: 0 10px; border-radius: 10px; }
 .site-nav .nav-years a:hover { background: var(--line); }
 .site-nav ul { align-items: flex-start; }
