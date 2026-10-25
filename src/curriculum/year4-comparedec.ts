@@ -17,7 +17,8 @@ function round(rng: Rng): Question {
   for (let v = a + 1; opts.length < 3; v++) if (v !== a && !opts.includes(v)) opts.push(v);
   const s = lab(t, 1);
   return wordQ(rng, `${s} to the nearest whole number?`, String(a), opts.map(String),
-    { say: `${ks2Say(s)} to the nearest whole number?`, hint: 'Look at the tenths digit: halfway or more rounds up', hintIsData: false });
+    { say: `${ks2Say(s)} to the nearest whole number?`, hint: 'Look at the tenths digit: halfway or more rounds up', hintIsData: false,
+      why: `Tenths digit ${t % 10} is ${t % 10 >= 5 ? '5 or more, so round up' : 'under 5, so stay'} to ${a}` });
 }
 
 /** d2: "3.45 ? 3.54" — same whole part, same places; one card in five equal, two in five a swapped-digit pair (2 dp). */
@@ -30,8 +31,10 @@ function compare(rng: Rng): Question {
   const [a, b] = [dec(w * top + x, dp), dec(w * top + y, dp)];
   const c = compareDec(a, b), ans = c < 0 ? '<' : c > 0 ? '>' : '=';
   const sa = fmt(a, { fixedDp: dp }), sb = fmt(b, { fixedDp: dp });
+  const at = [...sa].findIndex((ch, i) => ch !== sb[i]), place = ['Ones', '', 'Tenths', 'Hundredths'][at];
+  const why = at < 0 ? 'Every digit matches, so they are equal' : `${place}: ${sa[at]} is ${sa[at] < sb[at] ? 'less than' : 'more than'} ${sb[at]}, so ${ans === '<' ? 'less' : 'greater'}`;
   return wordQ(rng, `${sa} ? ${sb}`, ans, ['<', '>', '='],
-    { say: `${ks2Say(sa)} compared with ${ks2Say(sb)}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
+    { why, say: `${ks2Say(sa)} compared with ${ks2Say(sb)}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
 }
 
 /** d3: four different numbers with the same places, smallest to biggest. */
@@ -41,7 +44,8 @@ function order(rng: Rng): Question {
   const sorted = [...set].sort((p, q) => p - q).map(f => lab(w * top + f, dp)), shown = shuffle(rng, sorted);
   return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.map(s => ks2Say(s)).join(', ')}`,
     answer: sorted.join(' '), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') },
-    hint: 'Slice the smallest number first', hintIsData: false };
+    hint: 'Slice the smallest number first', hintIsData: false,
+    why: dp === 1 ? 'Same ones digit, so the smaller tenths come first' : 'Same ones digit: compare tenths, then hundredths' };
 }
 
 export const y4CompareDec: Generator = (level: Difficulty, rng) => (level === 1 ? round : level === 2 ? compare : order)(rng);
