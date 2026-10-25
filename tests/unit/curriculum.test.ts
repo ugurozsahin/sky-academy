@@ -15,13 +15,10 @@ import type { SentenceType } from '../../src/curriculum/year2';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
-import { NO_REPEATED_SET, Y2_GENS, Y2_IDS } from './helpers/topic-lists';
+import { NO_REPEATED_SET, Y2_GENS, Y2_IDS, gapBubbles } from './helpers/topic-lists';
 import { solve } from './helpers/ks2-oracle';
 import { genericTopicSuite } from './helpers/generic-topic-suite';
 import { isKs2 } from '../../src/curriculum/key-stage'; import { subjectTopics } from '../../src/game/pools';   // #1325: the island's own pool predicate, not a copy
-
-/** Letter bubbles a spelling-gap card offers (#2322): y1-spelling three, two at d1; the others four. */
-const gapBubbles = (id: string, d: number) => id !== 'y1-spelling' ? 4 : d === 1 ? 2 : 3;
 
 const N = 150;
 
