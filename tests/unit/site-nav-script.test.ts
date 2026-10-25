@@ -35,6 +35,10 @@ const FORBIDDEN: [string, RegExp][] = [
   ['address attribute', /\bsetAttribute(?:NS)?\s*\(\s*(?:[^,)]*,\s*)?['"`](?:src|href|srcset|action|formaction|ping|data|poster)['"`]/],
   ['HTML written', /\b(?:innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment|DOMParser|write|writeln)\b/],
   ['navigation', /\blocation\b|\bopen\s*\(|\bsubmit\b/],
+  // #2177: ways the first list missed. A relative URL has no slash or colon, so only the name catches these.
+  ['other storage or fetch', /\b(?:cookieStore|caches|fetchLater)\b|\bnavigator\s*\.\s*storage\b/],
+  ['ping', /\bping\b/], ['style written', /\.\s*(?:style|cssText)\b/],
+  ['computed member', /\[\s*(?:['"`]|[^\]]*\+)/],   // window['fe'+'tch']: the name is built, so no word list can read it
 ];
 function reaches(source: string): string[] {
   const { text, strings } = tokens(source);
@@ -60,10 +64,13 @@ describe('website/nav.js opens the Curriculum menu and does nothing else (#2174)
       ['WebSocket', 'new WebSocket(u)'], ['EventSource', 'new EventSource(u)'], ['Worker', 'new Worker(u)'],
       ['eval', 'eval(x)'], ['src or href set', 'img.src = u'], ['address attribute', "box.setAttribute('src', u)"],
       ['HTML written', "box.insertAdjacentHTML('beforeend', h)"], ['navigation', "location.assign('x')"],
+      ['other storage or fetch', 'cookieStore.set(n)'], ['ping', "a.ping = 'x'"], ['style written', "box.style.background = 'url(x)'"],
+      ['computed member', "window['fe' + 'tch']('x')"],
     ];
     expect(cases.map(([name]) => name), 'one case per forbidden entry').toEqual(FORBIDDEN.map(([name]) => name));
     for (const [name, line] of cases) expect(reaches(`${nav}\n${line.replace(/'[^']*[/:][^']*'/g, "'x'")};`), line).toContain(name);
     expect(reaches("const a = 'https://example.com';")).toEqual(['string "https://example.com"']);
+    for (const line of ['caches.open(n)', 'navigator.storage.estimate()', 'fetchLater(u)', 'box.style.cssText = c']) expect(reaches(line), line).not.toEqual([]);
     expect(reaches("const a = '/x.js';")).toEqual(['string "/x.js"']);
     expect(reaches('const a = `https://x.com/${b}`;'), 'a template with a substitution').toContain('string "`${`"');
     expect(reaches("box.setAttribute('aria-controls', list.id); const open = 1; String(open);"), 'what nav.js itself does').toEqual([]);
