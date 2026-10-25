@@ -21,6 +21,51 @@ const css = read('website/site.css').replace(/\/\*[\s\S]*?\*\//g, '');
 /** Every declaration block whose selector names .nav-years. */
 const rules = [...css.matchAll(/([^{}]*\.nav-years[^{}]*)\{([^}]*)\}/g)].map(m => ({ selector: m[1].trim(), body: m[2] }));
 
+/**
+ * #2170: the two rules above (nothing lies over the page, hover opens nothing) read only rules that name .nav-years,
+ * so a rule reaching the same list by another route would have passed. `reaches` is every selector that could match
+ * the nested list or its disclosure: .nav-years, any details/summary/::details-content, and a li or ul under .site-nav.
+ */
+const flat = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ selector: m[1].trim(), body: m[2] }));
+const reaches = (part: string) => /\.nav-years|\bdetails\b|\bsummary\b|details-content/.test(part) || /\.site-nav\b[^,]*\b(li|ul)\b/.test(part);
+const reached = flat.filter(r => r.selector.split(',').some(s => reaches(s)));
+const opensOnHover = (selector: string, body: string) => selector.split(',').some(s => reaches(s) && (
+  /:hover[^,]*(\bul\b|\bli\b|details-content)/.test(s) || (/\b(details|nav-years)\b[^\s,>+~]*:hover/.test(s) && /\b(display|content-visibility|visibility|height|max-height)\s*:/.test(body))));
+const overlays = (body: string) => /position:\s*(absolute|fixed|sticky)/.test(body);
+const onlyScripted = (selector: string) => selector.split(',').every(s => s.trim().startsWith('.site-nav div.nav-years'));
+
+describe('the rail reaches every rule that could touch the nested list (#2170)', () => {
+  it('reads the rules it is meant to judge', () => {
+    expect(reached.length, 'rules reaching the list').toBeGreaterThan(rules.length - 1);
+    expect(reached.map(r => r.selector)).toContain('.site-nav ul');
+    expect(reached.map(r => r.selector)).toContain('.site-nav .nav-years ul ul');
+  });
+  it('no rule reaching the list lies over the page unless nav.js made it closable (2.4.11)', () => {
+    for (const r of reached.filter(r => overlays(r.body))) expect(onlyScripted(r.selector), `${r.selector}: a panel no script can close could hide the next focused link`).toBe(true);
+  });
+  it('no rule reaching the list opens it on hover (1.4.13)', () => {
+    for (const r of reached) expect(opensOnHover(r.selector, r.body), `${r.selector}: hover must not open it`).toBe(false);
+  });
+  it('what it reads, and what it refuses (mutations)', () => {
+    for (const s of ['.site-nav li ul', '.site-nav details ul', '.site-nav details', '.site-nav ul ul', 'details > summary + ul']) expect(reaches(s), s).toBe(true);
+    for (const s of ['.site-nav a', '.site-header .wrap', '.btn']) expect(reaches(s), s).toBe(false);
+    expect(flat.some(r => r.selector.startsWith('@media')), 'a media prelude is not a rule').toBe(false);
+    expect(onlyScripted('.site-nav li ul') && overlays('position: absolute'), 'position: absolute on .site-nav li ul').toBe(false);
+    expect(onlyScripted('.site-nav details ul')).toBe(false);
+    expect(opensOnHover('.site-nav details:hover::details-content', 'content-visibility: visible')).toBe(true);
+    expect(opensOnHover('.nav-years:hover > ul', 'display: block')).toBe(true);
+    expect(opensOnHover('.site-nav details:hover ul', 'display: block')).toBe(true);
+    expect(opensOnHover('.nav-years > summary:hover', 'color: red'), 'a colour change on the summary is fine').toBe(false);
+  });
+  // The layout promises behind "opening the list moves nothing" (the browser test in tests/site/nav.spec.ts holds the
+  // behaviour; these hold the two declarations that produce it, so the failure names the line).
+  it('the in-flow list takes no width of its own, and the header row stays top-aligned from 900px', () => {
+    expect(flat.find(r => r.selector === '.site-nav .nav-years > ul')?.body).toMatch(/contain:\s*inline-size/);
+    const at = css.indexOf('@media (min-width: 900px)', css.indexOf('.site-nav div.nav-years > ul {'));
+    expect(css.slice(at).match(/\.site-header \.wrap\s*\{[^}]*align-items:\s*start/), 'align-items: start on .site-header .wrap at 900px').not.toBeNull();
+  });
+});
+
 describe('the Curriculum item opens the seven school years (#2159)', () => {
   const all = pages();
   const expected = [['/curriculum/', 'All years'], ...YEARS.map(y => [yearPath(y.id), y.title])];

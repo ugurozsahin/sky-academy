@@ -198,3 +198,29 @@ test.describe('without JavaScript', () => {
     expect(y1.y, 'Year 1 under Reception').toBeGreaterThanOrEqual(r.y + r.height);
   });
 });
+
+/**
+ * #2170: opening the no-script list moves nothing else in the header. `contain: inline-size` on the list stops its
+ * <li> widening (Features, Guides and About would slide sideways); `align-items: start` on the 900 px+ header row
+ * stops the brand and Play now dropping down. Held as behaviour, at 360 px and 1280 px, on four pages.
+ */
+for (const width of [360, 1280]) {
+  test.describe(`without JavaScript, at ${width} px`, () => {
+    test.use({ javaScriptEnabled: false, viewport: { width, height: 800 } });
+    for (const path of ['/', '/curriculum/', '/curriculum/year-3/', '/about/']) {
+      test(`opening the Curriculum list moves no header element on ${path}`, async ({ page }) => {
+        await page.goto(`${site.origin}${path}`);
+        const boxes = () => page.evaluate(() => [...document.querySelectorAll('.site-header .brand, .site-header .site-nav > ul > li, .site-header .site-nav > ul > li > a, .site-header .btn')]
+          .filter(el => !el.closest('.nav-years'))
+          .map(el => { const r = el.getBoundingClientRect(); return [el.className || el.tagName, Math.round(r.x), Math.round(r.y), Math.round(r.width)]; }));   // not height: the Curriculum item's own <li> grows with its list
+        const before = await boxes();
+        expect(before.length, 'the header elements it measures').toBeGreaterThan(2);
+        await page.locator('.site-nav details.nav-years > summary').click();
+        await expect(page.locator('.site-nav details.nav-years a').first()).toBeVisible();
+        expect(await boxes(), 'no brand, nav item or Play now moved').toEqual(before);
+        const { scroll, view } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
+        expect(scroll, 'no sideways scroll').toBe(view);
+      });
+    }
+  });
+}
