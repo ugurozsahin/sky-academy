@@ -119,6 +119,10 @@ export function roundTo(n: Dec, unit: RoundUnit): Dec {
 const PLACES = { 1000000: 6, 100000: 5, 10000: 4, 1000: 3, 100: 2, 10: 1, 1: 0, 0.1: -1, 0.01: -2, 0.001: -3 } as const;
 export type Place = keyof typeof PLACES;
 
+/** #2317: the column's name for a power of ten (1 → "ones" … 1,000,000 → "millions"), for a `why` that says which column a digit sits in. */
+const COLUMN_NAMES: Record<number, string> = { 1: 'ones', 10: 'tens', 100: 'hundreds', 1000: 'thousands', 10000: 'ten thousands', 100000: 'hundred thousands', 1000000: 'millions' };
+export const columnName = (power: number): string => COLUMN_NAMES[power];
+
 function toDec(n: Dec | number): Dec {
   if (typeof n !== 'number') return n;
   if (!Number.isInteger(n)) throw new Error(`digitAt/digitValue: a plain number must be an integer (got ${n}); pass a Dec for a fractional value`);

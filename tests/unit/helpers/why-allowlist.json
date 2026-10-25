@@ -76,7 +76,6 @@
 "y1-storyorder",
 "y1-trace",
 "y1-tracenum",
-"y2-pv",
 "y2-compare",
 "y2-skip",
 "y2-add",
@@ -137,7 +136,6 @@
 "y2-infer",
 "y2-trace",
 "y3-count",
-"y3-pv",
 "y3-compare",
 "y3-line",
 "y3-words",
@@ -181,7 +179,6 @@
 "y3-speech",
 "y4-count",
 "y4-negative",
-"y4-pv",
 "y4-roman",
 "y4-column",
 "y4-mistake",
@@ -228,7 +225,6 @@
 "y4-adverbials",
 "y4-pronouns",
 "y4-determiners",
-"y5-pv",
 "y5-negative",
 "y5-roman",
 "y5-column",
@@ -277,7 +273,6 @@
 "y5-commas",
 "y5-cohesion",
 "y5-perfect",
-"y6-pv",
 "y6-negative",
 "y6-longmult",
 "y6-longdiv",
@@ -325,4 +320,5 @@
 "y6-lists",
 "y6-hyphen",
 "y6-subjectobject",
-"y6-consistency"]
+"y6-consistency"
+]

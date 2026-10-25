@@ -3,7 +3,7 @@
 // push it past that moves to its own `year3-<slug>.ts` and this file keeps only its row/import.
 import type { Difficulty, Generator, Question, Topic } from './types';
 import { ri, pick, shuffle, wordQ, numberWord, NUM_WORDS } from './util';
-import { dec, fmt } from './ks2num';
+import { dec, fmt, columnName } from './ks2num';
 import { swappedDigits } from './mistakes';
 import { y3Line } from './year3-line';
 
@@ -155,7 +155,7 @@ function pvDigit(rng: () => number): Question {
   const shifts = COLS.filter(c => c !== COLS[col]).map(c => digit * c); // the right digit, the wrong column
   const others = ds.map((x, i) => x * COLS[i]).filter((_, i) => i !== col); // another digit's value
   const options = pvOptions(answer, [digit, shifts[0], others[0], shifts[1]], COLS[col], rng);
-  return { prompt: `What is the ${digit} worth in ${n}?`, say: `In ${n}, what is the ${digit} worth`, answer: fmtN(answer), options };
+  return { prompt: `What is the ${digit} worth in ${n}?`, say: `In ${n}, what is the ${digit} worth`, answer: fmtN(answer), options, why: `The ${digit} is in the ${columnName(COLS[col])} column: ${answer}` };
 }
 
 /** d2/d3: "3 hundreds, 4 tens and 6 ones = ?", sometimes out of order, a quarter with no tens (306). */
@@ -166,7 +166,7 @@ function pvBuild(d: Difficulty, rng: () => number): Question {
   if (d === 3 || rng() < 0.4) parts = shuffle(rng, parts);
   const text = join(parts);
   const named = [...swappedDigits(dec(answer, 0)).map(x => x.v), t ? h * 100 + t * 10 : h * 10 + o, t ? h * 10 + t : h * 100 + o * 10];
-  return { prompt: `${text} = ?`, say: `${text}. What number is that`, answer: fmtN(answer), options: pvOptions(answer, named, 100, rng) };
+  return { prompt: `${text} = ?`, say: `${text}. What number is that`, answer: fmtN(answer), options: pvOptions(answer, named, 100, rng), why: `${[h * 100, ...(t ? [t * 10] : []), o].join(' + ')} = ${answer}` };
 }
 
 /** d3: partition as the NC does: "146 = 130 + ?" (16) and "146 = 100 + ? + 6" (40). */
@@ -175,11 +175,11 @@ function pvPartition(rng: () => number): Question {
   if (t >= 2 && rng() < 0.5) {
     const shown = h * 100 + ri(rng, 1, t - 1) * 10, answer = n - shown;
     const options = pvOptions(answer, [o, n - h * 100, answer - o], 10, rng);
-    return { prompt: `${n} = ${shown} + ?`, say: `${n} is ${shown} plus what`, answer: fmtN(answer), options };
+    return { prompt: `${n} = ${shown} + ?`, say: `${n} is ${shown} plus what`, answer: fmtN(answer), options, why: `${n} = ${shown} + ${answer}` };
   }
   const answer = t * 10;
   const options = pvOptions(answer, [t, t * 100, n - h * 100, n - o], 10, rng);
-  return { prompt: `${n} = ${h * 100} + ? + ${o}`, say: `${n} is ${h * 100} plus what, plus ${o}`, answer: fmtN(answer), options };
+  return { prompt: `${n} = ${h * 100} + ? + ${o}`, say: `${n} is ${h * 100} plus what, plus ${o}`, answer: fmtN(answer), options, why: `${n} = ${h * 100} + ${answer} + ${o}` };
 }
 
 export const y3PlaceValue: Generator = (d, rng) => d === 1 ? pvDigit(rng) : d === 2 || rng() < 0.5 ? pvBuild(d, rng) : pvPartition(rng);
