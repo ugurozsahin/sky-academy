@@ -19,7 +19,11 @@ function current(): Built {
   return next;
 }
 
+let forced: RuntimeCatalogue | null = null;
+/** The seam for a catalogue that is not the profile's (#2239): every list that reads `activeCatalogue()` sees `cat` until `null` puts the profile's back. */
+export const setActiveCatalogue = (cat: RuntimeCatalogue | null): void => { forced = cat; };
+
 /** The runtime catalogue with the active profile's patch applied: `RUNTIME` itself when there is no patch. */
-export const activeCatalogue = (): RuntimeCatalogue => current().cat;
+export const activeCatalogue = (): RuntimeCatalogue => forced ?? current().cat;
 /** The patch's settings for game `id` on `year`: `resolveGame`'s last layer. */
 export const activeOverrides = (id: string, year: YearId): Overridable => gameOverrides(current().patch, id, year);
