@@ -26,7 +26,7 @@ export const y3FracOf: Generator = (d: Difficulty, rng): Question => {
     const whole = part * den;
     const ds = decoys(whole, [part + den, part * (den - 1)], 3);
     const text = `1/${den} of a number is ${part}. What is the number`;
-    return { ...q(`1/${den} of a number is ${part}. What is the number?`), say: say(text), answer: String(whole), options: shuffle(rng, [whole, ...ds].map(String)), slow: true };
+    return { ...q(`1/${den} of a number is ${part}. What is the number?`), say: say(text), answer: String(whole), options: shuffle(rng, [whole, ...ds].map(String)), slow: true, why: `${part} × ${den} = ${whole}` };
   }
   const dens = d === 1 ? [2, 3, 4, 5] : [2, 3, 4, 5, 6, 8, 10];
   const den = pick(rng, dens);
@@ -36,7 +36,8 @@ export const y3FracOf: Generator = (d: Difficulty, rng): Question => {
   const whole = k * den, answer = k * num;
   const named = [...(num > 1 ? [k] : []), ...(whole % num === 0 ? [whole / num] : []), whole];
   const ds = decoys(answer, named.filter(v => v !== answer), 3);
-  const card: Question = { ...q(`${num}/${den} of ${whole} = ?`), say: say(`What is ${num}/${den} of ${whole}`), answer: String(answer), options: shuffle(rng, [answer, ...ds].map(String)) };
+  const card: Question = { ...q(`${num}/${den} of ${whole} = ?`), say: say(`What is ${num}/${den} of ${whole}`), answer: String(answer), options: shuffle(rng, [answer, ...ds].map(String)),
+    why: num === 1 ? `${whole} ÷ ${den} = ${k}` : `${whole} ÷ ${den} = ${k}, ${k} × ${num} = ${answer}` };
   const withVisual = d === 1 ? { ...card, visual: { type: 'objects' as const, emoji: '⭐', n: whole } } : card;
   return d === 3 ? { ...withVisual, slow: true } : withVisual;
 };
