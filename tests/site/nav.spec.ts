@@ -137,6 +137,13 @@ for (const width of [360, 900, 1280]) {
       await expanded(page, false);
     });
 
+    test('a year link followed from the open list lands on that year page (#2177)', async ({ page }) => {
+      await button(page).click();
+      await expanded(page, true);
+      await Promise.all([page.waitForURL('**/curriculum/year-3/'), list(page).getByRole('link', { name: 'Year 3', exact: true }).click()]);
+      await expect(page).toHaveURL(/\/curriculum\/year-3\/$/);
+    });
+
     test('opened while pictures are still loading, it stays open when the page finishes loading (#2175 review)', async ({ page }) => {
       let release!: () => void;
       const held = new Promise<void>(r => { release = r; });
