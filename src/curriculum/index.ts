@@ -42,14 +42,14 @@ const islandOn = (year: YearId, cat: Visibility): boolean => previewAllYears() |
 export const isGameShown = (id: string, year: YearId, cat: Visibility = activeCatalogue()): boolean => gameOn(cat, id, year) && islandOn(year, cat);
 
 /** The rows of `list` (all on `year`) that `isGameShown` keeps: the same two checks, the island's made once. */
-const shownOn = (year: YearId, list: Topic[]): Topic[] => { const cat = activeCatalogue(); return islandOn(year, cat) ? list.filter(t => gameOn(cat, t.id, year)) : []; };
+const shownOn = (year: YearId, list: Topic[], cat: Visibility): Topic[] => (islandOn(year, cat) ? list.filter(t => gameOn(cat, t.id, year)) : []);
 
 /** A year's shown non-drill topics, in registry order: the island list, its totals, and every mixed pool (#2196). */
-export const topicsFor = (year: YearId, subject?: Topic['subject']) => shownOn(year, CORE_TOPICS.filter(t => t.year === year && (!subject || t.subject === subject)));
+export const topicsFor = (year: YearId, subject?: Topic['subject'], cat: Visibility = activeCatalogue()) => shownOn(year, CORE_TOPICS.filter(t => t.year === year && (!subject || t.subject === subject)), cat);
 /** Drill topics for a year, offered after the regular ones in the Sprint chooser (#915); shown ones only (#2196). */
-export const drillsFor = (year: YearId, subject?: Topic['subject']) => shownOn(year, TOPICS.filter(t => t.drill && t.year === year && (!subject || t.subject === subject)));
+export const drillsFor = (year: YearId, subject?: Topic['subject'], cat: Visibility = activeCatalogue()) => shownOn(year, TOPICS.filter(t => t.drill && t.year === year && (!subject || t.subject === subject)), cat);
 
 /** #1039, #2196: the shown non-drill topics of every island the map shows — what a reward or a dashboard total
  *  counts, so a hidden game, or a topic on a hidden island, never moves a star tally, a sticker or the Master
  *  Ninja unlock. */
-export const listedTopics = (): Topic[] => shownYears().flatMap(y => topicsFor(y.id));
+export const listedTopics = (cat: Visibility = activeCatalogue()): Topic[] => shownYears(cat).flatMap(y => topicsFor(y.id, undefined, cat));

@@ -67,6 +67,13 @@ try {
     years: Object.fromEntries(YEARS.map((y) => [y.id, yearNode(y)])),
     games: Object.fromEntries(TOPICS.map((t) => [t.id, gameNode(t, title[t.year])])),
   };
+  // Refuse to write a file the validator rejects: a new YEARS entry missing from GROUPS, or a duplicate topic id.
+  const { validateCatalogue } = await server.ssrLoadModule('/src/config/catalogue.ts');
+  const problems = validateCatalogue(catalogue);
+  if (problems.length) {
+    console.error(`catalogue-init: the catalogue it built is invalid, nothing written:\n${problems.join('\n')}`);
+    process.exit(1);
+  }
   mkdirSync('src/config', { recursive: true });
   writeFileSync(OUT, `${JSON.stringify(catalogue, null, 2)}\n`);
   writeSlim();
