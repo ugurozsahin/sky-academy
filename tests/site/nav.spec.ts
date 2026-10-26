@@ -6,7 +6,7 @@ import { serve } from '../../scripts/site-serve.mjs';
  * #2174: the Curriculum menu once website/nav.js has run (the W3C APG disclosure navigation pattern). Opens with
  * the mouse and with Enter or Space; closes on Escape (focus back to the button), on a press outside and when Tab
  * or Shift+Tab leaves it; aria-expanded follows; the header keeps its height; nothing scrolls sideways; and the
- * open list never covers the element that has focus. At the site project's 360 px phone, and at 1280 px.
+ * open list never covers the element that has focus. At the site project's 360 px phone, at 900 px (the breakpoint where the open panel changes shape, #2181), and at 1280 px.
  * Without the script the <details> still opens: the last test. #2178: the years in two key-stage lists.
  */
 let site: { origin: string; close: () => Promise<void> };
@@ -27,7 +27,7 @@ const focusUncovered = (page: Page) => page.evaluate(() => {
   return !!top && (el === top || el.contains(top));
 });
 
-for (const width of [360, 1280]) {
+for (const width of [360, 900, 1280]) {
   test.describe(`at ${width} px`, () => {
     test.use({ viewport: { width, height: 800 } });
     test.beforeEach(async ({ page }) => {
