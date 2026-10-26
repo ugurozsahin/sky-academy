@@ -29,6 +29,18 @@ const isStudy = (u: string) => {
   return h === 'doi.org' || h === 'pubmed.ncbi.nlm.nih.gov' || h === 'eric.ed.gov' || h === 'files.eric.ed.gov'
     || (AUTHOR_PDF_HOSTS.includes(h) && pathname.endsWith('.pdf'));
 };
+// #2235: the motor and reaction-time section cites by author and year, "(Hourcade et al., 2004)", and the link is
+// on the matching line under "## Sources". Counting every study link in the file let a profile lose all its motor
+// sources while Hasbrouck & Tindal (reading) or Betts (attention) kept the count at one.
+const motorStudies = (text: string): string[] => {
+  const section = /^## Fine motor and reaction\n([\s\S]*?)(?=^## |$(?![\s\S]))/m.exec(text)?.[1] ?? '';
+  const cited = new Set([...section.matchAll(/([A-Z][\p{L}-]+)(?: et al\.)?,? (\d{4})/gu)].map((m) => `${m[1]} ${m[2]}`));
+  const sources = text.slice(text.indexOf('\n## Sources')).split('\n').filter((l) => /^\d+\. /.test(l));
+  return sources.filter((l) => {
+    const lead = /^\d+\. ([A-Z][\p{L}-]+)\b.*?\((\d{4})\)/u.exec(l);
+    return lead && cited.has(`${lead[1]} ${lead[2]}`);
+  }).flatMap((l) => links(l)).filter(isStudy);
+};
 // #2243: the target line under "Your working floors" — its first sub-bullet — names two sizes, each
 // "**N mm (… a R px radius)**"; the one followed by "or more is comfortable" is the comfortable size, the other the floor.
 type Size = { mm: number; radius: number; across?: number };
@@ -70,7 +82,33 @@ describe('playtest profiles (#2204)', () => {
     const gov = all.filter((u) => u.startsWith('https://www.gov.uk/') || u.startsWith('https://assets.publishing.service.gov.uk/')
       || u.startsWith('https://explore-education-statistics.service.gov.uk/'));
     expect(gov.length, `${name}: the acceptance criterion is three official sources, linked`).toBeGreaterThanOrEqual(3);
-    expect(all.filter(isStudy).length, `${name}: motor and reaction-time norms need a published study (DOI, PubMed, ERIC or an author's PDF)`).toBeGreaterThanOrEqual(1);
+    expect(motorStudies(body(name)).length, `${name}: the "Fine motor and reaction" section needs a published study it cites (DOI, PubMed, ERIC or an author's PDF)`).toBeGreaterThanOrEqual(1);
+  });
+
+  it('motorStudies counts only the sources the motor section cites', () => {
+    const doc = (motor: string) => `## Fine motor and reaction\n\n- ${motor}\n\n## Sources\n\n1. Hasbrouck & Tindal (2017), [norms](https://files.eric.ed.gov/x.pdf).\n2. Hourcade, Bederson (2004), [pointing](https://doi.org/10.1/a).\n`;
+    expect(motorStudies(doc('Hit rates (Hourcade et al., 2004).'))).toEqual(['https://doi.org/10.1/a']);
+    expect(motorStudies(doc('No citation here.')), 'a reading study elsewhere in the file does not count').toEqual([]);
+  });
+
+  it.each([
+    ['a news or blog link', 'https://example.com/blog/children-and-touchscreens'],
+    ['an author page, not a PDF', 'https://lisa-anthony.com/about'],
+    ['a look-alike host', 'https://doi.org.example.com/x'],
+    ['a GOV.UK page', 'https://www.gov.uk/government/publications/x'],
+    ['a DOI on the old host', 'https://dx.doi.org/10.1/x'],
+  ])('isStudy rejects %s', (_what, url) => {
+    expect(isStudy(url)).toBe(false);
+  });
+
+  it.each([
+    ['a DOI', 'https://doi.org/10.1145/1035575.1035577'],
+    ['PubMed', 'https://pubmed.ncbi.nlm.nih.gov/12345/'],
+    ['ERIC', 'https://eric.ed.gov/?id=ED594994'],
+    ['ERIC files', 'https://files.eric.ed.gov/fulltext/ED594994.pdf'],
+    ['an author PDF', 'https://lisa-anthony.com/papers/x.pdf'],
+  ])('isStudy accepts %s', (_what, url) => {
+    expect(isStudy(url)).toBe(true);
   });
 
   it.each(CHILD)('%s states a target floor below its comfortable size, each in mm and a matching radius (#2243)', (name) => {
