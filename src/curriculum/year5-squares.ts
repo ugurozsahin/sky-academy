@@ -31,47 +31,50 @@ function decoys(answer: number, near: number[], rng: Rng, valid: (v: number) => 
 const card = (rng: Rng, prompt: string, answer: number, near: number[], say: string, valid?: (v: number) => boolean, unit = '', first?: number): Question =>
   wordQ(rng, prompt, f(answer) + unit, decoys(answer, near, rng, valid, first).map(v => f(v) + unit), { say });
 
+/** The working a wrong slice is shown (#2317): the multiplication behind the answer, ending on it. */
+const why = (q: Question, w: string): Question => ({ ...q, why: w });
+
 const sq = (n: number) => ({ text: `${n}²`, say: `${n} squared` });
 const cu = (n: number) => ({ text: `${n}³`, say: `${n} cubed` });
 
 function d1(rng: Rng): Question {
   if (rng() < 0.3) {
     const s = pick(rng, SQUARES.slice(2)), n = Math.sqrt(s);
-    return card(rng, 'Which is a square number?', s, [s - 1, s + 1, s - 2, s + 2, n * (n + 2), n * (n - 2)], 'Which is a square number? Pick the answer.', v => !isSquare(v));
+    return why(card(rng, 'Which is a square number?', s, [s - 1, s + 1, s - 2, s + 2, n * (n + 2), n * (n - 2)], 'Which is a square number? Pick the answer.', v => !isSquare(v)), `${n} × ${n} = ${s}`);
   }
   const n = ri(rng, 2, 12), { text, say } = sq(n);
-  return card(rng, `${text} = ?`, n * n, [(n + 1) ** 2, (n - 1) ** 2, n * n * n], `${say} equals what?`, undefined, '', 2 * n);
+  return why(card(rng, `${text} = ?`, n * n, [(n + 1) ** 2, (n - 1) ** 2, n * n * n], `${say} equals what?`, undefined, '', 2 * n), `${text} = ${n} × ${n} = ${n * n}`);
 }
 
 function d2(rng: Rng): Question {
   if (rng() < 0.4) {
     const c = pick(rng, CUBES), n = Math.round(Math.cbrt(c));
-    return card(rng, 'Which is a cube number?', c, [c - 1, c + 1, n * n, c - 2, c + 2, (n + 1) ** 2], 'Which is a cube number? Pick the answer.', v => !isCube(v));
+    return why(card(rng, 'Which is a cube number?', c, [c - 1, c + 1, n * n, c - 2, c + 2, (n + 1) ** 2], 'Which is a cube number? Pick the answer.', v => !isCube(v)), `${n} × ${n} × ${n} = ${f(c)}`);
   }
   const n = pick(rng, [2, 3, 4, 5, 10]), { text, say } = cu(n);
-  return card(rng, `${text} = ?`, n ** 3, [n * n, (n + 1) ** 3, (n - 1) ** 3], `${say} equals what?`, undefined, '', 3 * n);
+  return why(card(rng, `${text} = ?`, n ** 3, [n * n, (n + 1) ** 3, (n - 1) ** 3], `${say} equals what?`, undefined, '', 3 * n), `${text} = ${n} × ${n} × ${n} = ${f(n ** 3)}`);
 }
 
 function sumOfSquares(rng: Rng): Question {
   const a = ri(rng, 2, 9), b = ri(rng, 2, 9), p = `${sq(a).text} + ${sq(b).text} = ?`;
-  return card(rng, p, a * a + b * b, [2 * a + 2 * b, (a + b) ** 2, a * a + 2 * b, 2 * a + b * b], `${sq(a).say} plus ${sq(b).say} equals what?`);
+  return why(card(rng, p, a * a + b * b, [2 * a + 2 * b, (a + b) ** 2, a * a + 2 * b, 2 * a + b * b], `${sq(a).say} plus ${sq(b).say} equals what?`), `${a * a} + ${b * b} = ${a * a + b * b}`);
 }
 
 function root(rng: Rng): Question {
   const n = ri(rng, 3, 12), s = n * n;
-  return card(rng, `What number squared is ${s}?`, n, [Math.floor(s / 2), n + 1, n - 1, s / n + 1], `What number, squared, makes ${s}? Pick the answer.`);
+  return why(card(rng, `What number squared is ${s}?`, n, [Math.floor(s / 2), n + 1, n - 1, s / n + 1], `What number, squared, makes ${s}? Pick the answer.`), `${n} × ${n} = ${s}, so the number is ${n}`);
 }
 
 function side(rng: Rng): Question {
   const n = ri(rng, 3, 12), s = n * n;
-  return card(rng, `A square has an area of ${s} cm². How long is each side?`, n, [Math.floor(s / 2), Math.floor(s / 4), n + 1, n - 1], `A square has an area of ${s} square centimetres. How long is each side?`, undefined, ' cm');
+  return why(card(rng, `A square has an area of ${s} cm². How long is each side?`, n, [Math.floor(s / 2), Math.floor(s / 4), n + 1, n - 1], `A square has an area of ${s} square centimetres. How long is each side?`, undefined, ' cm'), `${n} × ${n} = ${s}, so each side is ${n} cm`);
 }
 
 /** 64 is the only number below 1,000 that is a square and a cube among these; the rest are squares only or cubes only. */
 function both(rng: Rng): Question {
   const squareOnly = SQUARES.filter(v => !isCube(v) && v >= 25), cubeOnly = CUBES.filter(v => !isSquare(v) && v > 8);
   const out = [144, pick(rng, cubeOnly), pick(rng, squareOnly.filter(v => v !== 144))];
-  return wordQ(rng, 'Which number is both a square and a cube?', '64', out.map(f), { say: 'Which number is both a square number and a cube number? Pick the answer.' });
+  return wordQ(rng, 'Which number is both a square and a cube?', '64', out.map(f), { say: 'Which number is both a square number and a cube number? Pick the answer.', why: '8 × 8 = 64 and 4 × 4 × 4 = 64' });
 }
 
 export const y5Squares: Generator = (d: Difficulty, rng): Question =>
