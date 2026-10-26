@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { pinSentence } from './helpers/pin-sentence';
 import { flatten, sliceSkill } from './helpers/slice-skill';
 import { PLAYTESTERS, PLAYTEST_EXTRA_KEYS, PLAYTEST_PINS } from './helpers/playtest';
+import { AGENTS, MARKETPLACE } from './helpers/agents';
 import { reviewPr, section, ROUND_CAP_ESCAPES, REVIEW_PR_HEADINGS, REVIEW_PR_UNNUMBERED } from './helpers/review-pr';
 
 /**
@@ -1638,7 +1639,6 @@ describe('a bullet is never swallowed onto the line above it (#195)', () => {
 describe('the vendored skills and agents are pinned, and the list is the allow-list (#180)', () => {
   const root = new URL('../../', import.meta.url);
   const SUPERPOWERS = { repo: 'obra/superpowers', sha: 'b36e0829c6d0' };
-  const MARKETPLACE = { repo: 'anthropics/claude-plugins-official', sha: '3b600518a637' };
 
   /** Every skill directory that may exist, and where it came from (`null` = written for this project). */
   const SKILLS: Record<string, { repo: string; sha: string; path: string } | null> = {
@@ -1656,13 +1656,6 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'using-git-worktrees': { ...SUPERPOWERS, path: 'skills/using-git-worktrees' },
     'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
     'test-driven-development': { ...SUPERPOWERS, path: 'skills/test-driven-development' },
-  };
-  /** Every agent definition that may exist (`null` = written here): three vendored review agents (#180), eight playtest profiles (#2204). */
-  const AGENTS: Record<string, { repo: string; sha: string; path: string } | null> = {
-    'pr-test-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/pr-test-analyzer.md' },
-    'silent-failure-hunter': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/silent-failure-hunter.md' },
-    'type-design-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/type-design-analyzer.md' },
-    ...Object.fromEntries(PLAYTESTERS.map((n) => [n, null])),
   };
   /** Vendored files kept byte-for-byte, with no header: a comment would have to go inside code or a licence. */
   const VERBATIM = [

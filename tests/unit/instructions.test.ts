@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { AGENTS, OWN_AGENT_NAMES } from './helpers/agents';
 import { PLAYTESTERS } from './helpers/playtest';
 
 /**
@@ -19,9 +20,9 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'pick-issue', 'playtest', 'qa-screenshot', 'review-pr',
                     'three-art'];
 // The agents written for this project (#2204): their pointers are read like a skill's. The three vendored review
-// agents point at nothing here. `governance.test.ts`'s `AGENTS` map is the allow-list and marks these `null` from the
-// same `PLAYTESTERS` list; this is only the reading list, so it reads by that name, not by a file-name prefix (#2213).
-const OWN_AGENTS = PLAYTESTERS.map((n) => `.claude/agents/${n}.md`);
+// agents point at nothing here. `governance.test.ts`'s `AGENTS` map is the allow-list and marks these `null`;
+// `OWN_AGENT_NAMES` is those entries, so every own agent is read, whatever its name (#2213, #2236).
+const OWN_AGENTS = OWN_AGENT_NAMES.map((n) => `.claude/agents/${n}.md`);
 const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven-development', 'using-git-worktrees',
                          'verification-before-completion'];   // pinned upstream; they point at their own siblings
 
@@ -70,6 +71,14 @@ const danglingIn = (text: string) => pointersIn(text).filter((p) => !(p in KNOWN
 describe('agent instruction files', () => {
   it.each(INSTRUCTION_FILES)('%s points only at paths that exist', (file) => {
     expect(danglingIn(readFileSync(join(root, file), 'utf8')), `${file} points at paths that do not exist`).toEqual([]);
+  });
+
+  it('OWN_AGENT_NAMES is the agents AGENTS marks as written here: non-empty, every playtester, none vendored (#2236)', () => {
+    const vendored = Object.entries(AGENTS).filter(([, v]) => v).map(([n]) => n);
+    expect(OWN_AGENT_NAMES.length).toBeGreaterThan(0);
+    expect([...OWN_AGENT_NAMES].sort()).toEqual(expect.arrayContaining([...PLAYTESTERS].sort()));
+    for (const n of vendored) expect(OWN_AGENT_NAMES, `${n} is vendored, not ours`).not.toContain(n);
+    expect([...OWN_AGENT_NAMES, ...vendored].sort()).toEqual(Object.keys(AGENTS).sort());
   });
 
   it('finds a dangling pointer alone in a span, inside a command, at the root, with a line number or anchor', () => {
