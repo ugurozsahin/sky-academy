@@ -52,8 +52,11 @@ function card(rng: Rng, whole: number, n: number, den: number, opts: { story?: S
   const lab = (v: number) => (opts.story ? `${num(v)} ${opts.story.unit}` : num(v));
   const prompt = opts.story ? opts.story.text(w, f) : `${f} of ${w} = ?`;
   const say = opts.story ? speakStory(opts.story.text(w, 'FRAC'), f) : `${ks2Say(f)} of ${w} equals what?`;
+  const k = opts.part / n;
+  const why = left ? `${f} is ${num(opts.part)}; ${w} − ${num(opts.part)} = ${num(answer)}`
+    : n === 1 ? `${w} ÷ ${den} = ${num(k)}` : `${w} ÷ ${den} = ${num(k)}, ${num(k)} × ${n} = ${num(opts.part)}`;
   return wordQ(rng, prompt, lab(answer), ds.map(lab),
-    { say, hint: opts.story?.hint ?? (n === 1 ? 'Divide by the bottom number' : 'Divide by the bottom number, then multiply by the top'), hintIsData: false });
+    { why, say, hint: opts.story?.hint ?? (n === 1 ? 'Divide by the bottom number' : 'Divide by the bottom number, then multiply by the top'), hintIsData: false });
 }
 
 /** d1: a unit fraction 1/2 to 1/12 of an amount to 144. */

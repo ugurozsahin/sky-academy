@@ -76,11 +76,12 @@ const HIDDEN = ['y4-tables', 'y4-pronouns'];
 const TEST_CAT = copy(c => { c.games['y4-tables'].visible = false; c.games['y4-pronouns'].years.year4.visible = false; });
 const without = (ts: readonly { id: string }[], gone = HIDDEN) => ids(ts).filter(id => !gone.includes(id));
 
-/** Loads the game against `cat` in place of the committed file, runs `body`, then restores the real modules. */
+/** Points the game at `cat` through the catalogue seam (#2239), runs `body`, then restores the profile's own. */
 async function withCatalogue(cat: RuntimeCatalogue, body: () => Promise<void>) {
   vi.resetModules();
-  vi.doMock('../../src/config/catalogue.runtime.json', () => ({ default: cat }));
-  try { await body(); } finally { vi.doUnmock('../../src/config/catalogue.runtime.json'); vi.resetModules(); }
+  const { setActiveCatalogue } = await import('../../src/config/active');
+  setActiveCatalogue(cat);
+  try { await body(); } finally { setActiveCatalogue(null); vi.resetModules(); }
 }
 
 describe('a hidden maths game and a hidden writing game leave every list and pool (#2196)', () => {

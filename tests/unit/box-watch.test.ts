@@ -139,3 +139,12 @@ describe('Arena measures whole CSS pixels, so two duel halves a sub-pixel apart 
     expect(t).toMatch(/this\.W = Math\.max\(1, Math\.round\(rect\.width\)\); this\.H = Math\.max\(1, Math\.round\(rect\.height\)\)/);
   });
 });
+
+describe('main.ts keeps --vh current as the visual viewport changes (#2184, #2189)', () => {
+  it('registers setVH on the window and on visualViewport resize, before any arena exists', () => {
+    const t = readFileSync(new URL('../../src/main.ts', import.meta.url), 'utf8');
+    expect(t).toMatch(/window\.addEventListener\('resize', setVH\)/);
+    expect(t).toMatch(/window\.visualViewport\?\.addEventListener\('resize', setVH\)/);
+    expect(t).toMatch(/setProperty\('--vh'/);
+  });
+});

@@ -11,7 +11,7 @@
 // the real `Arena` re-measures its canvas before laying a wave out.
 import { afterEach, describe, expect, it } from 'vitest';
 import { bubbleRadius, dealOrdered, layoutWave, PALETTE, reanchorBubble, type WaveOpts, type WavePlan } from '../../src/game/bubbles';
-import { keepUnderCard, RISE_MAX, RISE_MIN, TOP_INSET_MAX } from '../../src/game/wave-bounds';
+import { cardInset, keepUnderCard, RISE_MAX, RISE_MIN, TOP_INSET_MAX } from '../../src/game/wave-bounds';
 import { shuffle } from '../../src/curriculum/util';
 import type { Rng } from '../../src/curriculum/types';
 import { advanceUntil, createSim, rngFor, type Sim } from './sim/harness';
@@ -190,6 +190,17 @@ describe('keepUnderCard lowers an arc to the card line without stopping it falli
       expect(844 + b.r - relaunchRise, `y ${y} ovy ${ovy}: relaunch past the line`).toBeGreaterThanOrEqual(400 - 1e-9);
     }
   });
+  it('a relaunch (#591) rises exactly min(its drawn rise, the room under the line), not merely enough (#2189)', () => {
+    for (const y of [401, 450, 600, 800]) for (const ovy of [-300, -500, -900]) {
+      const b = { y, vy: -400, g: 200, r: 30, ovy };
+      const drawn = (ovy * ovy) / (2 * b.g);
+      keepUnderCard(b, 400, 844);
+      expect((b.ovy * b.ovy) / (2 * b.g), `y ${y} ovy ${ovy}`).toBeCloseTo(Math.min(drawn, 844 + b.r - 400), 9);
+    }
+    const hi = { y: 600, vy: -100, g: 200, r: 30, ovy: -900 };          // 2,025 px drawn against 474 of room: 474, never 220
+    keepUnderCard(hi, 400, 844);
+    expect((hi.ovy * hi.ovy) / (2 * hi.g)).toBeCloseTo(474, 9);
+  });
   it('a bubble already falling keeps its flight, and only its relaunch arc (#591) is lowered to the line', () => {
     const b = { y: 600, vy: 150, g: 200, r: 30, ovy: -600 };            // launch rise 900, room 844 + 30 - 400 = 474
     keepUnderCard(b, 400, 844);
@@ -329,4 +340,48 @@ describe('the arena lays a wave out for the box it really has (#2184)', () => {
     expect(rotations).toBe(1200);
     expect(slow).toEqual([]);
   }, 120_000);
+});
+
+describe('the card line is no reading when the card has no box, and a waiting relaunch follows a rotation (#2189)', () => {
+  const card = (height: number, bottom: number) => ({ getBoundingClientRect: () => ({ height, bottom }) }) as unknown as HTMLElement;
+  it('cardInset reads bottom + 6 for a card with a box and NaN for one with none', () => {
+    expect(cardInset(card(120, 200))).toBe(206);
+    expect(cardInset(card(0, 6))).toBeNaN();
+  });
+  it('a card with no height leaves topInset where it was, on the setter and through a resize', () => {
+    let live = 240;
+    const s = createSim({ W: 390, H: 760, seed: 3, arena: { measureInset: () => live } });
+    try {
+      s.arena.topInset = cardInset(card(200, 234));                       // 240
+      expect(s.arena.topInset).toBe(240);
+      s.arena.topInset = cardInset(card(0, 0));                           // NaN: ignored, not 6
+      expect(s.arena.topInset).toBe(240);
+      live = cardInset(card(0, 0));
+      s.arena.resize();
+      expect(s.arena.topInset, 'a NaN measurement on resize keeps the old line, scaled by the box').toBe(240);
+    } finally { s.destroy(); }
+  });
+  it('a sequence bubble waiting to relaunch is re-anchored under the card by a rotation', () => {
+    let tested = 0;
+    for (let seed = 1; seed <= 5; seed++) {
+      let cardH = 240;
+      const s = createSim({ W: 390, H: 760, seed, arena: { measureInset: () => cardH } });
+      try {
+        s.arena.topInset = cardH;
+        const l = labels(6), ordered = l.slice(0, 4);
+        s.spawn({ labels: l, speed: 1, ordered });
+        advanceUntil(s, () => s.arena.bubbles.some(b => b.relaunches > 0 && !b.launched && !b.dead), `seed ${seed}: no sequence bubble ever waited to relaunch`, 60_000);
+        cardH = 160;
+        (s.arena.canvas as unknown as { getBoundingClientRect: () => object }).getBoundingClientRect = () => ({ left: 0, top: 0, width: 844, height: 330, right: 844, bottom: 330, x: 0, y: 0 });
+        s.arena.resize();
+        for (const b of s.arena.bubbles.filter(x => x.relaunches > 0 && !x.launched && !x.dead)) {
+          const ceiling = 160 + b.r, rise = (b.ovy * b.ovy) / (2 * b.g), room = 330 + b.r - ceiling;
+          expect(330 + b.r - rise, `seed ${seed} ${b.label}: relaunch apex past the card`).toBeGreaterThanOrEqual(ceiling - 1e-6);
+          expect(rise, `seed ${seed} ${b.label}: relaunch rise`).toBeGreaterThanOrEqual(Math.min(RISE_MIN * 330, room) - 1e-6);
+          tested++;
+        }
+      } finally { s.destroy(); }
+    }
+    expect(tested, 'at least one waiting relaunch was rotated').toBeGreaterThan(0);
+  }, 60_000);
 });
