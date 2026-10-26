@@ -28,7 +28,8 @@ function d1Card(rng: Rng): Question {
   const slips = [`${k}/${b * k}`, `${k + 1}/${b}`, `1/${b + k}`, `${b}/${k}`];
   return wordQ(rng, `${k} × ${unit} = ?`, ans, decoys(ans, slips, 0, k, b),
     { visual: { type: 'fraction', parts: b, shaded: 1, shape: 'bar' }, say: `${cap(numberWord(k))} times ${ks2Say(unit)} equals what?`,
-      hint: 'Multiply the top by the whole number. The bottom stays the same', hintIsData: false });
+      hint: 'Multiply the top by the whole number. The bottom stays the same', hintIsData: false,
+      why: `${k} × 1 = ${k} on top; the bottom stays ${b}` });
 }
 
 /** A non-unit fraction n/b times k whose product is over 1 and not a whole number. */
@@ -39,7 +40,8 @@ function d2Card(rng: Rng): Question {
   const slips = [`${top}/${b * k}`, `${n + k}/${b}`, mixed(rem, whole, b), mixed(whole + 1, n, b)];
   return wordQ(rng, `${k} × ${fr} = ? Give it as a mixed number.`, ans, decoys(ans, slips, whole, rem, b),
     { say: `${cap(numberWord(k))} times ${ks2Say(fr)} equals what? Give it as a mixed number.`,
-      hint: 'Multiply the top, then turn the extra into wholes', hintIsData: false });
+      hint: 'Multiply the top, then turn the extra into wholes', hintIsData: false,
+      why: `${k} × ${n} = ${top} on top; ${top}/${b} is ${ans}` });
 }
 
 function d3Card(rng: Rng): Question {
@@ -49,7 +51,8 @@ function d3Card(rng: Rng): Question {
   const slips = [`${w * k} ${a}/${b}`, `${w + k} ${a}/${b}`, mixed(rem, whole, b), `${w * k} ${a * k}/${b * k}`, `${k * w + a} ${k}/${b}`];
   return wordQ(rng, `${k} × ${mx} = ? Give it as a mixed number.`, ans, decoys(ans, slips, whole, rem, b),
     { say: `${cap(numberWord(k))} times ${ks2Say(mx)} equals what? Give it as a mixed number.`,
-      hint: 'Multiply the wholes and the fractions, then put them together', hintIsData: false });
+      hint: 'Multiply the wholes and the fractions, then put them together', hintIsData: false,
+      why: `${mx} is ${w * b + a}/${b}; ${k} × ${w * b + a} = ${top}, so ${ans}` });
 }
 
 export const y5FracMult: Generator = (level: Difficulty, rng) => {
