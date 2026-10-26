@@ -16,8 +16,13 @@ export const RUNTIME = runtime as unknown as RuntimeCatalogue;
 /** The global bubble timing, `defaults.settings`: what `layoutWave` reads until per-game timing (item D, #2198). */
 export const TIMING: DefaultSettings = RUNTIME.defaults.settings;
 
-/** A timing table's value at `speed`; past the table, its last (fastest) entry, as `layoutWave`'s old fallback was. */
-export const bySpeed = (table: readonly number[], speed: number): number => table[speed] ?? table[table.length - 1];
+/** A timing table's value at `speed`; past speed 3, its last (fastest) entry, as `layoutWave`'s old fallback was. A table missing an entry for speeds 0–3 throws, so a short edit cannot play a wrong speed silently (#2217). */
+export const bySpeed = (table: readonly number[], speed: number): number => {
+  const v = table[speed];
+  if (v !== undefined) return v;
+  if (speed >= 0 && speed <= 3) throw new Error(`timing table has no entry for speed ${speed} (${table.length} entries)`);
+  return table[table.length - 1];
+};
 
 /** An own key only, so `constructor` is not a game. Not `Object.hasOwn`: older Android WebViews (Chrome < 93) lack it. */
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
