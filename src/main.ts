@@ -23,7 +23,7 @@ import { backGuard } from './ui/screen';
 import { shownYears, topicById, topicsFor, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
 import { blockedStart, type HIDDEN_LINE } from './game/hidden-game';
-import { needsSchoolYear, placementYear } from './school-year';
+import { firstMissionYear, needsSchoolYear } from './school-year';
 import { handleDeepLink, queueLink, stripLinkParams, takeLink, wireDeepLinks } from './deeplink-open';
 import { wireNativeLinks } from './deeplink-native';
 
@@ -68,7 +68,7 @@ const renderIntro = () => introScreen(() => finishWizard(true), () => finishWiza
 const startFirstMission = (chosen?: YearInfo) => {
   if (openLink()) return;   // #2027: a pending link outranks the default first mission
   const shown = shownYears();   // #2195: an island the catalogue hides is never where a first mission starts
-  const y = chosen ?? shown.find(i => i.id === placementYear(load(), shown)) ?? shown[0], topic = y && (['maths', 'writing'] as const).flatMap(s => topicsFor(y.id, s)).find(t => t.input !== 'tracing');   // #2238: writing games when every maths one is hidden
+  const y = firstMissionYear(shown, load(), chosen), topic = y && (['maths', 'writing'] as const).flatMap(s => topicsFor(y.id, s)).find(t => t.input !== 'tracing');   // #2238: writing games when every maths one is hidden
   if (!y) { nav.map(); return; }
   if (!topic) { nav.island(y); return; }   // #2238: nothing to start — open the island, never a silent map
   year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
