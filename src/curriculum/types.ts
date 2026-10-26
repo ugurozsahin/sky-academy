@@ -1,6 +1,6 @@
 // Shared question model for every subject. Generators are pure: (difficulty, rng) => Question.
 import type { Strand } from './strands';
-import { resolveYear } from '../config/resolve';
+import { RUNTIME, resolveYear } from '../config/resolve';
 import type { DefaultSettings, YearSettings } from '../config/catalogue';   // the year settings live in src/config/catalogue.json (#2194)
 export type Rng = () => number; // [0,1)
 
@@ -220,7 +220,7 @@ const ART_YEAR2 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 type YearSettingKey = Exclude<keyof YearSettings, 'airTime' | 'stagger'>;
 /** A `YEARS` row: its display fields here, its settings from `resolveYear` (defaults, then the year's own). */
 function year(id: YearId, display: Omit<YearInfo, 'id' | YearSettingKey>): YearInfo {
-  const s = resolveYear(id);
+  const s = resolveYear(id, RUNTIME);   // the static table: the committed file, never a profile's patch
   return { id, ...display, maxAnswer: s.maxAnswer, minAnswer: s.minAnswer, perStage: s.perStage, lives: s.lives, gentle: s.gentle,
     speeds: [...s.speeds], diffs: [...s.diffs], sprintStars: { ...s.sprintStars } };
 }
