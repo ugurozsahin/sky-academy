@@ -9,6 +9,11 @@ import { ks2Say } from './ks2say';
 
 const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
 const lab = (f: Frac) => `${f.n}/${f.d}`;
+/** Tops times tops, bottoms times bottoms, then the product, shown simplified when it needed it. */
+const why = (a: Frac, b: Frac, ans: Frac) => {
+  const n = a.n * b.n, d = a.d * b.d;
+  return `Tops ${a.n}×${b.n}=${n}, bottoms ${a.d}×${b.d}=${d}, so ${gcd(n, d) > 1 ? `${n}/${d} = ` : ''}${lab(ans)}`;
+};
 const bigger = (x: Frac, y: Frac) => (x.n * y.d >= y.n * x.d ? x : y);
 
 /** Fills three distinct decoys from the named slips, then from the answer's neighbours. None equals the answer in value, except `unsimplified`
@@ -40,7 +45,7 @@ function slips(a: Frac, b: Frac, ans: Frac): Frac[] {
 function card(rng: Rng, a: Frac, b: Frac, expr: string, unsimplify: boolean): Question {
   const raw = { n: a.n * b.n, d: a.d * b.d }, ans = mul(a, b);
   const ds = decoys(ans, slips(a, b, ans), unsimplify ? raw : null);
-  return wordQ(rng, `${expr} = ?`, lab(ans), ds, { say: `What is ${ks2Say(expr)}?`, hint: 'Multiply the tops, multiply the bottoms, then simplify', hintIsData: false });
+  return wordQ(rng, `${expr} = ?`, lab(ans), ds, { say: `What is ${ks2Say(expr)}?`, hint: 'Multiply the tops, multiply the bottoms, then simplify', hintIsData: false, why: why(a, b, ans) });
 }
 
 /** d1: 1/a × 1/b with both denominators 2–10, product 1/(ab). */
@@ -79,7 +84,7 @@ function inContext(rng: Rng): Question {
     const ans = mul(a, c);
     const prompt = pick(rng, stories)(lab(a), lab(c));
     const ds = decoys(ans, slips(a, c, ans), null);
-    return { ...wordQ(rng, prompt, lab(ans), ds, { say: ks2Say(prompt), hint: 'Multiply the two fractions', hintIsData: false }), slow: true };
+    return { ...wordQ(rng, prompt, lab(ans), ds, { say: ks2Say(prompt), hint: 'Multiply the two fractions', hintIsData: false, why: why(a, c, ans) }), slow: true };
   }
 }
 
