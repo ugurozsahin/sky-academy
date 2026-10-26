@@ -452,6 +452,7 @@
 .wordcard .emoji {
   font-size: 40px;
 }
+.duel-q .wordcard .txt { font-size: 26px; }   /* #2128: 40px wrapped in the 418px duel card at 800 wide */
 .wordcard .txt {
   font-size: clamp(26px, 7vw, 40px);
   font-weight: 700;
