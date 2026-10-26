@@ -212,14 +212,14 @@ const mtcPadRow = (nav: Nav, year: YearInfo): MenuRow => ({
 });
 
 /** Arithmetic practice (#1233): Year 6 only, through the menu's `years` filter. */
-const paperRow = (nav: Nav, year: YearInfo): MenuRow => ({ id: 'paper', mod: 'sprint', vport: '<span class="vport emoji">📝</span>', title: MODES.paper.title,
+const paperRow = (nav: Nav, year: YearInfo): MenuRow => ({ id: 'paper', mod: 'sprint', feeds: 'none', vport: '<span class="vport emoji">📝</span>', title: MODES.paper.title,
   blurb: '10 questions in the style of Paper 1 · 7½ minutes', years: ['year6'], go: () => nav.play({ year, mode: 'paper', deck: paperDeck(Math.random) }) });
 
 /** Tricky Facts (#1124): Sensei's pick of the child's least secure × facts — KS2 islands only, and only while some fact is insecure. */
 const trickyRow = (nav: Nav, year: YearInfo, facts: Record<string, Ks2Fact>): MenuRow[] => {
   const n = leastSecure(facts).length;
   return n ? [{
-    id: 'tricky', mod: 'train', title: 'Tricky Facts', blurb: `Sensei's pick: ${n} ${n === 1 ? 'fact' : 'facts'}`, years: ['year3', 'year4'],
+    id: 'tricky', mod: 'train', feeds: 'none', title: 'Tricky Facts', blurb: `Sensei's pick: ${n} ${n === 1 ? 'fact' : 'facts'}`, years: ['year3', 'year4'],
     vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
     go: () => nav.play({ year, mode: 'sprint', topic: TRICKY, deck: trickyDeck(facts, Math.random) }),
   }] : [];
@@ -228,21 +228,21 @@ const trickyRow = (nav: Nav, year: YearInfo, facts: Record<string, Ks2Fact>): Me
 /** Grammar mix (#1234): a 60-second Sprint over the KS2 grammar topics up to this island; Years 5–6 only (the pool is empty elsewhere), once the pool is big enough. */
 const grammarRow = (nav: Nav, year: YearInfo): MenuRow[] => {
   const pool = offeredPool(grammarPool(year.id));
-  return !pool.length ? [] : [{ id: 'grammar', mod: 'sprint', vport: '<span class="vport emoji">✏️</span>', title: 'Grammar mix',
+  return !pool.length ? [] : [{ id: 'grammar', mod: 'sprint', feeds: 'none', vport: '<span class="vport emoji">✏️</span>', title: 'Grammar mix',
     blurb: '60 seconds of grammar and punctuation', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Grammar mix' }) }];
 };
 
 /** Arithmetic Sprint (#1235): a 60-second Sprint over the island's context-free calculation topics; Years 5–6, once at least four exist. */
 const arithmeticRow = (nav: Nav, year: YearInfo): MenuRow[] => {
   const pool = arithmeticPool(year.id);
-  return !pool.length ? [] : [{ id: 'arith', mod: 'sprint', vport: '<span class="vport emoji">⏱️</span>', title: 'Arithmetic Sprint',
+  return !pool.length ? [] : [{ id: 'arith', mod: 'sprint', feeds: 'none', vport: '<span class="vport emoji">⏱️</span>', title: 'Arithmetic Sprint',
     blurb: '60 seconds of Paper 1-style sums', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Arithmetic Sprint' }) }];
 };
 
 /** Daily Sprint (#924): one 60-second Sprint whose deck is the same for every child on this island today. */
 const dailySprintRow = (nav: Nav, year: YearInfo): MenuRow[] => {
   const pool = dailySprintPool(topicsFor(year.id));
-  return !pool.length ? [] : [{ id: 'daily', mod: 'sprint', vport: '<span class="vport emoji">📅</span>', title: 'Daily Sprint',
+  return !pool.length ? [] : [{ id: 'daily', mod: 'sprint', feeds: 'none', vport: '<span class="vport emoji">📅</span>', title: 'Daily Sprint',
     blurb: 'Same 60 seconds for everyone today', go: () => nav.play({ year, mode: 'sprint', pool, title: 'Daily Sprint', seed: dailySprintSeed(today(), year.id) }) }];
 };
 
@@ -252,8 +252,9 @@ const dailyTenRows = (nav: Nav, year: YearInfo): MenuRow[] => {
   if (!isWhiteboard() || !dailyTenPool(topics).length) return [];
   const play = (mode: 'relaxed' | 'sprint') => () => nav.play({ year, mode, deck: dailyTenDeck(topics, Math.random), title: DAILY_TEN_TITLE });
   return [
-    { id: 'daily10', mod: '', vport: '<span class="vport emoji">🔟</span>', title: 'Daily Ten', blurb: 'Ten questions, no clock', go: play('relaxed') },
-    { id: 'daily10t', mod: '', vport: '<span class="vport emoji">⏱️</span>', title: 'Daily Ten · 60 seconds', blurb: 'Ten questions against the clock', go: play('sprint') },
+    { id: 'daily10', mod: '', feeds: 'none', vport: '<span class="vport emoji">🔟</span>', title: 'Daily Ten', blurb: 'Ten questions, no clock', go: play('relaxed') },
+    { id: 'daily10t', mod: '', feeds: 'none', vport: '<span class="vport emoji">⏱️</span>', title: 'Daily Ten · 60 seconds',
+      blurb: 'Ten questions against the clock', go: play('sprint') },
   ];
 };
 
@@ -263,22 +264,25 @@ const deckRows = (nav: Nav, year: YearInfo, progress: Record<string, TopicProgre
     ...arithmeticRow(nav, year), ...grammarRow(nav, year), ...dailySprintRow(nav, year), ...dailyTenRows(nav, year)];
 
 /** What a row's tap draws from, when the catalogue can empty it (#2196): the island's mixed pool, a duel pool, or Tables Check's topic. */
-export type Feed = 'mixed' | 'duel' | 'mtc';
-/** One island-menu row. `years` (#1117) limits it to those islands; `feeds` (#2196) hides it once the catalogue empties that pool. */
-export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[]; feeds?: Feed }
+export type Feed = 'mixed' | 'duel' | 'mtc' | 'none';
+/**
+ * One island-menu row. `years` (#1117) limits it to those islands; `feeds` (#2196, required #2240) names the pool
+ * whose emptying hides it — `'none'` for a row that draws from no game or hides itself.
+ */
+export interface MenuRow { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void; years?: YearId[]; feeds: Feed }
 export const menuFor = <T extends { years?: YearId[] }>(rows: T[], year: YearId): T[] => rows.filter(r => !r.years || r.years.includes(year));
 
 /**
  * #2196: a row whose pool the catalogue has emptied is not offered, rather than crash on the tap — `Session.pickTopic()`
  * and `duelScreen` both throw on an empty pool. A `mixed` row (Sensei, Sky Storm, Sprint, Relaxed, Boss) needs one
  * shown bubble topic on the island (`subjectPool` falls back to the whole year's); `duel` needs one it can duel on;
- * `mtc` needs `MTC_TOPIC` shown. A row with no `feeds` already hides on an empty pool itself (Legend, Daily, Grammar
+ * `mtc` needs `MTC_TOPIC` shown. A `'none'` row already hides on an empty pool itself (Legend, Daily, Grammar
  * mix, Arithmetic Sprint) or draws from no game (Memory Match, Tricky Facts, Arithmetic practice).
  */
-export const fedRows = <T extends { feeds?: Feed }>(rows: T[], year: YearInfo): T[] => {
+export const fedRows = <T extends { feeds: Feed }>(rows: T[], year: YearInfo): T[] => {
   const topics = topicsFor(year.id);
-  const fed: Record<Feed, boolean> = { mixed: topics.some(mixable), duel: topics.some(t => answerableBy(t, 'duel', year.diffs[0] ?? 1)), mtc: mtcOffered() };
-  return rows.filter(r => !r.feeds || fed[r.feeds]);
+  const fed: Record<Exclude<Feed, 'none'>, boolean> = { mixed: topics.some(mixable), duel: topics.some(t => answerableBy(t, 'duel', year.diffs[0] ?? 1)), mtc: mtcOffered() };
+  return rows.filter(r => r.feeds === 'none' || fed[r.feeds]);
 };
 
 /** #932: the Legend run menu row — only with a 3★ topic in hand; opens #910's chooser on exactly those topics, no Mixed. */
@@ -287,7 +291,7 @@ function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgr
   const crowned = (t: Topic) => !!progress[t.id]?.crown;
   const pick = (pro: boolean) => (t: Topic | null) => { if (t) { sfx.tap(); nav.play({ year, mode: 'mission', topic: t, legend: true, pro }); } };
   const open = (pro: boolean) => () => openChooser($('#island-overlay'), list, pick(pro), { mixed: false, badge: t => crowned(t) ? ' 👑' : '' });
-  const row = { id: 'legend', mod: '', vport: '<span class="vport emoji">👑</span>', title: 'Legend run',
+  const row = { id: 'legend', mod: '', feeds: 'none' as const, vport: '<span class="vport emoji">👑</span>', title: 'Legend run',
     blurb: `Hardest questions on your 3★ topics · 👑 ${list.filter(crowned).length}`, go: open(false) };
   // #1297: Pro — one speed step faster, one life fewer, the same crown; not on a gentle year (#700).
   const pro = { ...row, id: 'legend-pro', title: 'Legend run · Pro', blurb: 'One step faster, one fewer life', go: open(true) };
@@ -326,7 +330,7 @@ export function islandMenu(nav: Nav, year: YearInfo, d: SaveData, progress: Reco
       go: () => bossThenPlay(nav, year, subject(), mixedPool(), progress) },
     // #1049: Memory Match used to fall back to Reception's decks for a year with none of its own — hidden
     // instead, since `pickTheme` now throws rather than hand a KS2 child a Reception board.
-    ...(hasMemoryDecks(year.id) ? [{ id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
+    ...(hasMemoryDecks(year.id) ? [{ id: 'memory', mod: 'memory', feeds: 'none' as const, vport: `<span class="vport emoji">🃏</span>`,
       title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${memory[year.id] ?? 0}`,
       go: () => nav.memory(year) }] : []),
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,

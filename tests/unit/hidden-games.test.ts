@@ -52,7 +52,11 @@ describe('with the committed catalogue every list is exactly today\'s (#2196)', 
     expect(ids(listedTopics())).toEqual(ids(CORE.filter(t => shown.has(t.year))));
     for (const n of [5, 6]) expect(ids(grammarPool(`year${n}` as YearId))).toEqual(ids(before.grammarPool(n)));
     expect(mtcOffered()).toBe(true);
-    for (const y of YEARS) expect(ids(menu(islandMenu, load, y).filter(r => r.feeds)), y.id).toEqual(FED(y.id));
+    for (const y of YEARS) {
+      const rows = menu(islandMenu, load, y);
+      expect(rows.filter(r => !['mixed', 'duel', 'mtc', 'none'].includes(r.feeds)).map(r => r.id), `${y.id}: a row names its pool (#2240)`).toEqual([]);
+      expect(ids(rows.filter(r => r.feeds !== 'none')), y.id).toEqual(FED(y.id));
+    }
   });
   it('isGameShown is true for every registry game on its own year, and agrees with topicsFor/drillsFor', () => {
     expect(TOPICS.filter(t => !isGameShown(t.id, t.year)).map(t => t.id)).toEqual(OFF);
@@ -119,7 +123,7 @@ describe('a hidden maths game and a hidden writing game leave every list and poo
     const { load: ld } = await import('../../src/storage');
     const { mtcOffered: offered } = await import('../../src/game/mtc');
     expect(offered()).toBe(false);
-    for (const y of YEARS) expect(ids(menu(im, ld, y).filter(r => r.feeds)), y.id).toEqual(without(FED(y.id).map(id => ({ id })), ['mtc', 'mtcpad']));
+    for (const y of YEARS) expect(ids(menu(im, ld, y).filter(r => r.feeds !== 'none')), y.id).toEqual(without(FED(y.id).map(id => ({ id })), ['mtc', 'mtcpad']));
   }));
 
   it('every total and unlock counts shown games only; the save keeps the hidden games\' stars', () => withCatalogue(TEST_CAT, async () => {
@@ -174,10 +178,11 @@ describe('a pool the catalogue empties hides its entry point (#2196)', () => {
 
 /**
  * The static rail (#2196): a list built straight from the registry skips the catalogue. Every use of `TOPICS` or
- * `CORE_TOPICS` as a list, and every `.map(topicById)` pool, outside `src/curriculum/index.ts` is on this list with
+ * `CORE_TOPICS` as a list (called on, spread, looped, passed as an argument, copied or assigned to a name), and every
+ * `topicById` pool (`.map(topicById)` or `.map(id => topicById(id))`), outside `src/curriculum/index.ts` is on this list with
  * its reason; anything else reads `topicsFor`/`drillsFor`/`listedTopics` or applies `isGameShown`.
  */
-const LIST_USE = /\b(?:CORE_)?TOPICS\s*\.\s*(?:filter|find|findIndex|findLast|findLastIndex|some|every|map|flatMap|forEach|reduce)\b|\bof\s+(?:CORE_)?TOPICS\b|\.\.\.\s*(?:CORE_)?TOPICS\b|\.map\(\s*topicById\s*\)/g;
+const LIST_USE = /\b(?:CORE_)?TOPICS\s*\.\s*(?:filter|find|findIndex|findLast|findLastIndex|some|every|map|flatMap|forEach|reduce)\b|\bof\s+(?:CORE_)?TOPICS\b|\.\.\.\s*(?:CORE_)?TOPICS\b|\.map\(\s*topicById\s*\)|\b(?:CORE_)?TOPICS\s*\.\s*(?:slice|concat|values|entries)\b|\bArray\s*\.\s*from\(\s*(?:CORE_)?TOPICS\b|[(,]\s*(?:CORE_)?TOPICS\s*[,)]|=\s*(?:CORE_)?TOPICS\s*(?:;|$)|\.map\(\s*\(?\s*\w+\s*\)?\s*=>\s*topicById\(/gm;
 const ALLOWED: Record<string, string> = {
   '/src/game/sprint-pools.ts': 'grammarPool looks its ids up with topicById and applies isGameShown itself',
   '/src/deeplink-open.ts': 'a link resolves every registry id so a hidden game gets its notice (#2197); takeLink then applies gameHidden',
@@ -218,8 +223,11 @@ describe('guard rail: no list is built from the registry directly (#2196)', () =
     expect(Object.keys(ALLOWED).filter(f => !hits.some(([h]) => h === f))).toEqual([]);
   });
   it('the pattern catches each shape it names', () => {
-    for (const s of ['TOPICS.filter(t => t)', 'CORE_TOPICS.find(x)', 'for (const t of TOPICS)', '[...TOPICS]', 'ids.map(topicById)'])
+    for (const s of ['TOPICS.filter(t => t)', 'CORE_TOPICS.find(x)', 'for (const t of TOPICS)', '[...TOPICS]', 'ids.map(topicById)',
+      'totalStarsOf(d.progress, CORE_TOPICS)', 'duelPool(TOPICS)', 'senseiTopics(CORE_TOPICS, p, now)', 'const all = TOPICS;', 'let all = CORE_TOPICS',
+      'TOPICS.slice()', 'CORE_TOPICS.concat(x)', 'Array.from(TOPICS)', 'ids.map(id => topicById(id))', 'ids.map((id) => topicById(id)!)'])
       expect(s.match(LIST_USE), s).not.toBeNull();
-    for (const s of ['YEAR4_TOPICS.filter(t => t)', 'TOPICS[c.topic]', 'TOPICS.indexOf(t)']) expect(s.match(LIST_USE), s).toBeNull();
+    for (const s of ['YEAR4_TOPICS.filter(t => t)', 'TOPICS[c.topic]', 'TOPICS.indexOf(t)',
+      'import { CORE_TOPICS, TOPICS } from', 'const x = TOPICS[id];', 'ids.map(id => topicsFor(id))']) expect(s.match(LIST_USE), s).toBeNull();
   });
 });
