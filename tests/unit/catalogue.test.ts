@@ -121,6 +121,12 @@ describe('the catalogue file on disk (#2193)', () => {
     expect(execFileSync(process.execPath, ['--input-type=module', '-e', probe, FILE], { encoding: 'utf8' }).trim()).toBe(String(TOPICS.length));
   });
 
+  it('the init script validates what it built before it writes (#2210)', () => {
+    const src = readFileSync('scripts/catalogue-init.mjs', 'utf8');
+    expect(src).toContain('validateCatalogue(catalogue)');
+    expect(src.indexOf('validateCatalogue(catalogue)')).toBeLessThan(src.indexOf('writeFileSync(OUT'));
+  });
+
   it('the init script refuses to overwrite the file without --force', () => {
     const before = readFileSync(FILE, 'utf8');
     const run = spawnSync(process.execPath, ['scripts/catalogue-init.mjs'], { encoding: 'utf8' });
@@ -172,10 +178,10 @@ const MUTATIONS: [string, (c: Doc) => void, string][] = [
   ['an unknown sprintStars key', (c) => { c.years.year1.settings.sprintStars.oneStar = 1; }, 'years.year1.settings.sprintStars.oneStar: unknown key'],
   ['maxAnswer 0', (c) => { c.years.year1.settings.maxAnswer = 0; }, 'years.year1.settings.maxAnswer: must be a whole number above 0'],
   ['minAnswer not below maxAnswer', (c) => { c.years.year1.settings.minAnswer = 120; }, 'years.year1.settings.minAnswer: must be a whole number below maxAnswer'],
-  ['an air time table of the wrong length', (c) => { c.defaults.settings.airTime.pop(); }, 'defaults.settings.airTime: must be 4 numbers above 0'],
-  ['a stagger that is not positive', (c) => { c.defaults.settings.stagger[0] = 0; }, 'defaults.settings.stagger: must be 4 numbers above 0'],
-  ['an air time past 15 s', (c) => { c.defaults.settings.airTime[0] = 15.5; }, 'defaults.settings.airTime: must be 4 numbers above 0 and at most 15 s'],
-  ['a stagger past 1000 ms', (c) => { c.years.year1.settings.stagger = [1001, 420, 330, 260]; }, 'years.year1.settings.stagger: must be 4 numbers above 0 and at most 1000 ms'],
+  ['an air time table of the wrong length', (c) => { c.defaults.settings.airTime.pop(); }, 'defaults.settings.airTime: must be 4 numbers'],
+  ['a stagger that is not positive', (c) => { c.defaults.settings.stagger[0] = 0; }, 'defaults.settings.stagger: must be 4 numbers'],
+  ['an air time past 15 s', (c) => { c.defaults.settings.airTime[0] = 15.5; }, 'defaults.settings.airTime: must be 4 numbers from 1 to 15 s'],
+  ['a stagger past 1000 ms', (c) => { c.years.year1.settings.stagger = [1001, 420, 330, 260]; }, 'years.year1.settings.stagger: must be 4 numbers from 50 to 1000 ms'],
   ['a missing default', (c) => { delete c.defaults.settings.stagger; }, 'defaults.settings.stagger: missing'],
   ['a default the year always overrides', (c) => { c.defaults.settings.lives = 3; }, 'defaults.settings.lives: not a setting this level holds'],
   ['a year-only key on a game', (c) => { c.games[GAME].settings.maxAnswer = 50; }, `games.${GAME}.settings.maxAnswer: year-only`],
@@ -183,6 +189,15 @@ const MUTATIONS: [string, (c: Doc) => void, string][] = [
   ['a bad game override', (c) => { c.games[GAME].settings.lives = 9; }, `games.${GAME}.settings.lives: must be a whole number from 1 to 5`],
   ['an unknown group override', (c) => { c.games[GAME].groupSettings.ks3 = {}; }, `games.${GAME}.groupSettings.ks3: not a group`],
   ['a bad group override', (c) => { c.games[GAME].groupSettings.ks1 = { diffs: [1, 2, 3, 4, 3] }; }, `games.${GAME}.groupSettings.ks1.diffs: must be 5 values`],
+  ['a year-only key on a game-year node', (c) => { c.games[GAME].years.year1.settings = { maxAnswer: 50 }; }, `games.${GAME}.years.year1.settings.maxAnswer: year-only`],
+  ['a game with no year', (c) => { c.games[GAME].years = {}; }, `games.${GAME}.years: must name exactly one year`],
+  ['a minAnswer with no maxAnswer', (c) => { delete c.years.year4.settings.maxAnswer; }, 'years.year4.settings.maxAnswer: missing'],
+  ['a minAnswer beside a bad maxAnswer', (c) => { c.years.year4.settings.maxAnswer = 'big'; c.years.year4.settings.minAnswer = 5; }, 'years.year4.settings.maxAnswer: must be a whole number above 0'],
+  ['a bad airTime on a year island', (c) => { c.years.year1.settings.airTime = [1, 2]; }, 'years.year1.settings.airTime: must be 4 numbers'],
+  ['a stagger in seconds', (c) => { c.years.year1.settings.stagger = [0.5, 0.42, 0.33, 0.26]; }, 'years.year1.settings.stagger: must be 4 numbers from 50 to 1000 ms'],
+  ['an air time in milliseconds', (c) => { c.years.year1.settings.airTime = [7500, 5600, 4400, 3300]; }, 'years.year1.settings.airTime: must be 4 numbers from 1 to 15 s'],
+  ['a group named after an inherited property', (c) => { c.groups.ks1.push('constructor'); }, 'years.constructor: missing'],
+  ['a game in an inherited-property year', (c) => { c.games[GAME].years = { constructor: c.games[GAME].years.year1 }; }, `games.${GAME}.years.constructor: not a year in groups`],
   ['a bad year-node override', (c) => { c.games[GAME].years.year1.settings = { airTime: [1, 2] }; }, `games.${GAME}.years.year1.settings.airTime: must be 4`],
   ['a game visible that is not boolean', (c) => { c.games[GAME].visible = 'auto'; }, `games.${GAME}.visible: must be true or false`],
   ['a game-year visible that is not boolean', (c) => { c.games[GAME].years.year1.visible = 'auto'; }, `games.${GAME}.years.year1.visible: must be true or false`],
@@ -232,8 +247,10 @@ describe('validateCatalogue catches each kind of error in a seeded bad copy (#21
 
   it('accepts what the shape allows: overrides at each level, a scored node, extra keys on a media entry', () => {
     const copy = onDisk();
-    copy.games[GAME].settings = { perStage: 4, lives: 5, gentle: true, speeds: [0, 0, 1, 1, 2], diffs: [1, 1, 1, 2, 2], airTime: [15, 7, 5, 4], stagger: [1000, 500, 400, 300] };
-    copy.games[GAME].groupSettings = { ks1: { lives: 1 }, eyfs: {} };
+    copy.games[GAME].groupSettings = { eyfs: { perStage: 1 }, uks2: { perStage: 10 } };
+    copy.games[OTHER].playability = { ...play, score: 10 };
+    copy.games[GAME].settings = { perStage: 4, lives: 5, gentle: true, speeds: [0, 0, 1, 1, 2], diffs: [1, 1, 1, 2, 2], airTime: [15, 7, 5, 1], stagger: [1000, 500, 400, 50] };
+    Object.assign(copy.games[GAME].groupSettings, { ks1: { lives: 1 }, eyfs: {} });
     copy.years.year1.settings.airTime = [8, 6, 4, 3];
     copy.games[GAME].playability = play;
     copy.games[GAME].years.year1 = { visible: false, settings: { speeds: [3, 3, 3, 3, 3] }, playability: { ...play, score: 0 } };
