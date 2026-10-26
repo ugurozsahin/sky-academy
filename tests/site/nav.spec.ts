@@ -6,7 +6,7 @@ import { serve } from '../../scripts/site-serve.mjs';
  * #2174: the Curriculum menu once website/nav.js has run (the W3C APG disclosure navigation pattern). Opens with
  * the mouse and with Enter or Space; closes on Escape (focus back to the button), on a press outside and when Tab
  * or Shift+Tab leaves it; aria-expanded follows; the header keeps its height; nothing scrolls sideways; and the
- * open list never covers the element that has focus. At the site project's 360 px phone, and at 1280 px.
+ * open list never covers the element that has focus. At the site project's 360 px phone, at 900 px (the breakpoint where the open panel changes shape, #2181), and at 1280 px.
  * Without the script the <details> still opens: the last test. #2178: the years in two key-stage lists.
  */
 let site: { origin: string; close: () => Promise<void> };
@@ -27,7 +27,7 @@ const focusUncovered = (page: Page) => page.evaluate(() => {
   return !!top && (el === top || el.contains(top));
 });
 
-for (const width of [360, 1280]) {
+for (const width of [360, 900, 1280]) {
   test.describe(`at ${width} px`, () => {
     test.use({ viewport: { width, height: 800 } });
     test.beforeEach(async ({ page }) => {
@@ -135,6 +135,13 @@ for (const width of [360, 1280]) {
       await expanded(page, true);
       await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
       await expanded(page, false);
+    });
+
+    test('a year link followed from the open list lands on that year page (#2177)', async ({ page }) => {
+      await button(page).click();
+      await expanded(page, true);
+      await Promise.all([page.waitForURL('**/curriculum/year-3/'), list(page).getByRole('link', { name: 'Year 3', exact: true }).click()]);
+      await expect(page).toHaveURL(/\/curriculum\/year-3\/$/);
     });
 
     test('opened while pictures are still loading, it stays open when the page finishes loading (#2175 review)', async ({ page }) => {

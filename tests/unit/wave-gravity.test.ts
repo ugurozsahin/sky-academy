@@ -14,7 +14,7 @@ import { bubbleRadius, dealOrdered, layoutWave, PALETTE, reanchorBubble, type Wa
 import { keepUnderCard, RISE_MAX, RISE_MIN, TOP_INSET_MAX } from '../../src/game/wave-bounds';
 import { shuffle } from '../../src/curriculum/util';
 import type { Rng } from '../../src/curriculum/types';
-import { advanceUntil, createSim, type Sim } from './sim/harness';
+import { advanceUntil, createSim, rngFor, type Sim } from './sim/harness';
 
 /** mulberry32, as `arena.test.ts` uses: a plan can then be asserted, not only sampled. */
 const seeded = (s: number): Rng => () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -241,6 +241,19 @@ describe('the arena lays a wave out for the box it really has (#2184)', () => {
     for (const b of sim.arena.bubbles) expect(b.y, 'launched from the real floor').toBe(844 + b.r);
     const ms = flyOut(sim, '300×150 → 390×844');
     expect(ms, 'the wave left in a fraction of its 5.6 s flight').toBeGreaterThan(5600);
+  });
+
+  it('two duel halves whose rects round to the same pixel are dealt the same wave (#2188)', () => {
+    const a = createSim({ W: 390, H: 194, seed: 5 }), b = createSim({ W: 390, H: 194, seed: 5 });
+    try {
+      setRect(a, 390, 195.0); setRect(b, 390, 194.984);   // a 1.0 px and a 0.984 px drift: both round to 195
+      const shared = { now: 1000 };
+      for (const s of [a, b]) { s.arena.topInset = 40; s.arena.spawnWave({ labels: labels(4), speed: 1 }, { rng: rngFor(9), now: shared.now }); }
+      expect({ W: a.arena.W, H: a.arena.H }).toEqual({ W: 390, H: 195 });
+      expect({ W: b.arena.W, H: b.arena.H }).toEqual({ W: 390, H: 195 });
+      const plan = (s: Sim) => s.arena.bubbles.map(x => ({ label: x.label, x: x.x, y: x.y, vx: x.vx, vy: x.vy, g: x.g, r: x.r }));
+      expect(plan(b)).toEqual(plan(a));
+    } finally { b.destroy(); a.destroy(); }   // the harness stacks its globals: last in, first out
   });
 
   it('a KS2 card below a landscape floor still leaves a wave that goes up and comes down, with no ceiling clamp', () => {
