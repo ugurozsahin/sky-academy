@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { YEARS, type YearId } from '../../src/curriculum';
 import { layoutWave } from '../../src/game/bubbles';
-import { RUNTIME, TIMING, resolveGame, resolveYear } from '../../src/config/resolve';
+import { RUNTIME, TIMING, bySpeed, resolveGame, resolveYear } from '../../src/config/resolve';
 import type { RuntimeCatalogue } from '../../src/config/catalogue';
 import { RUNTIME as RUNTIME_FILE, slimCatalogue } from '../../scripts/catalogue-slim.mjs';
 import { CATALOGUE } from './helpers/catalogue-file';
@@ -152,7 +152,7 @@ describe('resolveGame visibility (#2194)', () => {
 // ---- The runtime copy: what the game bundle carries ---------------------------------------------------------
 const srcFiles = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
   const p = join(dir, f);
-  return statSync(p).isDirectory() ? srcFiles(p) : /\.tsx?$/.test(f) ? [p] : [];
+  return statSync(p).isDirectory() ? srcFiles(p) : /\.(tsx?|m?js)$/.test(f) ? [p] : [];
 });
 
 describe('the runtime catalogue (#2194)', () => {
@@ -177,8 +177,21 @@ describe('the runtime catalogue (#2194)', () => {
   });
 
   it('no module under src/ imports the full catalogue.json, so its media never reaches the game bundle', () => {
-    const bad = srcFiles('src').filter((f) => /from\s+['"][^'"]*\/catalogue\.json['"]/.test(readFileSync(f, 'utf8')));
+    const bad = srcFiles('src').filter((f) => /catalogue\.json(\?[a-z]+)?['"]/.test(readFileSync(f, 'utf8')));
     expect(bad).toEqual([]);
+  });
+
+  it('the text rail catches the ways round a static import: dynamic, ?raw, ?url (#2217)', () => {
+    const rail = /catalogue\.json(\?[a-z]+)?['"]/;
+    for (const probe of ["import('../config/catalogue.json')", "import x from '../config/catalogue.json?raw'", "import u from '../config/catalogue.json?url'", "from '../config/catalogue.json'"]) expect(probe, probe).toMatch(rail);
+    expect("from './catalogue.runtime.json'").not.toMatch(rail);
+  });
+
+  it('bySpeed throws on a missing entry for speeds 0..3 and falls back to the last entry above 3 (#2217)', () => {
+    expect(() => bySpeed([5, 4, 3], 3)).toThrow(/speed 3/);
+    expect(() => bySpeed([], 0)).toThrow(/speed 0/);
+    expect(bySpeed([5, 4, 3, 2], 3)).toBe(2);
+    expect(bySpeed([5, 4, 3, 2], 4)).toBe(2);
   });
 
   it('`npm run catalogue:show -- <game>` prints the resolved node for the game on its own year', () => {
