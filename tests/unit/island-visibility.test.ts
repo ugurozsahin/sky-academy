@@ -5,7 +5,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { RuntimeCatalogue } from '../../src/config/catalogue';
 import { RUNTIME } from '../../src/config/resolve';
 import { SHOWN_YEARS_KEY, TOPICS, YEARS, shownYears, type YearId } from '../../src/curriculum';
-import { placementYear, yearIdFromLevel } from '../../src/school-year';
+import { readFileSync } from 'node:fs';
+import { firstMissionYear, placementYear, yearIdFromLevel } from '../../src/school-year';
 
 type Mut = { years: Record<string, { visible: 'auto' | boolean }>; games: Record<string, { visible: boolean; years: Record<string, { visible: boolean }> }> };
 /** A test copy of the committed runtime catalogue, edited. */
@@ -84,7 +85,7 @@ describe('a saved school year whose island is hidden falls back as a gated year 
 });
 
 describe('a year set to false leaves the map and every reward total (#2195)', () => {
-  it('the map\'s islands, listedTopics, belts, stickers, Master Ninja and the parents\' summary all drop year2', async () => {
+  it('the map\'s islands, listedTopics, belts, stickers, Master Ninja and the parents\' summary all drop year2 (this test hands `shown` to those functions itself; the wiring rail below pins the callers)', async () => {
     vi.resetModules();
     vi.doMock('../../src/config/catalogue.runtime.json', () => ({ default: copy(c => { c.years.year2.visible = false; }) }));
     try {
@@ -120,5 +121,41 @@ describe('a year set to false leaves the map and every reward total (#2195)', ()
       vi.doUnmock('../../src/config/catalogue.runtime.json');
       vi.resetModules();
     }
+  });
+});
+
+describe('the app\'s own callers read shownYears(), never YEARS (#2230)', () => {
+  const src = (f: string) => readFileSync(`src/${f}`, 'utf8').replace(/\/\/.*$/gm, '');
+  it('no caller of the map, Master Ninja, parents\' summary or first mission names YEARS', () => {
+    for (const f of ['ui/home.ts', 'ui/avatar.ts', 'ui/parents.ts', 'main.ts']) expect(src(f), f).not.toMatch(/\bYEARS\b/);
+  });
+  it('each of them passes shownYears() where a shown list belongs', () => {
+    expect(src('ui/home.ts')).toMatch(/const shown = shownYears\(\)/);
+    expect(src('ui/avatar.ts').match(/masterProgress\(shownYears\(\)/g)).toHaveLength(2);
+    expect(src('ui/parents.ts')).toMatch(/parentSummary\([^;]*shownYears\(\)/);
+    expect(src('main.ts')).toMatch(/const shown = shownYears\(\)/);
+  });
+});
+
+describe('a year the catalogue leaves out is hidden (#2230)', () => {
+  it('a test copy with years.year2 deleted hides year2', () => {
+    expect(ids(copy(c => { delete c.years.year2; }))).toEqual(ALL.filter(y => y !== 'year2'));
+  });
+});
+
+describe('firstMissionYear (#2230)', () => {
+  const rows = (...xs: YearId[]) => xs.map(id => ({ id }));
+  const d = (schoolYear?: YearId) => ({ ks2: { schoolYear } });
+  it('Reception hidden: no school year takes the first shown island', () => {
+    expect(firstMissionYear(rows('year1', 'year2'), d())?.id).toBe('year1');
+  });
+  it('a school year whose island is hidden lands on the nearest shown one below, else the first shown', () => {
+    expect(firstMissionYear(rows('year1', 'year3'), d('year2'))?.id).toBe('year1');
+    expect(firstMissionYear(rows('year1', 'year2'), d('reception'))?.id).toBe('year1');
+  });
+  it('the chosen island wins; nothing shown gives undefined', () => {
+    const pick = { id: 'year2' as YearId };
+    expect(firstMissionYear(rows('year1'), d('year1'), pick)).toBe(pick);
+    expect(firstMissionYear([], d('year1'))).toBeUndefined();
   });
 });

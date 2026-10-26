@@ -15,6 +15,11 @@ export function placementYear(d: { ks2: { schoolYear?: YearId } }, shownNow: rea
   return undefined;
 }
 
+/** Where a first mission starts (#2230): the chosen island, else the placement year, else the first shown island; undefined when nothing is shown. */
+export function firstMissionYear<Y extends { id: YearId }>(shown: readonly Y[], d: { ks2: { schoolYear?: YearId } }, chosen?: Y): Y | undefined {
+  return chosen ?? shown.find(i => i.id === placementYear(d, shown)) ?? shown[0];
+}
+
 /** The year a ninja's voice is written for (#1287): the school year as `placementYear` reads it when it is set, else the island being played. */
 export const voiceYear = (d: { ks2: { schoolYear?: YearId } }, played?: YearId): YearId | undefined => placementYear(d) ?? played;
 
