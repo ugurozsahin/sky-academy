@@ -2,7 +2,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { OWN_AGENT_NAMES } from './helpers/agents';
+import { AGENTS, OWN_AGENT_NAMES } from './helpers/agents';
+import { PLAYTESTERS } from './helpers/playtest';
 
 /**
  * Rails for the agent instruction files themselves (docs/decisions/001-one-home-per-rule.md).
@@ -70,6 +71,14 @@ const danglingIn = (text: string) => pointersIn(text).filter((p) => !(p in KNOWN
 describe('agent instruction files', () => {
   it.each(INSTRUCTION_FILES)('%s points only at paths that exist', (file) => {
     expect(danglingIn(readFileSync(join(root, file), 'utf8')), `${file} points at paths that do not exist`).toEqual([]);
+  });
+
+  it('OWN_AGENT_NAMES is the agents AGENTS marks as written here: non-empty, every playtester, none vendored (#2236)', () => {
+    const vendored = Object.entries(AGENTS).filter(([, v]) => v).map(([n]) => n);
+    expect(OWN_AGENT_NAMES.length).toBeGreaterThan(0);
+    expect([...OWN_AGENT_NAMES].sort()).toEqual(expect.arrayContaining([...PLAYTESTERS].sort()));
+    for (const n of vendored) expect(OWN_AGENT_NAMES, `${n} is vendored, not ours`).not.toContain(n);
+    expect([...OWN_AGENT_NAMES, ...vendored].sort()).toEqual(Object.keys(AGENTS).sort());
   });
 
   it('finds a dangling pointer alone in a span, inside a command, at the root, with a line number or anchor', () => {
