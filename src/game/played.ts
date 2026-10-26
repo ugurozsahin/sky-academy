@@ -3,7 +3,7 @@
 // mode table and the year's. A Pro run (#1297) is then `proYear` of whichever year that was.
 import type { Topic, YearInfo } from '../curriculum/types';
 import { gameYear } from '../config/resolve';
-import { activeCatalogue, activeOverrides } from '../config/active';
+import { activeOverrides } from '../config/active';
 import { proYear } from './modes';
 
 interface Start { year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: readonly unknown[]; legend?: boolean; pro?: boolean }
@@ -13,6 +13,6 @@ export const playsAlone = (o: Start): boolean => !!o.topic && !o.pool && !o.deck
 
 /** `o` with the `year` the session plays; `o` itself when nothing changes it. `o.year` stays canonical for the caller. */
 export function played<T extends Start>(o: T): T {
-  const alone = playsAlone(o), year = alone ? gameYear(o.year, o.topic!.id, activeCatalogue(), activeOverrides(o.topic!.id, o.year.id)) : o.year;
+  const alone = playsAlone(o), year = alone ? gameYear(o.year, o.topic!.id, undefined, activeOverrides(o.topic!.id, o.year.id)) : o.year;
   return o.pro ? { ...o, year: proYear(year) } : alone ? { ...o, year } : o;
 }

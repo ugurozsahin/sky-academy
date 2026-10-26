@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { activeCatalogue, activeOverrides } from '../../src/config/active';
-import { RUNTIME, resolveGame } from '../../src/config/resolve';
+import { RUNTIME, resolveGame, resolveYear } from '../../src/config/resolve';
 import { applyPatch, sanitisePatch } from '../../src/config/patch';
 import { parsePatch, patchText, readPatch, removePatch, resetCatalogue, setGameSetting, setGameVisible, setYearVisible } from '../../src/config/patch-store';
 import { addProfile, deleteProfile, setActiveProfile } from '../../src/storage';
@@ -83,7 +83,21 @@ describe('the store', () => {
     expect(setGameSetting('p1', GAME, YEAR, 'lives', 2)).toBe(true);   // the game-on-this-year level is over the game level
     const year = YEARS.find(y => y.id === YEAR)!;
     expect(gameYear(year, GAME, activeCatalogue(), activeOverrides(GAME, YEAR)).lives).toBe(2);
-    expect(gameYear(year, GAME).lives).toBe(RUNTIME.years[YEAR].settings.lives);   // the committed file is untouched
+    expect(gameYear(year, GAME)).toEqual(gameYear(year, GAME, activeCatalogue()));   // no `cat` argument: the active catalogue is the default (#2231)
+    expect(gameYear(year, GAME, RUNTIME).lives).toBe(RUNTIME.years[YEAR].settings.lives);   // the committed file is untouched
+  });
+  it('resolveYear and resolveGame default to the active catalogue, so a patch changes what each returns (#2231)', () => {
+    const before = resolveYear(YEAR).perStage;
+    expect(setYearVisible('p1', YEAR, false)).toBe(true);
+    expect(resolveGame(GAME, YEAR).visible).toBe(resolveGame(GAME, YEAR, undefined, RUNTIME).visible);   // island visibility is shownYears', not this
+    expect(setGameVisible('p1', GAME, null, false)).toBe(true);
+    expect(resolveGame(GAME, YEAR).visible).toBe(false);
+    expect(resolveGame(GAME, YEAR, undefined, RUNTIME).visible).toBe(true);
+    const p = sanitisePatch({ version: 1, years: { [YEAR]: { settings: { perStage: before + 1 } } } }, RUNTIME);
+    localStorage.setItem('sna:catalogue:p1', JSON.stringify(p));
+    expect(resolveYear(YEAR).perStage).toBe(before + 1);
+    expect(resolveYear(YEAR, RUNTIME).perStage).toBe(before);
+    expect(resolveYear(YEAR)).toEqual(resolveYear(YEAR, activeCatalogue()));
   });
   it('a year setting in the patch reaches the year layer', () => {
     const p = sanitisePatch({ version: 1, years: { [YEAR]: { settings: { perStage: 3 } } } }, RUNTIME);
