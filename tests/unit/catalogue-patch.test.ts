@@ -83,7 +83,6 @@ describe('the store', () => {
     expect(setGameSetting('p1', GAME, YEAR, 'lives', 2)).toBe(true);   // the game-on-this-year level is over the game level
     const year = YEARS.find(y => y.id === YEAR)!;
     expect(gameYear(year, GAME, activeCatalogue(), activeOverrides(GAME, YEAR)).lives).toBe(2);
-    expect(gameYear(year, GAME)).toEqual(gameYear(year, GAME, activeCatalogue()));   // no `cat` argument: the active catalogue is the default (#2231)
     expect(gameYear(year, GAME, RUNTIME).lives).toBe(RUNTIME.years[YEAR].settings.lives);   // the committed file is untouched
   });
   it('resolveYear and resolveGame default to the active catalogue, so a patch changes what each returns (#2231)', () => {
@@ -98,6 +97,10 @@ describe('the store', () => {
     expect(resolveYear(YEAR).perStage).toBe(before + 1);
     expect(resolveYear(YEAR, RUNTIME).perStage).toBe(before);
     expect(resolveYear(YEAR)).toEqual(resolveYear(YEAR, activeCatalogue()));
+    const info = YEARS.find(y => y.id === YEAR)!;
+    expect(gameYear(info, GAME).perStage).toBe(before + 1);   // no `cat` argument: the active catalogue is gameYear's default
+    expect(gameYear(info, GAME, RUNTIME).perStage).toBe(before);
+    expect(info.perStage).toBe(before);   // YEARS is the committed file, whatever a profile's patch says
   });
   it('a year setting in the patch reaches the year layer', () => {
     const p = sanitisePatch({ version: 1, years: { [YEAR]: { settings: { perStage: 3 } } } }, RUNTIME);
