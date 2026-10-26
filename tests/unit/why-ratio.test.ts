@@ -14,6 +14,12 @@ describe('y6-ratio whys (#2317)', () => {
       expect(num(m[1]) / num(m[3]), q.why).toBe(num(m[2]));
       expect(num(m[2]) * num(m[5]), q.why).toBe(num(m[6]));
       expect(m[6], q.why).toBe(q.answer);
+      // the figures come from the prompt: known amount, group size (first "for every" number), other part (second)
+      const r = /^For every (\d+) .+? there (?:is|are) (\d+) .+?\. ([\d,]+) .+?: how many/.exec(q.prompt)!;
+      expect(r, q.prompt).toBeTruthy();
+      expect(num(m[1]), q.why).toBe(num(r[3]));
+      expect(num(m[3]), q.why).toBe(num(r[1]));
+      expect(num(m[5]), q.why).toBe(num(r[2]));
     }
   });
   it('sharing: parts × part size is the whole, and the second factor is the share asked for', () => {
