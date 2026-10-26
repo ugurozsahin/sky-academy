@@ -128,7 +128,7 @@ function percentOf(rng: Rng, d: 1 | 2): Question {
   const p = pick(rng, d === 1 ? PCT_D1 : PCT_D2), amount = 20 * ri(rng, 1, d === 1 ? 20 : 100), ans = amount * p / 100;
   const named = d === 1 ? [amount - ans, p, amount / 2] : [amount / 10, amount / 20, amount - ans];
   return card(rng, `${p}% of ${lab(amount)} = ?`, ans, named, d === 1 ? 'Find ten per cent first, then build up' : 'Find ten and five per cent first, then add',
-    `5% of ${lab(amount)} is ${lab(amount / 20)}; ${p / 5} lots of that is ${lab(ans)}`);
+    p === 5 ? `5% of ${lab(amount)} is ${lab(ans)}` : `5% of ${lab(amount)} is ${lab(amount / 20)}; ${p / 5} lots of that is ${lab(ans)}`);
 }
 
 /** d3: a hand-written bank of two-step and measures problems; every value is whole and at most 10,000. */

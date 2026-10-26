@@ -40,25 +40,48 @@ describe('y6-ratio whys (#2317)', () => {
       expect(share, q.why).toBe(f[4] === 'are not' ? d - n : n);
     }
   });
-  it('scale cards show the multiplication or division that gives the answer', () => {
+  it('scale cards: each form shows its own operation, operands from the prompt, and ends on the answer', () => {
+    const seen = new Set<string>();
     for (const q of draws('y6-ratio', 3)) {
-      const m = /^(?:Longer side|New ÷ old): (\d+) (×|÷) (\d+) = (\d+)(?: cm)?$/.exec(q.why!)!;
-      expect(m, q.why).toBeTruthy();
-      expect(m[2] === '×' ? num(m[1]) * num(m[3]) : num(m[1]) / num(m[3]), q.why).toBe(num(m[4]));
-      expect(m[4], q.why).toBe(q.answer);
+      const w = q.why!;
+      let m: RegExpExecArray | null;
+      if ((m = /^A (\d+) cm by (\d+) cm rectangle, scale factor (\d+)\. New longer side, in cm\?$/.exec(q.prompt))) {
+        const [s, l, k] = [m[1], m[2], m[3]].map(Number);
+        expect(l, q.prompt).toBeGreaterThan(s);
+        expect(w, q.prompt).toBe(`Longer side: ${l} × ${k} = ${l * k} cm`);
+        expect(String(l * k), w).toBe(q.answer); seen.add('rectangle');
+      } else {
+        m = /^A (\d+) cm side becomes (\d+) cm\. What is the scale factor\?$/.exec(q.prompt)!;
+        expect(m, q.prompt).toBeTruthy();
+        const [old, nw] = [m[1], m[2]].map(Number);
+        expect(w, q.prompt).toBe(`New ÷ old: ${nw} ÷ ${old} = ${nw / old}`);
+        expect(String(nw / old), w).toBe(q.answer); seen.add('factor');
+      }
     }
+    expect([...seen].sort()).toEqual(['factor', 'rectangle']);
   });
 });
 
 describe('y6-percentof whys (#2317)', () => {
-  it('the 5% step times its count is the answer', () => {
+  it('the 5% step times its count is the answer, and 5% itself has no "1 lots"', () => {
+    const seen = new Set<string>();
     for (const d of [1, 2] as Difficulty[]) for (const q of draws('y6-percentof', d)) {
+      const pr = /^(\d+)% of ([\d,]+) = \?$/.exec(q.prompt)!;
+      expect(pr, q.prompt).toBeTruthy();
+      expect(q.why, q.prompt).not.toMatch(/\b1 lots/);
+      if (Number(pr[1]) === 5) {
+        expect(q.why, q.prompt).toBe(`5% of ${pr[2]} is ${q.answer}`); seen.add('five');
+        continue;
+      }
       const m = /^5% of ([\d,]+) is ([\d,]+); (\d+) lots of that is ([\d,]+)$/.exec(q.why!)!;
       expect(m, q.why).toBeTruthy();
+      expect(num(m[1]), q.why).toBe(num(pr[2]));
       expect(num(m[1]) / 20, q.why).toBe(num(m[2]));
+      expect(Number(m[3]) * 5, q.why).toBe(Number(pr[1]));
       expect(num(m[2]) * num(m[3]), q.why).toBe(num(m[4]));
-      expect(m[4], q.why).toBe(q.answer);
+      expect(m[4], q.why).toBe(q.answer); seen.add('lots');
     }
+    expect([...seen].sort()).toEqual(['five', 'lots']);
   });
   it('every word problem shows true arithmetic and ends on the card\'s own answer', () => {
     const seen = new Set<string>();
