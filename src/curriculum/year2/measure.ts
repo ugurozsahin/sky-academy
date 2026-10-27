@@ -3,6 +3,7 @@ import { type Generator, type Question, type Rng, LONGER, HEAVIER, HOLDS } from 
 import { ri, pick, shuffle, numQ, wordQ, measureCompare, unitChoice, measureSum } from '../util';
 import { clockPhrase } from './number';
 import { barVisual } from '../bar-axis';
+import { colourBubbles } from '../colour-bubbles';
 
 // ---------- Measurement (#8, #298) ----------
 // Year 2 measurement is compare and order, choose the sensible unit, and add or subtract within one unit
@@ -99,7 +100,7 @@ function statsCounts(rng: Rng, survey: Survey, kind: string, step: number, ask: 
   return { counts, i, j };
 }
 
-export const y2Stats: Generator = (d, rng) => {
+const y2StatsRaw: Generator = (d, rng) => {
   const survey = pick(rng, SURVEYS);
   const kind = d === 1 ? 'tally' : d === 2 ? 'pictogram' : 'block';
   // The pictogram key is the whole of its difficulty: counts must be whole multiples of it or the drawing
@@ -117,6 +118,7 @@ export const y2Stats: Generator = (d, rng) => {
 
   return statsAnswer(rng, { survey, counts, i, j, ask, visual, chart });
 };
+export const y2Stats = colourBubbles(y2StatsRaw);   // #2301: the options are the colours
 
 function statsAnswer(rng: Rng, c: { survey: Survey; counts: number[]; i: number; j: number; ask: string; visual: Question['visual']; chart: string }): Question {
   const { survey, counts, i, j, ask, visual, chart } = c;
