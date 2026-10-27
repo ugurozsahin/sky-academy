@@ -11,20 +11,37 @@ describe('y5-negative whys (#2317)', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d)) {
       expect(q.why, q.prompt).toBeTruthy();
       expect(q.why!.split(' ').length, q.why).toBeLessThanOrEqual(14);
-      expect(q.why!.endsWith(q.answer) || q.why!.includes(`${q.answer} `) || q.why!.endsWith(`so it is coldest`), q.why).toBe(true);
+      expect(q.why!.includes(q.answer), q.why).toBe(true);
+      expect(q.why, q.why).not.toMatch(/\b1 steps\b/);
     }
   });
   it('counting through zero: the steps to zero plus the rest land on the answer', () => {
-    let seen = 0;
+    let seen = 0, one = 0;
     for (const q of draws(1)) {
       const m = /^Start at (−?\d+) and count (back|on) (\d+)/.exec(q.prompt);
       if (!m) continue;
       seen++;
-      const w = /^(\d+) steps to 0, then (\d+) more is (.+)$/.exec(q.why!)!;
+      const w = /^(\d+) steps? to 0, then (\d+) more is (.+)$/.exec(q.why!)!;
       expect(w, q.why).toBeTruthy();
       expect(Number(w[1]) + Number(w[2]), q.why).toBe(Number(m[3]));
       expect(w[3]).toBe(q.answer);
+      expect(q.why!.startsWith(`${w[1]} ${w[1] === '1' ? 'step' : 'steps'} to 0`), q.why).toBe(true);
+      if (w[1] === '1') one++;
       expect(n(w[3]), q.why).toBe(m[2] === 'back' ? n(m[1]) - Number(m[3]) : n(m[1]) + Number(m[3]));
+    }
+    expect(seen).toBeGreaterThan(20);
+    expect(one, 'a start of 1 is drawn').toBeGreaterThan(0);
+  });
+  it('number line: the marks step and the answer match the visual', () => {
+    let seen = 0;
+    for (const q of draws(1)) {
+      if (q.prompt !== 'What number is at A?') continue;
+      seen++;
+      const v = q.visual as { step: number };
+      const m = /^The marks go up (one at a time|in (\d+)s), so A is (.+)$/.exec(q.why!)!;
+      expect(m, q.why).toBeTruthy();
+      expect(m[3]).toBe(q.answer);
+      expect(m[1] === 'one at a time' ? 1 : Number(m[2]), q.why).toBe(v.step);
     }
     expect(seen).toBeGreaterThan(20);
   });

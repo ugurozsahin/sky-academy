@@ -10,6 +10,7 @@ import { dec, fmt } from './ks2num';
 export const NEG_MIN = -30, NEG_MAX = 30;
 const f = (n: number) => fmt(dec(n, 0));
 const word = (n: number) => (n < 0 ? `minus ${-n}` : `${n}`);
+const steps = (n: number) => `${n} ${n === 1 ? 'step' : 'steps'}`;
 const ok = (v: number) => v >= NEG_MIN && v <= NEG_MAX;
 
 /** Three decoys: the named misconceptions first, then a one-to-three-step fill; a big answer whose last digit no decoy shares swaps its last decoy for answer ± 10 (#1058). */
@@ -29,7 +30,7 @@ function line(rng: Rng): Question {
   const step = pick(rng, [1, 2, 5]), count = pick(rng, [5, 6]), k = ri(rng, 1, count - 2), from = -k * step;
   const ticks = Array.from({ length: count }, (_, i) => from + i * step), at = ticks[ri(rng, 1, count - 2)];
   const visual = { type: 'numberline' as const, from, to: ticks[count - 1], step, labels: ticks.map(f), marks: [{ label: 'A', at }] };
-  return finish(rng, 'What number is at A?', at, [-at, at + step, at - step], { visual, say: 'What number is at A?', why: `The marks go up in ${step}s, so A is ${f(at)}` });
+  return finish(rng, 'What number is at A?', at, [-at, at + step, at - step], { visual, say: 'What number is at A?', why: `The marks go up ${step === 1 ? 'one at a time' : `in ${step}s`}, so A is ${f(at)}` });
 }
 
 /** Count back from a start, or on from a negative start, so the move crosses zero. */
@@ -37,11 +38,11 @@ function count(rng: Rng): Question {
   if (rng() < 0.5) {
     const start = ri(rng, 1, 9), n = start + ri(rng, 1, 8), answer = start - n;
     return finish(rng, `Start at ${start} and count back ${n}. Where do you land?`, answer, [-answer, answer - 1, start + n],
-      { say: `Start at ${start} and count back ${n}. Where do you land?`, why: `${start} steps to 0, then ${n - start} more is ${f(answer)}` });
+      { say: `Start at ${start} and count back ${n}. Where do you land?`, why: `${steps(start)} to 0, then ${n - start} more is ${f(answer)}` });
   }
   const start = -ri(rng, 1, 9), n = -start + ri(rng, 1, 8), answer = start + n;
   return finish(rng, `Start at ${f(start)} and count on ${n}. Where do you land?`, answer, [-answer, answer + 1, start - n],
-    { say: `Start at ${word(start)} and count on ${n}. Where do you land?`, why: `${-start} steps to 0, then ${n + start} more is ${f(answer)}` });
+    { say: `Start at ${word(start)} and count on ${n}. Where do you land?`, why: `${steps(-start)} to 0, then ${n + start} more is ${f(answer)}` });
 }
 
 function change(rng: Rng): Question {
