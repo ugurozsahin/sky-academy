@@ -1,6 +1,7 @@
 // #2288: Reception and Year 1 bubbles are bigger; Year 2 up is unchanged; no wave overlaps at 390×844.
 import { describe, expect, it } from 'vitest';
 import { BUBBLE_SCALE, layoutWave, waveRadius, type WaveOpts } from '../../src/game/bubbles';
+import { waveOptsFor } from '../../src/ui/wave-opts';
 import { YEARS } from '../../src/curriculum/types';
 
 const W = 390, H = 844;
@@ -29,5 +30,12 @@ describe('year bubble scale (#2288)', () => {
         expect(row[0]).toBeGreaterThanOrEqual(plan.r); expect(row[row.length - 1]).toBeLessThanOrEqual(W - plan.r);
       }
     }
+  });
+  it('reaches the wave through waveOptsFor, by year id', () => {
+    const q = { options: ['1', '2', '3'] } as Parameters<typeof waveOptsFor>[0], info = { labels: q.options, speed: 1 };
+    expect(waveOptsFor(q, info, undefined, false, undefined, false, 'reception').scale).toBe(1.6);
+    expect(waveOptsFor(q, info, undefined, false, undefined, false, 'year1').scale).toBe(1.1);
+    expect(waveOptsFor(q, info, undefined, false, undefined, false, 'year2').scale).toBeUndefined();
+    expect(waveOptsFor(q, info).scale).toBeUndefined();
   });
 });

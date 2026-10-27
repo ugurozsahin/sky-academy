@@ -13,7 +13,6 @@ import type { Arena } from '../game/arena';
 import type { DojoOutcome } from '../game/dojo';
 import { Session, type SessionEvents, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed'; import { cardInset } from '../game/wave-bounds';   // #32: test-only time compression; #2184: the card line
-import { BUBBLE_SCALE } from '../game/bubbles';
 import { waveOptsFor, hintOnce, WORD_CAP_YEARS } from './wave-opts';
 import { canHear, haptic, hush, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate'; import { firstQuestionLine, type ResultCandidate } from './results';   // #897; one line: at its #714 cap
@@ -254,7 +253,7 @@ function questionCallbacks(c: BeatCtx) {
 function launchWave(c: BeatCtx, q: Question, info: QuestionInfo, firstLine: string, peeking: boolean) {
   const { opts, deps, st, session } = c, { els } = deps;
   const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
-  const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle, opts.year.timing, WORD_CAP_YEARS.has(opts.year.id), BUBBLE_SCALE[opts.year.id]);
+  const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle, opts.year.timing, WORD_CAP_YEARS.has(opts.year.id), opts.year.id);
   const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
   const storyLine = !!q.story && !peeking, myWave = st.waveId;   // #1352: holdForStory speaks a story's line
   const spawn = () => {

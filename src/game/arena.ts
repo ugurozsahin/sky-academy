@@ -8,7 +8,7 @@ import { watchBox } from './box-watch'; import { gameSpeed } from './speed';   /
 import type { Rng } from '../curriculum/types'; import { boxMoved, holdUnderCard, insetMax, nextInset } from './wave-bounds';   // #2184
 import {
   hittable, GOOD, RELAUNCH_DELAY, MAX_RELAUNCHES, COLLIDE,
-  layoutWave, reanchorBubble, bubbleRadius, resolveCollisions,
+  layoutWave, reanchorBubble, waveRadius, resolveCollisions,
   fitLabelLines, warnUnfitLabel,
 } from './bubbles';
 import type { Bubble, WaveOpts, ArenaBox, ClampCounts } from './bubbles';
@@ -139,7 +139,7 @@ export class Arena {
     // unrescaled box, so each one's next move must re-seat its anchor rather than draw from a stale point
   }
 
-  scale = 1; radius(wide: boolean) { return Math.min(bubbleRadius(this.W, this.H, wide) * this.scale, ((this.W - 16) / 3 - 10) / 2); }   // viewport-scaled, times the wave's year scale (#2288) so a ghost bubble matches; words get wider bubbles
+  scale = 1; radius(wide: boolean) { return waveRadius(this.W, this.H, wide, 1, this.scale); }   // the wave's year scale (#2288), so a ghost bubble matches; words get wider bubbles
 
   /**
    * `shared` is how two arenas put up **the same wave** — the Ninja Duel's two halves (#389). Two of
