@@ -27,8 +27,9 @@ function pickDecoys(ans: Opt, named: Opt[], fillers: Opt[]): string[] {
   return out.map(o => o.label);
 }
 
-function card(rng: Rng, prompt: string, ans: Opt, named: Opt[], fillers: Opt[], hint: string): Question {
-  return wordQ(rng, prompt, ans.label, pickDecoys(ans, named, fillers), { say: ks2Say(prompt), hint, hintIsData: false });
+/** `why` is the working a wrong slice is shown (#2317), ≤ 14 words. */
+function card(rng: Rng, prompt: string, ans: Opt, named: Opt[], fillers: Opt[], hint: string, why: string): Question {
+  return wordQ(rng, prompt, ans.label, pickDecoys(ans, named, fillers), { say: ks2Say(prompt), hint, hintIsData: false, why });
 }
 
 /** d1: a division written as a fraction, or the division that gives a fraction. Proper, lowest terms, tops 1–11, bottoms 2–12. */
@@ -37,10 +38,10 @@ function division(rng: Rng): Question {
   do { d = ri(rng, 2, 12); n = ri(rng, 1, d - 1); } while (gcd(n, d) > 1);
   const nb = [n + 1, n - 1, n + 2].map(x => frac(x, d)), db = [d + 1, d - 1].map(x => frac(n, x));
   if (rng() < 0.5) {
-    return card(rng, `${n} ÷ ${d} as a fraction`, frac(n, d), [frac(d, n), ...nb], db, 'A fraction bar means divided by');
+    return card(rng, `${n} ÷ ${d} as a fraction`, frac(n, d), [frac(d, n), ...nb], db, 'A fraction bar means divided by', `${n} ÷ ${d} is ${n}/${d}`);
   }
   const div = (a: number, b: number): Opt => ({ label: `${a} ÷ ${b}`, n: a, d: b });
-  return card(rng, `Which division gives ${n}/${d}?`, div(n, d), [div(d, n), div(n + 1, d), div(n, d + 1)], [div(n - 1, d), div(n, d - 1), div(n + 2, d)], 'A fraction bar means divided by');
+  return card(rng, `Which division gives ${n}/${d}?`, div(n, d), [div(d, n), div(n + 1, d), div(n, d + 1)], [div(n - 1, d), div(n, d - 1), div(n + 2, d)], 'A fraction bar means divided by', `${n}/${d} means ${n} ÷ ${d}`);
 }
 
 /** d2: the recall set as fractions in lowest terms (thirds are left out: 1/3 has no exact percentage). */
@@ -51,6 +52,14 @@ type Notation = 'F' | 'D' | 'P';
 const DIRECTIONS: [Notation, Notation][] = [['F', 'D'], ['F', 'P'], ['D', 'F'], ['D', 'P'], ['P', 'F'], ['P', 'D']];
 const asOpt = (f: Frac2, kind: Notation): Opt => kind === 'F' ? frac(f[0], f[1]) : kind === 'P' ? pct(percentOf(f)) : th(percentOf(f) * 10);
 const WORD: Record<Notation, string> = { F: 'a fraction', D: 'a decimal', P: 'a percentage' };
+
+/** Every recall runs through "out of a hundred": the percentage is the top over 100, the decimal is that read in hundredths. */
+function recallWhy([n, d]: Frac2, src: Notation, dst: Notation, ans: string): string {
+  const p = percentOf([n, d]), dec = asOpt([n, d], 'D').label;
+  if (src === 'F') return `${n}/${d} = ${p}/100: ${ans}`;
+  const from = src === 'P' ? `${p}%` : dec;
+  return dst === 'F' ? `${from} is ${p}/100, which is ${ans}` : `${from} is ${p}/100: ${ans}`;
+}
 
 function recall(rng: Rng): Question {
   const from = pick(rng, DIRECTIONS);
@@ -64,7 +73,7 @@ function recall(rng: Rng): Question {
   if (dst === 'F') named.push(frac(f[1], f[0]), frac(1, Math.round(p / 10)), frac(1, p));             // tops-and-bottoms, "6 on the bottom"
   named.push(near[0], near[1], near[2]);
   const hint = dst === 'F' ? 'Think of the fraction as parts out of a hundred' : 'Per cent means out of a hundred';
-  return card(rng, `${asOpt(f, src).label} as ${WORD[dst]}`, ans, named, [], hint);
+  return card(rng, `${asOpt(f, src).label} as ${WORD[dst]}`, ans, named, [], hint, recallWhy(f, src, dst, ans.label));
 }
 
 /** d3 sources: eighths (exact) and recurring cases (rounded to 3 dp, marked by `rec`). */
@@ -80,7 +89,8 @@ function byDivision(rng: Rng): Question {
   const fills = (recurring ? RECURRING : EIGHTHS).map(g => th(thousandths(g[0], g[1])));
   const named = recurring ? [trunc, early, inverted, digits] : [early, digits, inverted];
   const prompt = recurring ? `${n}/${d} as a decimal to 3 decimal places` : rng() < 0.5 ? `${n} ÷ ${d} = ?` : `${n}/${d} as a decimal`;
-  return card(rng, prompt, ans, named, fills, recurring ? 'Divide the top by the bottom, then round to 3 places' : 'Divide the top by the bottom');
+  return card(rng, prompt, ans, named, fills, recurring ? 'Divide the top by the bottom, then round to 3 places' : 'Divide the top by the bottom',
+    recurring ? `${n} ÷ ${d} is ${ans.label} to 3 places` : `${n} ÷ ${d} = ${ans.label}`);
 }
 
 export const y6Fdp: Generator = (d: Difficulty, rng: Rng): Question => d === 1 ? division(rng) : d === 2 ? recall(rng) : byDivision(rng);
