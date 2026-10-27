@@ -14,7 +14,7 @@ export function withIsland(cat: Visibility, year: YearId, v: IslandChoice): Visi
   return { ...cat, years: { ...cat.years, [year]: { ...cat.years[year], visible: v } } };
 }
 
-/** `cat` with game `id` switched `on` for `year`; switching on also turns on the game itself, as the store does. */
+/** `cat` with game `id` switched `on` for `year`; switching on also turns on the game itself, as `onGame` does. */
 export function withGame(cat: Visibility, id: string, year: YearId, on: boolean): Visibility {
   const g = cat.games[id];
   if (!g) return cat;

@@ -37,11 +37,13 @@ function commit(profile: ProfileId, next: Patch): boolean {
 const clone = (p: Patch): Patch => JSON.parse(JSON.stringify(p));
 const gameOf = (p: Patch, id: string): GamePatch => ((p.games ??= {})[id] ??= {});
 
-/** `year` null is the game itself, a year id is the game on that island. An unknown id or a game with no node for `year` is refused. */
-export function setGameVisible(profile: ProfileId, id: string, year: YearId | null, on: boolean): boolean {
+/** `year` null is the game itself, a year id is the game on that island. An unknown id or a game with no node for `year` is refused.
+ *  `alsoGame` also turns the game itself on, in the same write (so a failed write cannot leave half a switch-on). */
+export function setGameVisible(profile: ProfileId, id: string, year: YearId | null, on: boolean, alsoGame = false): boolean {
   if (!Object.prototype.hasOwnProperty.call(RUNTIME.games, id) || (year !== null && !RUNTIME.games[id].years[year])) return false;
   const p = clone(readPatch(profile)), g = gameOf(p, id);
   if (year === null) g.visible = on; else ((g.years ??= {})[year] ??= {}).visible = on;
+  if (alsoGame && on) g.visible = true;
   return commit(profile, p);
 }
 
