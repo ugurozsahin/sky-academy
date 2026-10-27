@@ -6,37 +6,39 @@ import { ri, pick, shuffle, wordQ, symSay } from './util';
 import { dec, fmt } from './ks2num';
 
 const f = (n: number) => fmt(dec(n, 0));
+/** The working a wrong slice is shown (#2317): the step that comes first, then the sum rewritten with it done, ending on the answer. */
+const w = (step: string, rest: string) => `${step}, so ${rest}`;
 const digits = (n: number) => String(n).replace(/\D/g, '');
 const lastOf = (n: number) => digits(n).slice(-1), leadOf = (n: number) => digits(n)[0];
 
 /** A card: its prompt text, the answer and the precedence slip. `slip` is the left-to-right or brackets-ignored result. */
-interface Card { text: string; ans: number; slip: number; }
+interface Card { text: string; ans: number; slip: number; why: string; }
 
 /** The sum with its brackets read aloud: "bracket 2 plus 1 close bracket times 3 equals what". */
 const say = (text: string) => symSay(text.replace(/\(/g, ' bracket ').replace(/\)/g, ' close bracket '));
 
 /** d1: the higher-rank operation second, so doing it first (precedence) differs from reading order. */
 const d1Forms: ((r: Rng) => Card)[] = [
-  r => { const a = ri(r, 1, 50), b = ri(r, 2, 12), c = ri(r, 2, 12); return { text: `${a} + ${b} × ${c}`, ans: a + b * c, slip: (a + b) * c }; },
-  r => { const b = ri(r, 2, 12), c = ri(r, 2, 12), a = ri(r, b * c, 50 + b * c); return { text: `${a} − ${b} × ${c}`, ans: a - b * c, slip: (a - b) * c }; },
-  r => { const c = ri(r, 2, 12), a = c * ri(r, 1, Math.floor(50 / c)), k = ri(r, 2, 12); return { text: `${a} + ${c * k} ÷ ${c}`, ans: a + k, slip: a / c + k }; },
-  r => { const c = ri(r, 2, 12), m = ri(r, 2, Math.floor(50 / c)), k = ri(r, 1, m); return { text: `${c * m} − ${c * k} ÷ ${c}`, ans: c * m - k, slip: m - k }; },
+  r => { const a = ri(r, 1, 50), b = ri(r, 2, 12), c = ri(r, 2, 12); return { text: `${a} + ${b} × ${c}`, ans: a + b * c, slip: (a + b) * c, why: w(`${b} × ${c} = ${b * c}`, `${a} + ${b * c} = ${f(a + b * c)}`) }; },
+  r => { const b = ri(r, 2, 12), c = ri(r, 2, 12), a = ri(r, b * c, 50 + b * c); return { text: `${a} − ${b} × ${c}`, ans: a - b * c, slip: (a - b) * c, why: w(`${b} × ${c} = ${b * c}`, `${a} − ${b * c} = ${a - b * c}`) }; },
+  r => { const c = ri(r, 2, 12), a = c * ri(r, 1, Math.floor(50 / c)), k = ri(r, 2, 12); return { text: `${a} + ${c * k} ÷ ${c}`, ans: a + k, slip: a / c + k, why: w(`${c * k} ÷ ${c} = ${k}`, `${a} + ${k} = ${a + k}`) }; },
+  r => { const c = ri(r, 2, 12), m = ri(r, 2, Math.floor(50 / c)), k = ri(r, 1, m); return { text: `${c * m} − ${c * k} ÷ ${c}`, ans: c * m - k, slip: m - k, why: w(`${c * k} ÷ ${c} = ${k}`, `${c * m} − ${k} = ${c * m - k}`) }; },
 ];
 
 /** d2: brackets that change the answer; the slip drops the brackets and lets precedence run. */
 const d2Forms: ((r: Rng) => Card)[] = [
-  r => { const a = ri(r, 1, 50), b = ri(r, 1, 50), c = ri(r, 2, 12); return { text: `(${a} + ${b}) × ${c}`, ans: (a + b) * c, slip: a + b * c }; },
-  r => { const a = ri(r, 2, 12), c = ri(r, 1, 30), b = c + ri(r, 1, 30); return { text: `${a} × (${b} − ${c})`, ans: a * (b - c), slip: a * b - c }; },
-  r => { const c = ri(r, 2, 12), i = ri(r, 1, Math.floor(30 / c)), j = ri(r, 1, 12); return { text: `(${c * i} + ${c * j}) ÷ ${c}`, ans: i + j, slip: c * i + j }; },
-  r => { const b = ri(r, 1, 30), c = ri(r, 1, 30), a = b + c + ri(r, 0, 20); return { text: `${a} − (${b} + ${c})`, ans: a - b - c, slip: a - b + c }; },
+  r => { const a = ri(r, 1, 50), b = ri(r, 1, 50), c = ri(r, 2, 12); return { text: `(${a} + ${b}) × ${c}`, ans: (a + b) * c, slip: a + b * c, why: w(`${a} + ${b} = ${a + b}`, `${a + b} × ${c} = ${f((a + b) * c)}`) }; },
+  r => { const a = ri(r, 2, 12), c = ri(r, 1, 30), b = c + ri(r, 1, 30); return { text: `${a} × (${b} − ${c})`, ans: a * (b - c), slip: a * b - c, why: w(`${b} − ${c} = ${b - c}`, `${a} × ${b - c} = ${a * (b - c)}`) }; },
+  r => { const c = ri(r, 2, 12), i = ri(r, 1, Math.floor(30 / c)), j = ri(r, 1, 12); return { text: `(${c * i} + ${c * j}) ÷ ${c}`, ans: i + j, slip: c * i + j, why: w(`${c * i} + ${c * j} = ${c * (i + j)}`, `${c * (i + j)} ÷ ${c} = ${i + j}`) }; },
+  r => { const b = ri(r, 1, 30), c = ri(r, 1, 30), a = b + c + ri(r, 0, 20); return { text: `${a} − (${b} + ${c})`, ans: a - b - c, slip: a - b + c, why: w(`${b} + ${c} = ${b + c}`, `${a} − ${b + c} = ${a - b - c}`) }; },
 ];
 
 /** d3: four numbers on two levels, answer at most 1,000. */
 const d3Forms: ((r: Rng) => Card)[] = [
-  r => { const a = ri(r, 1, 50), b = ri(r, 2, 12), c = ri(r, 2, 12), d = ri(r, 1, a + b * c); return { text: `${a} + ${b} × ${c} − ${d}`, ans: a + b * c - d, slip: (a + b) * c - d }; },
-  r => { const b = ri(r, 2, 12), c = ri(r, 2, 12), a = ri(r, b * c, 60 + b * c), d = ri(r, 1, 50); return { text: `${a} − ${b} × ${c} + ${d}`, ans: a - b * c + d, slip: (a - b) * c + d }; },
-  r => { const a = ri(r, 1, 50), b = ri(r, 2, 12), d = ri(r, 1, 20), c = d + ri(r, 1, 12); return { text: `${a} + ${b} × (${c} − ${d})`, ans: a + b * (c - d), slip: a + b * c - d }; },
-  r => { const a = ri(r, 1, 30), b = ri(r, 1, 30), c = ri(r, 2, 12), d = ri(r, 1, 50); return { text: `(${a} + ${b}) × ${c} − ${d}`, ans: (a + b) * c - d, slip: a + b * c - d }; },
+  r => { const a = ri(r, 1, 50), b = ri(r, 2, 12), c = ri(r, 2, 12), d = ri(r, 1, a + b * c); return { text: `${a} + ${b} × ${c} − ${d}`, ans: a + b * c - d, slip: (a + b) * c - d, why: w(`${b} × ${c} = ${b * c}`, `${a} + ${b * c} − ${d} = ${a + b * c - d}`) }; },
+  r => { const b = ri(r, 2, 12), c = ri(r, 2, 12), a = ri(r, b * c, 60 + b * c), d = ri(r, 1, 50); return { text: `${a} − ${b} × ${c} + ${d}`, ans: a - b * c + d, slip: (a - b) * c + d, why: w(`${b} × ${c} = ${b * c}`, `${a} − ${b * c} + ${d} = ${a - b * c + d}`) }; },
+  r => { const a = ri(r, 1, 50), b = ri(r, 2, 12), d = ri(r, 1, 20), c = d + ri(r, 1, 12); return { text: `${a} + ${b} × (${c} − ${d})`, ans: a + b * (c - d), slip: a + b * c - d, why: w(`${b} × (${c} − ${d}) = ${b * (c - d)}`, `${a} + ${b * (c - d)} = ${a + b * (c - d)}`) }; },
+  r => { const a = ri(r, 1, 30), b = ri(r, 1, 30), c = ri(r, 2, 12), d = ri(r, 1, 50); return { text: `(${a} + ${b}) × ${c} − ${d}`, ans: (a + b) * c - d, slip: a + b * c - d, why: w(`(${a} + ${b}) × ${c} = ${(a + b) * c}`, `${(a + b) * c} − ${d} = ${(a + b) * c - d}`) }; },
 ];
 
 /** Three distinct decoys: the slip first, then a last-digit twin and a leading-digit twin of the answer, then neighbours. */
@@ -56,7 +58,7 @@ function make(forms: ((r: Rng) => Card)[], rng: Rng): Question {
     const card = pick(rng, forms)(rng);
     if (!Number.isInteger(card.slip) || card.slip < 0 || card.ans < 0 || card.ans > 1000 || card.slip === card.ans) continue;
     const prompt = `${card.text} = ?`;
-    return wordQ(rng, prompt, f(card.ans), decoys(card, rng).map(f), { say: say(prompt) });
+    return wordQ(rng, prompt, f(card.ans), decoys(card, rng).map(f), { say: say(prompt), why: card.why });
   }
   throw new Error('y6-order-ops: no card drawn');
 }
