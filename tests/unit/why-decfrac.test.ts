@@ -36,14 +36,34 @@ describe('y5-decfrac whys (#2317)', () => {
     }
     expect(seen).toBeGreaterThan(100);
   });
-  it('the simplest-form cards divide top and bottom by the same number', () => {
+  it('a decimal to a fraction in simplest form divides top and bottom by their common factor', () => {
+    const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
     let seen = 0;
     for (const q of all) {
       const w = /^(\S+) = (\d+)\/(\d+); divide both by (\d+): (\d+)\/(\d+)$/.exec(q.why!);
       if (!w) continue;
       seen++;
+      const dp = (w[1].split('.')[1] ?? '').length;
+      expect(w[2], q.why).toBe(String(Math.round(Number(w[1]) * 10 ** dp)));
+      expect(w[3], q.why).toBe(String(10 ** dp));
       expect(Number(w[2]) / Number(w[4])).toBe(Number(w[5]));
       expect(Number(w[3]) / Number(w[4])).toBe(Number(w[6]));
+      expect(gcd(Number(w[5]), Number(w[6])), q.why).toBe(1);
+    }
+    expect(seen).toBeGreaterThan(10);
+  });
+  it('a simplest-form fraction to a decimal shows the raw fraction it reduces from', () => {
+    const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+    let seen = 0;
+    for (const q of all) {
+      const w = /^(\d+)\/(\d+) = (\d+)\/(\d+), which is (\S+)$/.exec(q.why!);
+      if (!w) continue;
+      seen++;
+      const dp = (w[5].split('.')[1] ?? '').length;
+      expect(w[4], q.why).toBe(String(10 ** dp));
+      expect(w[3], q.why).toBe(String(Math.round(Number(w[5]) * 10 ** dp)));
+      expect(Number(w[1]) * Number(w[4]), q.why).toBe(Number(w[3]) * Number(w[2]));
+      expect(gcd(Number(w[1]), Number(w[2])), q.why).toBe(1);
     }
     expect(seen).toBeGreaterThan(10);
   });
