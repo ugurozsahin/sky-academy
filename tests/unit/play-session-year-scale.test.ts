@@ -5,9 +5,8 @@ import { AVATARS } from '../../src/avatars';
 import { topicById, YEARS, type Question, type Rng } from '../../src/curriculum';
 import { say, resetVoiceProbe } from '../../src/audio';
 import type { WaveOpts } from '../../src/game/arena';
-import type { Mode } from '../../src/game/modes';
 import { reset, save } from '../../src/storage';
-import { createPlaySession, NO_VOICE_PEEK_MS, waveOptsFor, type PlaySessionDeps, type PlaySessionEls } from '../../src/ui/play-session';
+import { createPlaySession, NO_VOICE_PEEK_MS, type PlaySessionDeps, type PlaySessionEls } from '../../src/ui/play-session';
 import type { SessionOpts } from '../../src/game/session';
 
 const mem: Record<string, string> = {};
@@ -49,7 +48,6 @@ const sentenceQ = (): Question => ({
   options: [...SENTENCE.split(' '), 'dog', 'hat'], wide: true, visual: { type: 'word', text: '🐱' },
   hint: 'Listen, then slice the words in order', hintIsData: false, listen: SENTENCE, peek: true,
 });
-const soundHuntQ = (): Question => ({ prompt: '🔊 Listen!', say: 'Listen: sun, sock, sad', answer: 's', options: ['s', 'a', 't', 'p'], listen: 'sun · sock · sad' });
 
 function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}, sessionOver: Partial<SessionOpts> = {}) {
   const els = { score: fakeEl(), stage: fakeEl(), prompt: fakeEl(), vis: fakeEl(), hint: fakeEl(), qcard: fakeEl(), speak: fakeEl() };
