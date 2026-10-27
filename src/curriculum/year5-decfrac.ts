@@ -50,15 +50,24 @@ const SIMPLE: Item[] = [
 
 const HINT_FD = 'Count the digits after the point: tenths, then hundredths';
 
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+
+/** The working a wrong slice is shown (#2317), ≤ 14 words: the places after the point, or the step to the simplest form. */
+function whyOf(it: Item, decimal: string, toFrac: boolean): string {
+  const bottom = 10 ** it.v.dp, raw = `${it.v.v}/${bottom}`, unit = it.v.dp === 1 ? 'tenths' : 'hundredths';
+  if (raw !== it.frac) return toFrac ? `${decimal} = ${raw}; divide both by ${gcd(it.v.v, bottom)}: ${it.frac}` : `${it.frac} = ${raw}, which is ${decimal}`;
+  return toFrac ? `${decimal} has ${it.v.dp} place${it.v.dp === 1 ? '' : 's'} after the point: ${it.frac}` : `${it.frac} is ${it.v.v} ${unit}: ${decimal}`;
+}
+
 function card(rng: Rng, it: Item): Question {
   const decimal = fmt(it.v);
   if (rng() < 0.5) {
     return wordQ(rng, `${decimal} = ? Give it as a fraction.`, it.frac, three(it.v, it.frac, it.asFrac, ['1/10', '9/10', '1/100', '3/100']),
-      { say: `${ks2Say(decimal)} equals what fraction?`, hint: HINT_FD, hintIsData: false });
+      { say: `${ks2Say(decimal)} equals what fraction?`, hint: HINT_FD, hintIsData: false, why: whyOf(it, decimal, true) });
   }
   const decoys = noLeak(it.v, decimal, three(it.v, decimal, it.asDec, ['0.1', '0.01', '0.9', '0.99']));
   return wordQ(rng, `${it.frac} = ? Give it as a decimal.`, decimal, decoys,
-    { say: `${ks2Say(it.frac)} equals what decimal?`, hint: HINT_FD, hintIsData: false });
+    { say: `${ks2Say(it.frac)} equals what decimal?`, hint: HINT_FD, hintIsData: false, why: whyOf(it, decimal, false) });
 }
 
 export const y5DecFrac: Generator = (level: Difficulty, rng) => {
