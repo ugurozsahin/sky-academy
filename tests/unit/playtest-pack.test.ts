@@ -161,11 +161,29 @@ describe('a sequence label\'s reach over its relaunches, on a stub arena (#2251)
     expect(lr.frames.clean).toBe(true);
   });
 
-  it('is many times the first flight\'s aboveCardMs, which is why a sequence game does not use that', () => {
+  it('is many times the first flight\'s aboveCardMs, which is why a sequence game does not use that (#2257)', () => {
     const rc = flySeq([{ id: 1, label: 'the', launch: 0, vy, g }], { need: ['the'], until: 40000 });
-    const first = flightMetrics(rc.samples.map(([t, id, label, y]): Sample => [t, id, label, y, R, 0]), { H, cardBottom: 0 });
+    const first = flightMetrics(rc.samples.filter(s => s[4] === 0).map(([t, id, label, y]): Sample => [t, id, label, y, R, 0]), { H, cardBottom: 0 });
     expect(labelReach(rc, opts).labelReachMs!.min).toBeGreaterThan(MAX_RELAUNCHES * flight);
     expect(first.bubbles[0].reachMs).toBeGreaterThan(0);
+    expect(labelReach(rc, opts).labelReachMs!.min).toBeGreaterThan(MAX_RELAUNCHES * first.bubbles[0].reachMs!);
+  });
+
+  it('does not count a frame interval that spans a relaunch as reach (#2257)', () => {
+    const rc: ReachRecording = { ids: { 1: 'a' }, frames: [0, 90], ends: { 1: { t: 400, hit: true, dead: false, launched: true, relaunches: 1 } },
+      samples: [[0, 1, 'a', 400, 0], [90, 1, 'a', 500, 0], [490, 1, 'a', 400, 1]] };   // one 90 ms frame carried it past the floor; the next sample is the next flight's
+    const first = labelReach(rc, opts).labelReach.labels[0];
+    expect(first.reachMs, 'the first interval (90 ms) counts; the one into the next flight does not').toBe(90);
+  });
+
+  it('rebuilds the injected recorder from its source alone and records the same (#2257)', () => {
+    const alone = new Function(`return ${reachStep}`)() as typeof reachStep;
+    const a = newReach(), b = newReach();
+    const bs: ReachBubble[] = [{ id: 1, label: 'the', y: 400, launched: true, hit: false, dead: false, relaunches: 0 }];
+    reachStep(a, 16, bs, false, ['the']);
+    alone(b, 16, bs, false, ['the']);
+    expect(b).toEqual(a);
+    expect(b.samples).toHaveLength(1);
   });
 
   it('a label sliced on its second flight counts as reachable up to the slice', () => {
@@ -232,7 +250,7 @@ describe('a sequence label\'s reach over its relaunches, on a stub arena (#2251)
   it('gives the median of an even count as the middle two\'s mean', () => {
     const rc: ReachRecording = { ids: { 1: 'a', 2: 'b', 3: 'c', 4: 'd' }, samples: [], frames: [0, 16],
       ends: Object.fromEntries([1, 2, 3, 4].map(id => [id, { t: 0, hit: false, dead: true, launched: true, relaunches: MAX_RELAUNCHES }])) };
-    for (const [id, ms] of [[1, 1000], [2, 2000], [3, 3000], [4, 9000]]) rc.samples.push([0, id, 'x', 400, 0], [ms, id, 'x', 900, MAX_RELAUNCHES]);
+    for (const [id, ms] of [[1, 1000], [2, 2000], [3, 3000], [4, 9000]]) rc.samples.push([0, id, 'x', 400, MAX_RELAUNCHES], [ms, id, 'x', 900, MAX_RELAUNCHES]);
     expect(labelReach(rc, opts).labelReachMs).toEqual({ min: 1000, median: 2500, max: 9000 });
   });
 
@@ -417,6 +435,7 @@ describe('a pack carries every key its readers cite (#2205, #2214)', () => {
     expect(m, 'a game that is not a sequence has no label reach').not.toHaveProperty('labelReachMs');
     const build = (r: Recorded) => () => buildMetrics({ job: { year: 'year2', game: 'y2-sentence', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: r, shots: [], maxRelaunches: MAX_RELAUNCHES });
     const cut = flySeq([{ id: 1, label: 'the', launch: 100, vy: -600, g: 250 }], { need: ['the'], until: 30000, freezeAt: 3000 });
+    expect(() => buildMetrics({ job: { year: 'year2', game: 'y2-sentence', catalogue: true }, input: 'bubbles', settings, view, seed: 1, rec: { ...seqRec, screen: { ...seqRec.screen, card: null } }, shots: [], maxRelaunches: MAX_RELAUNCHES }), 'a sequence screen with no card fails (#2257)').toThrow(/no question card/);
     expect(build({ ...seqRec, reach: null }), 'a sequence pack with no recording fails').toThrow(/labelReachMs would be empty/);
     expect(build({ ...seqRec, reach: cut }), 'and so does one where every label was cut short').toThrow(/labelReachMs would be empty/);
     expect(Object.keys(ABOUT)).toEqual(expect.arrayContaining(['labelReachMs', 'labelReach']));
