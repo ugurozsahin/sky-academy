@@ -158,6 +158,32 @@ describe('a hidden maths game and a hidden writing game leave every list and poo
   }));
 });
 
+describe('Legend and "Next topic" read shown games only (#2240)', () => {
+  const crown = (st: typeof import('../../src/storage'), only: string[]) => { st.reset(); for (const id of only) st.recordTopic(id, 3, 5); };
+  it('Legend run needs a 3★ topic that is shown: stars only on hidden games draw no row', () => withCatalogue(TEST_CAT, async () => {
+    const { islandMenu: im } = await import('../../src/ui/home');
+    const st = await import('../../src/storage');
+    const rows = () => ids(im({} as never, YEARS.find(y => y.id === 'year4')!, st.load(), st.load().progress, () => 'maths'));
+    crown(st, HIDDEN);
+    expect(rows().filter(id => id.startsWith('legend')), 'only hidden games are 3★').toEqual([]);
+    const shown = ids(before.topicsFor('year4').filter(t => !HIDDEN.includes(t.id) && t.subject === 'maths' && answerableBy(t, 'mixed')))[0];
+    crown(st, [...HIDDEN, shown]);
+    expect(rows().filter(id => id.startsWith('legend')), 'a shown 3★ topic brings it back').not.toEqual([]);
+  }));
+  it('"Next topic" never offers a hidden game', () => withCatalogue(TEST_CAT, async () => {
+    const { nextUnstarredTopic } = await import('../../src/ui/play-results');
+    const cur = await import('../../src/curriculum');
+    const st = await import('../../src/storage');
+    st.reset();
+    const y4 = cur.YEARS.find(y => y.id === 'year4')!;
+    const list = cur.topicsFor('year4', 'maths');
+    for (const t of list.slice(1)) st.recordTopic(t.id, 1, 5);
+    expect(nextUnstarredTopic(y4, list[1]), 'wraps round to the one unstarred shown topic').toBe(list[0]);
+    for (const t of list) st.recordTopic(t.id, 1, 5);
+    expect(nextUnstarredTopic(y4, list[0]), 'hidden games are unstarred, yet are never the answer').toBeNull();
+  }));
+});
+
 describe('a pool the catalogue empties hides its entry point (#2196)', () => {
   it('an island left with only tracing and story games offers no mixed mode and no Duel, and still shows', () => {
     const mixable = before.topicsFor('reception').filter(t => answerableBy(t, 'mixed')).map(t => t.id);
