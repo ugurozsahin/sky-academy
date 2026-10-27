@@ -38,7 +38,7 @@ describe('the generic topic suite covers every topic exactly once (#1467)', () =
 // in neither direction: it can neither go stale nor be missing, and reads as protection it does not give.
 describe('NO_REPEATED_SET holds only cells the bookkeeping checks (#1467)', () => {
   it('every entry names a difficulty of an EYFS/KS1 topic', () => {
-    const ids = new Set(TOPICS.filter(t => !isKs2(t.year)).map(t => t.id.replace(/^y2-tables-\d+/, 'y2-tables')));
+    const ids = new Set(TOPICS.filter(t => !isKs2(t.year)).flatMap(t => [t.id, t.id.replace(/^y2-tables-\d+/, 'y2-tables')]));
     const bad = [...NO_REPEATED_SET].filter(cell => {
       const m = /^(.+) d([123])$/.exec(cell);
       return !m || !ids.has(m[1]);
