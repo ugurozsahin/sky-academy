@@ -143,7 +143,7 @@ export function promptStep(rows, asked, st, q) {
  * card draws only the slots, or with no voice the answer's letters, never the line, so its words are never read.
  * Fewer than two questions read is no comparison, so the pack fails rather than write a value nobody observed.
  */
-export function promptKeys(rows, { voiced = true } = {}) {
+export function promptKeys(rows, { voiced }) {
   const stage = rows[0]?.[1];
   const own = rows.filter(r => r[1] === stage);
   const waves = new Set(own.map(r => r[0])).size;
@@ -285,11 +285,13 @@ export const ABOUT = {
  */
 export function buildMetrics({ job, input, settings, view, seed, rec: p, shots, maxRelaunches }) {
   const { screen } = p;
+  if (!Array.isArray(p.lines)) throw new Error('lines missing: the page recorder was not read');
+  const lines = p.lines;
   return {
     ...p.extra,                                       // first, so a play flow's own key can never overwrite a measured one
     year: job.year, game: job.game, catalogue: job.catalogue, viewport: `${view.width}x${view.height}`, seed,
     input, mode: screen.mode, hasLives: screen.hasLives, settings,
-    prompt: screen.prompt, promptWords: countWords(screen.prompt), ...promptKeys(p.lines ?? [], { voiced: !!p.speech && p.speech.start !== null }), hint: screen.hint, hintWords: countWords(screen.hint),
+    prompt: screen.prompt, promptWords: countWords(screen.prompt), ...promptKeys(lines, { voiced: p.speech?.start != null }), hint: screen.hint, hintWords: countWords(screen.hint),
     ...speechKeys(p.speech, screen.speakVisible, p.promptAt, p.collectedAt), speechVoices: p.voices ?? null,
     ...(input === 'bubbles' ? flightKeys(p, p.speech) : {}),
     ...(input === 'bubbles' ? reachKeys(p, maxRelaunches) : {}),

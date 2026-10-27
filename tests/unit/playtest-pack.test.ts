@@ -313,10 +313,15 @@ describe('whether the question line is fixed over the stage, on a stub session (
     return rows;
   };
   const order = 'Smallest to biggest!';
+  const voicedKeys = (rows: PromptRow[]) => promptKeys(rows, { voiced: true });
 
   it('keeps one row per question, not per frame, and skips the frames with no line', () => {
     const rows = record([[0, 1, undefined], [1, 1, order], [1, 1, order], [1, 1, order], [2, 1, order], [2, 1, order], [2, 1, undefined], [3, 1, order]]);
     expect(rows).toEqual([[1, 1, order, false, true], [2, 1, order, false, true], [3, 1, order, false, true]]);
+  });
+
+  it('ignores a frame the session has not asked a question for, even with a line on it', () => {
+    expect(record([[0, 1, order], [1, 1, order]])).toEqual([[1, 1, order, false, true]]);
   });
 
   it('runs as the page runs it: from its own source text, with no module scope to lean on', () => {
@@ -327,33 +332,33 @@ describe('whether the question line is fixed over the stage, on a stub session (
 
   it('a sequence game whose line is the same every question is fixed, read from the game\'s state though its card never shows it', () => {
     const seq = { sequence: ['1', '5', '6'] };
-    expect(promptKeys(record([[1, 1, order, undefined, seq], [2, 1, order, undefined, seq], [3, 1, order, undefined, seq], [4, 1, order, undefined, seq]])))
+    expect(voicedKeys(record([[1, 1, order, undefined, seq], [2, 1, order, undefined, seq], [3, 1, order, undefined, seq], [4, 1, order, undefined, seq]])))
       .toEqual({ promptFixed: true, promptWaves: 4, promptShown: false });
   });
 
   it('a line that differs on any question of the stage is not fixed', () => {
-    expect(promptKeys(record([[1, 1, '6 + 1 = ?'], [2, 1, '8 + 0 = ?'], [3, 1, '2 + 5 = ?']]))).toEqual({ promptFixed: false, promptWaves: 3, promptShown: true });
-    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 1, 'Biggest to smallest!']])).promptFixed, 'even only the last').toBe(false);
+    expect(voicedKeys(record([[1, 1, '6 + 1 = ?'], [2, 1, '8 + 0 = ?'], [3, 1, '2 + 5 = ?']]))).toEqual({ promptFixed: false, promptWaves: 3, promptShown: true });
+    expect(voicedKeys(record([[1, 1, order], [2, 1, order], [3, 1, 'Biggest to smallest!']])).promptFixed, 'even only the last').toBe(false);
   });
 
   it('a line that changes within one question is not fixed either', () => {
-    expect(promptKeys(record([[1, 1, order], [1, 1, 'Now the next one'], [2, 1, order]]))).toEqual({ promptFixed: false, promptWaves: 2, promptShown: true });
+    expect(voicedKeys(record([[1, 1, order], [1, 1, 'Now the next one'], [2, 1, order]]))).toEqual({ promptFixed: false, promptWaves: 2, promptShown: true });
   });
 
   it('a fixed line is not vouched for when the voice never started and a question had a listen line, which a voiceless card shows', () => {
     const listened = record([[1, 1, 'Find the word you hear', 'cat'], [2, 1, 'Find the word you hear', 'dog']]);
-    expect(promptKeys(listened).promptFixed, 'voiced: the card showed the prompt').toBe(true);
+    expect(voicedKeys(listened).promptFixed, 'voiced: the card showed the prompt').toBe(true);
     expect(promptKeys(listened, { voiced: false }).promptFixed, 'voiceless: it showed cat, then dog').toBe(false);
     expect(promptKeys(record([[1, 1, order], [2, 1, order]]), { voiced: false }).promptFixed, 'no listen line: the prompt is what showed').toBe(true);
   });
 
   it('compares the stage the pack played only, not a stage the result moved on to', () => {
-    expect(promptKeys(record([[1, 1, order], [2, 1, order], [3, 2, 'Biggest to smallest!']]))).toEqual({ promptFixed: true, promptWaves: 2, promptShown: true });
+    expect(voicedKeys(record([[1, 1, order], [2, 1, order], [3, 2, 'Biggest to smallest!']]))).toEqual({ promptFixed: true, promptWaves: 2, promptShown: true });
   });
 
   it('fails a pack that read fewer than two questions, rather than write a value nobody compared', () => {
-    expect(() => promptKeys(record([[1, 1, order], [1, 1, order]]))).toThrow(/two questions in one stage; 1 read/);
-    expect(() => promptKeys([])).toThrow(/0 read/);
+    expect(() => voicedKeys(record([[1, 1, order], [1, 1, order]]))).toThrow(/two questions in one stage; 1 read/);
+    expect(() => voicedKeys([])).toThrow(/0 read/);
   });
 
   it('is written into every pack, bubbles or not, from the rows the page recorded', () => {
@@ -374,7 +379,10 @@ describe('whether the question line is fixed over the stage, on a stub session (
     expect(pack).toContain('window.__promptStep = ${promptStep};');
     expect(pack, 'the whole question, so the recorder sees its listen line and whether its card shows the line (#2265)').toContain('window.__promptStep(pk.lines, s.session.questionsAsked, st, s.session.current);');
     expect(pack, 'the rows start empty').toContain('prompts: [], lines: [],');
-    expect(pack.indexOf('played.lines = await page.evaluate(() => window.__pk.lines);'), 'read once play() has reached the result').toBeGreaterThan(pack.indexOf('const played = await play('));
+    const playAt = pack.indexOf('const played = await play('), readAt = pack.indexOf('played.lines = await page.evaluate(() => window.__pk.lines);');
+    expect(playAt, 'play() is called').toBeGreaterThanOrEqual(0);
+    expect(readAt, 'the rows are read').toBeGreaterThanOrEqual(0);
+    expect(readAt, 'read once play() has reached the result').toBeGreaterThan(playAt);
   });
 });
 
