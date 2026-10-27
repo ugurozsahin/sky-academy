@@ -29,7 +29,7 @@ function line(rng: Rng): Question {
   const step = pick(rng, [1, 2, 5]), count = pick(rng, [5, 6]), k = ri(rng, 1, count - 2), from = -k * step;
   const ticks = Array.from({ length: count }, (_, i) => from + i * step), at = ticks[ri(rng, 1, count - 2)];
   const visual = { type: 'numberline' as const, from, to: ticks[count - 1], step, labels: ticks.map(f), marks: [{ label: 'A', at }] };
-  return finish(rng, 'What number is at A?', at, [-at, at + step, at - step], { visual, say: 'What number is at A?' });
+  return finish(rng, 'What number is at A?', at, [-at, at + step, at - step], { visual, say: 'What number is at A?', why: `The marks go up in ${step}s, so A is ${f(at)}` });
 }
 
 /** Count back from a start, or on from a negative start, so the move crosses zero. */
@@ -37,11 +37,11 @@ function count(rng: Rng): Question {
   if (rng() < 0.5) {
     const start = ri(rng, 1, 9), n = start + ri(rng, 1, 8), answer = start - n;
     return finish(rng, `Start at ${start} and count back ${n}. Where do you land?`, answer, [-answer, answer - 1, start + n],
-      { say: `Start at ${start} and count back ${n}. Where do you land?` });
+      { say: `Start at ${start} and count back ${n}. Where do you land?`, why: `${start} steps to 0, then ${n - start} more is ${f(answer)}` });
   }
   const start = -ri(rng, 1, 9), n = -start + ri(rng, 1, 8), answer = start + n;
   return finish(rng, `Start at ${f(start)} and count on ${n}. Where do you land?`, answer, [-answer, answer + 1, start - n],
-    { say: `Start at ${word(start)} and count on ${n}. Where do you land?` });
+    { say: `Start at ${word(start)} and count on ${n}. Where do you land?`, why: `${-start} steps to 0, then ${n + start} more is ${f(answer)}` });
 }
 
 function change(rng: Rng): Question {
@@ -52,13 +52,14 @@ function change(rng: Rng): Question {
   const named = [-answer, warmer ? start - by : start + by, crosses ? answer + dir : answer - dir, Math.abs(by) - Math.abs(start)];
   const way = warmer ? 'warmer' : 'colder';
   return finish(rng, `It is ${f(start)} °C. It gets ${by} degrees ${way}. What is the temperature now?`, answer, named,
-    { say: `It is ${word(start)} degrees. It gets ${by} degrees ${way}. What is the temperature now?` });
+    { say: `It is ${word(start)} degrees. It gets ${by} degrees ${way}. What is the temperature now?`,
+      why: warmer ? `Warmer is up: ${f(start)} + ${by} = ${f(answer)}` : `Colder is down: ${f(start)} − ${by} = ${f(answer)}` });
 }
 
 function gap(rng: Rng): Question {
   const high = ri(rng, 1, 15), low = -ri(rng, 1, 15), answer = high - low;
   return finish(rng, `How many degrees warmer is ${high} °C than ${f(low)} °C?`, answer, [high - Math.abs(low), -answer, answer + 1, answer - 1],
-    { say: `How many degrees warmer is ${high} degrees than ${word(low)} degrees?` });
+    { say: `How many degrees warmer is ${high} degrees than ${word(low)} degrees?`, why: `${-low} up to 0, then ${high} more: ${-low} + ${high} = ${answer}` });
 }
 
 /** Three terms counted down (or up) in one step, the next term on the other side of zero. */
@@ -67,14 +68,14 @@ function sequence(rng: Rng): Question {
   if (down ? answer + 3 * step <= 0 : answer - 3 * step >= 0) return sequence(rng);
   const dir = down ? 1 : -1, shown = [3, 2, 1].map(k => answer + dir * k * step);
   return finish(rng, `${shown.map(f).join(', ')}, … what comes next?`, answer, [-answer, answer - dir, answer + 2 * dir * step, answer + dir],
-    { say: `${shown.map(word).join(', ')}, … what comes next?` });
+    { say: `${shown.map(word).join(', ')}, … what comes next?`, why: `Each step goes ${down ? 'down' : 'up'} ${step}: ${f(shown[2])} ${down ? '−' : '+'} ${step} = ${f(answer)}` });
 }
 
 function coldest(rng: Rng): Question {
   const vals = new Set<number>();
   while (vals.size < 4) vals.add(vals.size < 2 ? -ri(rng, 1, 19) : ri(rng, -19, 19));
   const all = [...vals], answer = Math.min(...all);
-  return wordQ(rng, 'Which temperature is the coldest?', f(answer), all.filter(v => v !== answer).map(f), { say: 'Which temperature is the coldest? Minus numbers are below zero.' });
+  return wordQ(rng, 'Which temperature is the coldest?', f(answer), all.filter(v => v !== answer).map(f), { say: 'Which temperature is the coldest? Minus numbers are below zero.', why: `${f(answer)} is furthest below zero, so it is coldest` });
 }
 
 export const y5Negative: Generator = (d: Difficulty, rng): Question => {
