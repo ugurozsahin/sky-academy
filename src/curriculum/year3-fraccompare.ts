@@ -11,8 +11,11 @@ const SIGN = ['>', '=', '<'] as const;   // compare() is −1, 0, 1 when the lef
 const EQUAL: [Frac, Frac][] = [[{ n: 1, d: 2 }, { n: 2, d: 4 }], [{ n: 1, d: 3 }, { n: 2, d: 6 }], [{ n: 1, d: 2 }, { n: 3, d: 6 }], [{ n: 1, d: 4 }, { n: 2, d: 8 }], [{ n: 1, d: 5 }, { n: 2, d: 10 }]];
 
 function sign(a: Frac, b: Frac, rng: Rng): Question {
-  const ans = SIGN[1 - compare(a, b)];
-  return { prompt: `${lab(a)} ? ${lab(b)}`, say: `${cap(ks2Say(lab(a)))} compared with ${ks2Say(lab(b))}. Less than, greater than, or equal?`,
+  const c = compare(a, b), ans = SIGN[1 - c], rel = c < 0 ? 'less than' : 'more than';
+  const why = c === 0 ? `${lab(a)} and ${lab(b)} are the same amount`
+    : a.d === b.d ? `Same bottom, so compare the tops: ${a.n} is ${rel} ${b.n}`
+    : `Bigger bottom means smaller pieces, so ${lab(a)} is ${rel} ${lab(b)}`;
+  return { why, prompt: `${lab(a)} ? ${lab(b)}`, say: `${cap(ks2Say(lab(a)))} compared with ${ks2Say(lab(b))}. Less than, greater than, or equal?`,
     answer: ans, options: shuffle(rng, ['<', '>', '=']), hint: 'Slice the right sign', hintIsData: false };
 }
 
@@ -23,7 +26,9 @@ function order(rng: Rng): Question {
   if (rng() < 0.5) { const bottoms = shuffle(rng, [2, 3, 4, 5, 6, 8, 9]).slice(0, 3); for (const d of bottoms) set.push({ n: 1, d }); }
   else { const d = ri(rng, 4, 9), tops = shuffle(rng, Array.from({ length: d - 1 }, (_, i) => i + 1)).slice(0, 3); for (const n of tops) set.push({ n, d }); }
   const sorted = set.slice().sort(compare).map(lab), shown = shuffle(rng, sorted);
-  return { prompt: 'Smallest to biggest!', say: `Slice the fractions from smallest to biggest: ${shown.map(s => ks2Say(s)).join(', ')}`,
+  const why = set.every(f => f.d === set[0].d) ? `Same bottom, so order the tops: ${sorted.map(l => l.split('/')[0]).join(', ')}`
+    : `Bigger bottom means smaller pieces: ${sorted.join(', ')}`;
+  return { why, prompt: 'Smallest to biggest!', say: `Slice the fractions from smallest to biggest: ${shown.map(s => ks2Say(s)).join(', ')}`,
     answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest fraction first', hintIsData: false };
 }
 
