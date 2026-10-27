@@ -80,11 +80,39 @@ describe('GitHub Pages deployment (#1933)', () => {
  * JSON-LD (`sameAs`, `installUrl`) fails this rail too, deliberately: it needs its own allow-list entry (#2113).
  */
 const SITE_ORIGINS = ['https://sharpwise.co.uk'];
-const STORE_LINK = /(<a\b[^>]*?\shref=)(["'])https:\/\/(?:play\.google\.com|apps\.apple\.com)\/[^"'<>\s]*\2/gi;
+const STORE_HREF = /^https:\/\/(?:play\.google\.com|apps\.apple\.com)\/[^"'<>\s]*$/i;
 /** #2132: plain outbound links to two official sites (owner, 2026-10-21): an exact, explicit list of hosts, as the `href`
- *  of an `<a>` that also carries `rel="noopener"`, never a source, `srcset`, `<link>`, CSS or JSON-LD. A new host is a new owner decision. */
+ *  of an `<a>` whose first `rel` is `noopener`, never a source, `srcset`, `<link>`, CSS or JSON-LD. A new host is a new owner decision. */
 const OFFICIAL_HOSTS = ['ico.org.uk', 'www.gov.uk'];
-const OFFICIAL_LINK = new RegExp(`<a\\b(?=[^>]*\\srel=(["'])noopener\\1)([^>]*?\\shref=)(["'])https://(?:${OFFICIAL_HOSTS.map(h => h.replace(/\./g, '\\.')).join('|')})/[^"'<>\\s]*\\3`, 'gi');
+const OFFICIAL_HREF = new RegExp(`^https://(?:${OFFICIAL_HOSTS.map(h => h.replace(/\./g, '\\.')).join('|')})/[^"'<>\\s]*$`, 'i');
+/** #2241: a real tag, found by walking quoted values whole, so an `<a` written inside another tag's attribute is never a tag of its own. */
+const TAG = /<([a-z][a-z0-9-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/gi;
+const ATTR = /([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+/** The first `href` (value span, quoted only) and the first `rel` value of a tag's attributes: browsers keep the first of a repeated attribute. */
+function firstAttrs(attrs: string): { href?: { start: number; end: number; value: string }; rel?: string } {
+  const out: { href?: { start: number; end: number; value: string }; rel?: string } = {};
+  const seen = new Set<string>();
+  for (const m of attrs.matchAll(ATTR)) {
+    const key = m[1].toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const quoted = m[2] ?? m[3];
+    if (key === 'rel') out.rel = quoted ?? m[4] ?? '';
+    if (key === 'href' && quoted !== undefined) {
+      const start = m.index + m[0].length - 1 - quoted.length;
+      out.href = { start, end: start + quoted.length, value: quoted };
+    }
+  }
+  return out;
+}
+/** Blank the allowed link's href value: only an `<a>`'s first `href` counts and, for the official hosts, only when its first `rel` is `noopener`. */
+function blankAllowedHref(name: string, attrs: string): string {
+  if (name.toLowerCase() !== 'a') return attrs;
+  const { href, rel } = firstAttrs(attrs);
+  if (!href) return attrs;
+  const allowed = STORE_HREF.test(href.value) || (rel === 'noopener' && OFFICIAL_HREF.test(href.value));
+  return allowed ? attrs.slice(0, href.start) + attrs.slice(href.end) : attrs;
+}
 const NAV_SCRIPT = '<script src="/nav.js" defer></script>';
 function offSite(html: string): string[] {
   const bad: string[] = [];
@@ -94,7 +122,7 @@ function offSite(html: string): string[] {
   }
   for (const [tag] of html.matchAll(/<[a-z][^>]*>/gi)) for (const [h] of tag.matchAll(/(?<=\s)on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi)) bad.push(h);   // an inline handler is script by another name (#2105)
   for (const [j] of html.matchAll(/javascript:[^"'\s>]*/gi)) bad.push(j);
-  const urls = html.replace(STORE_LINK, '$1$2$2').replace(OFFICIAL_LINK, '<a$2$3$3').replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
+  const urls = html.replace(TAG, (_t, name, attrs) => `<${name}${blankAllowedHref(name, attrs)}>`).replace(/"@context":\s*"https:\/\/schema\.org"/g, '').matchAll(/(?:\bhttps?:)?\/\/[^\s"'<>)]+/gi);
   for (const [u] of urls) if (!SITE_ORIGINS.some(o => u === o || u.startsWith(`${o}/`))) bad.push(u);
   return bad;
 }
@@ -152,10 +180,16 @@ describe('website/ loads nothing from another origin and runs no script but /nav
     expect(offSite('<a rel="noopener" href="https://gov.uk.evil.com/">x</a><a rel="noopener" href="https://sub.ico.org.uk/">y</a>'))
       .toEqual(['https://gov.uk.evil.com/', 'https://sub.ico.org.uk/']);
     const fails = (href: string) => expect(offSite(`<a rel="noopener" href="${href}">x</a>`), href).toEqual([href]);
-    for (const h of ['https://www.gov.uk.evil.com/', 'https://ico.org.uk.evil.com/', 'https://ico.org.uk@evil.com/', 'https://ico.org.uk:444/', 'https://www.gov.uk:444/x']) fails(h);
+    for (const h of ['https://wwwxgov.uk/', 'https://icoxorg.uk/', 'https://www.gov.uk.evil.com/', 'https://ico.org.uk.evil.com/', 'https://ico.org.uk@evil.com/', 'https://ico.org.uk:444/', 'https://www.gov.uk:444/x']) fails(h);
     expect(offSite('<link rel="noopener" href="https://www.gov.uk/x">')).toEqual(['https://www.gov.uk/x']);
     expect(offSite('<a rel="noopener" ping="https://www.gov.uk/p" href="https://www.gov.uk/x">x</a>')).toEqual(['https://www.gov.uk/p']);
     expect(offSite('<a rel="noopener" href="https://ico.org.uk/x" ping="https://ico.org.uk/p">x</a>')).toEqual(['https://ico.org.uk/p']);
+    // #2241: an `<a` inside another tag's attribute value is not a tag, and only an `<a>`'s first `rel` counts
+    expect(offSite('<a rel="noopener" href="https://evil.com/x">')).toEqual(['https://evil.com/x']);
+    expect(offSite('<link rel="stylesheet" title=\'<a rel="noopener"\' href="https://ico.org.uk/x.css">')).toEqual(['https://ico.org.uk/x.css']);
+    expect(offSite('<link rel="stylesheet" title="<a" href="https://apps.apple.com/x.css">')).toEqual(['https://apps.apple.com/x.css']);
+    expect(offSite('<a rel="nofollow" rel="noopener" href="https://ico.org.uk/x">')).toEqual(['https://ico.org.uk/x']);
+    expect(offSite('<a href="/ok/" href="https://apps.apple.com/x">')).toEqual(['https://apps.apple.com/x']);
     // the allowed path stops at a quote, an angle bracket or a space, so an HTML comment cannot hide a source inside it
     expect(offSite('<!-- <a rel="noopener" href="https://www.gov.uk/x --> <img src=https://evil.com/p.png> <!-- ">'))
       .toEqual(['https://www.gov.uk/x', 'https://evil.com/p.png']);
