@@ -35,9 +35,17 @@ function slips(f: Frac, k: number): Frac[] {
   ];
 }
 
+/** The working a wrong slice is shown (#2317), ≤ 14 words: divide the top when the divisor goes into it, else multiply the bottom (then reduce). */
+function why(f: Frac, k: number): string {
+  const ans = divide(f, k);
+  if (f.n % k === 0) return `${f.n} ÷ ${k} = ${f.n / k}, so ${lab(ans)}`;
+  const raw = `${f.n}/${f.d * k}`;
+  return `${f.d} × ${k} = ${f.d * k}: ${raw}${raw === lab(ans) ? '' : ` = ${lab(ans)}`}`;
+}
+
 function card(rng: Rng, f: Frac, k: number, prompt: string, say: string, slow = false): Question {
   const ans = divide(f, k);
-  const q = wordQ(rng, prompt, lab(ans), decoys(ans, slips(f, k)), { say, hint: 'Dividing by a whole number makes each part smaller: multiply the bottom, or divide the top', hintIsData: false });
+  const q = wordQ(rng, prompt, lab(ans), decoys(ans, slips(f, k)), { say, hint: 'Dividing by a whole number makes each part smaller: multiply the bottom, or divide the top', hintIsData: false, why: why(f, k) });
   return slow ? { ...q, slow: true } : q;
 }
 
