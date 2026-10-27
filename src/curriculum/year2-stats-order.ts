@@ -3,6 +3,7 @@
 import type { Generator, Question } from './types';
 import { pick, ri, shuffle } from './util';
 import { SURVEYS } from './year2';
+import { colourBubbles } from './colour-bubbles';
 
 /** Same neutral pictogram symbol as `y2Stats`: it claims to be none of the categories. */
 const PICTO_SYMBOL = '⭐';
@@ -12,7 +13,7 @@ const PICTO_SYMBOL = '⭐';
  * block diagram (d3). The prompt and `say` never state a count. Counts are re-rolled until all three differ,
  * at the difficulty asked for; the loop is bounded and ends deterministically by spacing the counts out.
  */
-export const y2StatsOrder: Generator = (d, rng) => {
+const y2StatsOrderRaw: Generator = (d, rng) => {
   const survey = pick(rng, SURVEYS);
   const kind = d === 1 ? 'tally' : d === 2 ? 'pictogram' : 'block';
   const step = kind === 'pictogram' ? pick(rng, [2, 5]) : 1;
@@ -39,3 +40,4 @@ export const y2StatsOrder: Generator = (d, rng) => {
     hint: 'Slice the biggest number first', hintIsData: false,
   };
 };
+export const y2StatsOrder = colourBubbles(y2StatsOrderRaw);   // #2301: the options are the colours

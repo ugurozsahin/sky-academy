@@ -3,6 +3,7 @@
 import type { Generator } from './types';
 import { numQ, pick, ri, shuffle, wordQ } from './util';
 import { SURVEYS } from './year2';
+import { colourBubbles } from './colour-bubbles';
 
 /**
  * Read a table of counts. d1 "How many chose 🐶?"; d2 adds "How many altogether?"; d3 adds "How many more" and
@@ -10,7 +11,7 @@ import { SURVEYS } from './year2';
  * and `say` never state a count. Ties are re-rolled at the same difficulty; the loop is bounded and ends
  * deterministically by raising one count.
  */
-export const y2StatsTable: Generator = (d, rng) => {
+const y2StatsTableRaw: Generator = (d, rng) => {
   const survey = pick(rng, SURVEYS);
   const ask = d === 1 ? 'one' : pick(rng, d === 2 ? ['one', 'total'] : ['one', 'total', 'more', 'most']);
   const roll = () => survey.rows.map(() => ri(rng, 1, 20));
@@ -48,3 +49,4 @@ export const y2StatsTable: Generator = (d, rng) => {
     visual, hint: 'Read the table', hintIsData: false, say: 'Look at the table. How many children chose this one?',
   });
 };
+export const y2StatsTable = colourBubbles(y2StatsTableRaw);   // #2301: the options are the colours

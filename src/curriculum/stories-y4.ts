@@ -1,5 +1,6 @@
 // Year 4 Retrieving Information (#1130): ten short non-fiction passages, each asked about by what / where / how many, then a paraphrased question.
 import { storyGen } from './story-bank';
+import { colourBubbles } from './colour-bubbles';
 import type { StoryItem } from './story-bank';
 
 const ROMANS = 'The Romans came to Britain nearly two thousand years ago. They built straight roads and warm baths.';
@@ -50,4 +51,4 @@ export const Y4_NONFICTION: StoryItem[] = [
   lit(3, THAMES, 'Who do boats carry along the river?', 'people', ['pirates', 'knights'], 'Boats carry people'),
 ];
 
-export const y4Retrieve = storyGen(Y4_NONFICTION);
+export const y4Retrieve = colourBubbles(storyGen(Y4_NONFICTION));

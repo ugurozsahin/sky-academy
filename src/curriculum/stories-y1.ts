@@ -1,5 +1,6 @@
 // Year 1 Story Time (#1018): ten short stories read aloud, each asked about by who / what / where, then by a simple inference.
 import { storyGen } from './story-bank';
+import { colourBubbles } from './colour-bubbles';
 import type { StoryItem } from './story-bank';
 
 const HAT = 'Tom has a red hat. He lost it in the park. Mum found it by the tree.';
@@ -51,4 +52,4 @@ export const Y1_STORIES: StoryItem[] = [
   inf(PUP, 'How is the pup now?', 'muddy', ['sleepy', 'hungry'], 'The pup ran in the mud'),
 ];
 
-export const y1StoryTime = storyGen(Y1_STORIES);
+export const y1StoryTime = colourBubbles(storyGen(Y1_STORIES));

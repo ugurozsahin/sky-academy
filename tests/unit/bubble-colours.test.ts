@@ -8,6 +8,10 @@ import { waveOptsFor } from '../../src/ui/wave-opts';
 
 function seeded(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
+// #2301: topics whose options ARE the colour answer. Every other topic that shows a colour word has it inside a
+// sentence or word list (r-sentence, y1-sentence, y2-wordclass, y2-homophones, y3-dictation …), where a random bubble is right.
+const COLOUR_ANSWER = ['y1-storytime', 'y2-stats', 'y2-stats-order', 'y2-stats-table', 'y4-retrieve'];
+
 describe('colour-word bubbles (#2269)', () => {
   it('every colour-word option is planned in its own colour, over every topic and 200 seeds', () => {
     let seen = 0;
@@ -17,6 +21,7 @@ describe('colour-word bubbles (#2269)', () => {
       if (!words.length) continue;
       const plan = layoutWave(waveOptsFor(q, { labels: q.options, speed: 1 }), { W: 390, H: 600, topInset: 120 }, 1, 0, seeded(seed));
       for (const b of plan.bubbles) if (b.label in COLOUR_BUBBLE && q.colours) { expect(b.color, `${t.id} ${b.label}`).toBe(COLOUR_BUBBLE[b.label]); seen++; }
+      if (COLOUR_ANSWER.includes(t.id) && words.length === q.options.length) expect(q.colours, `${t.id} sets colours`).toBeDefined();
       if (t.id.includes('capacity') || t.id.includes('length') || t.id.includes('mass')) expect(q.colours, `${t.id} sets colours`).toBeDefined();
     }
     expect(seen).toBeGreaterThan(100);
