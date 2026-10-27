@@ -117,4 +117,55 @@ test.describe('Years and games settings (#2200)', () => {
     await page.click('.island[data-year="year1"]');
     await expect(page.locator(`.topic[data-id="${off.id}"]`)).toHaveCount(1);
   });
+
+  test('a stale control is refused when it is used, and the patch is unchanged (#2263)', async ({ page }) => {
+    // Two islands show; the settings draw both Hide buttons enabled. Another tab then hides Reception, which leaves
+    // Year 1 as the last island, so the still-enabled Hide on Year 1 is a stale control.
+    await seed(page, { version: 1, years: Object.fromEntries(YEARS.filter(y => y.id !== 'reception' && y.id !== 'year1').map(y => [y.id, { visible: false }])) });
+    await openSettings(page);
+    const hide = page.locator('button[data-isl="year1"][data-v="hide"]');
+    await expect(hide).toBeEnabled();
+    const stale = JSON.stringify({ version: 1, years: Object.fromEntries(YEARS.filter(y => y.id !== 'year1').map(y => [y.id, { visible: false }])) });
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [PATCH_KEY, stale]);
+    await hide.click();
+    await expect(page.locator('#cat-msg')).toHaveText('Year 1 is the only island left on the map, so it stays.');
+    await expect(page.locator('#cat-msg')).toHaveClass(/bad/);
+    expect(await page.evaluate(k => localStorage.getItem(k), PATCH_KEY)).toBe(stale);
+  });
+
+  test('a game hidden at game level comes back, with its year, in one write (#2263)', async ({ page }) => {
+    const game = core('year1').find(t => t.subject === 'maths')!;
+    await seed(page, { version: 1, games: { [game.id]: { visible: false } } });
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator(`.topic[data-id="${game.id}"]`)).toHaveCount(0);
+    await page.click('#back');
+    await openSettings(page);
+    await page.selectOption('#cat-year', 'year1');
+    const sw = page.locator(`button[role="switch"][data-game="${game.id}"]`);
+    await expect(sw).toHaveAttribute('aria-checked', 'false');
+    await sw.click();
+    await expect(sw).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#cat-msg')).toHaveText(`${game.title} is on for Year 1.`);
+    const patch = await page.evaluate(k => JSON.parse(localStorage.getItem(k)!), PATCH_KEY);
+    expect(patch.games[game.id].visible).toBe(true);
+    expect(patch.games[game.id].years.year1.visible).toBe(true);
+    await page.click('#back');
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator(`.topic[data-id="${game.id}"]`)).toHaveCount(1);
+  });
+
+  test('a game switch that takes a Year 3 island over its gate says so (#2263)', async ({ page }) => {
+    // Year 3 needs 12 maths games on. Switch off all but 11, so the island is under the gate; one more brings it back.
+    const maths = core('year3').filter(t => t.subject === 'maths');
+    const off = maths.slice(11);
+    const games = Object.fromEntries(off.map(t => [t.id, { years: { year3: { visible: false } } }]));
+    await seed(page, { version: 1, games });
+    await expect(page.locator('.island[data-year="year3"]')).toHaveCount(0);
+    await openSettings(page);
+    await page.selectOption('#cat-year', 'year3');
+    await page.locator(`button[role="switch"][data-game="${off[0].id}"]`).click();
+    await expect(page.locator('#cat-msg')).toHaveText(`${off[0].title} is on for Year 3. Year 3 is now shown on the map.`);
+    await page.click('#back');
+    await expect(page.locator('.island[data-year="year3"]')).toHaveCount(1);
+  });
 });

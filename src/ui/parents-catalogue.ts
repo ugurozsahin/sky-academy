@@ -115,7 +115,7 @@ function onGame(b: HTMLElement, year: YearId): void {
   const id = b.dataset.game!, t = TOPICS.find(x => x.id === id)!, cat = activeCatalogue(), on = !gameOn(cat, id, year), p = sessionProfile();
   const sel = `button[data-game="${id}"]`, refused = on ? null : gameRefusal(cat, id, year, TOPICS), before = islandsShown(cat, TOPICS).includes(year);
   if (refused) return redraw(sel, why(refused, year, cat), true);
-  const ok = (!on || cat.games[id]?.visible !== false || setGameVisible(p, id, null, true)) && setGameVisible(p, id, year, on);
+  const ok = setGameVisible(p, id, year, on, on && cat.games[id]?.visible === false);   // one write, so a switch-on cannot half-save
   const after = islandsShown(activeCatalogue(), TOPICS).includes(year);
   const island = before === after ? '' : ` ${yearTitle(year)} is now ${after ? 'shown on' : 'hidden from'} the map.`;
   redraw(sel, ok ? `${t.title} is ${on ? 'on' : 'off'} for ${yearTitle(year)}.${island}` : NOT_SAVED, !ok);
