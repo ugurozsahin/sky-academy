@@ -10,8 +10,13 @@ import { workflowFiles } from './helpers/sources';
  * the fix. Now every setup-node step reads `node-version-file: .node-version`, so the next security release is a
  * one-line bump of that file, and these rails keep it the only place the version is set.
  *
+ * `actions/github-script` steps (review-gate.yml, unblock.yml) run on the Node bundled with the action, which
+ * setup-node cannot pin and `.node-version` does not control; the rails below cover setup-node steps only.
+ *
  * Prove it red: put `node-version: 22` back into any workflow; write `22` or `22.23.3` into `.node-version`; drop
- * the setup-node step from a job that runs `npm`; or lower a line of the `engines` floor in `package.json`.
+ * the setup-node step from a job that runs `npm`; or lower a line of the `engines` floor in `package.json`;
+ * quote the key (`"node-version": 22`); add a line such as `|| >=20.0.0 <21` to `engines`; move `npm ci` above the
+ * setup-node step; or put a comment after `jobs:`, which must not empty that file's job list.
  */
 const root = new URL('../../', import.meta.url);
 const workflows = workflowFiles();
@@ -48,7 +53,7 @@ const RUNS_NODE = /^(?!\s*#).*\b(node|npm|npx)\s/m;
 
 /** The jobs of a workflow, cut at each two-space-indented key under `jobs:`. */
 const jobs = (text: string): { name: string; body: string }[] => {
-  const after = text.split(/^jobs:\s*$/m)[1] ?? '';
+  const after = text.split(/^jobs:[ \t]*(?:#.*)?$/m)[1] ?? '';
   return after.split(/^(?= {2}[\w-]+:\s*(?:#.*)?$)/m).filter((part) => part.trim())
     .map((body) => ({ name: body.trim().split(':')[0], body }));
 };
@@ -60,11 +65,14 @@ describe('Node comes from .node-version, and it meets the security floor (#2254)
     expect(engines, 'package.json must carry engines.node').not.toBe('');
     const ci = workflows.find(({ name }) => name === 'ci.yml')?.text ?? '';
     expect(jobs(ci).map((job) => job.name), 'the job splitter must find the jobs in ci.yml').toEqual(['test', 'branch-name']);
+    for (const { name, text } of workflows.filter(({ text }) => /^jobs:/m.test(text))) {
+      expect(jobs(text).length, `${name}: the job splitter found no jobs, so its job rails pass vacuously`).toBeGreaterThan(0);
+    }
   });
 
   for (const { name, text } of workflows) {
     it(`${name}: no literal node-version, and every setup-node step reads .node-version`, () => {
-      const literal = text.split('\n').filter((line) => /\bnode-version\s*:/.test(line));
+      const literal = text.split('\n').filter((line) => /["']?\bnode-version["']?\s*:/.test(line));
       expect(literal, `${name}: set the version in .node-version, not in the workflow`).toEqual([]);
       const steps = text.match(/actions\/setup-node@/g)?.length ?? 0;
       const fromFile = text.match(/node-version-file:\s*\.node-version\b/g)?.length ?? 0;
@@ -74,7 +82,11 @@ describe('Node comes from .node-version, and it meets the security floor (#2254)
 
   for (const { name, text } of workflows) {
     it(`${name}: every job that runs node, npm or npx sets up Node first`, () => {
-      const unpinned = jobs(text).filter((job) => RUNS_NODE.test(job.body) && !job.body.includes('actions/setup-node@'));
+      const unpinned = jobs(text).filter((job) => {
+        const runs = RUNS_NODE.exec(job.body);
+        const setup = job.body.indexOf('actions/setup-node@');
+        return runs !== null && (setup === -1 || runs.index < setup);
+      });
       expect(unpinned.map((job) => job.name), `${name}: these jobs would run on the runner's own, unpinned Node`).toEqual([]);
     });
   }
@@ -86,6 +98,13 @@ describe('Node comes from .node-version, and it meets the security floor (#2254)
       expect(satisfies(older, engines), `${older} is below the ${fixed} fix but passes ${engines}`).toBe(false);
       expect(satisfies(`${major}.0.0`, engines), `${major}.0.0 passes ${engines}`).toBe(false);
     }
+  });
+
+  it('every major the engines field admits has its floor in PATCHED, so a new line is a deliberate edit', () => {
+    const floors = [...engines.matchAll(/>=\s*(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+    expect(floors.length, `no >= comparator found in ${engines}`).toBeGreaterThan(0);
+    for (const floor of floors) expect(PATCHED, `engines admits ${floor}, which is not a patched line`).toContain(floor);
+    expect(engines.split('||').length, `${engines} has a set without a >= floor`).toBe(floors.length);
   });
 
   it('.node-version is an exact version that satisfies the engines floor', () => {
