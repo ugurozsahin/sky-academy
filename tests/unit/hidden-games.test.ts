@@ -7,6 +7,7 @@ import { RUNTIME } from '../../src/config/resolve';
 import { CORE_TOPICS, TOPICS, YEARS, drillsFor, isGameShown, listedTopics, shownYears, topicById, topicsFor, type Topic, type YearId } from '../../src/curriculum';
 import { GRAMMAR, grammarPool } from '../../src/game/sprint-pools';
 import { answerableBy } from '../../src/game/pools';
+import { duelPool } from '../../src/game/duel';
 import { mtcOffered } from '../../src/game/mtc';
 import { islandMenu, islandSubjects } from '../../src/ui/home';
 import { load } from '../../src/storage';
@@ -156,6 +157,79 @@ describe('a hidden maths game and a hidden writing game leave every list and poo
     expect(ids(cur.drillsFor('year4'))).toEqual(without(before.drillsFor('year4'), ['y4-tables-6']));
     expect(ids(chooserTopics('year4', 'maths'))).not.toContain('y4-tables-6');
   }));
+});
+
+describe('Legend and "Next topic" read shown games only (#2240)', () => {
+  const crown = (st: typeof import('../../src/storage'), only: string[]) => { st.reset(); for (const id of only) st.recordTopic(id, 3, 5); };
+  it('Legend run needs a 3★ topic that is shown: stars only on hidden games draw no row', () => withCatalogue(TEST_CAT, async () => {
+    const { islandMenu: im } = await import('../../src/ui/home');
+    const st = await import('../../src/storage');
+    const rows = () => ids(im({} as never, YEARS.find(y => y.id === 'year4')!, st.load(), st.load().progress, () => 'maths'));
+    crown(st, HIDDEN);
+    expect(rows().filter(id => id.startsWith('legend')), 'only hidden games are 3★').toEqual([]);
+    const shown = ids(before.topicsFor('year4').filter(t => !HIDDEN.includes(t.id) && t.subject === 'maths' && answerableBy(t, 'mixed')))[0];
+    crown(st, [...HIDDEN, shown]);
+    expect(rows().filter(id => id.startsWith('legend')), 'a shown 3★ topic brings it back').not.toEqual([]);
+  }));
+  it('"Next topic" never offers a hidden game', () => withCatalogue(TEST_CAT, async () => {
+    const { nextUnstarredTopic } = await import('../../src/ui/play-results');
+    const cur = await import('../../src/curriculum');
+    const st = await import('../../src/storage');
+    st.reset();
+    const y4 = cur.YEARS.find(y => y.id === 'year4')!;
+    const list = cur.topicsFor('year4', 'maths');
+    for (const t of list.slice(1)) st.recordTopic(t.id, 1, 5);
+    expect(nextUnstarredTopic(y4, list[1]), 'wraps round to the one unstarred shown topic').toBe(list[0]);
+    for (const t of list) st.recordTopic(t.id, 1, 5);
+    expect(nextUnstarredTopic(y4, list[0]), 'hidden games are unstarred, yet are never the answer').toBeNull();
+  }));
+});
+
+describe('the remaining consumers read shown games only (#2240)', () => {
+  const y5 = () => YEARS.find(y => y.id === 'year5')!;
+  const rowsOf = async () => {
+    const { islandMenu: im } = await import('../../src/ui/home');
+    const st = await import('../../src/storage');
+    return ids(im({} as never, y5(), st.load(), st.load().progress, () => 'maths'));
+  };
+  it('a Duel pool emptied hides the Duel row, which the committed catalogue offers', () => {
+    const duelIds = ids(duelPool(before.topicsFor('year5')));
+    return withCatalogue(copy(c => { for (const id of duelIds) c.games[id].visible = false; }), async () => {
+      expect(duelIds.length, 'the committed catalogue offers Duel on Year 5').toBeGreaterThan(0);
+      const cur = await import('../../src/curriculum');
+      const { duelPool: dp } = await import('../../src/game/duel');
+      expect(dp(cur.topicsFor('year5'))).toEqual([]);
+      const rows = await rowsOf();
+      expect(rows, 'the Duel row goes').not.toContain('duel');
+      expect(rows, 'the other mixed rows are not Duel\'s to hide').toContain('grammar');
+    });
+  });
+  it('Arithmetic Sprint drops a hidden game and offers no row below its minimum', async () => {
+    const { ARITHMETIC, ARITHMETIC_MIN } = await import('../../src/game/sprint-pools');
+    const all = ids(before.topicsFor('year5')).filter(id => ARITHMETIC.year5.includes(id));
+    expect(all.length, 'the committed pool is bigger than the minimum').toBeGreaterThan(ARITHMETIC_MIN);
+    await withCatalogue(copy(c => { c.games[all[0]].visible = false; }), async () => {
+      const { arithmeticPool } = await import('../../src/game/sprint-pools');
+      expect(ids(arithmeticPool('year5')), 'the hidden game').not.toContain(all[0]);
+      expect(await rowsOf()).toContain('arith');
+    });
+    await withCatalogue(copy(c => { for (const id of all.slice(0, all.length - ARITHMETIC_MIN + 1)) c.games[id].visible = false; }), async () => {
+      const { arithmeticPool } = await import('../../src/game/sprint-pools');
+      expect(arithmeticPool('year5'), 'too few shown games').toEqual([]);
+      expect(await rowsOf()).not.toContain('arith');
+    });
+  });
+  it('the readiness read-out ranks shown strands only: tries on a hidden game count for nothing', async () => {
+    const t = before.topicsFor('year5').find(x => x.strand)!;
+    const play = { [t.id]: { stars: 1, best: 1, plays: 9, hits: 5, tries: 50 } } as never;
+    const html = async (cat: RuntimeCatalogue) => { let out = ''; await withCatalogue(cat, async () => {
+      const { readyHTML } = await import('../../src/ui/parents-ready');
+      const st = await import('../../src/storage');
+      out = readyHTML({ ...st.load(), progress: play, ks2: { ...st.load().ks2, schoolYear: 'year6' } });
+    }); return out; };
+    expect(await html(copy(() => {})), 'shown: the strand is ranked').toContain('% right');
+    expect(await html(copy(c => { c.games[t.id].visible = false; })), 'hidden: nothing to rank').toContain('not enough play yet');
+  });
 });
 
 describe('a pool the catalogue empties hides its entry point (#2196)', () => {
