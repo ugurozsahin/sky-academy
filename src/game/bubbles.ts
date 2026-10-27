@@ -48,8 +48,7 @@ export interface WaveOpts {
   ordered?: string[];   // sequence labels that must be sliced in this order
   // #700: a non-sequence question's correct-answer label, for a gentle year only — it gets one free trip
   // back up if it falls unhit, the same idea as `ordered` above but for a single label and a single trip.
-  scale?: number;   // #2288: the year's bubble scale (BUBBLE_SCALE); absent = 1
-  gentleTarget?: string; timing?: DefaultSettings;   // timing (#2198): this game's own; absent = the global `TIMING`
+  gentleTarget?: string; scale?: number; timing?: DefaultSettings;   // scale (#2288): BUBBLE_SCALE; timing (#2198): this game's own; absent = the global `TIMING`
 }
 
 /** Deal a sequence wave: the words that must be sliced in order are spread across the batches IN ORDER
@@ -92,9 +91,7 @@ export function bubbleRadius(W: number, H: number, wide: boolean): number {
   const base = Math.min(W, H) * 0.085;
   return Math.max(30, Math.min(wide ? 64 : 54, wide ? base * 1.25 : base));
 }
-
-/** #2288: Reception and Year 1 bubbles are scaled up for small fingers (33 px → 53 / 36 on a 390 px phone); Year 2 up stays at 1. The third-of-the-width cap in `waveRadius` still holds. */
-export const BUBBLE_SCALE: Readonly<Partial<Record<YearId, number>>> = { reception: 1.6, year1: 1.1 };
+export const BUBBLE_SCALE: Readonly<Partial<Record<YearId, number>>> = { reception: 1.6, year1: 1.1 };   // #2288: bigger for small fingers (53 / 36 px at 390 px); Year 2 up stays 1
 export function waveRadius(W: number, H: number, wide: boolean, n: number, scale = 1): number { return Math.max(1, Math.min(Math.max(26, bubbleRadius(W, H, wide) * scale * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1)), ((W - 16) / 3 - 10) / 2)); }   // layoutWave's own formula, exported for R-LBL (#1046); #2184: ≥ 1, as arc() throws on a negative radius
 /** The arena's drawable box, in CSS pixels. */
 export interface ArenaBox { W: number; H: number }
