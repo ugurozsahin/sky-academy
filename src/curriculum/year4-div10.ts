@@ -10,6 +10,9 @@ import { ks2Say } from './ks2say';
 const lab = (a: Dec) => fmt(a);
 const word = (k: 1 | 2) => (k === 1 ? 'ten' : 'one hundred');
 
+/** The working a wrong slice is shown (#2317): each digit moves k places right, ending on the answer (≤ 14 words). */
+const shifted = (n: number, k: 1 | 2, a: string) => `Each digit moves ${k === 1 ? '1 place' : '2 places'} right: ${n} ÷ ${k === 1 ? 10 : 100} = ${a}`;
+
 /** A number to divide: 1–9 at d1, else 1–99 without a trailing zero (40 ÷ 100 = 0.4 would change the decimal places). */
 const num = (rng: Rng, oneDigit: boolean) => { for (;;) { const n = oneDigit ? ri(rng, 1, 9) : ri(rng, 1, 99); if (n % 10) return n; } };
 
@@ -29,7 +32,7 @@ function decoys(rng: Rng, n: number, k: 1 | 2): string[] {
 function divide(rng: Rng, oneDigit: boolean): Question {
   const n = num(rng, oneDigit), k = (oneDigit || rng() < 0.5 ? 1 : 2) as 1 | 2, a = lab(divPow10(dec(n, 0), k));
   return wordQ(rng, `${n} ÷ ${k === 1 ? 10 : 100} = ?`, a, decoys(rng, n, k),
-    { say: `${ks2Say(String(n))} divided by ${word(k)} equals what?`, hint: k === 1 ? 'Dividing by 10 moves every digit one place to the right' : 'Dividing by 100 moves every digit two places to the right', hintIsData: false });
+    { say: `${ks2Say(String(n))} divided by ${word(k)} equals what?`, hint: k === 1 ? 'Dividing by 10 moves every digit one place to the right' : 'Dividing by 100 moves every digit two places to the right', hintIsData: false, why: shifted(n, k, a) });
 }
 
 /** "36 ÷ 100 = 0.36. The 6 is worth 6 ...?" (answer hundredths): two differing digits, so the asked digit has one place. */
@@ -39,7 +42,7 @@ function digitValue(rng: Rng): Question {
   const k = pick(rng, [1, 2] as const), tens = rng() < 0.5, d = tens ? Math.floor(n / 10) : n % 10, a = lab(divPow10(dec(n, 0), k));
   const place = (['ones', 'tenths', 'hundredths'] as const)[(tens ? 0 : 1) + (k - 1)];
   return wordQ(rng, `${n} ÷ ${k === 1 ? 10 : 100} = ${a}. The ${d} is worth ${d} ...?`, place, ['ones', 'tenths', 'hundredths', 'tens'].filter(p => p !== place),
-    { say: `${ks2Say(String(n))} divided by ${word(k)} equals ${ks2Say(a)}. The ${ks2Say(String(d))} is worth ${ks2Say(String(d))} what?`, hint: 'The first place after the point is tenths, then hundredths', hintIsData: false });
+    { say: `${ks2Say(String(n))} divided by ${word(k)} equals ${ks2Say(a)}. The ${ks2Say(String(d))} is worth ${ks2Say(String(d))} what?`, hint: 'The first place after the point is tenths, then hundredths', hintIsData: false, why: `${a} has its ${d} in the ${place} place` });
 }
 
 export const y4Div10: Generator = (level: Difficulty, rng) => {
