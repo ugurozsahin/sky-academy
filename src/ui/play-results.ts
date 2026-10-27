@@ -54,7 +54,7 @@ export interface ResultsScreenDeps {
  * other topic is already starred. Reads `load()` fresh rather than a screen-mount snapshot: `commitResult()`
  * has already recorded this game's own stars by the time `showResults()` runs (`play-session.ts`'s `onEnd`).
  */
-function nextUnstarredTopic(year: YearInfo, topic: Topic | undefined): Topic | null {
+export function nextUnstarredTopic(year: YearInfo, topic: Topic | undefined): Topic | null {
   if (!topic) return null;
   const list = topicsFor(year.id, topic.subject);
   const i = list.findIndex(t => t.id === topic.id);
