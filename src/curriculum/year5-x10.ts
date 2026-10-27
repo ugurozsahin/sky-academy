@@ -13,6 +13,10 @@ const TEN = (k: number) => 10 ** k;
 const apply = (a: Dec, op: '×' | '÷', k: Pow): Dec => (op === '×' ? mulPow10(a, k) : divPow10(a, k));
 const say = (sum: string) => ks2Say(q(sum).say ?? sum);
 
+/** The working a wrong slice is shown (#2317): each digit moves k places, ending on the answer (≤ 14 words). */
+const shift = (op: '×' | '÷', k: number, from: Dec, to: Dec): string =>
+  `Each digit moves ${k} ${k === 1 ? 'place' : 'places'} ${op === '×' ? 'left' : 'right'}: ${fmt(from)} ${op} ${fmt(dec(TEN(k), 0))} = ${fmt(to)}`;
+
 /** A 1- to 3-decimal-place number with no trailing zero, so it prints as itself. */
 function decimal(rng: Rng, dp: 1 | 2 | 3): Dec {
   const lo = TEN(dp - 1) + 1, hi = dp === 3 ? 9999 : TEN(dp + 1) - 1;
@@ -41,13 +45,13 @@ function d1(rng: Rng): Question {
   const first = op === '×' ? dec(m, 0) : dec(m * TEN(k), 0);
   const answer = op === '×' ? dec(m * TEN(k), 0) : dec(m, 0);
   const sum = `${fmt(first)} ${op} ${fmt(dec(TEN(k), 0))} = ?`;
-  return wordQ(rng, sum, fmt(answer), decoys(answer, apply(first, op === '×' ? '÷' : '×', k)), { say: say(sum) });
+  return wordQ(rng, sum, fmt(answer), decoys(answer, apply(first, op === '×' ? '÷' : '×', k)), { say: say(sum), why: shift(op, k, first, answer) });
 }
 
 /** A build card: the answer's digits, and its point when it has one, are all sliced (≤ 6 slots, 8 bubbles). */
-function build(rng: Rng, sum: string, answer: Dec): Question {
+function build(rng: Rng, sum: string, answer: Dec, why: string): Question {
   const label = fmt(answer);
-  return buildQ(rng, { prompt: sum, say: `${say(sum)}. Build the answer${label.includes('.') ? ', with the point' : ''}.`, answer: label, total: 8, steps: label.includes('.') ? { point: true } : undefined, hint: 'Slice the digits and the point in order' });
+  return { ...buildQ(rng, { prompt: sum, say: `${say(sum)}. Build the answer${label.includes('.') ? ', with the point' : ''}.`, answer: label, total: 8, steps: label.includes('.') ? { point: true } : undefined, hint: 'Slice the digits and the point in order' }), why };
 }
 
 /** d2: 1- or 2-dp × 10 or 100 (the answer may be whole), or a whole number ÷ 10 or 100 (never whole). */
@@ -55,11 +59,11 @@ function d2(rng: Rng): Question {
   const k = ri(rng, 1, 2) as Pow;
   if (rng() < 0.5) {
     const a = decimal(rng, pick(rng, [1, 2] as const));
-    return build(rng, `${fmt(a)} × ${fmt(dec(TEN(k), 0))} = ?`, mulPow10(a, k));
+    return build(rng, `${fmt(a)} × ${fmt(dec(TEN(k), 0))} = ?`, mulPow10(a, k), shift('×', k, a, mulPow10(a, k)));
   }
   let n = ri(rng, 11, 999);
   if (n % 10 === 0) n += 1;
-  return build(rng, `${fmt(dec(n, 0))} ÷ ${fmt(dec(TEN(k), 0))} = ?`, divPow10(dec(n, 0), k));
+  return build(rng, `${fmt(dec(n, 0))} ÷ ${fmt(dec(TEN(k), 0))} = ?`, divPow10(dec(n, 0), k), shift('÷', k, dec(n, 0), divPow10(dec(n, 0), k)));
 }
 
 /** d3 (b): which power of ten makes the sum true? The options are always 10, 100, 1,000 and 10,000. */
@@ -71,7 +75,7 @@ function missing(rng: Rng): Question {
   const sum = op === '×' ? `${fmt(a)} × ? = ${fmt(big)}` : `${fmt(big)} ÷ ? = ${fmt(a)}`;
   const label = (j: number) => fmt(dec(TEN(j), 0));
   const wrong = [1, 2, 3, 4].filter(j => j !== k).map(label);
-  return wordQ(rng, sum, label(k), wrong, { say: `${say(sum)} Pick the number.` });
+  return wordQ(rng, sum, label(k), wrong, { say: `${say(sum)} Pick the number.`, why: `${fmt(op === '×' ? a : big)} to ${fmt(op === '×' ? big : a)} is ${k} ${k === 1 ? 'place' : 'places'}, so ${label(k)}` });
 }
 
 /** d3 (a): ÷ 1,000 on a 2- to 4-digit whole number, or × 1,000 on a decimal. */
@@ -79,10 +83,10 @@ function d3(rng: Rng): Question {
   if (rng() < 0.5) return missing(rng);
   if (rng() < 0.5) {
     const n = ri(rng, 11, 9999);
-    return build(rng, `${fmt(dec(n, 0))} ÷ 1,000 = ?`, divPow10(dec(n, 0), 3));
+    return build(rng, `${fmt(dec(n, 0))} ÷ 1,000 = ?`, divPow10(dec(n, 0), 3), shift('÷', 3, dec(n, 0), divPow10(dec(n, 0), 3)));
   }
   const a = decimal(rng, pick(rng, [1, 2, 3] as const));
-  return build(rng, `${fmt(a)} × 1,000 = ?`, mulPow10(a, 3));
+  return build(rng, `${fmt(a)} × 1,000 = ?`, mulPow10(a, 3), shift('×', 3, a, mulPow10(a, 3)));
 }
 
 export const y5X10: Generator = (d: Difficulty, rng): Question => d === 1 ? d1(rng) : d === 2 ? d2(rng) : d3(rng);

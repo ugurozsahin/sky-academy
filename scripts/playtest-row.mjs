@@ -76,6 +76,9 @@ function entryProblems(e, i) {
   return errs;
 }
 
+const NUM = String.raw`\d+(?:\.\d+)?`;
+const PHYSICAL_SAW = new RegExp(`need ${NUM} s, reach ${NUM} s, ${NUM}%`);
+
 function evidenceProblems(evidence) {
   if (!Array.isArray(evidence)) return ['evidence: must be a list of { criterion, ref, saw }'];
   const errs = evidence.flatMap(entryProblems);
@@ -85,6 +88,9 @@ function evidenceProblems(evidence) {
     else if (!mine.some((e) => isText(e.saw) && !NOT_OBSERVED.test(e.saw.trim())))
       errs.push(`evidence: every entry for ${k} is "not observed"; that is a capture gap, not a score (skill §3), so hold the row back`);
   }
+  const seen = evidence.filter((e) => isObj(e) && e.criterion === 'physical' && isText(e.saw) && !NOT_OBSERVED.test(e.saw.trim()));
+  if (seen.length && !seen.some((e) => PHYSICAL_SAW.test(e.saw)))
+    errs.push('evidence: no observed `physical` entry states "need <n> s, reach <n> s, <n>%" (skill §2), so the mark shows no working');
   return errs;
 }
 

@@ -178,8 +178,9 @@ export function labelReach(rc, { H, cardBottom, maxRelaunches }) {
     const end = rc.ends[id];
     let sum = 0;                                     // each frame interval counts when it starts inside; the last one runs to the end frame
     for (let i = 0; i < pts.length; i++) {
-      const next = i + 1 < pts.length ? pts[i + 1][0] : end?.t;
-      if (next !== undefined && inside(pts[i][3])) sum += Math.max(0, next - pts[i][0]);
+      const last = i + 1 >= pts.length, next = last ? end : pts[i + 1];
+      const [nextT, nextRelaunches] = last ? [end?.t, end?.relaunches] : [next[0], next[4]];
+      if (nextT !== undefined && nextRelaunches === pts[i][4] && inside(pts[i][3])) sum += Math.max(0, nextT - pts[i][0]);   // an interval spanning a relaunch is the 300 ms delay, not reach (#2257)
     }
     return { label: rc.ids[id], reachMs: ms(sum), flights: pts.length ? 1 + Math.max(...pts.map(p => p[4])) : 0, endedBy: reachEnd(end, maxRelaunches) };
   });
@@ -246,7 +247,8 @@ function flightKeys(p, sp) {
 /** A sequence game's reach keys (#2251). A sequence pack with no label that ran out or was sliced has no reach to score: it fails, never a silent null. */
 function reachKeys(p, maxRelaunches) {
   if (!p.screen.sequence) return {};
-  const r = p.reach ? labelReach(p.reach, { H: p.screen.H, cardBottom: p.screen.card?.bottom ?? 0, maxRelaunches }) : null;
+  if (!p.screen.card) throw new Error('a sequence game with no question card on screen: labelReachMs would count the time behind it');
+  const r = p.reach ? labelReach(p.reach, { H: p.screen.H, cardBottom: p.screen.card.bottom, maxRelaunches }) : null;
   if (!r?.labelReachMs) throw new Error('a sequence game with no required label that ran out or was sliced: labelReachMs would be empty');
   return r;
 }

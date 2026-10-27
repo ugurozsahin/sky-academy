@@ -196,6 +196,14 @@ describe('rowProblems holds each row to the skill and #2214 (#2206)', () => {
     expect(ROWS[0].evidence.some((e) => e.criterion === 'physical' && e.saw.startsWith('not observed')), 'the fixture exercises the mixed case').toBe(true);
   });
 
+  it('refuses a row whose observed `physical` entries state no need, reach and percentage (#2249)', () => {
+    const row = fresh();
+    for (const e of row.evidence) if (e.criterion === 'physical') e.saw = 'bubbles reachable 4.5 s';
+    expect(rowProblems(row, ctx).some((e) => e.startsWith('evidence: no observed `physical` entry states'))).toBe(true);
+    row.evidence.push({ criterion: 'physical', ref: 'metrics.json#aboveCardMs.min', saw: 'need 4 s, reach 5.37 s, 134% at stage 1; working: 0 steps' });
+    expect(rowProblems(row, ctx)).toEqual([]);
+  });
+
   it.each(MUTATIONS)('%s', (_what, mutate, expected) => {
     const row = fresh();
     mutate(row);
