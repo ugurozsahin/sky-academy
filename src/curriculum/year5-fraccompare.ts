@@ -8,6 +8,9 @@ import { compare, type Frac } from './fractions';
 import { ks2Say } from './ks2say';
 
 const lab = (f: Frac) => `${f.n}/${f.d}`;
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+/** Every fraction rewritten over the lowest bottom they share, as tops in the order given. */
+const overCommon = (fs: Frac[]) => { const L = fs.reduce((l, f) => l * f.d / gcd(l, f.d), 1); return { L, tops: fs.map(f => f.n * (L / f.d)) }; };
 const BASES = [2, 3, 4, 5, 6];
 const distinct = (fs: Frac[]) => fs.every((f, i) => fs.every((g, j) => i === j || compare(f, g) !== 0));
 /** A proper fraction on a bottom drawn from the multiples of `base` up to 12 (so 3/6/12, 2/4/8, 5/10 …). */
@@ -23,8 +26,11 @@ const unique = <T>(make: () => T, ok: (t: T) => boolean): T => {
 
 function ask(fs: Frac[], big: boolean, rng: Rng, hint: string): Question {
   const ans = fs.slice().sort(compare)[big ? fs.length - 1 : 0];
+  const why = fs.length > 2 ? `Over ${overCommon(fs).L}: ${overCommon(fs).tops.slice().sort((x, y) => x - y).join(', ')}; ${big ? 'biggest' : 'smallest'} is ${lab(ans)}`
+    : fs[0].d === fs[1].d ? `Same bottom: ${lab(ans)} has the ${big ? 'bigger' : 'smaller'} top`
+    : `Same top: ${lab(ans)} has the ${big ? 'smaller' : 'bigger'} bottom`;
   const word = big ? 'larger' : 'smaller', shown = shuffle(rng, fs.map(lab));
-  return { prompt: fs.length === 2 ? `Which is ${word}? ${shown.join(' or ')}` : `Which is the ${big ? 'largest' : 'smallest'}?`,
+  return { why, prompt: fs.length === 2 ? `Which is ${word}? ${shown.join(' or ')}` : `Which is the ${big ? 'largest' : 'smallest'}?`,
     say: `Which is the ${fs.length === 2 ? word : big ? 'largest' : 'smallest'}? ${shown.map(s => ks2Say(s)).join(', or ')}`,
     answer: lab(ans), options: shown, visual: fs.length === 2 ? undefined : { type: 'word', text: shown.join('  ') }, hint, hintIsData: false };
 }
@@ -51,7 +57,8 @@ function order(rng: Rng): Question {
   const set = unique(() => { const base = pick(rng, BASES); return [onBase(rng, base), onBase(rng, base), onBase(rng, base)]; },
     fs => distinct(fs) && new Set(fs.map(f => f.d)).size >= 2);
   const sorted = set.slice().sort(compare).map(lab), shown = shuffle(rng, sorted);
-  return { prompt: 'Smallest to largest!', say: `Slice the fractions from smallest to largest: ${shown.map(s => ks2Say(s)).join(', ')}`,
+  const { L, tops } = overCommon(set), why = `Over ${L}, smallest to largest: ${tops.sort((x, y) => x - y).join(', ')}`;
+  return { why, prompt: 'Smallest to largest!', say: `Slice the fractions from smallest to largest: ${shown.map(s => ks2Say(s)).join(', ')}`,
     answer: sorted.join(' '), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest fraction first', hintIsData: false };
 }
 
