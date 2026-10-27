@@ -2,8 +2,8 @@
 // lookup is covered in bubble-scale.test.ts; this pins the call in launchWave that hands it the year.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AVATARS } from '../../src/avatars';
-import { topicById, YEARS, type Question, type Rng } from '../../src/curriculum';
-import { say, resetVoiceProbe } from '../../src/audio';
+import { YEARS, type Question } from '../../src/curriculum';
+import { resetVoiceProbe } from '../../src/audio';
 import type { WaveOpts } from '../../src/game/arena';
 import { reset, save } from '../../src/storage';
 import { createPlaySession, NO_VOICE_PEEK_MS, type PlaySessionDeps, type PlaySessionEls } from '../../src/ui/play-session';
