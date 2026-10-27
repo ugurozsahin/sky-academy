@@ -132,15 +132,26 @@ describe('playtest profiles (#2204)', () => {
     expect(rates, 'the Targets line quotes 4- and 5-year-olds at all three sizes').not.toBeNull();
     const mmAt = [1, 3, 5].map((i) => Number(rates![i]));
     const four = [2, 4, 6].map((i) => Number(rates![i])), five = [7, 8, 9].map((i) => Number(rates![i]));
-    const { floor, comfortable } = workingFloors(body('playtester-reception'))!;
+    const floors = workingFloors(body('playtester-reception'));
+    expect(floors, 'Reception: the "Your working floors" target line names a floor and a comfortable size').not.toBeNull();
+    const { floor, comfortable } = floors!;
+    // The floor bullet restates four of those rates in prose; an edit to one copy must not leave the other behind.
+    const bullet = text.slice(text.indexOf('Your working floors'));
+    for (const figure of [`${four[0]}% at ${mmAt[0]} mm`, `${four[1]}% at ${mmAt[1]} mm`, `${four[2]}% only at ${mmAt[2]} mm`, `${five[1]}% already at ${mmAt[1]} mm`]) {
+      expect(bullet, `the floor bullet restates "${figure}", which the Targets line must still say`).toContain(figure);
+    }
     expect(text, 'the "miss as often as a hit" claim is the floor\'s own').toContain(`a ${floor.radius} px radius)** is a miss as often as a hit`);
     const at = four.findIndex((h, i) => i > 0 && four[i - 1] < 50 && h >= 50);
     expect(at, 'the quoted 4-year-old rates cross 50% somewhere').toBeGreaterThan(0);
     const half = mmAt[at - 1] + ((50 - four[at - 1]) / (four[at] - four[at - 1])) * (mmAt[at] - mmAt[at - 1]);
     expect(Math.abs(floor.mm - half), `the floor is ${floor.mm} mm; the quoted rates put 50% at ${half.toFixed(1)} mm`).toBeLessThanOrEqual(1);
-    const ninety = (rs: number[]) => mmAt[rs.findIndex((h) => h >= 90)];
-    expect(comfortable.mm, 'comfortable is above the size where 5-year-olds already reach 90%').toBeGreaterThan(ninety(five));
-    expect(comfortable.mm, 'and below the size where 4-year-olds first do').toBeLessThan(ninety(four));
+    const ninety = (rs: number[], who: string) => {
+      const i = rs.findIndex((h) => h >= 90);
+      expect(i, `the quoted ${who} rates reach 90% at some size`).toBeGreaterThanOrEqual(0);
+      return mmAt[i];
+    };
+    expect(comfortable.mm, 'comfortable is above the size where 5-year-olds already reach 90%').toBeGreaterThan(ninety(five, '5-year-old'));
+    expect(comfortable.mm, 'and below the size where 4-year-olds first do').toBeLessThan(ninety(four, '4-year-old'));
   });
 
   it('the parent cites at least one published study, by link (#2213)', () => {
