@@ -18,7 +18,7 @@ export const say = (n: Dec, un: Unit) => `${fmt(n)} ${word(un, n)}`;
 const last = (s: string) => s.slice(-1);
 
 /** Three distinct decoys from `named` then `fill`; a 20+ or decimal answer whose last digit no decoy shares swaps its last decoy for answer ± 10 units (#1058). */
-export function finish(rng: Rng, prompt: string, spoken: string, answer: Dec, named: Dec[], hint: string): Question {
+export function finish(rng: Rng, prompt: string, spoken: string, answer: Dec, named: Dec[], hint: string, why?: string): Question {
   const label = fmt(answer), out: string[] = [];
   const fill = [dec(answer.v + 10, answer.dp), dec(answer.v - 10, answer.dp), dec(answer.v + 100, answer.dp), dec(answer.v + 1, answer.dp)];
   for (const c of [...named, ...fill]) {
@@ -29,5 +29,9 @@ export function finish(rng: Rng, prompt: string, spoken: string, answer: Dec, na
     const cand = [addDec(answer, dec(10, answer.dp)), subDec(answer, dec(10, answer.dp))].filter(c => c.v > 0).map(c => fmt(c)).filter(s => s !== label && !out.includes(s));
     if (cand.length) out[2] = pick(rng, cand);
   }
-  return wordQ(rng, prompt, label, out, { say: ks2Say(spoken), hint, hintIsData: false });
+  return wordQ(rng, prompt, label, out, { say: ks2Say(spoken), hint, hintIsData: false, why });
 }
+
+/** The why (#2317) of a one-pair conversion: the size of one big unit, then the multiply or divide by it. */
+export const scaleWhy = (big: Unit, small: Unit, f: number, from: Dec, to: Dec, down: boolean) =>
+  `1 ${big.sym} = ${f} ${small.sym}: ${fmt(from)} ${down ? '×' : '÷'} ${f} = ${fmt(to)}`;
