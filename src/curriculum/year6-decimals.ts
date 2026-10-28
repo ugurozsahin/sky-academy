@@ -9,6 +9,8 @@ import { dec, fmt, mulPow10, divPow10, compareDec, parseNum, type Dec } from './
 import { ks2Say } from './ks2say';
 
 type N = 1 | 2 | 3;
+const PLACES = ['one place', 'two places', 'three places'];
+const COLUMNS = ['thousands', 'hundreds', 'tens', 'ones', 'tenths', 'hundredths', 'thousandths'];
 const lab = (a: Dec) => fmt(a);
 const canon = (a: Dec): Dec => parseNum(fmt(a))!;
 const LIMIT = dec(1000000, 0);
@@ -52,7 +54,7 @@ function digitValue(rng: Rng): Question {
   const ans = dec(asked * 10 ** (len - 1 - at), 3);
   const prompt = `What is the value of the ${asked} in ${lab(num)}?`;
   const ds = pickDecoys(ans, [mulPow10(ans, 1), divPow10(ans, 1), dec(asked, 0), mulPow10(ans, 2), divPow10(ans, 2), mulPow10(ans, 3)]);
-  return wordQ(rng, prompt, lab(ans), ds, { say: `${ks2Say(prompt.slice(0, -1))}?`, hint: 'Which column is the digit in?', hintIsData: false });
+  return wordQ(rng, prompt, lab(ans), ds, { say: `${ks2Say(prompt.slice(0, -1))}?`, hint: 'Which column is the digit in?', hintIsData: false, why: `The ${asked} is in the ${COLUMNS[4 + at - whole]} column: ${lab(ans)}` });
 }
 
 /** One `start op 10^n` sum whose answer has at most 3 decimal places. */
@@ -73,7 +75,7 @@ function shiftSum(rng: Rng): Question {
   const pow = lab(dec(10 ** n, 0));
   const prompt = `${lab(start)} ${op} ${pow} = ?`;
   const ds = pickDecoys(ans, [...shifts(ans).slice(0, 2), other, ...shifts(ans).slice(2)]);
-  return wordQ(rng, prompt, lab(ans), ds, { say: `What is ${ks2Say(`${lab(start)} ${op} ${pow}`)}?`, hint: `Each digit moves ${n === 1 ? 'one place' : n === 2 ? 'two places' : 'three places'}`, hintIsData: false });
+  return wordQ(rng, prompt, lab(ans), ds, { say: `What is ${ks2Say(`${lab(start)} ${op} ${pow}`)}?`, hint: `Each digit moves ${n === 1 ? 'one place' : n === 2 ? 'two places' : 'three places'}`, hintIsData: false, why: `Digits move ${PLACES[n - 1]} ${op === '×' ? 'left' : 'right'}: ${lab(ans)}` });
 }
 
 /** d3: the missing power of ten ("3.6 × ? = 3,600") or the missing start ("? ÷ 100 = 0.045"). */
@@ -83,12 +85,12 @@ function missing(rng: Rng): Question {
     const prompt = `${lab(start)} ${op} ? = ${lab(ans)}`;
     const powers = [10, 100, 1000, 10000].map(p => dec(p, 0));
     const right = dec(10 ** n, 0);
-    return wordQ(rng, prompt, lab(right), powers.filter(p => p.v !== right.v).map(lab), { say: ks2Say(prompt), hint: `Count the places the digits moved`, hintIsData: false });
+    return wordQ(rng, prompt, lab(right), powers.filter(p => p.v !== right.v).map(lab), { say: ks2Say(prompt), hint: `Count the places the digits moved`, hintIsData: false, why: `Digits moved ${PLACES[n - 1]}, so ${op} ${lab(right)}` });
   }
   const prompt = `? ${op} ${lab(dec(10 ** n, 0))} = ${lab(ans)}`;
   const sameOp = op === '×' ? mulPow10(ans, n) : divPow10(ans, n); // applies the sum's operation to the answer, not its inverse
   const ds = pickDecoys(start, [...shifts(start).slice(0, 2), sameOp, ...shifts(start).slice(2)]);
-  return wordQ(rng, prompt, lab(start), ds, { say: ks2Say(prompt), hint: 'Work backwards: do the opposite', hintIsData: false });
+  return wordQ(rng, prompt, lab(start), ds, { say: ks2Say(prompt), hint: 'Work backwards: do the opposite', hintIsData: false, why: `Undo it: ${lab(ans)} ${op === '×' ? '÷' : '×'} ${lab(dec(10 ** n, 0))} = ${lab(start)}` });
 }
 
 export const y6Decimals: Generator = (d: Difficulty, rng: Rng): Question => d === 1 ? digitValue(rng) : d === 2 ? shiftSum(rng) : missing(rng);
