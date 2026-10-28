@@ -35,17 +35,21 @@ function decoys(rng: Rng, answerT: number, sourceT: number): string[] {
   return out.slice(0, 3).map(num);
 }
 
-function card(rng: Rng, prompt: string, say: string, answerT: number, sourceT: number, hint: string, slow = false): Question {
+function card(rng: Rng, prompt: string, say: string, answerT: number, sourceT: number, hint: string, why: string, slow = false): Question {
   return wordQ(rng, prompt, num(answerT), decoys(rng, answerT, sourceT),
-    { say, hint, hintIsData: false, ...(slow ? { slow: true } : {}) });
+    { say, hint, hintIsData: false, why, ...(slow ? { slow: true } : {}) });
 }
+
+/** The why (#2317): the size of one big unit, then the multiply or divide by it ("1 km = 1,000 m: 5 × 1,000 = 5,000"). */
+const scaleWhy = (row: Row, from: number, down: boolean, to: number) =>
+  `1 ${ONE[row.big] ?? row.big} = ${row.factor.toLocaleString('en-GB')} ${row.small}: ${num(from)} ${down ? '×' : '÷'} ${row.factor.toLocaleString('en-GB')} = ${num(to)}`;
 
 /** "5 km = ? m" — the bare count is the answer; both units sit on the card, one in words when it is a time. */
 function plain(rng: Rng, row: Row, down: boolean, t: number, slow = false): Question {
   const [from, to] = down ? [row.big, row.small] : [row.small, row.big];
   const a = down ? t * row.factor : t / row.factor;
   return card(rng, `${num(t)} ${unitFor(from, t)} = ? ${to}`, `${spoken(t, from)} is how many ${WORD[to] ?? to}?`, a, t,
-    down ? 'Multiply to go to the smaller unit' : 'Divide to go to the bigger unit', slow);
+    down ? 'Multiply to go to the smaller unit' : 'Divide to go to the bigger unit', scaleWhy(row, t, down, a), slow);
 }
 
 const whole = (rng: Rng, row: Row, down: boolean, upTo: number, slow = false) => {
@@ -60,7 +64,8 @@ function compound(rng: Rng, row: Row): Question {
   const left = `${k} ${unitFor(row.big, k * 10)}`, right = `${rest} ${unitFor(row.small, rest * 10)}`;
   const say = (n: number, u: string) => `${ks2Say(String(n))} ${n === 1 && ONE[u] ? ONE[u] : WORD[u] ?? u}`;
   return card(rng, `${left} ${right} = ? ${row.small}`, `${say(k, row.big)} ${say(rest, row.small)} is how many ${WORD[row.small] ?? row.small}?`,
-    total * 10, k * 10, 'Change the bigger unit first, then add the rest', true);
+    total * 10, k * 10, 'Change the bigger unit first, then add the rest',
+    `${k} × ${row.factor} = ${k * row.factor}; ${k * row.factor} + ${rest} = ${total}`, true);
 }
 
 /** d3 decimal: "2.5 km = ? m" (tenths of a bigger unit that make a whole smaller one) or the answer as a one-place decimal ("400 m = ? km"). */
@@ -77,7 +82,7 @@ function sentence(rng: Rng): Question {
   const what: Record<string, string> = { hours: 'A film lasts', minutes: 'A song lasts', years: 'A tree is', weeks: 'A trip lasts' };
   const unit = row.big, from = `${k} ${unit}`;
   return card(rng, `${what[unit]} ${from}${unit === 'years' ? ' old' : ''}. How many ${row.small}?`, `${what[unit]} ${ks2Say(String(k))} ${unit}${unit === 'years' ? ' old' : ''}. How many ${row.small}?`,
-    k * row.factor * 10, k * 10, 'Multiply to go to the smaller unit', true);
+    k * row.factor * 10, k * 10, 'Multiply to go to the smaller unit', scaleWhy(row, k * 10, true, k * row.factor * 10), true);
 }
 
 function d3(rng: Rng): Question {
