@@ -151,7 +151,7 @@ export function promptHTML(q: Question, done: number, reveal = false, remaining?
   if (q.anyOrder) {
     const left = new Set(remaining ?? q.sequence);
     const items = q.sequence.map(t => `<span class="${left.has(t) ? 'todo' : 'got'}">${left.has(t) && !reveal ? '_' : esc(t)}</span>`);
-    return `${esc(q.prompt)} <span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
+    return `${markDivide(esc(q.prompt))} <span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
   }
   const items = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done || reveal ? esc(l) : '_'}</span>`);
   return `<span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
@@ -189,7 +189,7 @@ function buildPromptHTML(prompt: string, template: string, sequence: readonly st
     return `<span class="${shown ? 'got' : 'todo'}">${shown ? esc(item) : '_'}</span>`;
   }).join('');
   const q = prompt.lastIndexOf('?');
-  return q === -1 ? `${esc(prompt)} <span class="seq">${slots}</span>` : `${esc(prompt.slice(0, q))}<span class="seq">${slots}</span>${esc(prompt.slice(q + 1))}`;
+  return q === -1 ? `${markDivide(esc(prompt))} <span class="seq">${slots}</span>` : `${markDivide(esc(prompt.slice(0, q)))}<span class="seq">${slots}</span>${markDivide(esc(prompt.slice(q + 1)))}`;
 }
 
 /**

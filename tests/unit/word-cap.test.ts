@@ -68,6 +68,19 @@ describe('Reception to Year 2 waves carry at most three word bubbles (#2315)', (
     }
     expect(capped, 'the cap actually bites somewhere').toBeGreaterThan(0);
   });
+  it('the topics whose lettered four-option sets the cap exempts are exactly this list (#2378)', () => {
+    const exempt = new Set<string>();
+    for (const t of topics) for (const d of DIFFS) for (let s = 0; s < 200; s++) {
+      const q = t.gen(d, rngFor(s * 7 + d));
+      if (q.options.length > MAX_WORD_BUBBLES_KS1 && !capApplies(q, q.options) && !q.sequence && !q.optionsAreContent && q.options.some(o => /[A-Za-z]/.test(o))) exempt.add(t.id);
+    }
+    // Sounds, tricky words, units, times and money: letters, but not a plain word set. A new word game that slips past isWordSet shows up here.
+    expect([...exempt].sort()).toEqual([
+      'r-capitals', 'r-soundhunt', 'r-sounds', 'r-tricky', 'y1-alphabet', 'y1-coins', 'y1-days', 'y1-digraphs', 'y1-soundhunt', 'y1-time',
+      'y2-capacity', 'y2-coincombo', 'y2-duration', 'y2-length', 'y2-mass', 'y2-money', 'y2-scales', 'y2-spelling', 'y2-story-add',
+      'y2-story-money', 'y2-symmetry', 'y2-temp', 'y2-time',
+    ]);
+  });
   it('Years 3 to 6 are not capped', () => {
     for (const t of TOPICS.filter(t => !WORD_CAP_YEARS.has(t.year)).slice(0, 40)) {
       const q = t.gen(2, rngFor(3));
