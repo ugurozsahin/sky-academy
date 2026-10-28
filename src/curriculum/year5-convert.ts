@@ -6,7 +6,7 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick } from './util';
 import { dec, fmt, mulPow10, divPow10, type Dec } from './ks2num';
-import { u, show, say, finish, type Unit } from './unitcard';
+import { u, show, say, finish, scaleWhy, type Unit } from './unitcard';
 
 interface Pair { big: Unit; small: Unit; f: number; pow: 1 | 2 | 3 | 0; time: boolean }
 const KM = u('km', 'kilometre'), M = u('m', 'metre'), CM = u('cm', 'centimetre'), MM = u('mm', 'millimetre'), KG = u('kg', 'kilogram'), G = u('g', 'gram');
@@ -29,7 +29,7 @@ function card(rng: Rng, p: Pair, big: Dec, small: Dec, hint: string, extra: Dec[
   const prompt = `${show(from, fu)} = ? ${tu.sym}`, spoken = `${say(from, fu)} is how many ${tu.many}?`;
   const shifts = [mulPow10(to, 1), divPow10(to, 1)];
   const wrongFactor = down ? [mulPow10(small, 1), divPow10(small, 1)] : [mulPow10(big, 1), divPow10(big, 1)];
-  return finish(rng, prompt, spoken, to, [...extra, ...shifts, ...wrongFactor, from], hint);
+  return finish(rng, prompt, spoken, to, [...extra, ...shifts, ...wrongFactor, from], hint, scaleWhy(p.big, p.small, p.f, from, to, down));
 }
 
 /** A metric amount of the larger unit as a Dec: `n` is its integer at `dp` places. */
@@ -60,21 +60,24 @@ function singleTime(rng: Rng): Question {
 function hoursMinutes(rng: Rng): Question {
   const h = ri(rng, 1, 5), min = ri(rng, 1, 11) * 5, answer = h * 60 + min;
   const prompt = `${h} h ${min} min = ? min`, spoken = `${h} ${h === 1 ? 'hour' : 'hours'} ${min} minutes is how many minutes?`;
-  return finish(rng, prompt, spoken, dec(answer, 0), [dec(h * 100 + min, 0), dec(h * 60, 0), dec(h + min, 0), dec(h * 600 + min, 0)], HINT_TIME);
+  return finish(rng, prompt, spoken, dec(answer, 0), [dec(h * 100 + min, 0), dec(h * 60, 0), dec(h + min, 0), dec(h * 600 + min, 0)], HINT_TIME,
+    `${h} × 60 = ${h * 60}; ${h * 60} + ${min} = ${answer}`);
 }
 
 /** "1.5 hours = ? minutes": a quarter, half or three quarters. The slips are 150 and 60 + 50. */
 function decimalHours(rng: Rng): Question {
   const h = ri(rng, 1, 4), q = pick(rng, [25, 50, 75]), hours = dec(h * 100 + q, 2), answer = h * 60 + (q * 60) / 100;
   const prompt = `${fmt(hours)} hours = ? minutes`, spoken = `${fmt(hours)} hours is how many minutes?`;
-  return finish(rng, prompt, spoken, dec(answer, 0), [dec(h * 100 + q, 0), dec(h * 60 + q, 0), dec(h * 60 + q / 5, 0), dec(h * 60, 0)], HINT_TIME);
+  return finish(rng, prompt, spoken, dec(answer, 0), [dec(h * 100 + q, 0), dec(h * 60 + q, 0), dec(h * 60 + q / 5, 0), dec(h * 60, 0)], HINT_TIME,
+    `${h * 60} + ${fmt(dec(q, 2))} × 60 = ${h * 60} + ${(q * 60) / 100} = ${answer}`);
 }
 
 /** "150 min = 2 h and ? min": the remainder. The slips are the digits after the hundreds and 60 minus the answer. */
 function remainder(rng: Rng): Question {
   const h = ri(rng, 1, 5), min = ri(rng, 1, 11) * 5, total = h * 60 + min;
   const prompt = `${total} min = ${h} h and ? min`, spoken = `${total} minutes is ${h} ${h === 1 ? 'hour' : 'hours'} and how many minutes?`;
-  return finish(rng, prompt, spoken, dec(min, 0), [dec(total % 100, 0), dec(60 - min, 0), dec(total - h * 100, 0), dec(h, 0)], HINT_TIME);
+  return finish(rng, prompt, spoken, dec(min, 0), [dec(total % 100, 0), dec(60 - min, 0), dec(total - h * 100, 0), dec(h, 0)], HINT_TIME,
+    `${h} × 60 = ${h * 60}; ${total} − ${h * 60} = ${min}`);
 }
 
 /** "1 m 35 cm = ? cm": the bigger unit first, then the rest. The slips are 1 + 35 style joins and a shifted tens. */
@@ -82,7 +85,8 @@ function mixedMetric(rng: Rng): Question {
   const p = pick(rng, MIXED), a = ri(rng, 1, 9), b = ri(rng, 1, p.f / 5 - 1) * 5, answer = a * p.f + b;
   const prompt = `${a} ${p.big.sym} ${b} ${p.small.sym} = ? ${p.small.sym}`;
   const spoken = `${a} ${a === 1 ? p.big.one : p.big.many} ${b} ${p.small.many} is how many ${p.small.many}?`;
-  return finish(rng, prompt, spoken, dec(answer, 0), [dec(a * p.f * 10 + b, 0), dec(a * 10 + b, 0), dec(a * p.f + b * 10, 0), dec(a + b, 0)], HINT_MIXED);
+  return finish(rng, prompt, spoken, dec(answer, 0), [dec(a * p.f * 10 + b, 0), dec(a * 10 + b, 0), dec(a * p.f + b * 10, 0), dec(a + b, 0)], HINT_MIXED,
+    `${a} ${p.big.sym} = ${a * p.f} ${p.small.sym}; ${a * p.f} + ${b} = ${answer}`);
 }
 
 export const y5Convert: Generator = (level: Difficulty, rng) => {

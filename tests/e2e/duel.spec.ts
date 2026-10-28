@@ -1339,6 +1339,25 @@ test.describe('Ninja Duel', () => {
     }
   });
 
+  test('guard rail: the longest word card stays on one line at 800 wide in portrait (#2401, #2128)', async ({ page }) => {
+    await startDuel(page);
+    await page.evaluate(() => { for (const p of ['a', 'b'] as const) window.__sna.arenas[p].paused = true; });
+    await resizeTo(page, { width: 800, height: 1280 });
+    // Dealt by hand, not drawn from the sweep above: #2400's `.duel-q .wordcard .txt { font-size: 26px }` was held
+    // only by a lucky draw, and removing the rule left the sweep green. This is the card that wrapped.
+    const card = {
+      html: '<div class="vis wordcard"><span class="emoji">🍪</span><span class="txt">biscuit + ice-cream</span></div>',
+      prompt: 'Which word is it?', hint: 'biscuit + ice-cream',
+    };
+    const P = await dressAndMeasure(page, card);
+    const txt = await page.evaluate(() => {
+      const el = document.querySelector('#vis .wordcard .txt') as HTMLElement;
+      return { h: el.getBoundingClientRect().height, font: parseFloat(getComputedStyle(el).fontSize) };
+    });
+    expect(txt.h, 'the word sits on one line, not two').toBeLessThan(txt.font * 1.15 * 1.5 + 4 + 1);
+    expect(P.clipY, '800x1280: the long word card is not cut off by the budget').toBeLessThanOrEqual(0.5);
+  });
+
   test('a duel is played on a bubble topic of the island, a round nobody slices is a draw, and pause holds both arenas', async ({ page }) => {
     await startDuel(page);
     const topic = await page.evaluate(() => ({ id: window.__sna.state().topic, input: window.__sna.duel.o.topic.input, sequence: window.__sna.duel.current?.sequence }));

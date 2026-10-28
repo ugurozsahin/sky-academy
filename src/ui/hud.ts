@@ -6,6 +6,7 @@
 // play.ts keeps all the wiring, exactly as the overlays split (#99) did.
 import type { Question } from '../curriculum';
 import { symSay } from '../curriculum/util';
+import { fromRoman } from '../curriculum/roman';
 import { say } from '../audio';
 import { traceNoun } from '../game/tracing';
 import { $, esc, fillAnswer } from './dom';
@@ -150,7 +151,7 @@ export function promptHTML(q: Question, done: number, reveal = false, remaining?
   if (q.anyOrder) {
     const left = new Set(remaining ?? q.sequence);
     const items = q.sequence.map(t => `<span class="${left.has(t) ? 'todo' : 'got'}">${left.has(t) && !reveal ? '_' : esc(t)}</span>`);
-    return `${esc(q.prompt)} <span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
+    return `${markDivide(esc(q.prompt))} <span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
   }
   const items = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done || reveal ? esc(l) : '_'}</span>`);
   return `<span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
@@ -188,7 +189,7 @@ function buildPromptHTML(prompt: string, template: string, sequence: readonly st
     return `<span class="${shown ? 'got' : 'todo'}">${shown ? esc(item) : '_'}</span>`;
   }).join('');
   const q = prompt.lastIndexOf('?');
-  return q === -1 ? `${esc(prompt)} <span class="seq">${slots}</span>` : `${esc(prompt.slice(0, q))}<span class="seq">${slots}</span>${esc(prompt.slice(q + 1))}`;
+  return q === -1 ? `${markDivide(esc(prompt))} <span class="seq">${slots}</span>` : `${markDivide(esc(prompt.slice(0, q)))}<span class="seq">${slots}</span>${markDivide(esc(prompt.slice(q + 1)))}`;
 }
 
 /**
@@ -240,7 +241,7 @@ export function createHud(els: HudEls, lives: number, audible: () => boolean) {
     speakCorrection(q: Question, topicId: string | undefined) {
       const line = correctionLine(q, topicId);
       if (line) say(line);
-      if (q.why) say(symSay(q.why), false, { queue: true });   // #2316: through the prompts' own clean-up, so × and = are read as words
+      if (q.why) say(symSay(q.why.replace(/\b[IVXLCDM]+\b/g, r => fromRoman(r) ? [...r].join(' ') : r)), false, { queue: true });   // #2316: through the prompts' own clean-up, so × and = are read as words, a Roman numeral letter by letter (#1057)
     },
   };
 }
