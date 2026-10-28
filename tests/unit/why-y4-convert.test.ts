@@ -8,7 +8,7 @@ const n = (s: string) => Number(s.replace(/,/g, ''));
 
 describe('y4-convert whys (#2317)', () => {
   it('every why ends in the card answer', () => {
-    for (const q of qs) expect(q.why!.split(/[=:]/).pop()!.trim().replace(/,/g, ''), q.why).toBe(q.answer.replace(/,/g, ''));
+    for (const q of qs) expect(q.why!.split(/[=:]/).pop()!.trim(), q.why).toBe(q.answer);
   });
   it('a scale why multiplies or divides by the stated factor, and the factor is the pair on the card', () => {
     const scale = qs.filter(q => /^1 \S+ = [\d,]+ \S+: /.test(q.why!));
@@ -29,8 +29,9 @@ describe('y4-convert whys (#2317)', () => {
   it('a compound why has true arithmetic in both steps', () => {
     const comp = qs.filter(q => q.why!.includes(';'));
     expect(comp.length).toBeGreaterThan(50);
+    expect(comp.some(q => /\d,\d{3} \+ /.test(q.why!)), 'a four-digit step carries its comma').toBe(true);
     for (const q of comp) for (const step of q.why!.split(';')) {
-      const m = /([\d,]+) ([×+]) ([\d,]+) = ([\d,]+)$/.exec(step.trim())!;
+      const m = /^([\d,]+) ([×+]) ([\d,]+) = ([\d,]+)$/.exec(step.trim())!;
       expect(m, q.why).toBeTruthy();
       expect(m[2] === '×' ? n(m[1]) * n(m[3]) : n(m[1]) + n(m[3]), q.why).toBe(n(m[4]));
     }

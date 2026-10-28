@@ -61,11 +61,12 @@ const whole = (rng: Rng, row: Row, down: boolean, upTo: number, slow = false) =>
 function compound(rng: Rng, row: Row): Question {
   const rest = row.factor === 7 || row.factor === 12 ? ri(rng, 1, row.factor - 1) : pick(rng, row.factor === 10 ? [2, 5, 7] : [5, 10, 15, 20, 25, 30, 40, 45, 50].filter(n => n < row.factor));
   const k = ri(rng, 1, row.time ? 5 : 9), total = k * row.factor + rest;
+  const c = (n: number) => n.toLocaleString('en-GB');
   const left = `${k} ${unitFor(row.big, k * 10)}`, right = `${rest} ${unitFor(row.small, rest * 10)}`;
   const say = (n: number, u: string) => `${ks2Say(String(n))} ${n === 1 && ONE[u] ? ONE[u] : WORD[u] ?? u}`;
   return card(rng, `${left} ${right} = ? ${row.small}`, `${say(k, row.big)} ${say(rest, row.small)} is how many ${WORD[row.small] ?? row.small}?`,
     total * 10, k * 10, 'Change the bigger unit first, then add the rest',
-    `${k} × ${row.factor} = ${k * row.factor}; ${k * row.factor} + ${rest} = ${total}`, true);
+    `${k} × ${c(row.factor)} = ${c(k * row.factor)}; ${c(k * row.factor)} + ${rest} = ${c(total)}`, true);
 }
 
 /** d3 decimal: "2.5 km = ? m" (tenths of a bigger unit that make a whole smaller one) or the answer as a one-place decimal ("400 m = ? km"). */
