@@ -186,7 +186,7 @@ export function orderQ(rng: Rng, max: number, count: number): Question {
 export function lineQ(rng: Rng, from: number, step: number, len: number): Question {
   const to = from + step * (len - 1);
   const idx = ri(rng, 1, len - 1); const mark = from + step * idx;
-  return numQ(rng, 'Which number is hidden?', mark, { min: 0, max: 120, visual: { type: 'numberline', from, to, mark, step }, say: `Which number is hidden on the number line?`, distractors: [mark + step, mark - step, mark + 1] });
+  return numQ(rng, 'Which number is hidden?', mark, { min: 0, max: 120, visual: { type: 'numberline', from, to, mark, step }, say: `Which number is hidden on the number line?`, distractors: Array.from({ length: 260 }, (_, i) => mark + (i % 2 ? -1 : 1) * (1 + (i >> 1))).filter(c => c >= 0 && c <= 120 && (c > to || c < from || (c - from) % step !== 0)).slice(0, 3) });   // #2319: never a value already printed on the line — the nearest unprinted ones are the real slips
 }
 
 /**
