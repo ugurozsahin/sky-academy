@@ -44,8 +44,11 @@ function decoys(a: Dec, k: number, ans: Dec, rng: Rng): string[] {
   return out;
 }
 
-/** The why (#2317): the digits multiplied with no point, then the point put back where the decimal places say. */
-const whyOf = (a: Dec, k: number, ans: Dec) => `${a.v} × ${k} = ${a.v * k}, then the point goes back ${a.dp === 1 ? '1 place' : `${a.dp} places`}: ${lab(ans)}`;
+/** The why (#2317): the digits multiplied with no point, then the point put back the stated places; a spare end zero is shown, then dropped (1.40 = 1.4), so counting the places always lands on the printed working. */
+function whyOf(a: Dec, k: number, ans: Dec): string {
+  const counted = fmt(ans, { fixedDp: a.dp }), shown = lab(ans);
+  return `${a.v} × ${k} = ${a.v * k}; point back ${a.dp === 1 ? '1 place' : `${a.dp} places`}: ${counted}${counted === shown ? '' : ` = ${shown}`}`;
+}
 
 function pickOne(rng: Rng, a: Dec): Question {
   const k = ri(rng, 2, 9), ans = canon(mulDecByInt(a, k)), expr = `${lab(a)} × ${k}`;
