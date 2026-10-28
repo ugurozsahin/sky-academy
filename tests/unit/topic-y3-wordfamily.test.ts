@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { AVOID } from '../../src/curriculum/util';
-import { FAMILIES } from '../../src/curriculum/year3-wordfamily';
+import { FAMILIES, affixesOf } from '../../src/curriculum/year3-wordfamily';
 import { rLblProblem } from './helpers/r-lbl';
 
 function rng(seed: number) {
@@ -54,6 +54,18 @@ describe('y3-wordfamily (#1107)', () => {
       const decoys = q.options!.filter(o => !q.sequence!.includes(o));
       expect(decoys).toHaveLength(2);
       for (const dcy of decoys) expect(inFamily(f, dcy), q.prompt).toBe(false);
+    }
+  });
+
+  it('#2321: a decoy shares an affix with the family words whenever another family offers one (200 seeds per level)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d, 200)) {
+      const f = family(q.prompt);
+      const shown = d === 2 ? q.options!.filter(o => inFamily(f, o)) : d === 1 ? [q.answer] : q.sequence!;
+      const decoys = d === 2 ? [q.answer] : q.options!.filter(o => !shown.includes(o));
+      const aff = new Set(shown.flatMap(affixesOf));
+      const pool = FAMILIES.filter(g => g[0] !== f[0]).flatMap(g => g[1]);
+      if (!pool.some(w => affixesOf(w).some(a => aff.has(a)))) continue;
+      expect(decoys.some(w => affixesOf(w).some(a => aff.has(a))), `${q.prompt} ${decoys}`).toBe(true);
     }
   });
 
