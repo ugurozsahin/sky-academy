@@ -11,11 +11,31 @@ export const y2Spelling: Generator = (d, rng) => {
   return trickyGap(rng, w);
 };
 export const CONTRACTIONS: [string, string][] = [['do not', "don't"], ['cannot', "can't"], ['is not', "isn't"], ['I am', "I'm"], ['it is', "it's"], ['you are', "you're"], ['we will', "we'll"], ['did not', "didn't"], ['has not', "hasn't"], ['they are', "they're"], ['I will', "I'll"], ['could not', "couldn't"]];
+/**
+ * #2320: the mistakes a child really writes for a contraction — the apostrophe left out (`dont`), put one
+ * letter early (`do'nt`) or late — and a bank neighbour that shares the answer's first word (`we will` against
+ * `we'll`, `I'll`), never an unrelated contraction that only the opening letter rules out.
+ */
+export function contractionDecoys(long: string, short: string, n: number): string[] {
+  const at = short.indexOf("'"), bare = short.replace("'", "");
+  const slip = (to: number) => { const l = bare.split(''); l.splice(to, 0, "'"); return l.join(''); };
+  const first = long.split(' ')[0];
+  const kin = CONTRACTIONS.filter(c => c[1] !== short && (c[0].split(' ')[0] === first || c[0].split(' ').pop() === long.split(' ').pop())).map(c => c[1]);
+  const wrong = [bare, slip(at - 1), slip(at + 1)].filter(w => w !== short && w !== bare + "'" && !w.startsWith("'"));
+  const rest = CONTRACTIONS.filter(c => c[1] !== short).map(c => c[1]);   // last resort, for a short with only two slips (cannot)
+  return [...new Set([...kin.slice(0, 1), ...wrong, ...kin.slice(1), ...rest])].slice(0, n);
+}
 export const y2Contractions: Generator = (d, rng) => {
   const [long, short] = pick(rng, CONTRACTIONS);
-  const ds = shuffle(rng, CONTRACTIONS.filter(c => c[1] !== short)).slice(0, d === 1 ? 2 : 3).map(c => c[1]);
-  if (d === 3 && rng() < 0.5) return wordQ(rng, short, long, shuffle(rng, CONTRACTIONS.filter(c => c[0] !== long)).slice(0, 3).map(c => c[0]), { visual: { type: 'word', text: short }, say: `What does ${short} mean?` });
-  return wordQ(rng, long, short, ds, { visual: { type: 'word', text: long }, say: `Which contraction means ${long}?`, hint: 'Slice the short form', hintIsData: false });
+  const n = d === 1 ? 2 : 3;
+  if (d === 3 && rng() < 0.5) {
+    const first = long.split(' ')[0], last = long.split(' ').pop();
+    const near = CONTRACTIONS.filter(c => c[0] !== long && (c[0].split(' ')[0] === first || c[0].split(' ').pop() === last));
+    const rest = CONTRACTIONS.filter(c => c[0] !== long && !near.includes(c));
+    const ds = [...shuffle(rng, near), ...shuffle(rng, rest)].slice(0, 3).map(c => c[0]);
+    return wordQ(rng, short, long, ds, { visual: { type: 'word', text: short }, say: `What does ${short} mean?` });
+  }
+  return wordQ(rng, long, short, shuffle(rng, contractionDecoys(long, short, 5)).slice(0, n), { visual: { type: 'word', text: long }, say: `Which contraction means ${long}?`, hint: 'Slice the short form', hintIsData: false });
 };
 /** [root, ending, sentence]. */
 export const SUFFIX2: ReadonlyArray<readonly [string, string, string]> = [['care', 'ful', 'Be care___ on the road.'], ['hope', 'less', 'The lost sock was hope___.'], ['kind', 'ness', 'Show kind___ to others.'], ['slow', 'ly', 'The snail moved slow___.'], ['enjoy', 'ment', 'We had lots of enjoy___.'], ['help', 'ful', 'A very help___ friend.'], ['quick', 'ly', 'She ran quick___.'], ['sad', 'ness', 'He felt great sad___.'], ['fear', 'less', 'The fear___ ninja jumped.'], ['pay', 'ment', 'Mum made the pay___.']];
