@@ -23,18 +23,31 @@ export const FAMILIES: readonly Family[] = [
 
 const others = (root: string): string[] => FAMILIES.filter(f => f[0] !== root).flatMap(f => f[1]);
 
+/** The affixes the families use (#2321): a decoy that wears the answer's affix looks like a family member without being one. */
+export const SUFFIXES = ['ful', 'less', 'er', 'or', 'ist', 'al', 'ive', 'hood', 'ish', 'ion', 'ly', 'ure'] as const;
+export const PREFIXES = ['un', 're', 'dis', 'in', 'bi'] as const;
+export const affixesOf = (w: string): string[] => [
+  ...SUFFIXES.filter(a => w.endsWith(a) && w.length > a.length + 2), ...PREFIXES.filter(a => w.startsWith(a) && w.length > a.length + 2),
+];
+/** Decoys from other families, those sharing an affix with `like` first, then the rest; each tier shuffled. */
+const decoysFor = (rng: () => number, root: string, like: readonly string[], n: number): string[] => {
+  const pool = others(root), aff = new Set(like.flatMap(affixesOf));
+  const shares = (w: string): boolean => affixesOf(w).some(a => aff.has(a));
+  return [...shuffle(rng, pool.filter(shares)), ...shuffle(rng, pool.filter(w => !shares(w)))].slice(0, n);
+};
+
 const memberQ = (rng: () => number): Question => {
   const [root, members] = pick(rng, FAMILIES);
   const answer = pick(rng, members);
-  const decoys = shuffle(rng, others(root)).slice(0, 2);
+  const decoys = decoysFor(rng, root, [answer], 2);
   const prompt = `Which word is in the same family as ${root}?`;
   return { prompt, answer, options: shuffle(rng, [answer, ...decoys]), wide: true, say: prompt, hint: 'Look for the same root word', hintIsData: false };
 };
 
 const oddQ = (rng: () => number): Question => {
   const [root, members] = pick(rng, FAMILIES.filter(f => f[1].length >= 3));
-  const answer = pick(rng, others(root));
   const three = shuffle(rng, members).slice(0, 3);
+  const answer = decoysFor(rng, root, three, 1)[0];
   const prompt = `Which word is not in the ${root} family?`;
   return { prompt, answer, options: shuffle(rng, [answer, ...three]), wide: true, say: prompt, hint: 'Three words share one root', hintIsData: false };
 };
@@ -42,7 +55,7 @@ const oddQ = (rng: () => number): Question => {
 const allQ = (rng: () => number): Question => {
   const [root, members] = pick(rng, FAMILIES);
   const targets = shuffle(rng, members).slice(0, rng() < 0.5 ? 2 : 3);
-  const decoys = shuffle(rng, others(root)).slice(0, 2);
+  const decoys = decoysFor(rng, root, targets, 2);
   const prompt = `Slice every word in the ${root} family.`;
   return anyOrderQ(rng, prompt, targets, decoys, { wide: true, say: prompt, hint: 'They all share the same root', hintIsData: false });
 };
