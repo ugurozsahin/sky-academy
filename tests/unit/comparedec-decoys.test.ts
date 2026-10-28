@@ -13,4 +13,13 @@ describe('y4-comparedec rounding decoys are whole numbers near the answer (#2319
       for (const d of ds) { expect(d).toBeGreaterThanOrEqual(0); expect(Math.abs(d - a), `seed ${seed}: ${d} vs ${a}`).toBeLessThanOrEqual(3); }
     }
   });
+
+  it('d1: the answer is not always an interior value of the sorted options (#2319 review)', () => {
+    let ends = 0, middles = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const q = y4CompareDec(1, rngOf(seed)), sorted = q.options.map(Number).sort((p, r) => p - r), i = sorted.indexOf(Number(q.answer));
+      if (i === 0 || i === 3) ends++; else middles++;
+    }
+    expect(ends).toBeGreaterThan(0); expect(middles).toBeGreaterThan(0);
+  });
 });
