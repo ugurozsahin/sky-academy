@@ -14,7 +14,7 @@ const scaled = (s: string, dp: number) => Number(s.replace('.', '')) * 10 ** (dp
 describe('y4-comparedec (#1148)', () => {
   it('is registered for Year 4 with sequences from d3', () => { expect(topic.year).toBe('year4'); expect(topic.sequenceFrom).toBe(3); });
 
-  it('d1: the answer is the tenths rounded up from .5, and every decoy is a real slip', () => {
+  it('d1: the answer is the tenths rounded up from .5, and every decoy is a whole number near it', () => {
     const seen = new Set<string>();
     for (const q of draw(1, 400)) {
       const m = q.prompt.match(/^(\d+)\.(\d) to the nearest whole number\?$/)!;
@@ -27,8 +27,7 @@ describe('y4-comparedec (#1148)', () => {
       q.options.forEach(o => expect(Number(o)).toBeGreaterThanOrEqual(0));
       const a = Number(q.answer), down = Math.floor(t / 10), wrong = a === down ? a + 1 : a - 1;
       if (wrong >= 0) expect(q.options).toContain(String(wrong));   // rounded the wrong way
-      if (t % 10 !== a) expect(q.options).toContain(String(t % 10)); // the tenths digit read as the answer
-      if (t !== a) expect(q.options).toContain(String(t));           // the number without its point
+      q.options.forEach(o => expect(Math.abs(Number(o) - a)).toBeLessThanOrEqual(3)); // no giveaways: the tenths digit or the number without its point (#2319)
       if (m[2] === '5') seen.add(q.answer);
     }
     expect(seen.size).toBeGreaterThan(0);
