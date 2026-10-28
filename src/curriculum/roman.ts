@@ -30,3 +30,14 @@ export function fromRoman(s: string): number | null {
 }
 
 export const isRoman = (s: string): boolean => fromRoman(s) !== null;
+
+const PLACES: readonly (readonly [number, string])[] = [[1000, 'M'], [100, 'C'], [10, 'X'], [1, 'I']];
+
+/** The why for a numeral (#2317): the numeral cut by place value, each cut added up (MCMXCIX = 1000 + 900 + 90 + 9 = 1999). A lone subtractive pair shows its take-away (IV: 5 − 1 = 4). */
+export function romanWhy(n: number): string {
+  const r = toRoman(n), parts: number[] = [];
+  for (const [unit] of PLACES) { const digit = Math.floor(n / unit) % 10; if (digit) parts.push(digit * unit); }
+  const big = ({ IV: 5, IX: 10, XL: 50, XC: 100, CD: 500, CM: 1000 } as Record<string, number>)[r];
+  if (big) return `${r}: ${big} − ${big - n} = ${n}`;
+  return parts.length === 1 ? `${r} = ${n}` : `${r} = ${parts.join(' + ')} = ${n}`;
+}
