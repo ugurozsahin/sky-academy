@@ -5,6 +5,8 @@ import { storyBankProblems } from '../../src/curriculum/story-bank';
 
 const inStory = (story: string, w: string): boolean => (story.toLowerCase().replace(/'s\b/g, '').match(/[a-z']+/g) ?? [] as string[]).includes(w.toLowerCase());
 
+// Covers only that a decoy is named in the story. It cannot see a decoy who also fits the answer (a second
+// character doing the same thing), so a new Who item still needs that read by hand.
 describe('#2320 Story Time "Who" decoys are in the story', () => {
   for (const [name, bank] of [['y1-storytime', Y1_STORIES], ['y2-storytime', Y2_STORIES]] as const) {
     it(`${name}: every decoy of a Who question is named in the story`, () => {

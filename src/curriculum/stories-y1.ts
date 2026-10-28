@@ -4,7 +4,7 @@ import { colourBubbles } from './colour-bubbles';
 import type { StoryItem } from './story-bank';
 
 const HAT = 'Tom has a red hat. He lost it in the park. Dad and Mum looked, then Mum found it by the tree.';
-const RAIN = 'Sam and Ben took an umbrella and wellies. They splashed in the puddles. Mum said Sam had so much fun.';
+const RAIN = 'Sam took his umbrella and wellies. He splashed in the puddles while Mum and Ben stayed dry. Sam had so much fun.';
 const PETS = 'Mia has a cat and a dog. The cat is black. The dog likes to run.';
 const SHOP = 'Ben went to the shop with Dad while Mum and Gran stayed home. They got milk, eggs and a loaf. Ben carried the eggs.';
 const SNOW = 'Lily put on her coat, hat and gloves. Then she ran out to play in the snow. Mum and Tom watched.';
