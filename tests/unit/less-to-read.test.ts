@@ -35,6 +35,12 @@ describe('y1-plurals bubbles (#2322)', () => {
       expect(['s', 'es']).toContain(q.answer);
     }
   });
+
+  it('the prompt is the bare "two <word>__" sentence, with no "one <word>" lead-in', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of gen('y1-plurals', d, 200)) {
+      expect(q.prompt).toMatch(/^two [a-z]+__$/);
+    }
+  });
 });
 
 describe('y1-spelling gap cards (#2322)', () => {
