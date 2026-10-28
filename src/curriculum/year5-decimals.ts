@@ -51,7 +51,8 @@ function rank(rng: Rng, make: () => Dec[], asks: typeof RANKS): Question {
     const labels = vals.map(v => fmt(v));
     if (tries < 200 && !labels.some(s => s !== answer && last(s) === last(answer))) continue;
     const prompt = `Which is the ${r.ask}?`;
-    return wordQ(rng, prompt, answer, labels.filter(s => s !== answer), { say: prompt, hint: HINT_ORDER, hintIsData: false });
+    const why = `Smallest to largest: ${sorted.map(v => fmt(v)).join(', ')}`;
+    return wordQ(rng, prompt, answer, labels.filter(s => s !== answer), { say: prompt, hint: HINT_ORDER, hintIsData: false, why });
   }
 }
 
@@ -78,19 +79,19 @@ function sameDigits(rng: Rng): Dec[] {
 function hundredthsIn(rng: Rng): Question {
   const t = ri(rng, 1, 9), answer = t * 10, v = dec(t, 1);
   const q = `How many hundredths make ${fmt(v)}?`;
-  return finish(rng, q, dec(answer, 0), [dec(t, 0), dec(t * 100, 0), dec(t * 10 + 1, 0)], [dec(answer + 10, 0), dec(answer - 10, 0)], { say: ks2Say(q), hint: HINT_PLACE });
+  return finish(rng, q, dec(answer, 0), [dec(t, 0), dec(t * 100, 0), dec(t * 10 + 1, 0)], [dec(answer + 10, 0), dec(answer - 10, 0)], { say: ks2Say(q), hint: HINT_PLACE, why: `1 tenth is 10 hundredths, so ${t} × 10 = ${answer}` });
 }
 
 function thousandthsIn(rng: Rng): Question {
   const small = rng() < 0.6, n = ri(rng, 1, 9), v = small ? dec(n, 1) : dec(n, 2), answer = small ? n * 100 : n * 10;
   const q = `How many thousandths make ${fmt(v)}?`;
-  return finish(rng, q, dec(answer, 0), [dec(answer / 10, 0), dec(answer * 10, 0), dec(n, 0)], [dec(answer + 1, 0), dec(answer + 100, 0)], { say: ks2Say(q), hint: HINT_PLACE });
+  return finish(rng, q, dec(answer, 0), [dec(answer / 10, 0), dec(answer * 10, 0), dec(n, 0)], [dec(answer + 1, 0), dec(answer + 100, 0)], { say: ks2Say(q), hint: HINT_PLACE, why: small ? `1 tenth is 100 thousandths, so ${n} × 100 = ${answer}` : `1 hundredth is 10 thousandths, so ${n} × 10 = ${answer}` });
 }
 
 function oneThousandthMore(rng: Rng): Question {
   const base = dec(ri(rng, 1, 9) * 1000 + ri(rng, 1, 999), 3), answer = addDec(base, dec(1, 3));
   const q = `What is 0.001 more than ${fmt(base)}?`;
-  return finish(rng, q, answer, [addDec(base, dec(1, 2)), addDec(base, dec(1, 1)), dec(base.v - 1, 3)], [addDec(base, dec(2, 3)), addDec(base, dec(11, 3)), addDec(base, dec(101, 3))], { say: ks2Say(q), hint: HINT_PLACE });
+  return finish(rng, q, answer, [addDec(base, dec(1, 2)), addDec(base, dec(1, 1)), dec(base.v - 1, 3)], [addDec(base, dec(2, 3)), addDec(base, dec(11, 3)), addDec(base, dec(101, 3))], { say: ks2Say(q), hint: HINT_PLACE, why: `Add 1 thousandth: ${fmt(base)} + 0.001 = ${fmt(answer)}` });
 }
 
 /** A line from a to a + 0.01 with six ticks 0.002 apart; only the ends print, and marker A sits on an inner tick. */
@@ -100,7 +101,7 @@ function line(rng: Rng): Question {
   const labels = ticks.map((t, i) => (i === 0 || i === 5 ? fmt(t) : ''));
   const visual = { type: 'numberline' as const, from, to, step: 0.002, labels, marks: [{ label: 'A', at: Number(fmt(answer)) }] };
   const neighbours = ticks.filter((_, i) => i !== at && i !== 0 && i !== 5);
-  return finish(rng, 'What number is at A?', answer, neighbours, [ticks[0], ticks[5]], { visual, say: 'What number is at A?', hint: HINT_LINE });
+  return finish(rng, 'What number is at A?', answer, neighbours, [ticks[0], ticks[5]], { visual, say: 'What number is at A?', hint: HINT_LINE, why: `A is ${at} step${at === 1 ? '' : 's'} of 0.002 from ${fmt(a)}, so it is ${fmt(answer)}` });
 }
 
 export const y5Decimals: Generator = (level: Difficulty, rng) => {
