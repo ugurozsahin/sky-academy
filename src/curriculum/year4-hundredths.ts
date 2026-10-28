@@ -29,7 +29,8 @@ function line(rng: Rng): Question {
   const shown = new Set(ticks.filter(t => t !== h));
   return wordQ(rng, 'Which number is hidden?', lab(h), decoys(rng, h, h + 10, [], shown),
     { visual: { type: 'numberline', from: from / 100, to: (from + 5) / 100, mark: h / 100, step: 0.01, labels: ticks.map(lab) },
-      say: 'Which number is hidden on the number line?', hint: 'The ticks go up in hundredths', hintIsData: false });
+      say: 'Which number is hidden on the number line?', hint: 'The ticks go up in hundredths', hintIsData: false,
+      why: idx > 0 ? `${lab(h - 1)} + 0.01 = ${lab(h)}` : `${lab(h + 1)} − 0.01 = ${lab(h)}` });
 }
 
 /** d2: three terms then "?", up or down in 0.01, the run crossing a tenth or a whole: "0.97, 0.98, 0.99, ?". */
@@ -39,14 +40,16 @@ function count(rng: Rng): Question {
   const terms = [3, 2, 1].map(k => h + s * k);
   const last = terms[2];
   return wordQ(rng, `Count ${up ? 'up' : 'down'} in hundredths: ${terms.map(lab).join(', ')}, ?`, lab(h), decoys(rng, h, up ? h + 10 : h - 10, [last + s * -10], new Set(terms)),
-    { say: `Count ${up ? 'up' : 'down'} in hundredths. ${ks2Say(terms.map(lab).join(', '))}, then what?`, hint: 'Each step is one hundredth', hintIsData: false });
+    { say: `Count ${up ? 'up' : 'down'} in hundredths. ${ks2Say(terms.map(lab).join(', '))}, then what?`, hint: 'Each step is one hundredth', hintIsData: false,
+      why: `${lab(last)} ${up ? '+' : '−'} 0.01 = ${lab(h)}` });
 }
 
 /** d3: "0.3 ÷ 10 = ?" (answer 0.03). */
 function divide(rng: Rng): Question {
   const t = ri(rng, 1, 9);
   return wordQ(rng, `${lab1(t)} ÷ 10 = ?`, lab(t), decoys(rng, t, t + 10),
-    { say: `${ks2Say(lab1(t))} divided by ten equals what?`, hint: 'Divide a tenth by 10 to make hundredths', hintIsData: false });
+    { say: `${ks2Say(lab1(t))} divided by ten equals what?`, hint: 'Divide a tenth by 10 to make hundredths', hintIsData: false,
+      why: `${t} tenth${t === 1 ? '' : 's'} ÷ 10 = ${t} hundredth${t === 1 ? '' : 's'}, which is ${lab(t)}` });
 }
 
 /** d3: "How many hundredths make 0.4?" (answer 40). */
@@ -54,7 +57,8 @@ function howMany(rng: Rng): Question {
   const t = ri(rng, 1, 9), a = t * 10;
   const ds = [...new Set([t, t * 100, t > 1 ? a - 10 : a + 10].filter(v => v > 0 && v !== a))].slice(0, 3);
   return wordQ(rng, `How many hundredths make ${lab1(t)}?`, String(a), ds.map(String),
-    { say: `How many hundredths make ${ks2Say(lab1(t))}?`, hint: 'One tenth is made of ten hundredths', hintIsData: false });
+    { say: `How many hundredths make ${ks2Say(lab1(t))}?`, hint: 'One tenth is made of ten hundredths', hintIsData: false,
+      why: `1 tenth is 10 hundredths, so ${t} × 10 = ${a}` });
 }
 
 export const y4Hundredths: Generator = (level: Difficulty, rng) => {
