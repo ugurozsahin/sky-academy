@@ -44,9 +44,12 @@ function decoys(a: Dec, k: number, ans: Dec, rng: Rng): string[] {
   return out;
 }
 
+/** The why (#2317): the digits multiplied with no point, then the point put back where the decimal places say. */
+const whyOf = (a: Dec, k: number, ans: Dec) => `${a.v} × ${k} = ${a.v * k}, then the point goes back ${a.dp === 1 ? '1 place' : `${a.dp} places`}: ${lab(ans)}`;
+
 function pickOne(rng: Rng, a: Dec): Question {
   const k = ri(rng, 2, 9), ans = canon(mulDecByInt(a, k)), expr = `${lab(a)} × ${k}`;
-  return wordQ(rng, `${expr} = ?`, lab(ans), decoys(a, k, ans, rng), { say: `What is ${ks2Say(expr)}?`, hint: 'Multiply as if there were no point, then put the point back', hintIsData: false });
+  return wordQ(rng, `${expr} = ?`, lab(ans), decoys(a, k, ans, rng), { say: `What is ${ks2Say(expr)}?`, hint: 'Multiply as if there were no point, then put the point back', hintIsData: false, why: whyOf(a, k, ans) });
 }
 
 /** A decimal with `dp` places, one whole digit 1–9 (or 0 at one place) and a non-zero last digit. */
@@ -72,7 +75,7 @@ function built(rng: Rng): Question {
     const a = randDec(rng, rng() < 0.5 ? 1 : 2), k = ri(rng, 11, 25), ans = canon(mulDecByInt(a, k));
     if (ans.dp === 0) continue;
     const answer = lab(ans), slots = digits(answer).length, prompt = pick(rng, stories)(lab(a), k);
-    return { ...buildQ(rng, { prompt, say: `${ks2Say(prompt.slice(0, -1)).replace(/in m$/, 'in metres')}. Build the answer.`, answer, total: Math.min(10, slots + 3), hint: 'Slice the digits in order' }), slow: true };
+    return { ...buildQ(rng, { prompt, say: `${ks2Say(prompt.slice(0, -1)).replace(/in m$/, 'in metres')}. Build the answer.`, answer, total: Math.min(10, slots + 3), hint: 'Slice the digits in order' }), slow: true, why: whyOf(a, k, ans) };
   }
 }
 
