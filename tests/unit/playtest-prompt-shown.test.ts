@@ -16,7 +16,7 @@ describe('whether the card shows the question line at all (#2265)', () => {
     const rows: PromptRow[] = [];
     qs.forEach((q, i) => step(rows, i + 1, `Line ${i}`, q));
     if (stage2) step(rows, qs.length + 1, 'Stage two', stage2, 2);
-    return promptKeys(rows);
+    return promptKeys(rows, { voiced: true });
   };
   const seq = { sequence: ['c', 'a', 't'] };
 
@@ -39,8 +39,18 @@ describe('whether the card shows the question line at all (#2265)', () => {
   it('is false for a plain sequence whether or not the voice started: its card never shows the line (#2325 review)', () => {
     const rows: PromptRow[] = [];
     step(rows, 1, 'Spell it', { ...seq, listen: 'cat' }); step(rows, 2, 'Spell it', seq);
-    expect(promptKeys(rows).promptShown, 'voiced: heard, never read').toBe(false);
+    expect(promptKeys(rows, { voiced: true }).promptShown, 'voiced: heard, never read').toBe(false);
     expect(promptKeys(rows, { voiced: false }).promptShown, 'voiceless: the answer\'s letters or bare slots, never the line').toBe(false);
+  });
+
+  it('a pack with no recorded speech at all is voiceless: a fixed line with listen rows is not vouched for', () => {
+    const screen = { H, card: null, speakVisible: false, prompt: 'x', answer: 'c', hasLives: true, hint: null, slow: false, wide: false, sequence: false, anyOrder: false, visual: null, lives: 3, mode: 'mission' };
+    const lines: PromptRow[] = [];
+    step(lines, 1, 'Find the word', { listen: 'cat' }); step(lines, 2, 'Find the word', { listen: 'dog' });
+    const rec: Recorded = { screen, samples: null, frames: [], labels: [], promptAt: null, speech: null, extra: {}, lines };
+    const build = (r: Recorded) => buildMetrics({ job: { year: 'year1', game: 'g', catalogue: true }, input: 'tracing', settings: {}, view: { width: 390, height: 844 }, seed: 1, rec: r, shots: [], maxRelaunches: MAX_RELAUNCHES });
+    expect(build(rec).promptFixed).toBe(false);
+    expect(() => build({ ...rec, lines: undefined as unknown as PromptRow[] })).toThrow(/lines missing: the page recorder was not read/);
   });
 
   it('is written into every pack, with its definition', () => {

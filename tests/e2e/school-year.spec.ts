@@ -48,4 +48,17 @@ test.describe('school year (#1055)', () => {
     await page.selectOption('#school-year', '');
     expect((await stored(page)).ks2.schoolYear).toBeUndefined();
   });
+
+  test('the grown-ups year select and birthday input are at least 44 px tall (#2264)', async ({ page }) => {
+    await seed(page, { onboarded: true });
+    await page.goto('/');
+    await page.click('#grownups');
+    const q = await page.locator('#gate-q').textContent();
+    await page.fill('#gate-input', String(gateProduct(q!)));
+    await page.click('#gate-go');
+    for (const id of ['#school-year', '#school-birth']) {
+      const box = await page.locator(id).boundingBox();
+      expect(box!.height, id).toBeGreaterThanOrEqual(44);
+    }
+  });
 });
