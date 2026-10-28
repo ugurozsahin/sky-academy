@@ -34,4 +34,4 @@ export function finish(rng: Rng, prompt: string, spoken: string, answer: Dec, na
 
 /** The why (#2317) of a one-pair conversion: the size of one big unit, then the multiply or divide by it. */
 export const scaleWhy = (big: Unit, small: Unit, f: number, from: Dec, to: Dec, down: boolean) =>
-  `1 ${big.sym} = ${f} ${small.sym}: ${fmt(from)} ${down ? '×' : '÷'} ${f} = ${fmt(to)}`;
+  `1 ${sym(big, dec(1, 0))} = ${f} ${small.sym}: ${fmt(from)} ${down ? '×' : '÷'} ${f} = ${fmt(to)}`;

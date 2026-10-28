@@ -6,6 +6,16 @@ const rngOf = (seed: number) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = 
 const draws = (id: string) => ([1, 2, 3] as Difficulty[]).flatMap(d => Array.from({ length: 200 }, (_, s) => TOPICS.find(t => t.id === id)!.gen(d, rngOf((s + 1) * 104729 + d))));
 const n = (s: string) => Number(s.replace(/,/g, ''));
 
+describe('a scale why names the big unit in the singular (#2317)', () => {
+  const qs = draws('y5-convert');
+  it('never opens "1 days", "1 weeks" or "1 years"', () => {
+    for (const q of qs) expect(q.why, q.prompt).not.toMatch(/^1 (days|weeks|years|months)/);
+  });
+  it.each([['year', 'months'], ['week', 'days'], ['day', 'h']])('says 1 %s = … %s', (big, small) => {
+    expect(qs.some(q => q.why!.startsWith(`1 ${big} = `) && q.why!.includes(` ${small}: `)), big).toBe(true);
+  });
+});
+
 describe.each(['y5-convert', 'y6-convert'])('%s whys (#2317)', id => {
   const qs = draws(id);
   it('every why ends in the card answer', () => {
@@ -18,19 +28,24 @@ describe.each(['y5-convert', 'y6-convert'])('%s whys (#2317)', id => {
       const m = /^1 \S+ = ([\d,]+) \S+: ([\d.,]+) ([×÷]) ([\d,]+) = ([\d.,]+)$/.exec(q.why!)!;
       expect(m, q.why).toBeTruthy();
       const [f, a, f2, r] = [n(m[1]), n(m[2]), n(m[4]), n(m[5])];
+      expect(q.prompt.startsWith(`${m[2]} `), `${q.prompt} / ${q.why}`).toBe(true);
       expect(f2, q.why).toBe(f);
       expect(m[3] === '×' ? a * f : a / f, q.why).toBeCloseTo(r, 9);
     }
   });
   it('a multi-step why has true arithmetic in every step', () => {
+    let checked = 0;
     for (const q of qs.filter(x => !/^1 \S+ = [\d,]+ \S+: /.test(x.why!))) {
       for (const step of q.why!.split(';')) {
         const m = /(?:^|=\s)?([\d.,]+) ([×÷+−]) ([\d.,]+) = ([\d.,]+)$/.exec(step.trim());
-        if (!m) continue;
-        const [a, b, r] = [n(m[1]), n(m[3]), n(m[4])];
-        const v = m[2] === '×' ? a * b : m[2] === '÷' ? a / b : m[2] === '+' ? a + b : a - b;
+        if (/^[\d.,]+ \S+ = [\d.,]+ \S+$/.test(step.trim())) continue; // a unit equality, 3 km = 3000 m: checked by the scale cards
+        expect(m, `${q.why}: step "${step}" has no sum to check`).toBeTruthy();
+        checked++;
+        const [a, b, r] = [n(m![1]), n(m![3]), n(m![4])];
+        const v = m![2] === '×' ? a * b : m![2] === '÷' ? a / b : m![2] === '+' ? a + b : a - b;
         expect(v, q.why).toBeCloseTo(r, 9);
       }
     }
+    expect(checked).toBeGreaterThan(50);
   });
 });
