@@ -4,7 +4,7 @@
 import type { Generator, Question, Rng } from './types';
 import { pick, shuffle, wordQ } from './util';
 import { ks2Say } from './ks2say';
-import { toRoman } from './roman';
+import { romanWhy, toRoman } from './roman';
 
 const HARD = [4, 9, 8, 11, 12, 7, 3];
 const CLOCK = [['top', 12], ['bottom', 6]] as const;
@@ -21,12 +21,12 @@ function slips(rng: Rng, n: number): number[] {
 function read(rng: Rng, n: number): Question {
   const r = toRoman(n);
   return wordQ(rng, 'Which number is this Roman numeral?', String(n), slips(rng, n).map(String), {
-    visual: { type: 'word', text: r }, say: ks2Say(`Which number is ${r}?`, { roman: [r] }), hint: 'Slice the number', hintIsData: false,
+    visual: { type: 'word', text: r }, say: ks2Say(`Which number is ${r}?`, { roman: [r] }), hint: 'Slice the number', hintIsData: false, why: romanWhy(n),
   });
 }
 
 function write(rng: Rng, n: number, prompt = `Which Roman numeral is ${n}?`, say = `Which Roman numeral is ${n}?`): Question {
-  return wordQ(rng, prompt, toRoman(n), slips(rng, n).map(toRoman), { say, hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true });
+  return wordQ(rng, prompt, toRoman(n), slips(rng, n).map(toRoman), { say, hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true, why: romanWhy(n) });
 }
 
 export const y3Roman: Generator = (d, rng) => {
