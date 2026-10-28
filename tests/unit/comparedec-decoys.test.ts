@@ -14,12 +14,19 @@ describe('y4-comparedec rounding decoys are whole numbers near the answer (#2319
     }
   });
 
-  it('d1: the answer is not always an interior value of the sorted options (#2319 review)', () => {
-    let ends = 0, middles = 0;
+  it('d1: the answer takes every rank in the sorted options, including 3rd and 4th (#2319 review)', () => {
+    const ranks = new Set<number>();
     for (let seed = 1; seed <= 200; seed++) {
-      const q = y4CompareDec(1, rngOf(seed)), sorted = q.options.map(Number).sort((p, r) => p - r), i = sorted.indexOf(Number(q.answer));
-      if (i === 0 || i === 3) ends++; else middles++;
+      const q = y4CompareDec(1, rngOf(seed)), sorted = q.options.map(Number).sort((p, r) => p - r);
+      ranks.add(sorted.indexOf(Number(q.answer)));
     }
-    expect(ends).toBeGreaterThan(0); expect(middles).toBeGreaterThan(0);
+    expect(ranks.has(2)).toBe(true); expect(ranks.has(3)).toBe(true);
+  });
+
+  it('d1: every card from 0.1 to 19.4 has three distinct, non-negative decoys', () => {
+    for (let t = 1; t <= 194; t++) {
+      const q = y4CompareDec(1, rngOf(t * 7)), ds = q.options.filter(o => o !== q.answer).map(Number);
+      expect(new Set(q.options).size, `t ${t}`).toBe(4); expect(ds.every(d => d >= 0)).toBe(true);
+    }
   });
 });
