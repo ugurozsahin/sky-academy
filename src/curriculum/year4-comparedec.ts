@@ -12,9 +12,10 @@ const lab = (v: number, dp: number) => fmt(dec(v, dp), { fixedDp: dp });
 function round(rng: Rng): Question {
   const t = ri(rng, 1, 194), a = roundTo(dec(t, 1), 1).v;
   const wrong = a === Math.floor(t / 10) ? a + 1 : a - 1;   // rounded the wrong way
-  const ds = [wrong, t % 10, t];                              // …the tenths digit, the number without its point
-  const opts = [...new Set(ds.filter(v => v >= 0 && v !== a))];
-  for (let v = a + 1; opts.length < 3; v++) if (v !== a && !opts.includes(v)) opts.push(v);
+  // Decoys are the whole numbers a child could land on: the wrong way first, then its neighbours. The tenths digit and the
+  // number without its point (6, 113) are giveaways no one picks (#2319).
+  const opts: number[] = [];
+  for (const v of [wrong, a + 1, a - 1, a + 2, a - 2, a + 3]) if (opts.length < 3 && v >= 0 && v !== a && !opts.includes(v)) opts.push(v);
   const s = lab(t, 1);
   return wordQ(rng, `${s} to the nearest whole number?`, String(a), opts.map(String),
     { say: `${ks2Say(s)} to the nearest whole number?`, hint: 'Look at the tenths digit: halfway or more rounds up', hintIsData: false,
