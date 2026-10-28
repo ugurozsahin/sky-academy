@@ -2,15 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, YEARS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { Session } from '../../src/game/session';
-import { TRICKY, trickyDecoys } from '../../src/curriculum/tricky-gaps';
+import { TRICKY, RARE_REAL, trickyDecoys } from '../../src/curriculum/tricky-gaps';
 import { AVOID, GAP_WORDS, Y1_CEW, Y2_CEW } from '../../src/curriculum/util';
 
 function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 const topic = (id: string) => TOPICS.find(t => t.id === id)!;
-/** Real words a decoy must never spell, beyond `GAP_WORDS`/`AVOID` (the review of #2345 found these by eye). */
-const REAL = ['fend', 'mend', 'weld', 'geld', 'held', 'eld', 'lave', 'pish', 'puss', 'must', 'mast', 'lost', 'lest', 'lust', 'mist', 'list', 'fest', 'pall', 'pell'];
 /** Exception words with no single tricky letter to gap: they leave both games on purpose. */
 const EXEMPT = ['the', 'a', 'to', 'today', 'of', 'are', 'is', 'his', 'has', 'you', 'your', 'be', 'he', 'me', 'she', 'we', 'no', 'go', 'so', 'by', 'my', 'here', 'there', 'where', 'one', 'once', 'ask', 'children', 'only', 'both', 'everybody', 'even', 'steak', 'last', 'plant', 'hour', 'eye', 'who', 'whole', 'clothes', 'parents'];
 
@@ -34,8 +32,14 @@ describe('y1-spelling / y2-spelling gap the tricky letter (#2277)', () => {
       for (const l of ds) {
         const s = w.slice(0, idx) + l + w.slice(idx + 1);
         expect(l, w).not.toBe(w[idx]);
-        expect(GAP_WORDS.has(s) || AVOID.has(s) || REAL.includes(s), s).toBe(false);
+        expect(GAP_WORDS.has(s) || AVOID.has(s) || RARE_REAL.has(s), s).toBe(false);
       }
+    }
+  });
+  it('every vowel gap offers a vowel decoy (#2348)', () => {
+    for (const [w, [idx]] of Object.entries(TRICKY)) {
+      if (!'aeiou'.includes(w[idx])) continue;
+      expect(trickyDecoys(w).some(l => 'aeiouy'.includes(l)), w).toBe(true);
     }
   });
   it('the gap covers the tricky letter over 200 seeds at every difficulty', () => {

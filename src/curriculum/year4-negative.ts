@@ -19,15 +19,15 @@ function decoys(answer: number, step: number, rng: () => number): number[] {
   return [...pool].slice(0, 3);
 }
 
-function card(rng: () => number, prompt: string, say: string, answer: number, step: number, visual?: Question['visual']): Question {
-  return wordQ(rng, prompt, f(answer), decoys(answer, step, rng).map(f), { say, visual });
+function card(rng: () => number, prompt: string, say: string, answer: number, step: number, why: string, visual?: Question['visual']): Question {
+  return wordQ(rng, prompt, f(answer), decoys(answer, step, rng).map(f), { say, visual, why });
 }
 
 /** d1: six ticks, step 1, holding 0 and at least two negatives; one tick is hidden. */
 function line(rng: () => number): Question {
   const from = ri(rng, -5, -2), to = from + 5, mark = ri(rng, from, to);
   const labels = Array.from({ length: 6 }, (_, i) => f(from + i));
-  return card(rng, 'Which number is hidden?', 'Which number is hidden on the number line?', mark, 1, { type: 'numberline', from, to, mark, step: 1, labels });
+  return card(rng, 'Which number is hidden?', 'Which number is hidden on the number line?', mark, 1, `The ticks go up one at a time, so the hidden one is ${f(mark)}`, { type: 'numberline', from, to, mark, step: 1, labels });
 }
 
 /** d2: count back from a multiple of the step, through 0, to the first negative: "15, 10, 5, 0, ?". */
@@ -35,7 +35,7 @@ function countBack(rng: () => number): Question {
   const step = pick(rng, [1, 2, 5, 10] as const), m = ri(rng, 2, 4);
   const terms = Array.from({ length: m + 1 }, (_, i) => step * (m - i));
   const answer = -step, shown = terms.map(f).join(', ');
-  return card(rng, `Count back in ${step}s: ${shown}, ?`, `Count back in ${step}s. ${terms.join(', ')}, then what?`, answer, step);
+  return card(rng, `Count back in ${step}s: ${shown}, ?`, `Count back in ${step}s. ${terms.join(', ')}, then what?`, answer, step, `One more ${step} back from 0 is ${f(answer)}`);
 }
 
 /** d3: "Start at 6. Count back 10 in 1s", landing below 0. */
@@ -44,7 +44,7 @@ function story(rng: () => number): Question {
   let k = Math.floor(start / step) + 1 + ri(rng, 0, 3);
   while (start - k * step < MIN) k--;
   const answer = start - k * step;
-  return card(rng, `Start at ${start}. Count back ${k} in ${step}s. Where do you land?`, `Start at ${start}. Count back ${k} in ${step}s. Where do you land?`, answer, step);
+  return card(rng, `Start at ${start}. Count back ${k} in ${step}s. Where do you land?`, `Start at ${start}. Count back ${k} in ${step}s. Where do you land?`, answer, step, `${k} × ${step} = ${k * step}, and ${start} − ${k * step} = ${f(answer)}`);
 }
 
 /** d3: a count that crosses 0 with a negative term missing: "10, 5, 0, ?, −10". */
@@ -54,7 +54,7 @@ function missing(rng: () => number): Question {
   const gap = ri(rng, m + 1, m + 2), answer = terms[gap];
   const shown = terms.map((t, i) => i === gap ? '?' : f(t)).join(', ');
   const spoken = terms.map((t, i) => i === gap ? 'what' : said(t)).join(', ');
-  return card(rng, shown, `Count back in ${step}s. ${spoken}.`, answer, step);
+  return card(rng, shown, `Count back in ${step}s. ${spoken}.`, answer, step, `Each step is ${step} less: ${f(terms[gap - 1])} − ${step} = ${f(answer)}`);
 }
 
 export const y4Negative: Generator = (d: Difficulty, rng) => d === 1 ? line(rng) : d === 2 ? countBack(rng) : rng() < 0.5 ? story(rng) : missing(rng);

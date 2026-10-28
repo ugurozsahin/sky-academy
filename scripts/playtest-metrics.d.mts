@@ -56,7 +56,7 @@ export type PromptRow = [asked: number, stage: number, prompt: string, listen: b
 export interface PromptQuestion { listen?: string | null; sequence?: readonly string[] | null; build?: unknown; anyOrder?: boolean | null }
 export declare function promptStep(rows: PromptRow[], asked: number, st: { stage: number; prompt?: string | null } | null | undefined, q?: PromptQuestion | null): void;
 /** Throws when fewer than two questions of the first row's stage were read. `voiced`: the pack's spoken prompt really started. */
-export declare function promptKeys(rows: PromptRow[], o?: { voiced?: boolean }): { promptFixed: boolean; promptWaves: number; promptShown: boolean };
+export declare function promptKeys(rows: PromptRow[], o: { voiced: boolean }): { promptFixed: boolean; promptWaves: number; promptShown: boolean };
 export declare const speechMode: (o: { autoplays: boolean; offered: boolean }) => 'auto' | 'tap' | 'none';
 export declare const cardShare: (rect: { width: number; height: number }, view: { width: number; height: number }) => number;
 export declare const ABOUT: Record<string, string>;

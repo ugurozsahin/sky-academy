@@ -5,7 +5,7 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { pick, ri, shuffle, wordQ } from './util';
 import { ks2Say } from './ks2say';
-import { toRoman } from './roman';
+import { romanWhy, toRoman } from './roman';
 
 const GLYPH: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100 };
 const fitsBubble = (n: number) => n >= 1 && n <= 100 && toRoman(n).length <= 6;
@@ -26,12 +26,12 @@ function slips(rng: Rng, n: number, bubble: boolean): number[] {
 const read = (rng: Rng, n: number): Question => {
   const r = toRoman(n);
   return wordQ(rng, 'Which number is this Roman numeral?', String(n), slips(rng, n, false).map(String), {
-    visual: { type: 'word', text: r }, say: ks2Say(`Which number is ${r}?`, { roman: [r] }), hint: 'Slice the number', hintIsData: false,
+    visual: { type: 'word', text: r }, say: ks2Say(`Which number is ${r}?`, { roman: [r] }), hint: 'Slice the number', hintIsData: false, why: romanWhy(n),
   });
 };
 
 const write = (rng: Rng, n: number): Question => wordQ(rng, `Which Roman numeral is ${n}?`, toRoman(n), slips(rng, n, true).map(toRoman), {
-  say: `Which Roman numeral is ${n}?`, hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true,
+  say: `Which Roman numeral is ${n}?`, hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true, why: romanWhy(n),
 });
 
 /** "Which one needs a 0 in our digits?": exactly one of three numerals is a multiple of 10 (XL beside XLV and XLIX). */
@@ -39,20 +39,20 @@ function needsZero(rng: Rng): Question {
   const m = pick(rng, [10, 20, 30, 40, 50, 60, 70, 90]);
   const others = shuffle(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => m + k).filter(fitsBubble)).slice(0, 2);
   return wordQ(rng, 'Which one needs a 0 in our digits?', toRoman(m), others.map(toRoman), {
-    say: 'Which Roman numeral needs a zero when we write it with our digits?', hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true,
+    say: 'Which Roman numeral needs a zero when we write it with our digits?', hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true, why: `${toRoman(m)} = ${m}: no ones, so the digit 0`,
   });
 }
 
-const BANK: readonly (readonly [string, boolean])[] = [
-  ['The Romans had no numeral for zero.', true],
-  ['In 305, the 0 shows there are no tens.', true],
-  ['In 505, both 5s are worth the same.', false],
-  ['In 250, the 0 can be left out without changing the number.', false],
+const BANK: readonly (readonly [string, boolean, string])[] = [
+  ['The Romans had no numeral for zero.', true, 'There is no Roman letter for 0.'],
+  ['In 305, the 0 shows there are no tens.', true, '305 is 3 hundreds, 0 tens and 5 ones.'],
+  ['In 505, both 5s are worth the same.', false, 'The first 5 is 500; the last is 5.'],
+  ['In 250, the 0 can be left out without changing the number.', false, 'Without the 0, 250 would read 25.'],
 ];
 
 function trueFalse(rng: Rng): Question {
-  const [text, truth] = pick(rng, BANK);
-  return { prompt: text, answer: truth ? 'True' : 'False', options: shuffle(rng, ['True', 'False']), say: `True or false? ${text}`, hint: 'Slice true or false', hintIsData: false };
+  const [text, truth, why] = pick(rng, BANK);
+  return { prompt: text, answer: truth ? 'True' : 'False', options: shuffle(rng, ['True', 'False']), say: `True or false? ${text}`, hint: 'Slice true or false', hintIsData: false, why };
 }
 
 export const y4Roman: Generator = (d: Difficulty, rng: Rng) => {

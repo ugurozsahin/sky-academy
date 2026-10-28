@@ -13,7 +13,7 @@ const before: Generator = (d, rng) => {
   const table = d === 1 ? pick(rng, [2, 10]) : pick(rng, [2, 5, 10]);
   const n = ri(rng, 1, 12);
   const kind = d === 3 ? ri(rng, 0, 2) : d === 2 ? ri(rng, 0, 1) : 0;
-  if (kind === 0) { const p = rng() < 0.5 ? `${n} × ${table} = ?` : `${table} × ${n} = ?`; return numQ(rng, p, n * table, { min: 0, max: 120, ...q(p), distractors: [n * table + table, n * table - table, n * table + 1] }); }
+  if (kind === 0) { const p = rng() < 0.5 ? `${n} × ${table} = ?` : `${table} × ${n} = ?`; return numQ(rng, p, n * table, { min: 0, max: 120, ...q(p), distractors: [n * table + table, n * table - table, n * table + 2 * table, n * table - 2 * table, n * table + 3 * table, n * table - 3 * table] }); }
   if (kind === 1) { const p = `${n * table} ÷ ${table} = ?`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) }); }
   const p = `? × ${table} = ${n * table}`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) });
 };
@@ -43,6 +43,18 @@ describe('times-table drills (#916)', () => {
   });
   it('tablesQ is the one factory the mixed topic calls', () => {
     expect(tablesQ(1, rngOf(3), 5).prompt).toMatch(/5/);
+  });
+});
+
+describe('times-table multiply cards (#2319)', () => {
+  it.each([2, 5, 10])('every wrong option on a y2-tables-%i multiply card is a multiple of the table', (t) => {
+    const gen = topicById(`y2-tables-${t}`)!.gen;
+    for (const d of DS) for (let seed = 1; seed <= 300; seed++) {
+      const c = gen(d, rngOf(seed * 11 + d));
+      if (!/^(\d+ × \d+|\d+ × \d+) = \?$/.test(c.prompt)) continue;
+      for (const o of c.options) expect(+o % t).toBe(0);
+      expect(new Set(c.options).size).toBe(c.options.length);
+    }
   });
 });
 

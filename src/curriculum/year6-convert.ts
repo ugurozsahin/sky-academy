@@ -6,7 +6,7 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick } from './util';
 import { dec, fmt, mulPow10, divPow10, type Dec } from './ks2num';
-import { finish, show, say, u, type Unit } from './unitcard';
+import { finish, show, say, u, scaleWhy, type Unit } from './unitcard';
 
 interface Pair { big: Unit; small: Unit; f: number; pow: 1 | 2 | 3 | 0 }
 const KM = u('km', 'kilometre'), M = u('m', 'metre'), CM = u('cm', 'centimetre'), MM = u('mm', 'millimetre'), KG = u('kg', 'kilogram'), G = u('g', 'gram');
@@ -31,7 +31,7 @@ function norm(v: number, dp: number): Dec {
 function card(rng: Rng, p: Pair, big: Dec, small: Dec, down: boolean, hint: string, extra: Dec[] = []): Question {
   const from = down ? big : small, to = down ? small : big, fu = down ? p.big : p.small, tu = down ? p.small : p.big;
   return finish(rng, `${show(from, fu)} = ? ${tu.sym}`, `${say(from, fu)} is how many ${tu.many}?`, to,
-    [...extra, mulPow10(to, 1), divPow10(to, 1), mulPow10(to, 2), from].map(d => norm(d.v, d.dp)).filter(d => d.dp <= 3), hint);
+    [...extra, mulPow10(to, 1), divPow10(to, 1), mulPow10(to, 2), from].map(d => norm(d.v, d.dp)).filter(d => d.dp <= 3), hint, scaleWhy(p.big, p.small, p.f, from, to, down));
 }
 
 /** A metric amount of the larger unit with `dp` places and no trailing zero, and its whole number of the smaller unit. */
@@ -63,7 +63,8 @@ function miles(rng: Rng): Question {
   const prompt = `Use 5 miles = 8 km: ${fmt(dec(from, 0))} ${fu.sym} is about ? ${tu.sym}`;
   const ans = dec(to, 0);
   return finish(rng, prompt, `${fmt(dec(from, 0))} ${fu.many} is about how many ${tu.many}?`, ans,
-    [inverse, mulPow10(ans, 1), divPow10(ans, 1), dec(from, 0)], HINT_MILES);
+    [inverse, mulPow10(ans, 1), divPow10(ans, 1), dec(from, 0)], HINT_MILES,
+    toKm ? `${mi} ÷ 5 = ${k}; ${k} × 8 = ${km}` : `${km} ÷ 8 = ${k}; ${k} × 5 = ${mi}`);
 }
 
 /** "2.4 km + 650 m = ? m", or a take-away. The slips are the unconverted sum and a place-shifted small unit. */
@@ -75,7 +76,8 @@ function sumCard(rng: Rng): Question {
   const spoken = `${fmt(big)} ${p.big.many} ${plus ? 'plus' : 'minus'} ${s} ${p.small.many}, in ${p.small.many}?`;
   const sign = plus ? 1 : -1;
   return finish(rng, prompt, spoken, dec(ans, 0),
-    [dec(bigSmall + sign * s * 10, 0), dec(bigSmall / 10 + sign * s, 0), dec(n + sign * s, 0), dec(bigSmall + sign * s / 10, 0)], HINT_SUM);
+    [dec(bigSmall + sign * s * 10, 0), dec(bigSmall / 10 + sign * s, 0), dec(n + sign * s, 0), dec(bigSmall + sign * s / 10, 0)], HINT_SUM,
+    `${fmt(big)} ${p.big.sym} = ${bigSmall} ${p.small.sym}; ${bigSmall} ${plus ? '+' : '−'} ${s} = ${ans}`);
 }
 
 export const y6Convert: Generator = (level: Difficulty, rng) => {

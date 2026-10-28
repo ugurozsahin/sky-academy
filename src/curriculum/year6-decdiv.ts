@@ -46,9 +46,16 @@ function decoys(dividend: number, dp: number, k: number, ans: Dec, rng: Rng): st
   return out;
 }
 
+/** The why (#2317): a whole dividend shows the remainder turned into a decimal (147 ÷ 4 = 36 r 3; 3 ÷ 4 = 0.75: 36.75); a 1 dp one is divided as hundredths. */
+function whyOf(dividend: number, dp: number, k: number, ans: Dec): string {
+  if (dp === 1) return `${dividend * 10} hundredths ÷ ${k} = ${dividend * 10 / k} hundredths: ${lab(ans)}`;
+  const r = dividend % k;
+  return `${dividend.toLocaleString('en-GB')} ÷ ${k} = ${Math.floor(dividend / k)} r ${r}; ${r} ÷ ${k} = ${lab(canon(dec(r * 100 / k, 2)))}: ${lab(ans)}`;
+}
+
 function pickOne(rng: Rng, dividend: number, dp: number, k: number, ans: Dec): Question {
   const expr = `${lab(dec(dividend, dp))} ÷ ${k}`;
-  return wordQ(rng, `${expr} = ?`, lab(ans), decoys(dividend, dp, k, ans, rng), { say: `What is ${ks2Say(expr)}?`, hint: 'Divide, then carry on past the point with the remainder', hintIsData: false });
+  return wordQ(rng, `${expr} = ?`, lab(ans), decoys(dividend, dp, k, ans, rng), { say: `What is ${ks2Say(expr)}?`, hint: 'Divide, then carry on past the point with the remainder', hintIsData: false, why: whyOf(dividend, dp, k, ans) });
 }
 
 /** d1: a 1–2 digit whole number ÷ 2, 4 or 5 with a non-whole answer. */
@@ -75,7 +82,7 @@ function built(rng: Rng): Question {
     const n = ri(rng, 100, 9999), k = pick(rng, [20, 25, 40, 50]), ans = quotient(n, 0, k);
     if (!ans) continue;
     const sum = `${n.toLocaleString('en-GB')} ÷ ${k} = ?`, answer = lab(ans);
-    return { ...buildQ(rng, { prompt: sum, say: `${ks2Say(sum.slice(0, -4))}. Build the answer.`, answer, total: Math.min(10, digits(answer).length + 3), hint: 'Slice the digits in order' }), slow: true };
+    return { ...buildQ(rng, { prompt: sum, say: `${ks2Say(sum.slice(0, -4))}. Build the answer.`, answer, total: Math.min(10, digits(answer).length + 3), hint: 'Slice the digits in order' }), slow: true, why: whyOf(n, 0, k, ans) };
   }
 }
 
