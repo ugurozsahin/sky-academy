@@ -40,6 +40,22 @@ describe('÷ on sequence, build and any-order cards', () => {
       expect(html).toContain('<span class="op-div">÷</span>');
       expect(html).not.toMatch(/÷(?!<\/span>)/);
     }
-    expect(seen).toBeGreaterThan(0);
+    expect(seen).toBeGreaterThan(20);
+  });
+  // No generator emits an any-order ÷ card or a build ÷ prompt without a `?`, so these two branches are pinned by hand-built cards.
+  const card = (extra: Omit<Question, 'options'>): Question => ({ options: [], ...extra } as Question);
+  it('an any-order card wraps the ÷ in its prompt', () => {
+    const q = card({ prompt: 'Slice 12 ÷ 3 and 20 ÷ 5', answer: '4,4', sequence: ['4', '4'], anyOrder: true });
+    const html = promptHTML(q, 0);
+    expect(html).toContain('<span class="op-div">÷</span>');
+    expect(html).not.toMatch(/÷(?!<\/span>)/);
+    expect(html.replace(/<[^>]+>/g, '')).toBe('Slice 12 ÷ 3 and 20 ÷ 5 __');
+  });
+  it('a build card whose prompt has no ? wraps the ÷ too', () => {
+    const q = card({ prompt: '12 ÷ 3 =', answer: '4', sequence: ['4'], build: { template: '_' } });
+    const html = promptHTML(q, 0);
+    expect(html).toContain('<span class="op-div">÷</span>');
+    expect(html).not.toMatch(/÷(?!<\/span>)/);
+    expect(html.replace(/<[^>]+>/g, '')).toBe('12 ÷ 3 = _');
   });
 });
