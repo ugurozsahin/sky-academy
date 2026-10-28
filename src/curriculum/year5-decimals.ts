@@ -101,7 +101,7 @@ function line(rng: Rng): Question {
   const labels = ticks.map((t, i) => (i === 0 || i === 5 ? fmt(t) : ''));
   const visual = { type: 'numberline' as const, from, to, step: 0.002, labels, marks: [{ label: 'A', at: Number(fmt(answer)) }] };
   const neighbours = ticks.filter((_, i) => i !== at && i !== 0 && i !== 5);
-  return finish(rng, 'What number is at A?', answer, neighbours, [ticks[0], ticks[5]], { visual, say: 'What number is at A?', hint: HINT_LINE, why: `A is ${at} steps of 0.002 from ${fmt(a)}, so it is ${fmt(answer)}` });
+  return finish(rng, 'What number is at A?', answer, neighbours, [ticks[0], ticks[5]], { visual, say: 'What number is at A?', hint: HINT_LINE, why: `A is ${at} step${at === 1 ? '' : 's'} of 0.002 from ${fmt(a)}, so it is ${fmt(answer)}` });
 }
 
 export const y5Decimals: Generator = (level: Difficulty, rng) => {

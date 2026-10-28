@@ -18,9 +18,11 @@ describe('y5-decimals whys (#2317)', () => {
     }
   });
   it('place-value facts multiply by the real factor and reach the answer', () => {
+    let seen = 0;
     for (const q of [...draws(1), ...draws(2)]) {
       const m = /^1 (tenth|hundredth) is (\d+) (hundredths|thousandths), so (\d) × (\d+) = (\d+)$/.exec(q.why!);
       if (!m) continue;
+      seen++;
       expect(Number(m[4]) * Number(m[5]), q.why).toBe(Number(m[6]));
       expect(m[6], q.why).toBe(q.answer);
       expect(m[2], q.why).toBe(m[5]);
@@ -28,14 +30,19 @@ describe('y5-decimals whys (#2317)', () => {
       expect(asked[1], q.why).toBe(m[3]);
       expect(Number(asked[2]) * (m[3] === 'hundredths' ? 100 : 1000), q.prompt).toBeCloseTo(Number(m[6]));
     }
+    expect(seen, 'no why matched the place-value template').toBeGreaterThan(0);
   });
   it('0.001 more shows the real sum, and a number-line marker counts real 0.002 steps', () => {
+    const seen = { more: 0, one: 0, many: 0 };
     for (const q of draws(2)) {
       const m = /^Add 1 thousandth: ([\d.]+) \+ 0\.001 = ([\d.]+)$/.exec(q.why!);
-      if (m) { expect(q.prompt, q.why).toBe(`What is 0.001 more than ${m[1]}?`); expect(Number(m[1]) + 0.001, q.why).toBeCloseTo(Number(m[2]), 6); expect(m[2]).toBe(q.answer); continue; }
-      const l = /^A is (\d) steps of 0\.002 from ([\d.]+), so it is ([\d.]+)$/.exec(q.why!);
-      if (l) { expect(Number(l[2]) + 0.002 * Number(l[1]), q.why).toBeCloseTo(Number(l[3]), 6); expect(l[3]).toBe(q.answer); }
+      if (m) { seen.more++; expect(q.prompt, q.why).toBe(`What is 0.001 more than ${m[1]}?`); expect(Number(m[1]) + 0.001, q.why).toBeCloseTo(Number(m[2]), 6); expect(m[2]).toBe(q.answer); continue; }
+      const l = /^A is (\d) steps? of 0\.002 from ([\d.]+), so it is ([\d.]+)$/.exec(q.why!);
+      if (l) { expect(q.why, 'singular for one step').toMatch(l[1] === '1' ? /1 step of/ : /steps of/); if (l[1] === '1') seen.one++; else seen.many++; expect(Number(l[2]) + 0.002 * Number(l[1]), q.why).toBeCloseTo(Number(l[3]), 6); expect(l[3]).toBe(q.answer); }
     }
+    expect(seen.more, 'no 0.001-more why matched').toBeGreaterThan(0);
+    expect(seen.one, 'no one-step why drawn').toBeGreaterThan(0);
+    expect(seen.many, 'no many-step why drawn').toBeGreaterThan(0);
   });
   it('every question at every level has a why', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d)) expect(q.why, q.prompt).toBeTruthy();
