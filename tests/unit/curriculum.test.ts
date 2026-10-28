@@ -2290,7 +2290,7 @@ describe('a card\'s bubble width is derived from its options, never from its ans
         }
         // #1050: the blind-list bookkeeping is EYFS/KS1-only; a KS2 cell still counts toward `swept`, `cards`, `discriminating` and `split`
         if (isKs2(topic.year)) continue;
-        const blindKey = cell.replace(/^y2-tables-\d+/, 'y2-tables');   // #916: a drill shares its mixed topic's pool
+        const blindKey = NO_REPEATED_SET.has(cell) ? cell : cell.replace(/^y2-tables-\d+/, 'y2-tables');   // #916: a drill shares its mixed topic's pool unless named itself (#2319: the 2× and 5× d1 drills, whose decoys are table multiples, repeat no option set)
         if (cellDiscriminating === 0 && !NO_REPEATED_SET.has(blindKey)) unexpectedlyBlind.push(cell);
         if (cellDiscriminating > 0 && NO_REPEATED_SET.has(blindKey)) nowComparable.push(cell);
       }
