@@ -7,7 +7,7 @@ import type { Difficulty, Generator, Question, Rng } from './types';
 import { pick, ri, shuffle, wordQ } from './util';
 import { dec, fmt } from './ks2num';
 import { ks2Say } from './ks2say';
-import { toRoman } from './roman';
+import { romanWhy, toRoman } from './roman';
 
 const GLYPH: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
 const vals = (r: string) => [...r].map(c => GLYPH[c]);
@@ -56,7 +56,7 @@ function read(rng: Rng, n: number, hi: number, year: boolean, lo = 1): Question 
   const prompt = year ? 'The end credits show this year. What year is it?' : 'Which number is this Roman numeral?';
   return wordQ(rng, prompt, num(n, year), wrong(rng, r, n, lo, hi).map(x => num(x, year)), {
     visual: { type: 'word', text: r }, say: ks2Say(`${year ? 'Which year is' : 'Which number is'} ${r}?`, { roman: [r] }),
-    hint: year ? 'Slice the year' : 'Slice the number', hintIsData: false,
+    hint: year ? 'Slice the year' : 'Slice the number', hintIsData: false, why: romanWhy(n),
   });
 }
 
@@ -67,7 +67,7 @@ function write(rng: Rng): Question {
   const r = toRoman(n);
   const cand = wrong(rng, r, n, 1, 999).concat(shuffle(rng, [n + 10, n - 10, n + 100, n - 100, n + 1, n - 1, n + 2, n - 2, n + 3, n - 3, n + 20, n - 20, n + 50, n - 50]));
   const opts = [...new Set(cand.filter(x => x !== n && fitsBubble(x)))].slice(0, 3);
-  return wordQ(rng, `Which Roman numeral is ${n}?`, r, opts.map(toRoman), { say: `Which Roman numeral is ${n}?`, hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true });
+  return wordQ(rng, `Which Roman numeral is ${n}?`, r, opts.map(toRoman), { say: `Which Roman numeral is ${n}?`, hint: 'Slice the numeral', hintIsData: false, noSayAnswer: true, why: romanWhy(n) });
 }
 
 export const y5Roman: Generator = (d: Difficulty, rng: Rng) => {
