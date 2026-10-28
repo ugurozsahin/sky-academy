@@ -6,6 +6,7 @@
 // play.ts keeps all the wiring, exactly as the overlays split (#99) did.
 import type { Question } from '../curriculum';
 import { symSay } from '../curriculum/util';
+import { fromRoman } from '../curriculum/roman';
 import { say } from '../audio';
 import { traceNoun } from '../game/tracing';
 import { $, esc, fillAnswer } from './dom';
@@ -240,7 +241,7 @@ export function createHud(els: HudEls, lives: number, audible: () => boolean) {
     speakCorrection(q: Question, topicId: string | undefined) {
       const line = correctionLine(q, topicId);
       if (line) say(line);
-      if (q.why) say(symSay(q.why), false, { queue: true });   // #2316: through the prompts' own clean-up, so × and = are read as words
+      if (q.why) say(symSay(q.why.replace(/\b[IVXLCDM]+\b/g, r => fromRoman(r) ? [...r].join(' ') : r)), false, { queue: true });   // #2316: through the prompts' own clean-up, so × and = are read as words, a Roman numeral letter by letter (#1057)
     },
   };
 }
