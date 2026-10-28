@@ -3,16 +3,17 @@
 // command keeps them all current. No build step: the pages are committed, and `tests/unit/site-curriculum*.test.ts`
 // regenerate them in memory and fail on drift.
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { ALL_YEARS, renderCurriculumPage, renderYearPage, withoutYearLinks, yearSlug } from './site-curriculum-lib.mjs';
+import { ALL_YEARS, renderCurriculumPage, renderYearPage, withYearLinks, withoutYearLinks, yearSlug } from './site-curriculum-lib.mjs';
 import { sitemapXml } from './site-sitemap.mjs';
 
 const map = JSON.parse(readFileSync('docs/content-map.json', 'utf8'));
 const hidden = ALL_YEARS.filter(id => !map.byYear.some(y => y.year === id));
 // A year the catalogue hides is not advertised either (#2201): its nav line goes from every page, and from llms.txt.
+// A year it shows again gets its lines back (#2303), so hide-then-show leaves the site as if it had never been hidden.
 const pages = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? pages(`${dir}/${e.name}`) : e.name.endsWith('.html') ? [`${dir}/${e.name}`] : []);
 for (const f of [...pages('website'), 'website/llms.txt']) {
   const was = readFileSync(f, 'utf8');
-  const now = hidden.reduce(withoutYearLinks, was);
+  const now = hidden.reduce(withoutYearLinks, ALL_YEARS.filter(id => !hidden.includes(id)).reduce(withYearLinks, was));
   if (now !== was) writeFileSync(f, now);
 }
 const home = readFileSync('website/index.html', 'utf8');

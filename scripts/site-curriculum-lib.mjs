@@ -30,6 +30,49 @@ export function withoutYearLinks(text, id) {
     .replace(new RegExp(`^- \\[[^\\]]*\\]\\(https://sharpwise\\.co\\.uk/curriculum/${slug}/\\):.*\\r?\\n`, 'gm'), '');
 }
 
+/** The nav's two year groups (#2303): a year goes back into its own group, never across the heading between them. */
+const NAV_GROUPS = [['nav-ks1', ['reception', 'year1', 'year2']], ['nav-ks2', ['year3', 'year4', 'year5', 'year6']]];
+const yearName = (id) => (id === 'reception' ? 'Reception' : id.replace(/^year(\d)$/, 'Year $1'));
+const lineOf = (text, re) => text.match(re);
+
+/**
+ * The inverse of `withoutYearLinks` (#2303): put a shown year's nav `<li>` and `llms.txt` line back where they belong,
+ * next to its neighbour in the same key-stage group (nav) or the same list (llms.txt). A page that already has the
+ * line, or has no nav or year list to put it in, comes back unchanged, so running it on every page is safe.
+ */
+export function withYearLinks(text, id) {
+  const slug = yearSlug(id);
+  const esc1 = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const navRe = (sl) => new RegExp(`^([ \\t]*)<li><a href="/curriculum/${esc1(sl)}/"[^>]*>[^<]*</a></li>\\r?\\n`, 'm');
+  const llmsRe = (sl) => new RegExp(`^- \\[[^\\]]*\\]\\(${esc1(ORIGIN)}/curriculum/${esc1(sl)}/\\):.*\\r?\\n`, 'm');
+  /** Splice `line` next to the nearest present neighbour in `ids`; `fallback` is where an empty list takes it. */
+  const put = (src, ids, re, line, fallback) => {
+    if (re(slug).test(src)) return src;
+    const at = ids.indexOf(id);
+    const near = [...ids.slice(0, at).reverse().map(i => [i, true]), ...ids.slice(at + 1).map(i => [i, false])];
+    for (const [i, after] of near) {
+      const m = lineOf(src, re(yearSlug(i)));
+      if (m) { const k = m.index + (after ? m[0].length : 0); return src.slice(0, k) + line(m) + src.slice(k); }
+    }
+    return fallback ? fallback(src, line) : src;
+  };
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  let out = text;
+  for (const [label, ids] of NAV_GROUPS) {
+    if (!ids.includes(id)) continue;
+    const ul = lineOf(out, new RegExp(`^([ \\t]*)<ul aria-labelledby="${label}">\\r?\\n`, 'm'));
+    if (!ul) continue;
+    out = put(out, ids, navRe, (m) => `${m ? m[1] : ul[1] + '  '}<li><a href="/curriculum/${slug}/">${yearName(id)}</a></li>${eol}`,
+      (src, line) => { const k = ul.index + ul[0].length; return src.slice(0, k) + line(null) + src.slice(k); });
+  }
+  const hub = lineOf(out, new RegExp(`^- \\[Curriculum\\]\\(${esc1(ORIGIN)}/curriculum/\\):.*\\r?\\n`, 'm'));
+  if (hub) {
+    out = put(out, ALL_YEARS, llmsRe, () => `- [${yearName(id)}](${ORIGIN}/curriculum/${slug}/): what a child practises in ${yearName(id)}, in plain words, with ideas to try at home${eol}`,
+      (src, line) => { const h = lineOf(src, new RegExp(`^- \\[Curriculum\\]\\(${esc1(ORIGIN)}/curriculum/\\):.*\\r?\\n`, 'm')); const k = h.index + h[0].length; return src.slice(0, k) + line(null) + src.slice(k); });
+  }
+  return out;
+}
+
 /** A strand's name inside its own year: `Year 1 Number: fractions` → `Number: fractions`. EYFS names are kept. */
 const areaName = (name) => name.replace(/^Years? [\d–-]+ /, '');
 
