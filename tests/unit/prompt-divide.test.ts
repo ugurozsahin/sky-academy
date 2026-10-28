@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { promptHTML, markDivide } from '../../src/ui/hud';
+import { TOPICS } from '../../src/curriculum';
 import { y6OrderOps } from '../../src/curriculum/year6-order-ops';
 import type { Question } from '../../src/curriculum/types';
 
@@ -22,5 +23,23 @@ describe('÷ in a prompt', () => {
       }
     }
     expect(seen).toBeGreaterThan(20);
+  });
+});
+
+// #2355: the sequence/build/anyOrder branches wrap the ÷ too.
+describe('÷ on sequence, build and any-order cards', () => {
+  it('every such card with a ÷ renders it wrapped, and strips back to the prompt', () => {
+    let seen = 0;
+    for (const t of TOPICS) for (const d of [1, 2, 3] as const) for (let seed = 1; seed <= 60; seed++) {
+      let s = seed * 7 + d;
+      const rng = () => { s = s + 0x6D2B79F5 | 0; let x = Math.imul(s ^ s >>> 15, 1 | s); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+      const q = t.gen(d, rng) as Question;
+      if (!q.sequence || !(q.build || q.anyOrder) || !q.prompt.includes('÷')) continue;
+      seen++;
+      const html = promptHTML(q, 0);
+      expect(html).toContain('<span class="op-div">÷</span>');
+      expect(html).not.toMatch(/÷(?!<\/span>)/);
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });
