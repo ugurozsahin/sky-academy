@@ -88,6 +88,7 @@ export const NO_REPEATED_SET = new Set([
 'y1-skip d1', 'y1-skip d2', 'y1-skip d3', 'y1-order d1', 'y1-order d2', 'y1-order d3',
 'y1-coins d3', 'y1-shapes d3', 'y1-plurals d1', 'y1-punct d1', 'y1-days d3', 'y2-suffix d1', // #2272: decoys that spell a real word are withheld, so no option set recurs with a second answer
 'y1-sentence d1', 'y1-sentence d2', 'y1-sentence d3',
+  'y1-line d1', 'y1-line d2', 'y1-line d3', 'y2-line d1', // #2319: decoys are the nearest unprinted values to the hidden label, so no option set recurs with a different answer
   'y1-alien d1', 'y1-alien d2', 'y1-alien d3',
   'y1-prefix d1', 'y1-prefix d2', 'y1-prefix d3', // #977: the options are un+root and bank words around a random root, so no option set recurs with a different answer at these seeds
   'y1-compound d1', 'y1-compound d2', 'y1-compound d3', // #978: each entry's options are its own answer plus its own decoys, so no option set recurs with a different answer

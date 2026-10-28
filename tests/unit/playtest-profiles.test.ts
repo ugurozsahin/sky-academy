@@ -53,6 +53,14 @@ const workingFloors = (text: string): { floor: Size; comfortable: Size } | null 
   return sizes.length === 2 && comfortable.length === 1 ? { floor: floor[0], comfortable: comfortable[0] } : null;
 };
 
+// Named, never copied: a rate, a floor or a size written in the parent profile would drift from the year profile it came from (#2291, #2329).
+const NUM = '(?:\\d|\u00bd)(?:\\.\\d+)?';
+const NO_COPIED_FIGURES: [string, RegExp][] = [
+  ['no reading rate of its own', new RegExp(`${NUM}\\s+(?:\\w+\\s+)?(?:words?|wpm)\\b`, 'i')],
+  ['no reaction floor of its own', new RegExp(`${NUM}\\s*(?:s|secs?|seconds?|ms|milliseconds?)\\b`, 'i')],
+  ['no target size of its own', new RegExp(`${NUM}\\s*(?:CSS\\s+)?(?:mm|cm|px|pixels?)\\b`, 'i')],
+];
+
 describe('playtest profiles (#2204)', () => {
   it('there is exactly one profile per year group, plus the parent', () => {
     const onDisk = readdirSync(new URL('.claude/agents/', root)).filter((f) => f.startsWith('playtester-')).map((f) => f.replace(/\.md$/, ''));
@@ -175,12 +183,14 @@ describe('playtest profiles (#2204)', () => {
     expect(flat, 'card text and a hint as that child reads them').toContain('Card text and a hint count whenever that child would need them to choose, even when you could choose from the bubbles alone');
     expect(flat, 'frustration risk reads the mark, it does not replace it').toContain('**Frustration risk is what the mark means to you, not a second measure:**');
     // Named, never copied: a rate, a floor or a size written here would drift from the year profile it came from.
-    const at = parent.indexOf('## How you mark `physical`'), section = parent.slice(at, parent.indexOf('\n## ', at + 1));
-    expect(at, 'the section is there').toBeGreaterThan(-1);
-    // The figures as the year profiles write them: "60 words a minute", "29 words correct per minute", "3.5 seconds", "42 CSS px".
-    expect(section, 'no reading rate of its own').not.toMatch(/\d+\s+(words?\b|wpm\b)/);
-    expect(section, 'no reaction floor of its own').not.toMatch(/\d+(\.\d+)?\s*(s|seconds?)\b/);
-    expect(section, 'no target size of its own').not.toMatch(/\d+(\.\d+)?\s*(CSS\s+)?(mm|px)\b/);
+    expect(parent, 'the section is there').toContain('## How you mark `physical`');
+    // The figures as the year profiles write them: "60 words a minute", "29 correct words per minute", "3.5 sec", "3500 ms", "2½ seconds", "42 CSS pixels", "1 cm". The whole file is read, not one section (#2329).
+    for (const [why, re] of NO_COPIED_FIGURES) expect(parent, why).not.toMatch(re);
+  });
+
+  it.each(['60 WPM', '29 correct words per minute', '3.5 sec', '3500 ms', '2\u00bd seconds', '42 CSS pixels', '1 cm', '12 px'])('the no-copied-figures rail catches "%s" anywhere in the parent profile (#2329)', (figure) => {
+    const copy = `${body('playtester-parent')}\n| \`physical\` | ${figure} |\n`;
+    expect(NO_COPIED_FIGURES.some(([, re]) => re.test(copy)), 'red on an in-memory copy').toBe(true);
   });
 
   it.each(CHILD)('%s carries what the parent takes from it for `physical`: a reach floor, a reading rule and a Number section (#2291)', (name) => {

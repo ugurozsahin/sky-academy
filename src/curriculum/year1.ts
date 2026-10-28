@@ -499,8 +499,16 @@ const y1Days: Generator = (d, rng) => {
   const day = pick(rng, DAYS);
   if (d === 3) return spellQ(rng, day, '📅', 3);   // days keep their capital letter (Y1 grammar)
   const idx = ri(rng, 1, Math.min(4, day.length - 1));
-  return gapQ(rng, day, idx, gapLetters(day, idx), '📅', `Which letter is missing from ${day}?`);
+  return gapQ(rng, day, idx, daysDecoyPool(day, idx), '📅', `Which letter is missing from ${day}?`);
 };
+/** #2320: a decoy is a letter that could fill the gap in a child's spelling — a vowel for a vowel, a common consonant for a consonant — never q, z or x (`F_iday` offering q, c, z was a giveaway). */
+const COMMON_CONSONANTS = 'bcdfghlmnprstwy';
+export function daysDecoyPool(day: string, idx: number): string[] {
+  const all = gapLetters(day, idx);
+  const isVowel = 'aeiou'.includes(day[idx].toLowerCase());
+  const same = all.filter(l => isVowel ? 'aeiou'.includes(l) : COMMON_CONSONANTS.includes(l));
+  return same.length >= 3 ? same : all;
+}
 const Y1_SENTS: Sent[][] = [
   [['The frog can jump high.', '🐸'], ['My mum has a red car.', '🚗'], ['We like to play outside.', '⚽'], ['The little bird can sing.', '🐦'], ['I have two pet fish.', '🐟'], ['The ship sails on the sea.', '🚢'], ['Can you see the rainbow?', '🌈'], ['The king has a gold crown.', '👑'], ['We went to the park.', '🌳'], ['My friend has a kite.', '🪁']],
   [['The little dog ran very fast.', '🐶'], ['We had chips for our tea.', '🍟'], ['Can you find my blue sock?', '🧦'], ['The moon shines at night.', '🌙'], ['I love to read in bed.', '📖'], ['The sheep are in the field.', '🐑'], ['My dad made a big cake.', '🎂'], ['Is it raining today?', '🌧️'], ['The snail moved along slowly.', '🐌'], ['Look at that huge whale!', '🐋']],
