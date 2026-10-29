@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { y2CoinCombo } from '../../src/curriculum/year2-coincombo';
+import { y2CoinCombo, nearTolerance } from '../../src/curriculum/year2-coincombo';
 
 function mulberry32(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -44,6 +44,23 @@ describe('y2-coincombo (#1002)', () => {
         expect(q.say).toBe(`Which coins make ${target === 100 ? 'a pound' : `${target} pence`}?`);
         expect(q.prompt + q.say).not.toMatch(/\.\d|£\d+ and/);
       }
+    });
+  }
+
+  for (const d of [1, 2, 3] as const) {
+    it(`d${d}: wrong coin sets total close to the target, not a giveaway (#2319)`, () => {
+      const rng = mulberry32(2319 + d);
+      let tight = 0;
+      for (let i = 0; i < 300; i++) {
+        const q = y2CoinCombo(d, rng);
+        const target = pence(q.prompt.match(/£1|\d+p/)![0]);
+        const wrong = q.options.filter(o => o !== q.answer).map(total);
+        const near = wrong.filter(w => Math.abs(w - target) <= nearTolerance(target));
+        // Whenever the pool allows, all three decoys are near; a thin pool (90p) may need a farther top-up.
+        if (near.length === 3) tight++;
+        if (target < 10) for (const w of wrong) expect(w).toBeLessThanOrEqual(10);
+      }
+      expect(tight).toBeGreaterThan(200);
     });
   }
 });
