@@ -49,7 +49,7 @@ function decoys(p: number, area: number, rng: Rng): number[] {
   return out.slice(0, 3);
 }
 
-function card(rng: Rng, p: number, area: number, prompt: string, say: string, extra: Partial<Question>): Question {
+function card(rng: Rng, p: number, area: number, prompt: string, say: string, extra: Partial<Question> & { why: string }): Question {
   return wordQ(rng, prompt, cm(p), decoys(p, area, rng).map(cm), { say, hint: 'Count the edges round the outside', hintIsData: false, ...extra });
 }
 
@@ -58,10 +58,10 @@ export const y3Perimeter: Generator = (d: Difficulty, rng) => {
     let l: number, w: number;
     do { l = ri(rng, 4, 9); w = ri(rng, 2, 6); } while (l <= w || l * w === 2 * (l + w));
     return card(rng, 2 * (l + w), l * w, `A rectangle is ${l} cm long and ${w} cm wide. What is its perimeter?`,
-      `A rectangle is ${l} centimetres long and ${w} centimetres wide. What is its perimeter?`, {});
+      `A rectangle is ${l} centimetres long and ${w} centimetres wide. What is its perimeter?`, { why: `2 × (${l} + ${w}) = ${2 * (l + w)} cm` });
   }
   let grid: string[];
   do grid = gridShape(d, rng); while (areaOf(grid) === perimeterOf(grid));
   return card(rng, perimeterOf(grid), areaOf(grid), 'Each square is 1 cm. What is the perimeter?',
-    'Each square is 1 centimetre. What is the perimeter of the shape?', { visual: { type: 'symmetry', grid, mirror: false } });
+    'Each square is 1 centimetre. What is the perimeter of the shape?', { why: `${perimeterOf(grid)} edges of 1 cm round the outside`, visual: { type: 'symmetry', grid, mirror: false } });
 };
