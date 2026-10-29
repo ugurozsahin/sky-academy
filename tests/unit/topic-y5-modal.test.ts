@@ -44,7 +44,7 @@ describe('y5-modal (#1225)', () => {
     for (const s of BANKS) for (const w of wordsOf(s)) { expect(AVOID.has(w), w).toBe(false); expect(EXCLUDE, w).not.toContain(w); }
   });
 
-  it('d1 and d2: the answer is the sentence\'s one marker, among 4 single-word bubbles of the sentence', () => {
+  it('d1 and d2: the answer is the sentence\'s one marker, among 3 same-class words the sentence lacks (#2321)', () => {
     for (const [d, prompt, bank] of [[1, 'Slice the modal verb', MODAL_BANK], [2, 'Slice the adverb of possibility', ADVERB_BANK]] as const) {
       for (const q of draws(d)) {
         expect(q.prompt).toBe(prompt);
@@ -52,8 +52,12 @@ describe('y5-modal (#1225)', () => {
         expect(marks(text(q))).toEqual([q.answer.toLowerCase()]);
         expect(q.options).toHaveLength(4);
         expect(q.options).toContain(q.answer);
-        expect(q.options.filter(o => ALL.includes(o.toLowerCase()))).toEqual([q.answer]);
-        for (const o of q.options) { expect(o).toMatch(/^[A-Za-z]+$/); expect(wordsOf(text(q))).toContain(o.toLowerCase()); }
+        const list = d === 1 ? MODALS : ADVERBS;
+        for (const o of q.options) {
+          expect(o).toMatch(/^[A-Za-z]+$/);
+          expect(list).toContain(o.toLowerCase());
+          expect(wordsOf(text(q)).includes(o.toLowerCase()), o).toBe(o === q.answer);
+        }
       }
     }
   });
