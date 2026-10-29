@@ -10,8 +10,8 @@ const deg = (v: number) => `${v}°`;
 const lead = (v: number) => String(v)[0];
 
 /** Four options: the named slips first (the first is never displaced), then a last-digit sharer and a leading-digit sharer for answers of 20 or more (#1058), in 5–360. */
-function degCard(rng: Rng, prompt: string, answer: number, named: number[], extra: Partial<Question>): Question {
-  const ok = (v: number) => v >= 5 && v <= 360 && v % 5 === 0 && v !== answer;
+function degCard(rng: Rng, prompt: string, answer: number, named: number[], extra: Partial<Question>, cap = 360): Question {
+  const ok = (v: number) => v >= 5 && v <= cap && v % 5 === 0 && v !== answer;
   const ds = [...new Set(named.filter(ok))].slice(0, 3);
   if (answer >= 20) {
     const last = (v: number) => v % 10;
@@ -53,12 +53,13 @@ function missingCard(rng: Rng): Question {
   if (onLine) parts.push({ kind: 'segment', a: [8, 50], b: [92, 50] });
   let dir = onLine ? 0 : ri(rng, 0, 23) * 15;
   order.forEach((v, i) => { parts.push({ kind: 'angle', at: [50, onLine ? 50 : 38], dir, deg: v, label: i === unk ? '?' : deg(v), len: 15 }); dir += v; });
-  const bad = onLine ? [360 - known[0], known[0], 90 - known[0]] : [Math.abs(180 - sum), sum, 360 - sum + 90];
+  // On a line no angle can top 180°, so a decoy past it is a giveaway: the slips are the printed angle, a total of 90°, a neighbour.
+  const bad = onLine ? [known[0], 90 - known[0], answer + 10, answer - 10] : [Math.abs(180 - sum), sum, 360 - sum + 90];
   return degCard(rng, onLine ? 'Angles on a line. Missing angle = ?°' : 'Angles at a point. Missing angle = ?°', answer, bad, {
     visual: { type: 'geometry', parts },
     say: onLine ? 'Angles on a straight line add up to 180 degrees. What is the missing angle?' : 'Angles at a point add up to 360 degrees. What is the missing angle?',
     hint: onLine ? 'Angles on a straight line make a half turn' : 'Angles at a point make a whole turn', hintIsData: false,
-  });
+  }, onLine ? 180 : 360);
 }
 
 /** d3: rectangles in text, every prompt at most 60 characters. */
