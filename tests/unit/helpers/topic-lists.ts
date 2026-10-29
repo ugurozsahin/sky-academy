@@ -100,7 +100,7 @@ export const NO_REPEATED_SET = new Set([
 'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
 'y2-related d1', 'y2-related d2', 'y2-related d3', 'y2-tables-2 d1', 'y2-tables-5 d1', 'y2-line d2', 'y2-line d3',
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
-'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
+'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d3',
 'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
   'y2-conjunction d1', 'y2-conjunction d2', 'y2-conjunction d3', // #1007: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y2-nouns d1', 'y2-nouns d2', 'y2-nouns d3', // #1008: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
