@@ -20,15 +20,17 @@ const LEX: Record<string, Cls> = {};
 const add = (c: Cls, words: string) => { for (const w of words.split(' ')) { if (LEX[w] && LEX[w] !== c) throw new Error(`${w} has two classes`); LEX[w] = c; } };
 add('det', 'the a an my our some');
 add('prep', 'with in over on at near by from to');
-add('adj', 'fluffy black tall heavy wooden long kind clever tiny dark old big red green shiny new funny little hungry brown cold juicy small noisy strict happy tasty bright busy quiet friendly');
+add('adj', 'fluffy black tall heavy wooden long kind clever tiny dark old big red green shiny new funny little hungry brown cold juicy small noisy strict happy tasty bright busy quiet friendly sour salty crunchy squeaky sleepy fizzy');
 add('noun', 'dog cat tree bag cake chocolate gate road boy girl bird sky book farm school man bus frog coin brother bear wind winter apple team football stick hat kite garden maths teacher fan stand stone bridge river flag cheese sandwich pickle birthday table history office block park lamp door city street bakery village shop corner paper boat pond dinner lady hall lock beard picture room film ball hill ducks wall');
 add('verb', 'ran went ate sang swam drank grew flew kicked opened found climbed read fed painted cleaned watched jumped');
 add('adv', 'quickly slowly loudly gently happily very quite really fast ever so much later far away carefully suddenly rather quietly soon');
 const cls = (w: string) => { const c = LEX[w]; if (!c) throw new Error(`"${w}" is not in the test lexicon`); return c; };
 const words = (s: string) => s.split(' ');
-// The test's own literal decoy lists.
-const VERBS = ['ran', 'went', 'ate', 'sang', 'swam', 'drank', 'grew', 'flew'];
-const ADVERBS = ['quickly', 'slowly', 'loudly', 'gently', 'happily'];
+// The test's own rules (#2321): a d1 decoy is an adjective that cannot describe the noun in any reading. Words with a real use beside some noun
+// (salty/sour attitude, juicy meat, sleepy poetry, wooden toy, squeaky toy) are never offered; animate nouns only get the two words below.
+const DENY = ['wooden', 'salty', 'sour', 'sleepy', 'juicy'];
+const ANIMATE = ['dog', 'cat', 'boy', 'girl', 'bird', 'tree'];
+const NONSENSE = ['crunchy', 'fizzy'];
 
 /** A noun phrase per the test's own rule: det, one or more adjectives or nouns, a noun, optionally prep det noun. Returns the head noun or null. */
 function npHead(ws: string[]): string | null {
@@ -49,18 +51,31 @@ describe('y4-nounphrase (#1165)', () => {
     expect(topic).toMatchObject({ year: 'year4', subject: 'writing', strand: 'grammar', title: 'Expanded Noun Phrases' });
   });
 
-  it('d1: the answer is the only adjective or noun among the options; the decoys are a verb and an adverb from the test’s own lists', () => {
+  it('d1: the bank offers no decoy with a real use as a describing word, and animate nouns only the two nonsense ones (#2321 review)', () => {
+    for (const [, head, , [x, y]] of GAP_BANK) {
+      expect(x, head).not.toBe(y);
+      for (const c of [x, y]) { expect(DENY, `${head} ${c}`).not.toContain(c); if (ANIMATE.includes(head)) expect(NONSENSE, `${head} ${c}`).toContain(c); }
+    }
+  });
+
+  it('d1: the decoys are two adjectives that cannot describe the noun, the same word class as the answer (#2321)', () => {
+    const phrases = [...NP_BANK.map(phraseText), ...HEAD_BANK.map(headText)];
     for (const q of draws(1)) {
       expect(q.options).toHaveLength(3);
       expect(q.wide).toBe(true);
       expect(text(q)).toMatch(/^\w+ ___ \w+$/);
-      const fit = q.options.filter(o => ['adj', 'noun'].includes(cls(o)));
-      expect(fit, text(q)).toEqual([q.answer]);
+      const noun = words(text(q))[2];
       const decoys = q.options.filter(o => o !== q.answer);
-      expect(decoys.filter(o => VERBS.includes(o)), text(q)).toHaveLength(1);
-      expect(decoys.filter(o => ADVERBS.includes(o)), text(q)).toHaveLength(1);
+      expect(decoys, text(q)).toHaveLength(2);
+      expect(new Set(decoys).size, text(q)).toBe(2);
+      for (const o of decoys) {
+        expect(cls(o), `${text(q)} ${o}`).toBe('adj');
+        expect(GAP_BANK.find(r => r[1] === noun && r[2] === q.answer)![3], `${text(q)} ${o}`).toContain(o);
+        // No decoy ever describes this noun in any phrase the bank itself writes.
+        expect(phrases.some(p => words(p).includes(o) && words(p).includes(noun)), `${noun} ${o}`).toBe(false);
+      }
       // The completed phrase is a noun phrase by the test's rule.
-      expect(npHead(words(text(q).replace('___', q.answer))), text(q)).toBe(words(text(q))[2]);
+      expect(npHead(words(text(q).replace('___', q.answer))), text(q)).toBe(noun);
     }
   });
 
@@ -117,8 +132,10 @@ describe('y4-nounphrase (#1165)', () => {
 
   it('bank shape: sizes, every word in the lexicon with one class, tags agree with the lexicon', () => {
     for (const b of [GAP_BANK, NP_BANK, VP_BANK, ADV_BANK, HEAD_BANK]) expect(b.length).toBeGreaterThanOrEqual(12);
-    for (const [det, head, mod] of GAP_BANK) {
+    for (const [det, head, mod, clash] of GAP_BANK) {
       expect(cls(det)).toBe('det'); expect(cls(head)).toBe('noun');
+      for (const c of clash) expect(cls(c), head).toBe('adj');
+      expect(clash).not.toContain(mod);
       expect(['adj', 'noun'], mod).toContain(cls(mod));
     }
     for (const r of NP_BANK) { expect(npHead(words(phraseText(r))), phraseText(r)).toBe(r[2]); expect(phraseText(r).length).toBeLessThanOrEqual(30); }
