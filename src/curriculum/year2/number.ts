@@ -53,6 +53,12 @@ export const y2Add: Generator = (d, rng) => {
   if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a + b));
   return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p) }));
 };
+/** #2319: the slips 2-digit subtraction invites — the smaller units digit taken from the larger (52 − 17 = 45), a borrow forgotten or doubled (±10), adding instead. Never a random neighbour. */
+export const subSlips = (a: number, b: number): number[] => {
+  const ans = a - b, ua = a % 10, ub = b % 10;
+  const swapped = (Math.floor(a / 10) - Math.floor(b / 10)) * 10 + Math.abs(ua - ub);
+  return [swapped, ans + 10, ans - 10, a + b].filter(v => v !== ans && v >= 0 && v <= 100 && v !== a);
+};
 export const y2Sub: Generator = (d, rng) => {
   let a: number, b: number;
   if (d === 1) { a = ri(rng, 10, 99); b = ri(rng, 1, 9); }
@@ -60,7 +66,7 @@ export const y2Sub: Generator = (d, rng) => {
   else { a = ri(rng, 30, 99); b = ri(rng, 10, a - 1); }
   const p = `${a} − ${b} = ?`;
   if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a - b));
-  return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p) }));
+  return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p), distractors: subSlips(a, b) }));
 };
 export const y2Three: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 9;
