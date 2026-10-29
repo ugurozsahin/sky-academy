@@ -26,10 +26,10 @@ add('verb', 'ran went ate sang swam drank grew flew kicked opened found climbed 
 add('adv', 'quickly slowly loudly gently happily very quite really fast ever so much later far away carefully suddenly rather quietly soon');
 const cls = (w: string) => { const c = LEX[w]; if (!c) throw new Error(`"${w}" is not in the test lexicon`); return c; };
 const words = (s: string) => s.split(' ');
-// The test's own literal list (#2321): adjectives that cannot describe the noun, which d1 offers as decoys. Same word class as the answer, so only sense separates them.
+// The test's own literal list (#2321): adjectives that cannot describe the noun in any plausible reading (no `wooden` dog: a toy is real English), which d1 offers as decoys. Same word class as the answer, so only sense separates them.
 const CLASH: Record<string, string[]> = {
-  dog: ['sour', 'wooden'], cat: ['salty', 'crunchy'], tree: ['sour', 'squeaky'], bag: ['sleepy', 'hungry', 'sour'], cake: ['sleepy', 'wooden'],
-  gate: ['hungry', 'sleepy'], road: ['sleepy', 'juicy'], boy: ['wooden', 'juicy'], girl: ['wooden', 'sour'], bird: ['sour', 'juicy'],
+  dog: ['salty', 'crunchy'], cat: ['salty', 'crunchy'], tree: ['sour', 'squeaky'], bag: ['sleepy', 'hungry', 'sour'], cake: ['sleepy', 'squeaky'],
+  gate: ['hungry', 'sleepy'], road: ['sleepy', 'juicy'], boy: ['crunchy', 'salty'], girl: ['crunchy', 'salty'], bird: ['sour', 'juicy'],
   sky: ['sleepy', 'crunchy'], book: ['hungry', 'sleepy'],
 };
 
@@ -50,6 +50,10 @@ describe('y4-nounphrase (#1165)', () => {
   it('is registered once in Year 4 grammar', () => {
     expect(TOPICS.filter(t => t.id === 'y4-nounphrase')).toHaveLength(1);
     expect(topic).toMatchObject({ year: 'year4', subject: 'writing', strand: 'grammar', title: 'Expanded Noun Phrases' });
+  });
+
+  it('d1: no decoy is `wooden` beside a living noun or food (#2321 review)', () => {
+    for (const [, head, , clash] of GAP_BANK) if (!['gate'].includes(head)) expect(clash, head).not.toContain('wooden');
   });
 
   it('d1: the decoys are two adjectives that cannot describe the noun, the same word class as the answer (#2321)', () => {

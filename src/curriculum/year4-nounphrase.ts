@@ -7,9 +7,9 @@ import { pick, shuffle, wordQ } from './util';
 /** d1: [determiner, head noun, the modifier that fits, two adjectives that cannot describe that noun (#2321)]. The modifier is an adjective or a noun used as a modifier. */
 export type GapRow = readonly [det: string, head: string, modifier: string, clash: readonly [string, string]];
 export const GAP_BANK: readonly GapRow[] = [
-  ['the', 'dog', 'fluffy', ['sour', 'wooden']], ['a', 'cat', 'black', ['salty', 'crunchy']], ['the', 'tree', 'tall', ['sour', 'squeaky']],
-  ['my', 'bag', 'heavy', ['sleepy', 'hungry']], ['the', 'cake', 'chocolate', ['sleepy', 'wooden']], ['a', 'gate', 'wooden', ['hungry', 'sleepy']],
-  ['the', 'road', 'long', ['sleepy', 'juicy']], ['a', 'boy', 'kind', ['wooden', 'juicy']], ['the', 'girl', 'clever', ['wooden', 'sour']],
+  ['the', 'dog', 'fluffy', ['salty', 'crunchy']], ['a', 'cat', 'black', ['salty', 'crunchy']], ['the', 'tree', 'tall', ['sour', 'squeaky']],
+  ['my', 'bag', 'heavy', ['sleepy', 'hungry']], ['the', 'cake', 'chocolate', ['sleepy', 'squeaky']], ['a', 'gate', 'wooden', ['hungry', 'sleepy']],
+  ['the', 'road', 'long', ['sleepy', 'juicy']], ['a', 'boy', 'kind', ['crunchy', 'salty']], ['the', 'girl', 'clever', ['crunchy', 'salty']],
   ['a', 'bird', 'tiny', ['sour', 'juicy']], ['the', 'sky', 'dark', ['sleepy', 'crunchy']], ['my', 'book', 'old', ['hungry', 'sleepy']],
   ['the', 'gate', 'farm', ['hungry', 'sleepy']], ['a', 'bag', 'school', ['sour', 'sleepy']],
 ];
