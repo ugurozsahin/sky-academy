@@ -52,9 +52,12 @@ function pickOne(a: number, m: number, rng: Rng): Question {
   const digitsum = String(a).split('').reduce((s, d) => s + Number(d), 0) * m;
   const rules = [digitsum, a + m].filter(ok);
   const picked: number[] = [];
+  const tens = Array.from({ length: 40 }, (_, i) => (i + 1) * 10);
   const add = (v: number | undefined) => { if (v !== undefined && ok(v) && [ans, ...picked].every(p => Math.abs(p - v) > 1) && picked.length < 3) picked.push(v); };
+  // Steps in tens first (a wrong carry); a leading-digit decoy for a 2-digit answer can only step 2..9 inside its tens digit.
   const fill = (same: (v: number) => boolean) => {
-    for (let d = 1; d <= 40; d++) for (const s of shuffle(rng, [1, -1])) { const v = ans + s * d * 10; if (ok(v) && same(v) && !picked.includes(v)) return v; }
+    const steps = same === sameLast ? tens : [...tens, ...Array.from({ length: 39 }, (_, i) => i + 2)];
+    for (const d of steps) for (const s of shuffle(rng, [1, -1])) { const v = ans + s * d; if (ok(v) && same(v) && !picked.includes(v)) return v; }
     return undefined;
   };
   const sameLast = (v: number) => v % 10 === ans % 10;
