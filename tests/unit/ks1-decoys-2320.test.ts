@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import { CONTRACTIONS, contractionDecoys } from '../../src/curriculum/year2';
-import { daysDecoyPool } from '../../src/curriculum/year1';
+import { daysDecoyPool, shapeDecoys } from '../../src/curriculum/year1';
 import type { Difficulty } from '../../src/curriculum';
 
 function rng(seed: number) {
@@ -64,5 +64,29 @@ describe('#2320 y2-tense: some d2 cards carry no time word', () => {
     const bareAt = (d: Difficulty) => { const r = rng(2330 + d); let n = 0; for (let i = 0; i < N; i++) { const q = t.gen(d, r); const s = (q.visual as { text: string }).text; if (!timeWord.test(s)) n++; expect(q.options).toContain(q.answer); } return n; };
     expect(bareAt(2)).toBeGreaterThan(20);
     expect(bareAt(1)).toBe(0);
+  });
+});
+
+describe('#2320 y1-shapes decoys are the shapes children mix up', () => {
+  it('pentagon and hexagon are each other\'s decoy, and square/rectangle never share a card', () => {
+    for (let i = 0; i < N; i++) {
+      const r = rng(2322 + i);
+      expect(shapeDecoys('pentagon', 5, r)).toContain('⬢');
+      expect(shapeDecoys('hexagon', 6, r)).toContain('⬟');
+      expect(shapeDecoys('square', 4, r)).not.toContain('▬');
+      expect(shapeDecoys('rectangle', 4, r)).not.toContain('■');
+      expect(new Set(shapeDecoys('triangle', 3, r)).size).toBe(3);
+    }
+  });
+  it('generated "Which is a …?" cards keep unique options with the answer among them', () => {
+    const t = topic('y1-shapes');
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(2330 + d);
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        expect(q.options).toContain(q.answer);
+        expect(new Set(q.options).size).toBe(q.options.length);
+      }
+    }
   });
 });
