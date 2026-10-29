@@ -203,7 +203,7 @@ function endTime(rng: Rng): Question {
 export const y2Duration: Generator = (d, rng) => {
   if (d === 1) {
     const { phrase, n } = pick(rng, DUR_FACTS);
-    return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 100, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n === 60 ? 30 : n * 2] });
+    return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 100, say: `How many ${phrase}?`, distractors: DUR_FACTS.map(f => f.n).filter(v => v !== n) });
   }
   if (d === 2) return intervalCompare(rng, rng() < 0.5 ? 2 : 3);
   return endTime(rng);
