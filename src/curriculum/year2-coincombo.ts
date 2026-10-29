@@ -28,16 +28,21 @@ const sum = (c: Combo) => c.reduce((s, n) => s + n, 0);
 export const comboLabel = (c: Combo) => c.map(coinLabel).join(' + ');
 const spoken = (p: number) => (p === 100 ? 'a pound' : `${p} pence`);
 
+/** How far from the target a wrong coin set's total may be before it is a giveaway. */
+export const nearTolerance = (target: number) => Math.max(3, Math.round(target * 0.4));
+
 export const y2CoinCombo: Generator = (d, rng): Question => {
   const { coins, sizes, min, max } = COINS[d as 1 | 2 | 3];
   const all = sizes.flatMap(s => combos(coins, s)).filter(c => sum(c) <= max);
   const answers = all.filter(c => sum(c) >= min);
   const ans = pick(rng, answers);
   const target = sum(ans);
-  // Near misses: a different coin set whose total is 1p–10p off, never the target itself. A target with fewer
-  // than three of those (90p from 5p/10p/20p/50p) is topped up with the nearest other totals.
+  // Near misses: a different coin set whose total is close to the target (within 3p, or 40% of it), never the target
+  // itself, so no option is a giveaway like 10p + 2p beside 3p (#2319). A target with fewer than three of those
+  // (90p from 5p/10p/20p/50p) is topped up with the nearest other totals.
   const gap = (c: Combo) => Math.abs(sum(c) - target);
+  const tol = nearTolerance(target);
   const others = all.filter(c => gap(c) >= 1);
-  const near = [...shuffle(rng, others.filter(c => gap(c) <= 10)), ...others.filter(c => gap(c) > 10).sort((x, y) => gap(x) - gap(y))];
+  const near = [...shuffle(rng, others.filter(c => gap(c) <= tol)), ...others.filter(c => gap(c) > tol).sort((x, y) => gap(x) - gap(y))];
   return wordQ(rng, `Which coins make ${coinLabel(target)}?`, comboLabel(ans), near.slice(0, 3).map(comboLabel), { say: `Which coins make ${spoken(target)}?` });
 };
