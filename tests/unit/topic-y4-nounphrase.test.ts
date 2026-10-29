@@ -20,18 +20,17 @@ const LEX: Record<string, Cls> = {};
 const add = (c: Cls, words: string) => { for (const w of words.split(' ')) { if (LEX[w] && LEX[w] !== c) throw new Error(`${w} has two classes`); LEX[w] = c; } };
 add('det', 'the a an my our some');
 add('prep', 'with in over on at near by from to');
-add('adj', 'fluffy black tall heavy wooden long kind clever tiny dark old big red green shiny new funny little hungry brown cold juicy small noisy strict happy tasty bright busy quiet friendly sour salty crunchy squeaky sleepy');
+add('adj', 'fluffy black tall heavy wooden long kind clever tiny dark old big red green shiny new funny little hungry brown cold juicy small noisy strict happy tasty bright busy quiet friendly sour salty crunchy squeaky sleepy fizzy');
 add('noun', 'dog cat tree bag cake chocolate gate road boy girl bird sky book farm school man bus frog coin brother bear wind winter apple team football stick hat kite garden maths teacher fan stand stone bridge river flag cheese sandwich pickle birthday table history office block park lamp door city street bakery village shop corner paper boat pond dinner lady hall lock beard picture room film ball hill ducks wall');
 add('verb', 'ran went ate sang swam drank grew flew kicked opened found climbed read fed painted cleaned watched jumped');
 add('adv', 'quickly slowly loudly gently happily very quite really fast ever so much later far away carefully suddenly rather quietly soon');
 const cls = (w: string) => { const c = LEX[w]; if (!c) throw new Error(`"${w}" is not in the test lexicon`); return c; };
 const words = (s: string) => s.split(' ');
-// The test's own literal list (#2321): adjectives that cannot describe the noun in any plausible reading (no `wooden` dog: a toy is real English), which d1 offers as decoys. Same word class as the answer, so only sense separates them.
-const CLASH: Record<string, string[]> = {
-  dog: ['salty', 'crunchy'], cat: ['salty', 'crunchy'], tree: ['sour', 'squeaky'], bag: ['sleepy', 'hungry', 'sour'], cake: ['sleepy', 'squeaky'],
-  gate: ['hungry', 'sleepy'], road: ['sleepy', 'juicy'], boy: ['crunchy', 'salty'], girl: ['crunchy', 'salty'], bird: ['sour', 'juicy'],
-  sky: ['sleepy', 'crunchy'], book: ['hungry', 'sleepy'],
-};
+// The test's own rules (#2321): a d1 decoy is an adjective that cannot describe the noun in any reading. Words with a real use beside some noun
+// (salty/sour attitude, juicy meat, sleepy poetry, wooden toy, squeaky toy) are never offered; animate nouns only get the two words below.
+const DENY = ['wooden', 'salty', 'sour', 'sleepy', 'juicy'];
+const ANIMATE = ['dog', 'cat', 'boy', 'girl', 'bird', 'tree'];
+const NONSENSE = ['crunchy', 'fizzy'];
 
 /** A noun phrase per the test's own rule: det, one or more adjectives or nouns, a noun, optionally prep det noun. Returns the head noun or null. */
 function npHead(ws: string[]): string | null {
@@ -52,8 +51,11 @@ describe('y4-nounphrase (#1165)', () => {
     expect(topic).toMatchObject({ year: 'year4', subject: 'writing', strand: 'grammar', title: 'Expanded Noun Phrases' });
   });
 
-  it('d1: no decoy is `wooden` beside a living noun or food (#2321 review)', () => {
-    for (const [, head, , clash] of GAP_BANK) if (!['gate'].includes(head)) expect(clash, head).not.toContain('wooden');
+  it('d1: the bank offers no decoy with a real use as a describing word, and animate nouns only the two nonsense ones (#2321 review)', () => {
+    for (const [, head, , [x, y]] of GAP_BANK) {
+      expect(x, head).not.toBe(y);
+      for (const c of [x, y]) { expect(DENY, `${head} ${c}`).not.toContain(c); if (ANIMATE.includes(head)) expect(NONSENSE, `${head} ${c}`).toContain(c); }
+    }
   });
 
   it('d1: the decoys are two adjectives that cannot describe the noun, the same word class as the answer (#2321)', () => {
@@ -68,7 +70,7 @@ describe('y4-nounphrase (#1165)', () => {
       expect(new Set(decoys).size, text(q)).toBe(2);
       for (const o of decoys) {
         expect(cls(o), `${text(q)} ${o}`).toBe('adj');
-        expect(CLASH[noun], `${text(q)} ${o}`).toContain(o);
+        expect(GAP_BANK.find(r => r[1] === noun && r[2] === q.answer)![3], `${text(q)} ${o}`).toContain(o);
         // No decoy ever describes this noun in any phrase the bank itself writes.
         expect(phrases.some(p => words(p).includes(o) && words(p).includes(noun)), `${noun} ${o}`).toBe(false);
       }
