@@ -41,7 +41,8 @@ describe('y5-anglefacts (#1210)', () => {
       a.filter(p => p.label !== '?').forEach(p => expect(p.label).toBe(`${p.deg}°`));
       a.forEach((p, i) => { expect(p.deg % 5).toBe(0); expect(p.deg).toBeGreaterThanOrEqual(30); if (i > 0) expect(p.dir).toBe(a[i - 1].dir + a[i - 1].deg); });
       const known = a.filter(p => p.label !== '?').reduce((s, p) => s + p.deg, 0);
-      expect(q.options.map(num)).toContain(total === 180 ? 360 - a.find(p => p.label !== '?')!.deg : (Math.abs(180 - known) || known));
+      if (total === 180) { expect(q.options.map(num), q.prompt).toContain(a.find(p => p.label !== '?')!.deg); q.options.forEach(o => expect(num(o), q.prompt).toBeLessThanOrEqual(180)); }
+      else expect(q.options.map(num)).toContain(Math.abs(180 - known) || known);
     }
     expect(line).toBeGreaterThan(150); expect(point).toBeGreaterThan(150);
   });
