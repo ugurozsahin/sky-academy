@@ -2,7 +2,7 @@
 // d1 is the Year 4 recap, one place to the nearest whole (3.7 → 4); d2 is two places to the nearest whole, half the cards in
 // pounds ("Round £3.46 to the nearest pound"); d3 is two places to one place (4.65 → 4.7, 3.96 → 4.0). Values are scaled
 // integers (`ks2num.ts`), never floats, and halves round up. A one-place answer always prints its place (4.0, not 4).
-// The slips are cutting the digits off, always rounding up, rounding to the wrong place and missing the carry on a 9.
+// A decoy with the answer's last digit is ten away, so only when the answer is 10 or more. The slips are cutting the digits off, always rounding up, rounding to the wrong place and missing the carry on a 9.
 // No decoy is worth the answer, so 4 is never offered beside 4.0. The answer shares its last printed digit with a decoy (#1058).
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, wordQ, numberWord } from './util';
@@ -45,7 +45,8 @@ function decoys(n: Dec, answer: Dec, target: 0 | 1, kind: Kind): string[] {
   };
   [down, addDec(down, one), wrongPlace, addDec(answer, one), subDec(answer, one)].forEach(add);
   for (let k = 2; picked.length < 3; k++) add(addDec(answer, dec(k, answer.dp)));
-  if (!picked.some(p => p.label.slice(-1) === label.slice(-1))) {
+  // A whole answer under 10 gets no ten-away decoy: 18 beside 7.5 is a giveaway, not a slip (#2319).
+  if (!picked.some(p => p.label.slice(-1) === label.slice(-1)) && (answer.dp > 0 || answer.v >= 10)) {
     const ten = dec(10, answer.dp);
     const swap = [addDec(answer, ten), ...(answer.v >= ten.v ? [subDec(answer, ten)] : [])].filter(c => fresh(c) && show(c, kind) !== label && !picked.some(p => p.label === show(c, kind)));
     if (swap.length) picked[2] = { label: show(swap[0], kind), value: swap[0] };
