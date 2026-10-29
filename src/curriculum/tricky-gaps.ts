@@ -27,12 +27,13 @@ export function trickyDecoys(word: string): string[] {
   const safe = gapDecoys(word, idx, gapLetters(word, idx)).filter(l => !RARE_REAL.has(word.slice(0, idx) + l + word.slice(idx + 1)));
   const plausible = gapDecoys(word, idx, wrong.split('')).filter(l => safe.includes(l));
   const vowel = (l: string) => 'aeiou'.includes(l) === 'aeiou'.includes(word[idx]);   // a vowel gap pads with vowels, not "wbre"
-  // Every real-word vowel swap of put/pull is filtered, so a vowel gap tops up with "y" before it falls back to a consonant.
-  const vowelGap = 'aeiou'.includes(word[idx]);
-  // #2320: the top-up never offers a letter no child writes there (q, x, z, j, v, k); "y" only where `wrong` names it or a vowel gap has run dry.
+  // #2320: the top-up never offers a letter no child writes there (q, x, z, j, v, k); "y" only where `wrong` names it, or as the last resort once every likelier letter is used.
   const odd = (l: string) => 'qxzjvk'.includes(l);
   const likely = safe.filter(l => !odd(l) && l !== 'y');
-  return [...new Set([...plausible, ...likely.filter(vowel), ...(vowelGap ? safe.filter(l => l === 'y') : []), ...likely, ...safe])].slice(0, 5);
+  const five = [...new Set([...plausible, ...likely.filter(vowel), ...likely, ...safe])].slice(0, 5);
+  // #2348: a vowel gap keeps one vowel-like decoy; when put/pull have no real-word vowel swap left, "y" is that one, in the last slot only.
+  if ('aeiou'.includes(word[idx]) && !five.some(l => 'aeiouy'.includes(l)) && safe.includes('y')) five[4] = 'y';
+  return five;
 }
 
 /** A missing-letter card whose gap is the word's tricky letter. */
