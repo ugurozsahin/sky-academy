@@ -95,13 +95,21 @@ export const TENSE_FRAMES: ReadonlyArray<readonly [string, TenseCol, 'present' |
   ['He was ___ in the garden.', 3, 'past'],
   ['We were ___ in the park.', 3, 'past'],
 ];
+/** #2320: no time word, so at d2 the verb's own ending settles the tense (a child cannot read "Yesterday" and stop). Never used at d3, where the gap would fit two forms. */
+export const TENSE_BARE: ReadonlyArray<readonly [string, 1 | 2, 'present' | 'past']> = [
+  ['She ___ in the garden.', 1, 'present'],
+  ['He ___ in the park.', 1, 'present'],
+  ['She ___ in the park.', 2, 'past'],
+  ['He ___ in the garden.', 2, 'past'],
+];
 /**
  * d1 and d2 name the tense of a finished sentence — d1 on the simple forms, d2 with the progressive, where
  * the auxiliary rather than the verb ending carries the tense. d3 turns the same sentence round and asks the
  * child to produce the form the gap needs, with all four forms of that one verb on the bubbles.
  */
 export const y2Tense: Generator = (d, rng) => {
-  const [frame, col, tense] = pick(rng, d === 1 ? TENSE_FRAMES.filter(f => f[1] !== 3) : TENSE_FRAMES);
+  const bare = d === 2 && rng() < 0.4;
+  const [frame, col, tense] = pick<readonly [string, TenseCol, 'present' | 'past']>(rng, bare ? TENSE_BARE : d === 1 ? TENSE_FRAMES.filter(f => f[1] !== 3) : TENSE_FRAMES);
   const v = pick(rng, TENSE_VERBS);
   if (d === 3) return wordQ(rng, frame, v[col], v.filter(w => w !== v[col]), {
     visual: { type: 'sentence', text: frame }, say: frame.replace('___', 'blank'),

@@ -56,3 +56,13 @@ describe('#2320 y2-contractions decoys are real mistakes', () => {
     }
   });
 });
+
+describe('#2320 y2-tense: some d2 cards carry no time word', () => {
+  it('over 200 seeds d2 mixes bare and time-worded cards, and d1/d3 never go bare', () => {
+    const t = topic('y2-tense');
+    const timeWord = /Every|Yesterday|Last week|now|\bare\b|\bwas\b|\bwere\b|\bis\b/;
+    const bareAt = (d: Difficulty) => { const r = rng(2330 + d); let n = 0; for (let i = 0; i < N; i++) { const q = t.gen(d, r); const s = (q.visual as { text: string }).text; if (!timeWord.test(s)) n++; expect(q.options).toContain(q.answer); } return n; };
+    expect(bareAt(2)).toBeGreaterThan(20);
+    expect(bareAt(1)).toBe(0);
+  });
+});

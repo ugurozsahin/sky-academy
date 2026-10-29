@@ -8,7 +8,7 @@ import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID
 import { anyOrderQ } from '../../src/curriculum/any-order';
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
 import {
-  TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES,
+  TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES, TENSE_BARE,
 } from '../../src/curriculum/year2';
 import { nearOppositeParity } from '../../src/curriculum/year2-oddeven'; import { WORD_CLASSES, WORD_CLASS_NAMES } from '../../src/curriculum/year2-wordclass';
 import type { SentenceType } from '../../src/curriculum/year2';
@@ -1971,7 +1971,7 @@ describe('Year 2 grammar and spelling (#299 slice 3)', () => {
 
     it('d1 names the tense on simple forms, d2 adds the progressive, d3 asks for the form itself', () => {
       const t = topic('y2-tense'), r = rng(3002);
-      const frameOf = (text: string) => TENSE_FRAMES.find(f => {
+      const frameOf = (text: string) => [...TENSE_FRAMES, ...TENSE_BARE].find(f => {
         const [head, tail] = f[0].split('___');
         return text.startsWith(head) && text.endsWith(tail);
       });
