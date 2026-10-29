@@ -309,9 +309,19 @@ const y1Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 10 : 20, d === 3 ? 
 const y1Line: Generator = (d, rng) => lineQ(rng, d === 1 ? 0 : ri(rng, 0, d === 2 ? 10 : 90), 1, 6);
 
 /** Shapes (2-D) — properties and recognition. Tables live in util.ts (SHAPES_2D/SHAPES_3D). */
+/**
+ * Decoys for "Which is a …?" are the shapes a child mixes up with it (#2320): the nearest side count first
+ * (pentagon with hexagon, triangle with a four-sided shape), never the square/rectangle pair (sameShape), and
+ * the round circle only when nothing closer is left. Ties are broken by the rng so cards still vary.
+ */
+export function shapeDecoys(name: string, sides: number, rng: () => number): string[] {
+  const far = (n: number) => n === 0 ? 99 : n;
+  return shuffle(rng, SHAPES_2D.filter(x => !sameShape(x[1], name)))
+    .sort((a, b) => Math.abs(far(a[2]) - far(sides)) - Math.abs(far(b[2]) - far(sides))).slice(0, 3).map(x => x[0]);
+}
 const y1Shapes: Generator = (d, rng) => {
   const [g, name, sides] = pick(rng, SHAPES_2D);
-  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_2D.filter(x => !sameShape(x[1], name))).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape', hintIsData: false });
+  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shapeDecoys(name, sides, rng), { hint: 'Slice the shape', hintIsData: false });
   if (sides === 0) return y1Shapes(d, rng);
   return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2] });
 };
