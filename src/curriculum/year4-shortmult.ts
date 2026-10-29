@@ -1,7 +1,8 @@
 // y4-shortmult (#1140): 2- and 3-digit × 1-digit with the formal written method. d1 is pick-one; d2 mixes pick-one and
 // build; d3 is build only (the sum stays on the card, the child slices the answer's digits, at most four slots).
 // Pick-one decoys are the slips a written method invites: a dropped carry, the tens digit multiplied as ones, adding
-// instead of multiplying; ±10 / ±1 fills guarantee one decoy shares the answer's last and leading digit (#1058).
+// instead of multiplying; ±10 fills guarantee one decoy shares the answer's last and leading digit (#1058); a fill never sits one away from
+// the answer, where only the units digit would separate them (#2319).
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, shuffle, wordQ, q } from './util';
 import { buildQ } from './build';
@@ -51,9 +52,12 @@ function pickOne(a: number, m: number, rng: Rng): Question {
   const digitsum = String(a).split('').reduce((s, d) => s + Number(d), 0) * m;
   const rules = [digitsum, a + m].filter(ok);
   const picked: number[] = [];
-  const add = (v: number | undefined) => { if (v !== undefined && ok(v) && !picked.includes(v) && picked.length < 3) picked.push(v); };
+  const tens = Array.from({ length: 40 }, (_, i) => (i + 1) * 10);
+  const add = (v: number | undefined) => { if (v !== undefined && ok(v) && [ans, ...picked].every(p => Math.abs(p - v) > 1) && picked.length < 3) picked.push(v); };
+  // Steps in tens first (a wrong carry); a leading-digit decoy for a 2-digit answer can only step 2..9 inside its tens digit.
   const fill = (same: (v: number) => boolean) => {
-    for (let d = 1; d <= 40; d++) for (const s of shuffle(rng, [1, -1])) { const v = ans + s * d * (same === sameLast ? 10 : 1); if (ok(v) && same(v) && !picked.includes(v)) return v; }
+    const steps = same === sameLast ? tens : [...tens, ...Array.from({ length: 39 }, (_, i) => i + 2)];
+    for (const d of steps) for (const s of shuffle(rng, [1, -1])) { const v = ans + s * d; if (ok(v) && same(v) && !picked.includes(v)) return v; }
     return undefined;
   };
   const sameLast = (v: number) => v % 10 === ans % 10;
@@ -63,6 +67,7 @@ function pickOne(a: number, m: number, rng: Rng): Question {
   if (!picked.some(sameLead)) add(fill(sameLead));
   for (const v of shuffle(rng, rules)) add(v);
   for (const v of shuffle(rng, dropped)) add(v);
+  for (let d = 1; picked.length < 3 && d < 100; d++) add(ans + (rng() < 0.5 ? d : -d) * 10);
   for (let d = 1; picked.length < 3 && d < 100; d++) add(ans + (rng() < 0.5 ? d : -d));
   const sum = `${f(a)} × ${m} = ?`;
   return wordQ(rng, sum, f(ans), picked.map(f), { say: q(sum).say });
