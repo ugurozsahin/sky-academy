@@ -74,3 +74,32 @@ describe('y1-spelling / y2-spelling gap the tricky letter (#2277)', () => {
     }
   });
 });
+
+describe('#2320 y2-spelling decoys are letters a child could write', () => {
+  it('offers q, x, z, j, v, k or y only where the table names it for that word', () => {
+    const t = topic('y2-spelling');
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(23200 + d);
+      for (let i = 0; i < 200; i++) {
+        const q = t.gen(d, r);
+        if (!q.prompt.includes('_')) continue;   // d3 spell-it cards offer the word's own letters
+        for (const o of q.options.filter(x => x !== q.answer)) {
+          const named = Object.entries(TRICKY).some(([w, [, wrong]]) => q.prompt.replace('_', q.answer) === w && wrong.includes(o));
+          const lastResortY = o === 'y' && 'aeiou'.includes(q.answer) && trickyDecoys(q.prompt.replace('_', q.answer)).indexOf('y') === 4;   // put/pull only (#2348)
+          if ('qxzjvky'.includes(o)) expect(named || lastResortY, `${q.prompt}: ${o}`).toBe(true);
+        }
+      }
+    }
+  });
+  it('y is a vowel gap\'s decoy only in the last slot, and only when no other vowel fits', () => {
+    for (const [w, [, wrong]] of Object.entries(TRICKY)) {
+      const ds = trickyDecoys(w);
+      if (wrong.includes('y') || ds.indexOf('y') < 0) continue;
+      expect(ds.indexOf('y'), w).toBe(4);
+      expect(ds.slice(0, 4).some(l => 'aeiou'.includes(l)), w).toBe(false);
+    }
+  });
+  it('every tabled word still offers five candidate decoys', () => {
+    for (const w of Object.keys(TRICKY)) expect(trickyDecoys(w).length, w).toBe(5);
+  });
+});
