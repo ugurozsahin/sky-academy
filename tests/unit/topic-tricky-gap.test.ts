@@ -74,3 +74,23 @@ describe('y1-spelling / y2-spelling gap the tricky letter (#2277)', () => {
     }
   });
 });
+
+describe('#2320 y2-spelling decoys are letters a child could write', () => {
+  it('offers q, x, z, j, or v only where the table names it for that word; y only there or as the last top-up of a vowel gap', () => {
+    const t = topic('y2-spelling');
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(23200 + d);
+      for (let i = 0; i < 200; i++) {
+        const q = t.gen(d, r);
+        if (!q.prompt.includes('_')) continue;   // d3 spell-it cards offer the word's own letters
+        for (const o of q.options.filter(x => x !== q.answer)) {
+          const named = Object.entries(TRICKY).some(([w, [, wrong]]) => q.prompt.replace('_', q.answer).includes(w) && wrong.includes(o));
+          if ('qxzjvy'.includes(o)) expect(named || (o === 'y' && 'aeiou'.includes(q.answer)), `${q.prompt}: ${o}`).toBe(true);
+        }
+      }
+    }
+  });
+  it('every tabled word still offers five candidate decoys', () => {
+    for (const w of Object.keys(TRICKY)) expect(trickyDecoys(w).length, w).toBe(5);
+  });
+});
