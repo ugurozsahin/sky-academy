@@ -95,6 +95,13 @@ describe('y4-pronouns (#1168)', () => {
     }
   });
 
+  it('no card names a pronoun outside the gap, so none gives the answer away (#2321)', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d, 250)) {
+      const t = text(q), outside = t.replace('___', ' ').toLowerCase().match(/[a-z]+/g)!;
+      for (const w of outside) expect(['he', 'she', 'it', 'his', 'her', 'hers', 'him', 'its', 'they', 'their', 'them'], `${t} ${w}`).not.toContain(w);
+    }
+  });
+
   it('capitalisation follows the gap on every card', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d, 300)) {
       const t = text(q);
