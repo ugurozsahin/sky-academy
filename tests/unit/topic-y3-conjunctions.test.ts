@@ -63,6 +63,13 @@ describe('y3-conjunctions (#1108)', () => {
     for (const [s, a, ds, c] of GAP_BANK) if (c === 'conjunction' && (a === 'before' || a === 'after')) expect(ds, s).not.toContain(a === 'before' ? 'after' : 'before');
   });
 
+  it('every conjunction gap has a decoy that is itself a conjunction, so class alone cannot give the answer (#2321)', () => {
+    const CONJ = [...new Set([...GAP_BANK.filter(r => r[3] === 'conjunction').map(r => r[1]), 'although', 'if', 'so'])];
+    let rows = 0;
+    for (const [s, , ds, c] of GAP_BANK) if (c === 'conjunction') { rows++; expect(ds.filter(d => CONJ.includes(d)).length, s).toBeGreaterThanOrEqual(1); }
+    expect(rows).toBeGreaterThan(0);
+  });
+
   it('every gap and class sentence is unique', () => {
     expect(new Set(GAP_BANK.map(r => r[0])).size).toBe(GAP_BANK.length);
     expect(new Set(CLASS_BANK.map(r => r[0])).size).toBe(CLASS_BANK.length);

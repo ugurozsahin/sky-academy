@@ -1350,10 +1350,13 @@ test.describe('Ninja Duel', () => {
       prompt: 'Which word is it?', hint: 'biscuit + ice-cream',
     };
     const P = await dressAndMeasure(page, card);
-    const txt = await page.evaluate(() => {
+    // Dealt again inside the same tick it is measured in: a live duel repaints `#vis` between two evaluates, and
+    // the nightly of 2026-10-30 found the card gone (`el` null) on shard 1/3.
+    const txt = await page.evaluate(html => {
+      document.querySelector('#vis')!.innerHTML = html;
       const el = document.querySelector('#vis .wordcard .txt') as HTMLElement;
       return { h: el.getBoundingClientRect().height, font: parseFloat(getComputedStyle(el).fontSize) };
-    });
+    }, card.html);
     expect(txt.h, 'the word sits on one line, not two').toBeLessThan(txt.font * 1.15 * 1.5 + 4 + 1);
     expect(P.clipY, '800x1280: the long word card is not cut off by the budget').toBeLessThanOrEqual(0.5);
   });

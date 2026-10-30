@@ -13,18 +13,18 @@ export type ClassRow = [sentence: string, word: string, cls: WordClass];
 
 export const GAP_BANK: GapRow[] = [
   // conjunctions: because, so, when, before, after, while
-  ['We wore coats ___ it was cold.', 'because', ['during', 'then', 'in'], 'conjunction'],
-  ['I was late ___ the bus broke down.', 'because', ['next', 'soon', 'in'], 'conjunction'],
+  ['We wore coats ___ it was cold.', 'because', ['so', 'then', 'in'], 'conjunction'],
+  ['I was late ___ the bus broke down.', 'because', ['so', 'next', 'in'], 'conjunction'],
   ['It was cold, ___ we wore coats.', 'so', ['because', 'during', 'in'], 'conjunction'],
   ['The ice melted, ___ we could not skate.', 'so', ['because', 'during', 'in'], 'conjunction'],
-  ['I wave ___ I see my friend at the gate.', 'when', ['soon', 'during', 'in'], 'conjunction'],
+  ['I wave ___ I see my friend at the gate.', 'when', ['although', 'soon', 'in'], 'conjunction'],
   ['The bell rings ___ it is time for playtime.', 'when', ['although', 'soon', 'in'], 'conjunction'],
-  ['Put on your boots ___ you go out in the rain.', 'before', ['during', 'soon', 'in'], 'conjunction'],
-  ['Mum switched the oven on ___ she put the pie in.', 'before', ['during', 'soon', 'in'], 'conjunction'],
-  ['We washed up ___ we had eaten our dinner.', 'after', ['during', 'in', 'soon'], 'conjunction'],
-  ['He fell asleep ___ he had read the story.', 'after', ['during', 'in', 'soon'], 'conjunction'],
-  ['Dad cooked ___ we laid the table.', 'while', ['soon', 'during', 'in'], 'conjunction'],
-  ['The baby slept ___ we tiptoed past.', 'while', ['next', 'in', 'soon'], 'conjunction'],
+  ['Put on your boots ___ you go out in the rain.', 'before', ['although', 'soon', 'in'], 'conjunction'],
+  ['Mum switched the oven on ___ she put the pie in.', 'before', ['although', 'soon', 'in'], 'conjunction'],
+  ['We washed up ___ we had eaten our dinner.', 'after', ['so', 'in', 'soon'], 'conjunction'],
+  ['He fell asleep ___ he had read the story.', 'after', ['so', 'in', 'soon'], 'conjunction'],
+  ['Dad cooked ___ we laid the table.', 'while', ['although', 'soon', 'in'], 'conjunction'],
+  ['The kettle boiled ___ I washed up.', 'while', ['although', 'soon', 'in'], 'conjunction'],
   // adverbs: then, next, soon, therefore
   ['First we mixed it, and ___ we baked it.', 'then', ['because', 'during', 'if'], 'adverb'],
   ['I got in the bath and ___ I washed my hair.', 'then', ['although', 'during', 'because'], 'adverb'],

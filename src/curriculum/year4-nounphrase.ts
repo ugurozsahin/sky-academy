@@ -4,17 +4,15 @@
 import type { Generator, Question } from './types';
 import { pick, shuffle, wordQ } from './util';
 
-/** d1: [determiner, head noun, the modifier that fits]. The modifier is an adjective or a noun used as a modifier. */
-export type GapRow = readonly [det: string, head: string, modifier: string];
+/** d1: [determiner, head noun, the modifier that fits, two adjectives that cannot describe that noun (#2321)]. The modifier is an adjective or a noun used as a modifier. */
+export type GapRow = readonly [det: string, head: string, modifier: string, clash: readonly [string, string]];
 export const GAP_BANK: readonly GapRow[] = [
-  ['the', 'dog', 'fluffy'], ['a', 'cat', 'black'], ['the', 'tree', 'tall'], ['my', 'bag', 'heavy'], ['the', 'cake', 'chocolate'],
-  ['a', 'gate', 'wooden'], ['the', 'road', 'long'], ['a', 'boy', 'kind'], ['the', 'girl', 'clever'], ['a', 'bird', 'tiny'],
-  ['the', 'sky', 'dark'], ['my', 'book', 'old'], ['the', 'gate', 'farm'], ['a', 'bag', 'school'],
+  ['the', 'dog', 'fluffy', ['crunchy', 'fizzy']], ['a', 'cat', 'black', ['crunchy', 'fizzy']], ['the', 'tree', 'tall', ['crunchy', 'fizzy']],
+  ['my', 'bag', 'heavy', ['hungry', 'fizzy']], ['the', 'cake', 'chocolate', ['hungry', 'squeaky']], ['a', 'gate', 'wooden', ['hungry', 'fizzy']],
+  ['the', 'road', 'long', ['hungry', 'fizzy']], ['a', 'boy', 'kind', ['crunchy', 'fizzy']], ['the', 'girl', 'clever', ['crunchy', 'fizzy']],
+  ['a', 'bird', 'tiny', ['crunchy', 'fizzy']], ['the', 'sky', 'dark', ['hungry', 'fizzy']], ['my', 'book', 'old', ['hungry', 'fizzy']],
+  ['the', 'gate', 'farm', ['hungry', 'fizzy']], ['a', 'bag', 'school', ['hungry', 'fizzy']],
 ];
-
-/** d1 decoys. Irregular simple-past verbs (not the participle, so "the ran dog" can never be read), and -ly adverbs made from an adjective. */
-export const VERB_DECOYS = ['ran', 'went', 'ate', 'sang', 'swam', 'drank', 'grew', 'flew'] as const;
-export const ADVERB_DECOYS = ['quickly', 'slowly', 'loudly', 'gently', 'happily'] as const;
 
 /** d2: an expanded noun phrase [determiner, modifiers, head noun, optional preposition phrase]. */
 export type PhraseRow = readonly [det: string, mods: readonly string[], head: string, pp?: readonly [prep: string, det: string, noun: string]];
@@ -55,12 +53,12 @@ const NP_PROMPT = 'Which is an expanded noun phrase?';
 export const phraseText = (r: PhraseRow): string => [r[0], ...r[1], r[2], ...(r[3] ?? [])].join(' ');
 export const headText = (r: HeadRow): string => [r[0], ...r[1], r[2], r[3], ...r[4]].join(' ');
 
-/** d1: choose the modifier. The decoys are a verb and an adverb, neither of which can sit before a noun. */
+/** d1: choose the modifier. The decoys are adjectives too, so only sense separates them: the row's two that cannot describe the noun (#2321). */
 function gap(rng: () => number): Question {
-  const [det, head, mod] = pick(rng, GAP_BANK);
+  const [det, head, mod, clash] = pick(rng, GAP_BANK);
   const text = `${det} ___ ${head}`;
   const prompt = 'Which word fits the gap to expand the noun phrase?';
-  return wordQ(rng, prompt, mod, [pick(rng, VERB_DECOYS), pick(rng, ADVERB_DECOYS)], {
+  return wordQ(rng, prompt, mod, [...clash], {
     visual: { type: 'sentence', text }, say: `${text.replace('___', 'blank')}. ${prompt}`, wide: true,
     hint: 'A word that describes the noun goes in the gap.', hintIsData: false,
   });

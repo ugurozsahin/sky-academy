@@ -36,7 +36,9 @@ function card(rng: Rng, prompt: string, ans: Opt, named: Opt[], fillers: Opt[], 
 function division(rng: Rng): Question {
   let n: number, d: number;
   do { d = ri(rng, 2, 12); n = ri(rng, 1, d - 1); } while (gcd(n, d) > 1);
-  const nb = [n + 1, n - 1, n + 2].map(x => frac(x, d)), db = [d + 1, d - 1].map(x => frac(n, x));
+  // #2319: a fraction decoy is one a child could believe is the answer, so it is in lowest terms (not 2/8 beside 3/8).
+  const lowest = (o: Opt) => gcd(o.n, o.d) === 1;
+  const nb = [n + 1, n - 1, n + 2, n + 3, n + 4, n + 5].map(x => frac(x, d)).filter(lowest), db = [d + 1, d - 1, d + 2, d + 3, d + 4].map(x => frac(n, x)).filter(lowest);
   if (rng() < 0.5) {
     return card(rng, `${n} ÷ ${d} as a fraction`, frac(n, d), [frac(d, n), ...nb], db, 'A fraction bar means divided by', `${n} ÷ ${d} is ${n}/${d}`);
   }

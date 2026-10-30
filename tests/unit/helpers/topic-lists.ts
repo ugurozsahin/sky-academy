@@ -100,13 +100,13 @@ export const NO_REPEATED_SET = new Set([
 'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
 'y2-related d1', 'y2-related d2', 'y2-related d3', 'y2-tables-2 d1', 'y2-tables-5 d1', 'y2-line d2', 'y2-line d3',
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
-'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d3',
+'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d3', 'y2-sub d1', 'y2-sub d2', // #2319: borrow-slip decoys depend on both numbers, so no option set recurs with a second answer
 'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
   'y2-conjunction d1', 'y2-conjunction d2', 'y2-conjunction d3', // #1007: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y2-nouns d1', 'y2-nouns d2', 'y2-nouns d3', // #1008: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y2-storytime d2', 'y2-storytime d3', // #1019: each story question carries its own decoys, so an option set never recurs with a different answer; d1 does compare (the names Mum and Dad recur)
   'r-storytime d2', 'r-storytime d3', // #1020: each story question carries its own pictures or digits, so an option set never recurs with a different answer; d1 compares
-  'y1-storytime d2', 'y1-storytime d3', // #1018: each story question carries its own decoys, so an option set never recurs with a different answer; d1 does compare (the names Mum and Dad recur)
+  'y1-storytime d3', // #1018: each story question carries its own decoys, so an option set never recurs with a different answer; d1 and d2 compare (#2437: the blue/red colour cards share an option set)
   'y1-share d2', 'y1-share d3', // #986: the decoys are the total, k and answer ±1, all derived from the card, so no option set recurs with a different answer at these seeds
   'y2-story-times d1', // #995: the array on d1 cards is the whole question and its decoys derive from the card, so no option set recurs with a different answer
   'y2-story-add d1', 'y2-story-add d3', // #994: the decoys are the other operation and answer ±1/±10, all derived from the card, so no option set recurs with a different answer

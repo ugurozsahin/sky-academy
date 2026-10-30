@@ -41,12 +41,13 @@ export const wordsOf = (s: string): string[] => s.toLowerCase().match(/[a-z]+/g)
 /** The bank sentence's single marker word, as written. */
 const markerIn = (s: string, list: readonly string[]): string => s.match(/[A-Za-z]+/g)!.find(w => list.includes(w.toLowerCase()))!;
 
-/** Slice-the-word card: four words of the sentence, the marker plus three others of two or more letters. */
+/** Slice-the-word card (#2321): the marker plus three words of its own class that the sentence does not hold, so only sense separates them. */
 function spot(rng: () => number, bank: readonly string[], list: readonly string[], prompt: string, hint: string): Question {
   const s = pick(rng, bank);
   const answer = markerIn(s, list);
-  const others = [...new Set(s.match(/[A-Za-z]+/g)!)].filter(w => w !== answer && w.length >= 2 && w.toLowerCase() !== 'the');
-  return wordQ(rng, prompt, answer, shuffle(rng, others).slice(0, 3), {
+  const cap = (w: string): string => answer[0] === answer[0].toUpperCase() ? w[0].toUpperCase() + w.slice(1) : w;
+  const decoys = shuffle(rng, list.filter(w => w !== answer.toLowerCase())).slice(0, 3).map(cap);
+  return wordQ(rng, prompt, answer, decoys, {
     visual: { type: 'sentence', text: s }, say: `${s} ${prompt}.`, hint, hintIsData: false,
   });
 }
