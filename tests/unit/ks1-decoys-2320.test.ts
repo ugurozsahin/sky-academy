@@ -90,3 +90,26 @@ describe('#2320 y1-shapes decoys are the shapes children mix up', () => {
     }
   });
 });
+
+describe('#2320 y1-position row cards: decoys are the mistakes a child makes', () => {
+  it('"first" and "last" always offer the other end and its neighbour', () => {
+    const t = topic('y1-position');
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(2340 + d);
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        expect(q.options).toContain(q.answer);
+        expect(new Set(q.options).size).toBe(q.options.length);
+        const m = /^Which is (first|last) in the row\?$/.exec(q.prompt);
+        if (!m) continue;
+        const glyphs = (q.visual as { text: string }).text.split(' ');
+        const ans = glyphs.indexOf(q.answer as string);
+        expect(ans).toBe(m[1] === 'first' ? 0 : 4);
+        expect(q.options).toContain(glyphs[m[1] === 'first' ? 4 : 0]);
+        seen++;
+      }
+    }
+    expect(seen).toBeGreaterThan(50);
+  });
+});
