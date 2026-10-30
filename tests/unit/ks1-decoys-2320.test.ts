@@ -113,3 +113,28 @@ describe('#2320 y1-position row cards: decoys are the mistakes a child makes', (
     expect(seen).toBeGreaterThan(50);
   });
 });
+
+describe('#2320 y2-stats-table: the wrong bubbles are table-reading slips', () => {
+  const t = TOPICS.find(x => x.id === 'y2-stats-table')!;
+  type Tab = { rows: { label: string; n: number }[] };
+  it.each([1, 2, 3] as const)('difficulty %s: over 200 seeds', (d) => {
+    let seed = 2320 * d;
+    const rng = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let x = Math.imul(seed ^ seed >>> 15, 1 | seed); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+    for (let i = 0; i < 200; i++) {
+      const q = t.gen(d, rng);
+      if (!q.visual || q.visual.type !== 'chart') continue;
+      const ns = (q.visual as unknown as Tab).rows.map(r => r.n);
+      const wrong = q.options.filter(o => o !== q.answer).map(Number);
+      expect(new Set(q.options).size).toBe(q.options.length);
+      if (Number.isNaN(Number(q.answer))) continue;
+      if (q.prompt.includes('altogether')) {
+        const sum = ns.reduce((a, b) => a + b, 0);
+        expect(wrong.some(w => ns.some(c => w === sum - c))).toBe(true);
+      } else if (q.prompt.startsWith('How many more')) {
+        expect(wrong.some(w => ns.includes(w) || w > Number(q.answer))).toBe(true);
+      } else if (ns.filter(c => c !== Number(q.answer)).length > 1) {
+        expect(wrong.some(w => ns.includes(w))).toBe(true);
+      }
+    }
+  });
+});

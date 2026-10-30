@@ -26,8 +26,11 @@ const y2StatsTableRaw: Generator = (d, rng) => {
   const rows = survey.rows.map(([icon, name], k) => ({ label: `${icon} ${name}`, n: counts[k] }));
   const visual = { type: 'chart' as const, kind: 'table' as const, rows, head: [survey.what[0].toUpperCase() + survey.what.slice(1), 'Children'] as [string, string] };
 
+  // #2320: the wrong bubbles are the slips a child makes reading a table — another row's count, a row left out of the sum, the two counts added instead of subtracted.
+  const sum = counts.reduce((a, b) => a + b, 0);
   if (ask === 'total') {
-    return numQ(rng, 'How many children altogether?', counts.reduce((a, b) => a + b, 0), {
+    return numQ(rng, 'How many children altogether?', sum, {
+      distractors: counts.map(c => sum - c),
       visual, hint: 'Add up the table', hintIsData: false, say: 'Look at the table. How many children are there altogether?',
     });
   }
@@ -35,6 +38,7 @@ const y2StatsTableRaw: Generator = (d, rng) => {
     const [hi, lo] = counts[i] > counts[j] ? [i, j] : [j, i];
     const [hiIcon, hiName] = survey.rows[hi], [loIcon, loName] = survey.rows[lo];
     return numQ(rng, `How many more ${hiIcon} than ${loIcon}?`, counts[hi] - counts[lo], {
+      distractors: [counts[hi] + counts[lo], counts[hi], counts[lo]], max: counts[hi] + counts[lo],
       visual, say: `Look at the table. How many more children chose ${hiName} than ${loName}?`,
     });
   }
@@ -46,6 +50,7 @@ const y2StatsTableRaw: Generator = (d, rng) => {
   }
   const k = ri(rng, 0, survey.rows.length - 1);
   return numQ(rng, `How many chose ${survey.rows[k][0]}?`, counts[k], {
+    distractors: counts.filter((_, m) => m !== k), min: 1, max: 21,
     visual, hint: 'Read the table', hintIsData: false, say: 'Look at the table. How many children chose this one?',
   });
 };
