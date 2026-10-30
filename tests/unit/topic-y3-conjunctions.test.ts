@@ -64,8 +64,10 @@ describe('y3-conjunctions (#1108)', () => {
   });
 
   it('every conjunction gap has a decoy that is itself a conjunction, so class alone cannot give the answer (#2321)', () => {
-    const CONJ = ['when', 'before', 'after', 'while', 'so', 'because', 'although', 'if'];
-    for (const [s, , ds, c] of GAP_BANK) if (c === 'conjunction') expect(ds.filter(d => CONJ.includes(d)).length, s).toBeGreaterThanOrEqual(1);
+    const CONJ = [...new Set([...GAP_BANK.filter(r => r[3] === 'conjunction').map(r => r[1]), 'although', 'if'])];
+    let rows = 0;
+    for (const [s, , ds, c] of GAP_BANK) if (c === 'conjunction') { rows++; expect(ds.filter(d => CONJ.includes(d)).length, s).toBeGreaterThanOrEqual(1); }
+    expect(rows).toBeGreaterThan(0);
   });
 
   it('every gap and class sentence is unique', () => {
