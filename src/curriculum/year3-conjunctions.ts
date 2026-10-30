@@ -24,7 +24,7 @@ export const GAP_BANK: GapRow[] = [
   ['We washed up ___ we had eaten our dinner.', 'after', ['so', 'in', 'soon'], 'conjunction'],
   ['He fell asleep ___ he had read the story.', 'after', ['so', 'in', 'soon'], 'conjunction'],
   ['Dad cooked ___ we laid the table.', 'while', ['although', 'soon', 'in'], 'conjunction'],
-  ['The baby slept ___ we tiptoed past.', 'while', ['so', 'next', 'soon'], 'conjunction'],
+  ['The kettle boiled ___ I washed up.', 'while', ['although', 'soon', 'in'], 'conjunction'],
   // adverbs: then, next, soon, therefore
   ['First we mixed it, and ___ we baked it.', 'then', ['because', 'during', 'if'], 'adverb'],
   ['I got in the bath and ___ I washed my hair.', 'then', ['although', 'during', 'because'], 'adverb'],
