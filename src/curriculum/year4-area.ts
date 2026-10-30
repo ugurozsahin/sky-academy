@@ -12,15 +12,15 @@ function rectArea(rng: Rng): Question {
   let w: number, h: number;
   do { w = ri(rng, 2, 6); h = ri(rng, 2, 5); } while (w * h > 24);
   const g = fill(w, h), a = w * h;
-  return opts(rng, 'What is the area? Count the squares.', a, [perimeter(g), w + h, w * h + w], { say: 'What is the area? Count the squares.', ...SAY(g) });
+  return opts(rng, 'What is the area? Count the squares.', a, [perimeter(g), w + h, w * h + w], { say: 'What is the area? Count the squares.', why: `${w} × ${h} = ${a} squares`, ...SAY(g) });
 }
 
 /** d2: area or perimeter of a rectilinear shape, half and half. */
 function shape(rng: Rng): Question {
   const g = rectilinear(rng), a = cells(g), p = perimeter(g);
-  if (rng() < 0.5) return opts(rng, 'What is the area? Count the squares.', a, [p, edgeSquares(g), a + 1], { say: 'What is the area? Count the squares.', ...SAY(g) });
+  if (rng() < 0.5) return opts(rng, 'What is the area? Count the squares.', a, [p, edgeSquares(g), a + 1], { say: 'What is the area? Count the squares.', why: `${a} squares in the shape`, ...SAY(g) });
   const prompt = 'Each square has 1 cm sides. What is the perimeter in cm?';
-  return opts(rng, prompt, p, [a, p / 2, edgeSquares(g), p - 2], { say: 'Each square has 1 centimetre sides. What is the perimeter in centimetres?', ...SAY(g) });
+  return opts(rng, prompt, p, [a, p / 2, edgeSquares(g), p - 2], { say: 'Each square has 1 centimetre sides. What is the perimeter in centimetres?', why: `${p} edges of 1 cm round the outside`, ...SAY(g) });
 }
 
 /** d3: perimeter of a rectangle or square from its sides, in cm or m, no grid. */
@@ -29,13 +29,13 @@ function calc(rng: Rng): Question {
   if (rng() < 0.3) {
     const s = ri(rng, 2, 15), p = 4 * s;
     return opts(rng, `A square has ${s} ${unit} sides. What is its perimeter in ${unit}?`, p, [s * s, 2 * s, 3 * s],
-      { say: `A square has ${s} ${word} sides. What is its perimeter in ${word}?` });
+      { say: `A square has ${s} ${word} sides. What is its perimeter in ${word}?`, why: `4 × ${s} = ${p} ${unit}` });
   }
   const l = ri(rng, 3, 15);
   let b = ri(rng, 2, 14); if (b >= l) b = l - 1;
   const p = 2 * (l + b);
   return opts(rng, `A rectangle is ${l} ${unit} long and ${b} ${unit} wide. What is its perimeter in ${unit}?`, p, [l * b, l + b, 2 * l + b],
-    { say: `A rectangle is ${l} ${word} long and ${b} ${word} wide. What is its perimeter in ${word}?` });
+    { say: `A rectangle is ${l} ${word} long and ${b} ${word} wide. What is its perimeter in ${word}?`, why: `2 × (${l} + ${b}) = ${p} ${unit}` });
 }
 
 export const y4Area: Generator = (level: Difficulty, rng) => (level === 1 ? rectArea : level === 2 ? shape : calc)(rng);
