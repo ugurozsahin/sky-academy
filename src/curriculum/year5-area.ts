@@ -29,10 +29,10 @@ function card(rng: Rng, prompt: string, answer: number, bad: number[], extra: Pa
 function rectArea(rng: Rng): Question {
   if (rng() < 0.5) {
     const w = ri(rng, 2, 12), h = ri(rng, 2, 6), g = fill(w, h), a = w * h;
-    return card(rng, `Each square is 1 cm². ${w} squares wide. ${CM2}`, a, [perimeter(g), w + h, 2 * (w + h) + 2], { say: `Each square is 1 square centimetre. The rectangle is ${w} squares wide. ${SAY_CM2}`, ...vis(rows(g)) });
+    return card(rng, `Each square is 1 cm². ${w} squares wide. ${CM2}`, a, [perimeter(g), w + h, 2 * (w + h) + 2], { why: `${w} × ${h} = ${a} cm²`, say: `Each square is 1 square centimetre. The rectangle is ${w} squares wide. ${SAY_CM2}`, ...vis(rows(g)) });
   }
   const l = ri(rng, 3, 12), w = ri(rng, 2, l - 1), a = l * w;
-  return card(rng, `${l} cm by ${w} cm. ${CM2}`, a, [2 * (l + w), l + w, a + l], { say: `A rectangle is ${l} centimetres by ${w} centimetres. ${SAY_CM2}` });
+  return card(rng, `${l} cm by ${w} cm. ${CM2}`, a, [2 * (l + w), l + w, a + l], { why: `${l} × ${w} = ${a} cm²`, say: `A rectangle is ${l} centimetres by ${w} centimetres. ${SAY_CM2}` });
 }
 
 /** An L, T or U of 6 to 20 squares. */
@@ -47,11 +47,11 @@ function perimOrMetres(rng: Rng): Question {
   const r = rng();
   if (r < 0.6) {
     const g = composite(rng), a = cells(g), p = perimeter(g);
-    return card(rng, 'Each side is 1 cm. Perimeter = ? cm', p, [a, boundingPerimeter(g), p / 2, p + 2], { say: 'Each side of a square is 1 centimetre. What is the perimeter in centimetres?', ...vis(rows(g)) });
+    return card(rng, 'Each side is 1 cm. Perimeter = ? cm', p, [a, boundingPerimeter(g), p / 2, p + 2], { why: `${p} edges of 1 cm round the outside`, say: 'Each side of a square is 1 centimetre. What is the perimeter in centimetres?', ...vis(rows(g)) });
   }
   const l = ri(rng, 4, 12), w = ri(rng, 3, l - 1), spokenBox = `A rectangle is ${l} metres by ${w} metres.`;
-  if (r < 0.8) return card(rng, `${l} m by ${w} m. Area = ? m²`, l * w, [2 * (l + w), l + w, l * w + l], { say: `${spokenBox} What is the area in square metres?` });
-  return card(rng, `${l} m by ${w} m. Perimeter = ? m`, 2 * (l + w), [l * w, l + w, 2 * l + w], { say: `${spokenBox} What is the perimeter in metres?` });
+  if (r < 0.8) return card(rng, `${l} m by ${w} m. Area = ? m²`, l * w, [2 * (l + w), l + w, l * w + l], { why: `${l} × ${w} = ${l * w} m²`, say: `${spokenBox} What is the area in square metres?` });
+  return card(rng, `${l} m by ${w} m. Perimeter = ? m`, 2 * (l + w), [l * w, l + w, 2 * l + w], { why: `2 × (${l} + ${w}) = ${2 * (l + w)} m`, say: `${spokenBox} What is the perimeter in metres?` });
 }
 
 /** A rectangle with a rectangular notch, then an even number of its edge squares turned into half squares. */
@@ -72,11 +72,11 @@ function withHalves(rng: Rng): { rows: string[]; whole: number; half: number } {
 function estimate(rng: Rng): Question {
   if (rng() < 0.6) {
     const s = withHalves(rng), a = s.whole + s.half / 2;
-    return card(rng, `Count half squares as ½. Area is about ? cm²`, a, [s.whole + s.half, s.whole, s.whole + 1], { say: 'Count each half square as one half. About how many square centimetres is the area?', ...vis(s.rows) });
+    return card(rng, `Count half squares as ½. Area is about ? cm²`, a, [s.whole + s.half, s.whole, s.whole + 1], { why: `${s.whole} whole + ${s.half} halves (${s.half / 2}) = ${a} cm²`, say: 'Count each half square as one half. About how many square centimetres is the area?', ...vis(s.rows) });
   }
   const l = ri(rng, 5, 12), w = ri(rng, 4, Math.min(l, 11)), cw = ri(rng, 1, 3), ch = ri(rng, 1, 3), a = l * w - cw * ch;
   const prompt = `${l} × ${w} cm rectangle, ${cw} × ${ch} cm corner cut off. ${CM2}`;
-  return card(rng, prompt, a, [2 * (l + w), l * w, l * w + cw * ch], { say: `A ${l} by ${w} centimetre rectangle has a ${cw} by ${ch} centimetre corner cut off. ${SAY_CM2}` }, 2);
+  return card(rng, prompt, a, [2 * (l + w), l * w, l * w + cw * ch], { why: `${l} × ${w} − ${cw} × ${ch} = ${a} cm²`, say: `A ${l} by ${w} centimetre rectangle has a ${cw} by ${ch} centimetre corner cut off. ${SAY_CM2}` }, 2);
 }
 
 export const y5Area: Generator = (level: Difficulty, rng) => (level === 1 ? rectArea : level === 2 ? perimOrMetres : estimate)(rng);
