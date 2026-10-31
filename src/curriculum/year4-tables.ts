@@ -58,7 +58,7 @@ export function y4TablesQ(d: Difficulty, rng: Rng, table?: number): Question {
     : table ? [`? × ${t} = ${p}`, n, factorDecoys(n, t, rng)]
     : [`? × ${n} = ${p}`, t, factorDecoys(t, n, rng)];
   const fact = form === 'div' ? {} : { fact: `${t}×${n}` };   // #1122: division is not tagged
-  return { ...q(prompt), ...fact, answer: String(answer), options: shuffle(rng, [answer, ...decoys].map(String)) };
+  return { ...q(prompt), ...fact, answer: String(answer), options: shuffle(rng, [answer, ...decoys].map(String)), why: `${t} × ${n} = ${p}` };   // #2317: the multiplication fact behind every form
 }
 
 /** #1127: from d2, one card in three is a reverse form ("Which makes P?"), half × and half ÷; the drills keep y4TablesQ's one form. */
