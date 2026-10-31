@@ -31,10 +31,12 @@ function basic(rng: Rng): Question {
     do n = ri(rng, 2, 10); while (n === 3);
     const v = n ** 3, prompt = pick(rng, [`A cube has sides of ${n} cm. Volume?`, `Each edge of a cube is ${n} cm. Volume?`, `A cube is ${n} cm × ${n} cm × ${n} cm. Volume?`]);
     return card(rng, prompt, cubic(v, CM), [square(v, CM), cubic(n * 3, CM), cubic(n * n, CM)], x => cubic(x, CM), v, {
+      why: `${n} × ${n} × ${n} = ${g(v)} cm³`,
       say: `A cube has sides of ${n} centimetres. What is its volume in cubic centimetres?` });
   }
   const l = ri(rng, 2, 10), w = ri(rng, 2, 10), h = ri(rng, 2, 10), v = l * w * h;
   return card(rng, `A box is ${l} cm × ${w} cm × ${h} cm. Volume?`, cubic(v, CM), [square(v, CM), cubic(l * w, CM), cubic(l + w + h, CM)], x => cubic(x, CM), v, {
+    why: `${l} × ${w} × ${h} = ${g(v)} cm³`,
     say: `A box is ${l} centimetres by ${w} centimetres by ${h} centimetres. What is its volume in cubic centimetres?` });
 }
 
@@ -45,10 +47,12 @@ function missingOrMetres(rng: Rng): Question {
     do { l = ri(rng, 2, 10); w = ri(rng, 2, 10); } while (l === w);
     const h = ri(rng, 2, 10), v = l * w * h;
     return card(rng, `Volume ${g(v)} cm³, base ${l} cm × ${w} cm. Height?`, `${h} cm`, [`${v / l} cm`, `${v / w} cm`, `${h} cm²`], x => `${x} cm`, h, {
+      why: `${g(v)} ÷ ${l} ÷ ${w} = ${h} cm`,
       say: `A box has a volume of ${v} cubic centimetres and a base of ${l} centimetres by ${w} centimetres. What is its height?` });
   }
   const l = ri(rng, 2, 12), w = ri(rng, 2, 12), h = ri(rng, 2, 12), v = l * w * h;
   return card(rng, `A room is ${l} m × ${w} m × ${h} m. Volume?`, cubic(v, M), [square(v, M), cubic(l * w, M), cubic(l + w + h, M)], x => cubic(x, M), v, {
+    why: `${l} × ${w} × ${h} = ${g(v)} m³`,
     say: `A room is ${l} metres by ${w} metres by ${h} metres. What is its volume in cubic metres?` });
 }
 
@@ -61,6 +65,7 @@ function compareOrExtend(rng: Rng): Question {
       if (Math.abs(va - vb) < 0.1 * Math.max(va, vb)) continue;
       const box = (d: number[]) => `${d[0]}×${d[1]}×${d[2]}`, spoken = (d: number[]) => `${d[0]} by ${d[1]} by ${d[2]}`;
       return wordQ(rng, `Which holds more: A ${box(a)} or B ${box(b)}?`, va > vb ? 'A' : 'B', [va > vb ? 'B' : 'A'], {
+        why: `A is ${g(va)} cm³ and B is ${g(vb)} cm³`,
         say: `Box A is ${spoken(a)} centimetres and box B is ${spoken(b)} centimetres. Which holds more?`, hint: HINT, hintIsData: false });
     }
   }
@@ -69,6 +74,7 @@ function compareOrExtend(rng: Rng): Question {
   do n = ri(rng, 2, 12); while (n === 3);
   const v = n ** 3;
   return card(rng, `A cube with ${n} ${un.sym} sides. Volume in ${un.sym}³?`, cubic(v, un), [square(v, un), cubic(n * 3, un), cubic(n * n, un)], x => cubic(x, un), v, {
+    why: `${n} × ${n} × ${n} = ${g(v)} ${un.sym}³`,
     say: `A cube has sides of ${n} ${un.word}. What is its volume in ${cubicWord(un)}?` });
 }
 
