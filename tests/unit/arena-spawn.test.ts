@@ -296,3 +296,17 @@ describe('reduced motion thins bursts and drops wake sparks (#900)', () => {
     expect(particlesOf(a as unknown as Arena).some(p => p.kind === 'ember')).toBe(true);
   });
 });
+
+describe('the year bubble scale reaches the drawn bubble (#2288)', () => {
+  const spawnScaled = (scale?: number) => {
+    const arena = new Arena(stubCanvas(ctx), { onHit: () => {}, onFall: () => {}, onWaveEnd: () => {} });
+    arenas.push(arena); arena.spawnWave({ labels: ['1', '2', '3'], speed: 2, scale });
+    return arena;
+  };
+  it('draws a bigger bubble for the scale, and the ghost bubble of reveal() matches it', () => {
+    const plain = spawnScaled(), big = spawnScaled(1.6);
+    expect(big.bubbles[0].r).toBeGreaterThan(plain.bubbles[0].r * 1.5);
+    expect(big.radius(false)).toBeCloseTo(big.bubbles[0].r, 5);
+    expect(plain.radius(false)).toBeCloseTo(plain.bubbles[0].r, 5);
+  });
+});

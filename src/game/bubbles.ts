@@ -1,7 +1,7 @@
 // Bubble spawn, launch stagger and layout (#559, split out of arena.ts): the data model, the pure wave
 // layout, bubble-to-bubble collision, label fitting, and the offscreen sprite caches drawBubble draws from.
 // Nothing here touches a canvas event or the render loop — `Arena` still owns those.
-import { shuffle } from '../curriculum/util'; import type { Rng } from '../curriculum/types';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
+import { shuffle } from '../curriculum/util'; import type { Rng, YearId } from '../curriculum/types';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
 import { boundedRise, insetMax } from './wave-bounds'; import { bySpeed, TIMING } from '../config/resolve'; import type { DefaultSettings } from '../config/catalogue';   // #2184: the bounds every arc is held to; #2194: air time and stagger per speed, from src/config/catalogue.json
 
 export interface Bubble {
@@ -48,7 +48,7 @@ export interface WaveOpts {
   ordered?: string[];   // sequence labels that must be sliced in this order
   // #700: a non-sequence question's correct-answer label, for a gentle year only — it gets one free trip
   // back up if it falls unhit, the same idea as `ordered` above but for a single label and a single trip.
-  gentleTarget?: string; timing?: DefaultSettings;   // timing (#2198): this game's own; absent = the global `TIMING`
+  gentleTarget?: string; scale?: number; timing?: DefaultSettings;   // scale (#2288): BUBBLE_SCALE; timing (#2198): this game's own; absent = the global `TIMING`
 }
 
 /** Deal a sequence wave: the words that must be sliced in order are spread across the batches IN ORDER
@@ -91,8 +91,8 @@ export function bubbleRadius(W: number, H: number, wide: boolean): number {
   const base = Math.min(W, H) * 0.085;
   return Math.max(30, Math.min(wide ? 64 : 54, wide ? base * 1.25 : base));
 }
-
-export function waveRadius(W: number, H: number, wide: boolean, n: number): number { return Math.max(1, Math.min(Math.max(26, bubbleRadius(W, H, wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1)), ((W - 16) / 3 - 10) / 2)); }   // layoutWave's own formula, exported for R-LBL (#1046); #2184: ≥ 1, as arc() throws on a negative radius
+export const BUBBLE_SCALE: Readonly<Partial<Record<YearId, number>>> = { reception: 1.6, year1: 1.1 };   // #2288: bigger for small fingers (53 / 36 px at 390 px); Year 2 up stays 1
+export function waveRadius(W: number, H: number, wide: boolean, n: number, scale = 1): number { return Math.max(1, Math.min(Math.max(26, bubbleRadius(W, H, wide) * scale * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1)), ((W - 16) / 3 - 10) / 2)); }   // layoutWave's own formula, exported for R-LBL (#1046); #2184: ≥ 1, as arc() throws on a negative radius
 /** The arena's drawable box, in CSS pixels. */
 export interface ArenaBox { W: number; H: number }
 /**
@@ -316,7 +316,7 @@ function planBubble(p: { label: string; k: number; idx: number; size: number; pe
  */
 export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: number, rng: Rng): WavePlan {
   const { W, H } = geom, topInset = Math.min(geom.topInset, insetMax(W, H));   // #2184: a card past half the box (KS2, landscape) left a negative rise; #2278: a tall box allows more
-  const n = o.labels.length, r = waveRadius(W, H, !!o.wide, n);
+  const n = o.labels.length, r = waveRadius(W, H, !!o.wide, n, o.scale);
   const T = bySpeed((o.timing ?? TIMING).airTime, o.speed) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
   const apexMin = topInset + r + 10, usable = H - apexMin - r;
   const stagger = bySpeed((o.timing ?? TIMING).stagger, o.speed) / speedK;
