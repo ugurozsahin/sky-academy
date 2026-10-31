@@ -5,6 +5,8 @@ import { TOPICS, type Difficulty } from '../../src/curriculum';
 const rngOf = (seed: number) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const draws = (d: Difficulty) => Array.from({ length: 200 }, (_, s) => TOPICS.find(t => t.id === 'y3-tenths')!.gen(d, rngOf((s + 1) * 104729 + d)));
 
+const val = (s: string) => { const f = /^(\d+)\/(\d+)$/.exec(s); return f ? Number(f[1]) / Number(f[2]) : Number(s); };
+
 describe('y3-tenths whys (#2317)', () => {
   it('every card has a short why', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d)) {
@@ -18,6 +20,7 @@ describe('y3-tenths whys (#2317)', () => {
       const m = /^(\S+) \+ 1 tenth = (\S+)$/.exec(q.why!);
       expect(m, q.why).not.toBeNull();
       expect([m![1], m![2]]).toContain(q.answer);
+      expect(val(m![2]) - val(m![1]), q.why).toBeCloseTo(0.1, 9);
     }
   });
   it('a more/less why agrees with its prompt and answer', () => {
