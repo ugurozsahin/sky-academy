@@ -47,7 +47,7 @@ function rightTriangle(rng: Rng): Question {
     foot([X0, YB]),
   ];
   return areaCard(rng, 'Triangle area = ? cm²', b * h / 2, [b * h, b + h, b * h / 2 + b], {
-    visual: { type: 'geometry', parts }, say: say(`The triangle has a base of ${b} cm and a height of ${h} cm. What is its area in cm²?`),
+    why: `${b} × ${h} ÷ 2 = ${b * h / 2} cm²`, visual: { type: 'geometry', parts }, say: say(`The triangle has a base of ${b} cm and a height of ${h} cm. What is its area in cm²?`),
   });
 }
 
@@ -68,7 +68,7 @@ function slantedShape(rng: Rng): Question {
     ];
     const name = triangle ? 'triangle' : 'parallelogram';
     return areaCard(rng, `${triangle ? 'Triangle' : 'Parallelogram'} area = ? cm²`, triangle ? b * h / 2 : b * h, triangle ? [b * h, b * l / 2, b + h] : [b * l, b * h / 2, b + h], {
-      visual: { type: 'geometry', parts },
+      why: triangle ? `${b} × ${h} ÷ 2 = ${b * h / 2} cm²` : `${b} × ${h} = ${b * h} cm²`, visual: { type: 'geometry', parts },
       say: say(`The ${name} has a base of ${b} cm, a height of ${h} cm and a slanted side of ${l} cm. What is its area in cm²?`),
     });
   }
@@ -80,16 +80,19 @@ function reasoning(rng: Rng): Question {
   if (r < 0.34) {
     const b = ri(rng, 4, 12), h = 2 * ri(rng, 2, 5), a = b * h / 2; // an even height, so the halved-not-doubled slip a / b is a whole number
     return areaCard(rng, `Triangle area ${a} cm², base ${b} cm. Height = ? cm`, h, [a / b, a - b, a + b], {
+      why: `${a} × 2 ÷ ${b} = ${h} cm`,
       say: say(`A triangle has an area of ${a} cm² and a base of ${b} cm. What is its height in cm?`) });
   }
   if (r < 0.67) {
     const b = ri(rng, 4, 14), h = ri(rng, 3, 12);
     if ((b * h) % 2) return reasoning(rng);
     return areaCard(rng, `Base ${b} cm, height ${h} cm: parallelogram − triangle = ? cm²`, b * h / 2, [b * h, b * h + b * h / 2, b + h], {
+      why: `${b * h} − ${b * h / 2} = ${b * h / 2} cm²`,
       say: say(`A parallelogram and a triangle have the same base of ${b} cm and the same height of ${h} cm. How much bigger is the parallelogram's area, in cm²?`) });
   }
   const b = ri(rng, 3, 12), h = ri(rng, 3, 10), a = b * h;
   return areaCard(rng, `Parallelogram area ${a} cm², height ${h} cm. Base = ? cm`, b, [a - h, a + h, b + h], {
+    why: `${a} ÷ ${h} = ${b} cm`,
     say: say(`A parallelogram has an area of ${a} cm² and a height of ${h} cm. What is its base in cm?`) });
 }
 
