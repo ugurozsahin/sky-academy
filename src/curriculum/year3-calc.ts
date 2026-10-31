@@ -55,14 +55,15 @@ export const y3Multiply: Generator = (d, rng) => {
     const fact = div ? `${f} ÷ ${m} = ${tens}` : `${tens} × ${m} = ${f}`;
     const slips = [div ? tens : f, div ? tens * 100 : f * 100, ans + 10, ans - 10, (tens + 1) * (div ? 10 : m * 10), (tens - 1) * (div ? 10 : m * 10)];
     const say = `${q(fact).say}. So ${q(prompt).say}`;
-    const card = numQ(rng, prompt, ans, { min: 1, max: 100000, distractors: shuffle(rng, slips), visual: { type: 'word', text: fact }, say });
+    const card = numQ(rng, prompt, ans, { min: 1, max: 100000, distractors: shuffle(rng, slips), visual: { type: 'word', text: fact }, say, why: fact });
     return { ...card, options: card.options.map(o => Number(o).toLocaleString('en-GB')) }; // #1047: 1,200 not 1200
   }
-  const a = ri(rng, 11, 49), p = a * m, prompt = `${a} × ${m} = ?`;
-  if (d === 3) return buildQ(rng, { prompt, say: `${q(prompt).say} Build the answer.`, answer: String(p), total: 6, hint: 'Slice the digits in order' });
+  const a = ri(rng, 11, 49), p = a * m, prompt = `${a} × ${m} = ?`, u = a % 10, tn = a - u;
+  const why = u ? `${tn} × ${m} = ${tn * m} and ${u} × ${m} = ${u * m}` : `${a} × ${m} = ${p}`; // tens and ones multiplied apart
+  if (d === 3) return { ...buildQ(rng, { prompt, say: `${q(prompt).say} Build the answer.`, answer: String(p), total: 6, hint: 'Slice the digits in order' }), why };
   // #1058: a place slip (±10) shares the units digit; then ones not multiplied, a dropped carry, the neighbouring multipliers
   const slips = [p + (rng() < 0.5 ? 10 : -10), Math.floor(a / 10) * m * 10 + a % 10, Math.floor(a / 10) * m * 10 + a % 10 * m % 10, a * (m - 1), a * (m + 1)];
-  return numQ(rng, prompt, p, { min: 1, max: 500, distractors: slips, ...q(prompt) });
+  return numQ(rng, prompt, p, { min: 1, max: 500, distractors: slips, ...q(prompt), why });
 };
 
 /** y3-story (#1089): the hand-written bank. scale [unit, one, times, ask] · pairs [x, y, z] · share [thing, who, ask]. */
