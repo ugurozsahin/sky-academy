@@ -9,7 +9,7 @@ const nums = (s: string) => (s.match(/\d+/g) ?? []).map(Number);
 const noEmpty = (w: string) => {
   const sides = w.split(' = ');
   expect(sides[0], w).not.toBe(sides[1]);           // never "40 + 5 = 40 + 5"
-  expect(w, w).not.toMatch(/\+ 0$|− 0$/);           // never a dangling zero
+  expect(w, w).not.toMatch(/\+ 0$|− 0$|= 0 \+|\b1 tens\b/);           // never a dangling zero
 };
 
 describe('y2-add and y2-sub whys (#2317)', () => {
@@ -21,6 +21,9 @@ describe('y2-add and y2-sub whys (#2317)', () => {
     expect(subWhy(30, 4)).toBe('30 − 4 = 20 + 6');
     expect(subWhy(52, 7)).toBe('52 − 7 = 50 − 5');
     expect(subWhy(57, 4)).toBe('7 − 4 = 3, so 53');
+    expect(subWhy(30, 20)).toBe('3 − 2 = 1 ten');
+    expect(subWhy(10, 4)).toBe('10 = 6 + 4');
+    expect(addWhy(10, 5)).toBe('1 ten + 5 = 15');
     expect(subWhy(50, 20)).toBe('5 − 2 = 3 tens');
     expect(subWhy(47, 20)).toBe('40 − 20 = 20, plus 7');
     expect(subWhy(73, 28)).toBe('73 − 20 = 53, − 8');
@@ -32,8 +35,8 @@ describe('y2-add and y2-sub whys (#2317)', () => {
       expect(w.split(/\s+/).length, w).toBeLessThanOrEqual(8);
       noEmpty(w);
       let m: RegExpExecArray | null;
-      if ((m = /^(\d+) \+ (\d+) = (\d+) tens$/.exec(w))) expect([+m[1] * 10 + +m[2] * 10, +m[3] * 10]).toEqual([a + b, a + b]);
-      else if ((m = /^(\d+) tens \+ (\d+) = (\d+)$/.exec(w))) { expect(+m[1] * 10).toBe(a); expect(+m[2]).toBe(b); expect(+m[3]).toBe(a + b); }
+      if ((m = /^(\d+) \+ (\d+) = (\d+) tens?$/.exec(w))) expect([+m[1] * 10 + +m[2] * 10, +m[3] * 10]).toEqual([a + b, a + b]);
+      else if ((m = /^(\d+) tens? \+ (\d+) = (\d+)$/.exec(w))) { expect(+m[1] * 10).toBe(a); expect(+m[2]).toBe(b); expect(+m[3]).toBe(a + b); }
       else { m = /^(\d+) \+ (\d+) = (\d+) \+ (\d+)$/.exec(w); expect(m, w).not.toBeNull(); expect([+m![1], +m![2]]).toEqual([a, b]); expect(+m![3] + +m![4]).toBe(a + b); expect(+m![3] % 10).toBe(0); }
     }
   });
@@ -48,7 +51,8 @@ describe('y2-add and y2-sub whys (#2317)', () => {
       else if ((m = /^(\d+) − (\d+) = (\d+) \+ (\d+)$/.exec(w))) { expect([+m[1], +m[2]]).toEqual([a, b]); expect(+m[3] + +m[4]).toBe(ans); }
       else if ((m = /^(\d+) − (\d+) = (\d+), plus (\d+)$/.exec(w))) { expect(+m[1] + +m[4]).toBe(a); expect(+m[2]).toBe(b); expect(+m[3] + +m[4]).toBe(ans); }
       else if ((m = /^(\d+) − (\d+) = (\d+), − (\d+)$/.exec(w))) { expect(+m[1]).toBe(a); expect(+m[1] - +m[2]).toBe(+m[3]); expect(+m[2] + +m[4]).toBe(b); expect(+m[3] - +m[4]).toBe(ans); }
-      else { m = /^(\d+) − (\d+) = (\d+) tens$/.exec(w); expect(m, w).not.toBeNull(); expect([+m![1] * 10, +m![2] * 10, +m![3] * 10]).toEqual([a, b, ans]); }
+      else if ((m = /^10 = (\d+) \+ (\d+)$/.exec(w))) { expect(a).toBe(10); expect([+m[1], +m[2]]).toEqual([ans, b]); }
+      else { m = /^(\d+) − (\d+) = (\d+) tens?$/.exec(w); expect(m, w).not.toBeNull(); expect([+m![1] * 10, +m![2] * 10, +m![3] * 10]).toEqual([a, b, ans]); }
     }
   });
 });

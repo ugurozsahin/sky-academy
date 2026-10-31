@@ -43,11 +43,13 @@ export const y2Compare: Generator = (d, rng) => {
 /** "Build the answer" card (#1016): slice the digits of the result in order. Five bubbles whatever the answer's length (#481). */
 const digitsQ = (rng: Rng, p: string, n: number): Question =>
   buildQ(rng, { prompt: p, say: `${q(p).say} Slice the digits of the answer.`, answer: String(n), total: 5, hint: 'Slice the digits in order' });
+/** "1 ten", "4 tens". */
+const tens = (n: number): string => `${n} ${n === 1 ? 'ten' : 'tens'}`;
 /** #2317: tens and ones added apart ("47 + 35 = 70 + 12"); never a line that restates the sum — whole tens add as tens, and a ten-number plus ones names its tens. At most 8 words. */
 export const addWhy = (a: number, b: number): string => {
   const ta = a - a % 10, tb = b - b % 10, ones = a % 10 + b % 10;
-  if (ones === 0) return `${ta / 10} + ${tb / 10} = ${(ta + tb) / 10} tens`;
-  if (ta === a && tb === 0) return `${ta / 10} tens + ${b} = ${a + b}`;
+  if (ones === 0) return `${ta / 10} + ${tb / 10} = ${tens((ta + tb) / 10)}`;
+  if (ta === a && tb === 0) return `${tens(ta / 10)} + ${b} = ${a + b}`;
   return `${a} + ${b} = ${ta + tb} + ${ones}`;
 };
 export const y2Add: Generator = (d, rng) => {
@@ -71,9 +73,10 @@ export const subSlips = (a: number, b: number): number[] => {
 /** #2317: the step that makes a 2-digit subtraction mechanical — within the ones, across a ten (equal difference), tens first. At most 8 words. */
 export const subWhy = (a: number, b: number): string => {
   const ua = a % 10, ub = b % 10;
+  if (b < 10 && a === 10) return `10 = ${10 - b} + ${b}`;
   if (b < 10 && ua === 0) return `${a} − ${b} = ${a - 10} + ${10 - b}`;
   if (b < 10) return ub <= ua ? `${ua} − ${b} = ${ua - b}, so ${a - b}` : `${a} − ${b} = ${a - ua} − ${b - ua}`;
-  if (ub === 0) return ua === 0 ? `${a / 10} − ${b / 10} = ${(a - b) / 10} tens` : `${a - ua} − ${b} = ${a - ua - b}, plus ${ua}`;
+  if (ub === 0) return ua === 0 ? `${a / 10} − ${b / 10} = ${tens((a - b) / 10)}` : `${a - ua} − ${b} = ${a - ua - b}, plus ${ua}`;
   return `${a} − ${b - ub} = ${a - b + ub}, − ${ub}`;
 };
 export const y2Sub: Generator = (d, rng) => {
