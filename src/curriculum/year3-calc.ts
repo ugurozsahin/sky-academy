@@ -27,7 +27,7 @@ export function y3TablesQ(d: Difficulty, rng: () => number, table?: 3 | 4 | 8): 
     // the drills (#1125): on a fixed table the neighbours often miss the answer's leading digit (8 × 8 = 64), so offer a close number that shares it
     const close = table && ans >= 20 && !near.some(v => lead(v) === lead(ans)) ? shuffle(rng, [ans + 1, ans - 1, ans + 2, ans - 2]).filter(v => lead(v) === lead(ans) && v <= max) : [];
     const cands = [...slip.slice(0, 1), ...near.filter(v => lead(v) === lead(ans)), ...close.slice(0, 1), ...near, ...slip.slice(1)];
-    return numQ(rng, prompt, ans, { min: 0, max, distractors: cands, ...q(prompt), ...extra });
+    return numQ(rng, prompt, ans, { min: 0, max, distractors: cands, ...q(prompt), why: `${n} × ${t} = ${p}`, ...extra });
   };
   const fact = (a: number, b: number): Pick<Question, 'fact'> => a >= 2 && b >= 2 ? { fact: `${a}×${b}` } : {};   // #1122
   const prod = [(n - 1) * t, (n + 1) * t, n * (t - 1), n * (t + 1)];
