@@ -9,7 +9,7 @@ const nums = (s: string) => (s.match(/\d+/g) ?? []).map(Number);
 const noEmpty = (w: string) => {
   const sides = w.split(' = ');
   expect(sides[0], w).not.toBe(sides[1]);           // never "40 + 5 = 40 + 5"
-  expect(w, w).not.toMatch(/\+ 0$|− 0$|= 0 \+|\b1 tens\b/);           // never a dangling zero
+  expect(w, w).not.toMatch(/\+ 0$|− 0$|= 0 \+|= 0,|\b1 tens\b/);           // never a dangling zero
 };
 
 describe('y2-add and y2-sub whys (#2317)', () => {
@@ -23,11 +23,18 @@ describe('y2-add and y2-sub whys (#2317)', () => {
     expect(subWhy(57, 4)).toBe('7 − 4 = 3, so 53');
     expect(subWhy(30, 20)).toBe('3 − 2 = 1 ten');
     expect(subWhy(10, 4)).toBe('10 = 6 + 4');
+    expect(subWhy(34, 4)).toBe('34 = 30 + 4');
+    expect(subWhy(36, 30)).toBe('36 = 30 + 6');
+    expect(subWhy(31, 30)).toBe('31 = 30 + 1');
     expect(addWhy(10, 5)).toBe('1 ten + 5 = 15');
     expect(subWhy(50, 20)).toBe('5 − 2 = 3 tens');
     expect(subWhy(47, 20)).toBe('40 − 20 = 20, plus 7');
     expect(subWhy(73, 28)).toBe('73 − 20 = 53, − 8');
     expect(subWhy(83, 27)).toBe('83 − 20 = 63, − 7');
+  });
+  it('every pair the generators can emit gets a why with no empty step', () => {
+    for (let a = 10; a <= 99; a++) for (let b = 1; b < a; b++) { noEmpty(subWhy(a, b)); expect(subWhy(a, b).split(/\s+/).length).toBeLessThanOrEqual(8); }
+    for (let a = 10; a <= 99; a++) for (let b = 1; a + b <= 100; b++) { noEmpty(addWhy(a, b)); expect(addWhy(a, b).split(/\s+/).length).toBeLessThanOrEqual(8); }
   });
   it('an addition why is true and never restates or ends in zero', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws('y2-add', d)) {
@@ -51,7 +58,7 @@ describe('y2-add and y2-sub whys (#2317)', () => {
       else if ((m = /^(\d+) − (\d+) = (\d+) \+ (\d+)$/.exec(w))) { expect([+m[1], +m[2]]).toEqual([a, b]); expect(+m[3] + +m[4]).toBe(ans); }
       else if ((m = /^(\d+) − (\d+) = (\d+), plus (\d+)$/.exec(w))) { expect(+m[1] + +m[4]).toBe(a); expect(+m[2]).toBe(b); expect(+m[3] + +m[4]).toBe(ans); }
       else if ((m = /^(\d+) − (\d+) = (\d+), − (\d+)$/.exec(w))) { expect(+m[1]).toBe(a); expect(+m[1] - +m[2]).toBe(+m[3]); expect(+m[2] + +m[4]).toBe(b); expect(+m[3] - +m[4]).toBe(ans); }
-      else if ((m = /^10 = (\d+) \+ (\d+)$/.exec(w))) { expect(a).toBe(10); expect([+m[1], +m[2]]).toEqual([ans, b]); }
+      else if ((m = /^(\d+) = (\d+) \+ (\d+)$/.exec(w))) { expect(+m[1]).toBe(a); expect(+m[2] + +m[3]).toBe(a); expect([+m[2], +m[3]]).toContain(ans); expect([+m[2], +m[3]]).toContain(b); }
       else { m = /^(\d+) − (\d+) = (\d+) tens?$/.exec(w); expect(m, w).not.toBeNull(); expect([+m![1] * 10, +m![2] * 10, +m![3] * 10]).toEqual([a, b, ans]); }
     }
   });

@@ -73,9 +73,10 @@ export const subSlips = (a: number, b: number): number[] => {
 /** #2317: the step that makes a 2-digit subtraction mechanical — within the ones, across a ten (equal difference), tens first. At most 8 words. */
 export const subWhy = (a: number, b: number): string => {
   const ua = a % 10, ub = b % 10;
-  if (b < 10 && a === 10) return `10 = ${10 - b} + ${b}`;
+  if (b < 10 && (a === 10 || ua === b)) return `${a} = ${a - b} + ${b}`;   // a number bond: never "x − x = 0" or a leading zero
   if (b < 10 && ua === 0) return `${a} − ${b} = ${a - 10} + ${10 - b}`;
   if (b < 10) return ub <= ua ? `${ua} − ${b} = ${ua - b}, so ${a - b}` : `${a} − ${b} = ${a - ua} − ${b - ua}`;
+  if (ub === 0 && ua !== 0 && a - ua === b) return `${a} = ${b} + ${ua}`;
   if (ub === 0) return ua === 0 ? `${a / 10} − ${b / 10} = ${tens((a - b) / 10)}` : `${a - ua} − ${b} = ${a - ua - b}, plus ${ua}`;
   return `${a} − ${b - ub} = ${a - b + ub}, − ${ub}`;
 };
