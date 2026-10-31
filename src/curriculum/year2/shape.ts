@@ -116,7 +116,7 @@ export const y2Symmetry: Generator = (d, rng) => {
  */
 const PATTERN_GLYPHS = PATTERN_OBJECTS.map(([g]) => g);
 /** Unit shapes as letters: which positions repeat, filled with objects at generation time. */
-const UNITS_D1 = ['AB'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
+const UNITS_D1 = ['AB', 'ABC'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
 export const y2Patterns: Generator = (d, rng) => {
   const shape = pick(rng, d === 1 ? UNITS_D1 : UNITS_LONGER);
   const letters = [...new Set([...shape])];
