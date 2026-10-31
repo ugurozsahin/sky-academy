@@ -146,7 +146,9 @@ const rDoubles: Generator = (d, rng) => {
 const rShapes: Generator = (d, rng) => {
   const set = SHAPES_2D.slice(0, 4);
   const [g, name] = pick(rng, set);
-  const decoys = shuffle(rng, set.filter(s => !sameShape(s[1], name)));
+  const sides = set.find(s => s[1] === name)![2];
+  // Shuffle first so equal side counts tie at random; the stable sort then puts the closest look-alikes first (#2320).
+  const decoys = shuffle(rng, set.filter(s => !sameShape(s[1], name))).sort((a, b) => Math.abs(a[2] - sides) - Math.abs(b[2] - sides));
   const ds = d === 1 ? decoys.slice(0, 2) : decoys;
   const hint = { hint: 'Slice the shape', hintIsData: false };
   if (d === 3) return wordQ(rng, 'What is this shape called?', name, ds.map(s => s[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?', ...hint });
