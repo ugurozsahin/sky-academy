@@ -43,6 +43,13 @@ export const y2Compare: Generator = (d, rng) => {
 /** "Build the answer" card (#1016): slice the digits of the result in order. Five bubbles whatever the answer's length (#481). */
 const digitsQ = (rng: Rng, p: string, n: number): Question =>
   buildQ(rng, { prompt: p, say: `${q(p).say} Slice the digits of the answer.`, answer: String(n), total: 5, hint: 'Slice the digits in order' });
+/** #2317: tens and ones added apart ("47 + 35 = 70 + 12"); never a line that restates the sum — whole tens add as tens, and a ten-number plus ones names its tens. At most 8 words. */
+export const addWhy = (a: number, b: number): string => {
+  const ta = a - a % 10, tb = b - b % 10, ones = a % 10 + b % 10;
+  if (ones === 0) return `${ta / 10} + ${tb / 10} = ${(ta + tb) / 10} tens`;
+  if (ta === a && tb === 0) return `${ta / 10} tens + ${b} = ${a + b}`;
+  return `${a} + ${b} = ${ta + tb} + ${ones}`;
+};
 export const y2Add: Generator = (d, rng) => {
   let a: number, b: number;
   if (d === 1) { a = ri(rng, 10, 89); b = ri(rng, 1, 9); }          // 2-digit + ones
@@ -51,7 +58,7 @@ export const y2Add: Generator = (d, rng) => {
   if (a + b > 100) return y2Add(d, rng);
   const p = `${a} + ${b} = ?`;
   // #2317: the tens added together and the ones added together ("47 + 35 = 70 + 12"), the same split at every difficulty.
-  const why = `${a} + ${b} = ${a - a % 10 + b - b % 10} + ${a % 10 + b % 10}`;
+  const why = addWhy(a, b);
   if (d === 3 && rng() < 0.5) return slowAtD3(d, { ...digitsQ(rng, p, a + b), why });
   return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p), why }));
 };
@@ -66,8 +73,8 @@ export const subWhy = (a: number, b: number): string => {
   const ua = a % 10, ub = b % 10;
   if (b < 10 && ua === 0) return `${a} − ${b} = ${a - 10} + ${10 - b}`;
   if (b < 10) return ub <= ua ? `${ua} − ${b} = ${ua - b}, so ${a - b}` : `${a} − ${b} = ${a - ua} − ${b - ua}`;
-  if (ub === 0) return ua === 0 ? `${a} − ${b} = ${a - b}` : `${a - ua} − ${b} = ${a - ua - b}, plus ${ua}`;
-  return `${a} − ${b} = ${a - b + ub} − ${ub}`;
+  if (ub === 0) return ua === 0 ? `${a / 10} − ${b / 10} = ${(a - b) / 10} tens` : `${a - ua} − ${b} = ${a - ua - b}, plus ${ua}`;
+  return `${a} − ${b - ub} = ${a - b + ub}, − ${ub}`;
 };
 export const y2Sub: Generator = (d, rng) => {
   let a: number, b: number;
