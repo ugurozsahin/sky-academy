@@ -50,8 +50,10 @@ export const y2Add: Generator = (d, rng) => {
   else { a = ri(rng, 10, 60); b = ri(rng, 10, 99 - a); }             // 2-digit + 2-digit
   if (a + b > 100) return y2Add(d, rng);
   const p = `${a} + ${b} = ?`;
-  if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a + b));
-  return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p) }));
+  // #2317: the tens added together and the ones added together ("47 + 35 = 70 + 12"), the same split at every difficulty.
+  const why = `${a} + ${b} = ${a - a % 10 + b - b % 10} + ${a % 10 + b % 10}`;
+  if (d === 3 && rng() < 0.5) return slowAtD3(d, { ...digitsQ(rng, p, a + b), why });
+  return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p), why }));
 };
 /** #2319: the slips 2-digit subtraction invites — the smaller units digit taken from the larger (52 − 17 = 45), a borrow forgotten or doubled (±10), adding instead. Never a random neighbour. */
 export const subSlips = (a: number, b: number): number[] => {
@@ -59,14 +61,23 @@ export const subSlips = (a: number, b: number): number[] => {
   const swapped = (Math.floor(a / 10) - Math.floor(b / 10)) * 10 + Math.abs(ua - ub);
   return [swapped, ans + 10, ans - 10, a + b].filter(v => v !== ans && v >= 0 && v <= 100 && v !== a);
 };
+/** #2317: the step that makes a 2-digit subtraction mechanical — within the ones, across a ten (equal difference), tens first. At most 8 words. */
+export const subWhy = (a: number, b: number): string => {
+  const ua = a % 10, ub = b % 10;
+  if (b < 10 && ua === 0) return `${a} − ${b} = ${a - 10} + ${10 - b}`;
+  if (b < 10) return ub <= ua ? `${ua} − ${b} = ${ua - b}, so ${a - b}` : `${a} − ${b} = ${a - ua} − ${b - ua}`;
+  if (ub === 0) return ua === 0 ? `${a} − ${b} = ${a - b}` : `${a - ua} − ${b} = ${a - ua - b}, plus ${ua}`;
+  return `${a} − ${b} = ${a - b + ub} − ${ub}`;
+};
 export const y2Sub: Generator = (d, rng) => {
   let a: number, b: number;
   if (d === 1) { a = ri(rng, 10, 99); b = ri(rng, 1, 9); }
   else if (d === 2) { a = ri(rng, 30, 99); b = 10 * ri(rng, 1, 2); }
   else { a = ri(rng, 30, 99); b = ri(rng, 10, a - 1); }
   const p = `${a} − ${b} = ?`;
-  if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a - b));
-  return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p), distractors: subSlips(a, b) }));
+  const why = subWhy(a, b);
+  if (d === 3 && rng() < 0.5) return slowAtD3(d, { ...digitsQ(rng, p, a - b), why });
+  return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p), distractors: subSlips(a, b), why }));
 };
 export const y2Three: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 9;
