@@ -45,6 +45,12 @@ function drawPick(carries: number, exact: boolean, rng: Rng): { a: number; m: nu
   return { a: 24, m: 3 };
 }
 
+/** `why` (#2317): the number split into its place values, each part times the multiplier, the parts to be added. */
+export function splitWhy(a: number, m: number): string {
+  const parts = String(a).split('').map((d, i, all) => Number(d) * 10 ** (all.length - 1 - i)).filter(v => v > 0);
+  return `${f(a)} = ${parts.map(f).join(' + ')}, so ${parts.map(v => f(v * m)).join(' + ')}`;
+}
+
 function pickOne(a: number, m: number, rng: Rng): Question {
   const ans = a * m, max = 99 * 9;
   const ok = (v: number) => Number.isInteger(v) && v >= 10 && v <= max && v !== ans;
@@ -70,12 +76,12 @@ function pickOne(a: number, m: number, rng: Rng): Question {
   for (let d = 1; picked.length < 3 && d < 100; d++) add(ans + (rng() < 0.5 ? d : -d) * 10);
   for (let d = 1; picked.length < 3 && d < 100; d++) add(ans + (rng() < 0.5 ? d : -d));
   const sum = `${f(a)} × ${m} = ?`;
-  return wordQ(rng, sum, f(ans), picked.map(f), { say: q(sum).say });
+  return wordQ(rng, sum, f(ans), picked.map(f), { say: q(sum).say, why: splitWhy(a, m) });
 }
 
 function build(a: number, m: number, rng: Rng): Question {
   const sum = `${f(a)} × ${m} = ?`;
-  return buildQ(rng, { prompt: sum, say: `${q(sum).say}. Slice the digits of the answer.`, answer: f(a * m), total: 6, hint: 'Slice the digits in order' });
+  return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Slice the digits of the answer.`, answer: f(a * m), total: 6, hint: 'Slice the digits in order' }), why: splitWhy(a, m) };
 }
 
 export const y4ShortMult: Generator = (d: Difficulty, rng): Question => {

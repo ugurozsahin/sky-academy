@@ -40,10 +40,13 @@ function d1Decoys(answer: number, rng: Rng): number[] {
   return out;
 }
 
+/** `why` (#2317): the multiplication that checks the division, with any remainder named as what is left over. */
+const checkWhy = (quotient: number, d: number, r = 0) => r ? `${f(quotient)} × ${d} = ${f(quotient * d)}, plus ${r} left over` : `${f(quotient)} × ${d} = ${f(quotient * d)}`;
+
 function d1(rng: Rng): Question {
   const d = ri(rng, 3, 9), quotient = ri(rng, Math.ceil(100 / d), Math.floor(999 / d));
   const sum = `${f(quotient * d)} ÷ ${d} = ?`;
-  return wordQ(rng, sum, f(quotient), d1Decoys(quotient, rng).map(f), { say: q(sum).say });
+  return wordQ(rng, sum, f(quotient), d1Decoys(quotient, rng).map(f), { say: q(sum).say, why: checkWhy(quotient, d) });
 }
 
 /** d2: a 4-digit number whose first digit is smaller than the divisor, so the quotient has 3 digits; a quarter divide exactly. */
@@ -53,7 +56,7 @@ function d2(rng: Rng): Question {
   const n = exact ? quotient * d : quotient * d + ri(rng, 1, d - 1);
   const sum = `${f(n)} ÷ ${d} = ?`;
   const answer = exact ? String(quotient) : `${quotient} r ${n % d}`;
-  return buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer with the remainder.`, answer, total: 6, hint: 'Slice the digits in order' });
+  return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer with the remainder.`, answer, total: 6, hint: 'Slice the digits in order' }), why: checkWhy(quotient, d, exact ? 0 : n % d) };
 }
 
 function d3(rng: Rng): Question {
@@ -65,7 +68,7 @@ function d3(rng: Rng): Question {
   const others = (['down', 'up', 'left'] as Reading[]).filter(k => k !== reading).map(k => value[k]);
   // Under the leak limit a round-down or round-up answer needs a last-digit twin, so the run-together decoy gives way to ± 10.
   const third = reading === 'left' ? Number(`${quotient}${r}`) : value[reading] + pick(rng, [10, -10]);
-  return wordQ(rng, prompt, f(value[reading]), [...others, third].map(f), { say: `${prompt} Pick the answer.` });
+  return wordQ(rng, prompt, f(value[reading]), [...others, third].map(f), { say: `${prompt} Pick the answer.`, why: reading === 'up' ? `${f(quotient)} are full, ${r} left over, so one more` : `${f(quotient)} are full, ${r} left over` });
 }
 
 export const y5ShortDiv: Generator = (d: Difficulty, rng): Question => d === 1 ? d1(rng) : d === 2 ? d2(rng) : d3(rng);
