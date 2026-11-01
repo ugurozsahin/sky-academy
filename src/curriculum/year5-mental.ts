@@ -11,7 +11,16 @@ const MAX = 999999;
 const f = (n: number) => fmt(dec(n, 0));
 const first = (s: string) => s[0];
 
-interface Card { prompt: string; spoken: string; answer: number; named: number[]; cap?: number; }
+interface Card { prompt: string; spoken: string; answer: number; named: number[]; why: string; cap?: number; }
+
+const count = (n: number, w: string) => `${f(n)} ${w}${n === 1 ? '' : 's'}`;
+/** #2317: the step in the head. A multiple of 1,000 changes only the thousands; a near multiple is rounded, then put right. */
+function stepWhy(a: number, b: number, add: boolean, diff: number): string {
+  const op = add ? '+' : '−', ans = add ? a + b : a - b;
+  if (diff) { const r = b + diff, mid = add ? a + r : a - r; return `${f(a)} ${op} ${f(r)} = ${f(mid)}, ${add ? '−' : '+'} ${diff}`; }
+  const ta = Math.floor(a / 1000), tb = b / 1000, tr = Math.floor(ans / 1000);
+  return `${count(ta, 'thousand')} ${op} ${count(tb, 'thousand')} = ${count(tr, 'thousand')}`;
+}
 
 /** The card text for `a ± b = ?`, with the place, exchange and (optionally) compensation decoys. */
 function calc(a: number, b: number, add: boolean, diff = 0): Card {
@@ -19,7 +28,7 @@ function calc(a: number, b: number, add: boolean, diff = 0): Card {
   const tz = String(b).length - String(b).replace(/0+$/, '').length, step = 10 ** tz;
   const shift = (x: number) => (add ? a + x : a - x);
   const named = diff ? [answer + diff, answer - diff, shift(b * 10), shift(b / 10)] : [answer + step, shift(b * 10), answer - step, shift(b / 10), answer + step * 10, answer - step * 10];
-  return { prompt: `${f(a)} ${sign} ${f(b)} = ?`, spoken: `${f(a)} ${add ? 'plus' : 'minus'} ${f(b)}`, answer, named };
+  return { prompt: `${f(a)} ${sign} ${f(b)} = ?`, spoken: `${f(a)} ${add ? 'plus' : 'minus'} ${f(b)}`, answer, named, why: stepWhy(a, b, add, diff) };
 }
 
 /** A missing-number card: `? ± b = c` or `a ± ? = c`. The inverse-operation slip is the first decoy. */
@@ -27,10 +36,10 @@ function missing(a: number, b: number, add: boolean, rng: Rng): Card {
   const c = add ? a + b : a - b, sign = add ? '+' : '−';
   if (pick(rng, [true, false])) {
     // ? ± b = c, so the answer is a; the slip is to apply the same operation to c.
-    return { prompt: `? ${sign} ${f(b)} = ${f(c)}`, spoken: `What number ${add ? 'plus' : 'minus'} ${f(b)} makes ${f(c)}`, answer: a, named: [add ? c + b : c - b, add ? a + b * 10 : a - b * 10, a + 10 ** (String(b).length - String(b).replace(/0+$/, '').length)] };
+    return { prompt: `? ${sign} ${f(b)} = ${f(c)}`, spoken: `What number ${add ? 'plus' : 'minus'} ${f(b)} makes ${f(c)}`, answer: a, why: `${f(c)} ${add ? '−' : '+'} ${f(b)} = ${f(a)}`, named: [add ? c + b : c - b, add ? a + b * 10 : a - b * 10, a + 10 ** (String(b).length - String(b).replace(/0+$/, '').length)] };
   }
   // a ± ? = c, so the answer is b; the slip is to add where it should subtract (or the reverse).
-  return { prompt: `${f(a)} ${sign} ? = ${f(c)}`, spoken: `${f(a)} ${add ? 'plus' : 'minus'} what number makes ${f(c)}`, answer: b, named: [a + c, c - b, b * 10, b / 10] };
+  return { prompt: `${f(a)} ${sign} ? = ${f(c)}`, spoken: `${f(a)} ${add ? 'plus' : 'minus'} what number makes ${f(c)}`, answer: b, why: `${f(add ? c : a)} − ${f(add ? a : c)} = ${f(b)}`, named: [a + c, c - b, b * 10, b / 10] };
 }
 
 function draw1(rng: Rng): Card {
@@ -81,5 +90,5 @@ function options(c: Card, rng: Rng): number[] {
 
 export const y5Mental: Generator = (d, rng): Question => {
   const c = draw(d, rng);
-  return wordQ(rng, c.prompt, f(c.answer), options(c, rng).map(f), { say: ks2Say(`${c.spoken}?`) });
+  return wordQ(rng, c.prompt, f(c.answer), options(c, rng).map(f), { say: ks2Say(`${c.spoken}?`), why: c.why });
 };
