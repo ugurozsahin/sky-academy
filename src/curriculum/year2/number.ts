@@ -124,10 +124,10 @@ export const y2Fractions: Generator = (d, rng) => {
   return numQ(rng, `${num}/${den} of ${whole} = ?`, ans, { min: 0, max: 24, say: `What is ${num} ${den === 2 ? 'half' : den === 3 ? 'third' : 'quarter'}${num > 1 ? 's' : ''} of ${whole}?`, visual: { type: 'objects', emoji: '⭐', n: whole } });
 };
 export const y2Money: Generator = (d, rng) => {
-  if (d === 1) { const coins = Array.from({ length: 3 }, () => pick(rng, [2, 5, 10, 20, 50])); return unitQ(rng, coins.reduce((s, c) => s + c, 0), coins); }
+  if (d === 1) { const coins = Array.from({ length: 3 }, () => pick(rng, [2, 5, 10, 20, 50])); const sum = coins.reduce((s, c) => s + c, 0); return { ...unitQ(rng, sum, coins), why: `${coins.map(c => `${c}p`).join(' + ')} = ${sum}p` }; }
   // £ and p recorded separately, never `£1.50` — decimal money is Year 4 (#298 slice 2). `coinLabel` is the
   // one source for the label, so the distractors are filtered as amounts before they are ever formatted.
-  if (d === 2) { const coins = Array.from({ length: 2 }, () => pick(rng, [50, 100, 200])); const total = coins.reduce((s, c) => s + c, 0); const ds = [total + 50, total - 50, total + 100].filter(p => p > 0 && p !== total); return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: 'How much money altogether?' }); }
+  if (d === 2) { const coins = Array.from({ length: 2 }, () => pick(rng, [50, 100, 200])); const total = coins.reduce((s, c) => s + c, 0); const ds = [total + 50, total - 50, total + 100].filter(p => p > 0 && p !== total); return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: 'How much money altogether?', why: `${coins.map(c => `${c}p`).join(' + ')} = ${total}p` }); }
   const price = 5 * ri(rng, 1, 19);
   const change = 100 - price;
   // At exactly one price (50p), `price` as a decoy equals `change` (the answer) — wordQ's own de-dup then
@@ -137,7 +137,7 @@ export const y2Money: Generator = (d, rng) => {
   // this — it collided with `price` at 55p too, silently saved only by wordQ's own dedup, with no margin
   // left). 15 is not a multiple of 10 and not ±5, so this candidate can never equal `price`, `change` or
   // either of the other two decoys, at any price in range.
-  return wordQ(rng, `Change from £1 for ${price}p?`, `${change}p`, [`${change + 5}p`, `${change - 5}p`, `${price}p`, `${change + 15}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
+  return wordQ(rng, `Change from £1 for ${price}p?`, `${change}p`, [`${change + 5}p`, `${change - 5}p`, `${price}p`, `${change + 15}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?`, why: `100p − ${price}p = ${change}p` });
 };
 /**
  * The clock phrase for `h:mm` on a 12-hour dial — `3 o'clock`, `quarter past 3`, `half past 3`, `quarter to 4`,
