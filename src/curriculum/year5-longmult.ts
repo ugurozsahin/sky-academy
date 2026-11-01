@@ -27,9 +27,20 @@ function decoys(a: number, b: number, rng: Rng): number[] {
   return out;
 }
 
+/** `why` (#2317): the multiplier split into tens and ones (or, for a 1-digit multiplier, the number split by place), each part
+ *  multiplied, so the child sees the partial products the answer is the sum of. */
+export function whyOf(a: number, b: number): string {
+  if (b >= 10) {
+    const t = b - (b % 10), u = b % 10;
+    return `${f(a)} × ${t} = ${f(a * t)}, ${f(a)} × ${u} = ${f(a * u)}`;
+  }
+  const k = 10 ** (String(a).length - 1), h = a - (a % k), r = a - h;
+  return r ? `${f(h)} × ${b} = ${f(h * b)}, ${f(r)} × ${b} = ${f(r * b)}` : `${f(a / k)} × ${b} = ${f(a * b / k)}, then × ${f(k)}`;
+}
+
 function pickOne(a: number, b: number, rng: Rng): Question {
   const sum = `${f(a)} × ${f(b)} = ?`;
-  return wordQ(rng, sum, f(a * b), decoys(a, b, rng).map(f), { say: q(sum).say });
+  return wordQ(rng, sum, f(a * b), decoys(a, b, rng).map(f), { say: q(sum).say, why: whyOf(a, b) });
 }
 
 /** A 2-digit multiplier with a non-zero tens and ones digit, so the missing-zero slip differs from the answer. */
@@ -41,7 +52,7 @@ function build(rng: Rng): Question {
     const a = ri(rng, 12, 99), b = twoDigit(rng);
     if (a * b < 1000 || a * b > 9999) continue;
     const sum = `${f(a)} × ${f(b)} = ?`;
-    return buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer: f(a * b), total: 6, hint: 'Slice the digits in order' });
+    return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer: f(a * b), total: 6, hint: 'Slice the digits in order' }), why: whyOf(a, b) };
   }
 }
 

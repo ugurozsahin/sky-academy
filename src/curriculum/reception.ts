@@ -146,7 +146,9 @@ const rDoubles: Generator = (d, rng) => {
 const rShapes: Generator = (d, rng) => {
   const set = SHAPES_2D.slice(0, 4);
   const [g, name] = pick(rng, set);
-  const decoys = shuffle(rng, set.filter(s => !sameShape(s[1], name)));
+  const sides = set.find(s => s[1] === name)![2];
+  // Shuffle first so equal side counts tie at random; the stable sort then puts the closest look-alikes first (#2320).
+  const decoys = shuffle(rng, set.filter(s => !sameShape(s[1], name))).sort((a, b) => Math.abs(a[2] - sides) - Math.abs(b[2] - sides));
   const ds = d === 1 ? decoys.slice(0, 2) : decoys;
   const hint = { hint: 'Slice the shape', hintIsData: false };
   if (d === 3) return wordQ(rng, 'What is this shape called?', name, ds.map(s => s[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?', ...hint });
@@ -304,12 +306,17 @@ const rLetterSound: Generator = (d, rng) => {
   const [w, e] = pickWord(rng, d, rWords(d).filter(([w]) => medialIsGenuine(w)));
   return gapQ(rng, w, 1, VOWELS, e, `${w}. Which sound is in the middle of ${w}?`);
 };
+/** #2320: the letters a Reception child really mixes up (mirror and near-twin shapes); a decoy is one of these whenever it is in the pool. */
+export const R_LOOKALIKE: Record<string, string[]> = { b: ['d', 'p'], d: ['b', 'q'], p: ['q', 'b'], q: ['p', 'd'], m: ['n', 'w'], n: ['m', 'u'], u: ['n', 'v'], v: ['u', 'w'], w: ['v', 'm'], i: ['l', 'j'], l: ['i'], j: ['i'] };
 const rCapitals: Generator = (d, rng) => {
   const l = pick(rng, rLetters(d));
   const upper = rng() < 0.5;
   const shown = upper ? l.toUpperCase() : l;
   const ans = upper ? l : l.toUpperCase();
-  const ds = shuffle(rng, rLetters(d).filter(x => x !== l)).slice(0, d === 1 ? 2 : 3).map(x => (upper ? x : x.toUpperCase()));
+  const pool = rLetters(d).filter(x => x !== l);
+  const twins = (R_LOOKALIKE[l] ?? []).filter(x => pool.includes(x));
+  const ordered = [...(twins.length ? [pick(rng, twins)] : []), ...shuffle(rng, pool)].filter((x, i, a) => a.indexOf(x) === i);
+  const ds = ordered.slice(0, d === 1 ? 2 : 3).map(x => (upper ? x : x.toUpperCase()));
   return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown }, say: `Find the ${upper ? 'small' : 'capital'} letter that matches ${l}`, hint: upper ? 'Find the lower-case letter' : 'Find the capital letter', hintIsData: false });
 };
 /**

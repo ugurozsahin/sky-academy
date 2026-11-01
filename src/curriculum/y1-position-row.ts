@@ -13,13 +13,13 @@ export const y1PositionRow: Generator = (d, rng) => {
   const list = `${row.slice(0, 4).map(a => `the ${a[1]}`).join(', ')} and ${name(4)}`;
   const form = pick(rng, d === 1 ? ['first', 'last'] : d === 2 ? ['first', 'last', 'between'] : ['first', 'last', 'between', 'next']);
   const visual = { type: 'strip' as const, text: glyphs.join(' ') };
-  const ask = (prompt: string, say: string, ans: number, off: number[], decoys: number) => wordQ(rng, prompt, glyphs[ans],
-    shuffle(rng, glyphs.filter((_, i) => i !== ans && !off.includes(i))).slice(0, decoys),
+  const ask = (prompt: string, say: string, ans: number, off: number[], decoys: number, near: number[] = []) => wordQ(rng, prompt, glyphs[ans],
+    [...near, ...shuffle(rng, glyphs.map((_, i) => i).filter(i => i !== ans && !off.includes(i) && !near.includes(i)))].slice(0, decoys).map(i => glyphs[i]),
     { visual, say: `${list.replace(/^the /, 'The ')} are in a row. ${say}`, hint: 'Slice the animal', hintIsData: false });
   const decoys = d === 1 ? 2 : 3;
   if (form === 'first' || form === 'last') {
     const i = form === 'first' ? 0 : 4;
-    return ask(`Which is ${form} in the row?`, `Start on the left. Which is ${form}?`, i, [], decoys);
+    return ask(`Which is ${form} in the row?`, `Start on the left. Which is ${form}?`, i, [], decoys, form === 'first' ? [4, 1] : [0, 3]);   // the other end, then the one beside it: what a child mixes up
   }
   if (form === 'between') {
     const i = ri(rng, 0, 2);

@@ -12,12 +12,14 @@ const mostLeast = (d: number, rng: () => number) => {
 };
 
 /** #985 form A: two groups of 1–10 — "more", "fewer" (never when equal) or "equal". */
-const groups = (rng: () => number) => {
+const groups = (d: number, rng: () => number) => {
   const [e1, e2] = shuffle(rng, OBJECTS);
   const equal = rng() < 1 / 3;
   const a = ri(rng, 1, 10);
   let b = a;
-  while (!equal && b === a) b = ri(rng, 1, 10);
+  // #2320: groups a child has to count, not two heaps far apart — never more than 3 apart at d1, 2 beyond.
+  const reach = d === 1 ? 3 : 2;
+  while (!equal && (b === a || Math.abs(b - a) > reach)) b = ri(rng, Math.max(1, a - reach), Math.min(10, a + reach));
   const fewer = !equal && rng() < 0.5;
   const prompt = fewer ? 'Which group has fewer?' : `Are there more ${e1} or more ${e2}, or are they equal?`;
   const ans = a === b ? 'equal' : (a < b) === fewer ? e1 : e2;
@@ -28,4 +30,4 @@ const groups = (rng: () => number) => {
 };
 
 /** #985: the Year 1 comparison words — d1 groups only, d2/d3 half groups, half most/least. */
-export const y1Compare: Generator = (d, rng) => (d >= 2 && rng() < 0.5 ? mostLeast(d, rng) : groups(rng));
+export const y1Compare: Generator = (d, rng) => (d >= 2 && rng() < 0.5 ? mostLeast(d, rng) : groups(d, rng));

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
-import { SENTENCE_TYPES, TENSE_VERBS, TENSE_FRAMES, type TenseCol } from '../../src/curriculum/year2';
+import { SENTENCE_TYPES, TENSE_VERBS, TENSE_FRAMES, TENSE_BARE, type TenseCol } from '../../src/curriculum/year2';
 
 function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -142,13 +142,13 @@ describe('y2-tense generator (#667)', () => {
     const t = topic('y2-tense'), r = rng(8101);
     for (const d of [1, 2] as Difficulty[]) for (let i = 0; i < N; i++) {
       const q = t.gen(d, r), text = (q.visual as { text: string }).text;
-      const hits = TENSE_FRAMES.flatMap(f => TENSE_VERBS.filter(v => fill(f, v) === text).map(v => [f, v] as const));
+      const hits = [...TENSE_FRAMES, ...TENSE_BARE].flatMap(f => TENSE_VERBS.filter(v => fill(f, v) === text).map(v => [f, v] as const));
       expect(hits.length, `${text} — must come from exactly one frame and verb`).toBe(1);
       expect(q.answer, text).toBe(hits[0][0][2]);
     }
   });
   it('every frame x verb card has distinct fills, so the lookup cannot re-point', () => {
-    const all = TENSE_FRAMES.flatMap(f => TENSE_VERBS.map(v => fill(f, v)));
+    const all = [...TENSE_FRAMES, ...TENSE_BARE].flatMap(f => TENSE_VERBS.map(v => fill(f, v)));
     expect(new Set(all).size).toBe(all.length);
   });
   it('d3: the card shows the gapped frame, the bubbles are one whole row, and the answer is its column', () => {

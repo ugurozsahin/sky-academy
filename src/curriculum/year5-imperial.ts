@@ -52,7 +52,8 @@ function convert(rng: Rng, e: Eq, k: number, forward: boolean): Question {
   const ds = decoys(src, answer, exact, whole, forward, e.f10 / 10, others);
   const fromS = fmt(round(src, src >= 10)), prompt = `${fromS} ${lab(e, fromW, src)} is about ? ${lab(e, toW, ans)}`;
   const say = ks2Say(`About how many ${spoken(e, toW, 2)} is ${fromS} ${spoken(e, fromW, src)}?`);
-  return wordQ(rng, prompt, fmt(answer), ds, { say, hint: HINT_FWD, hintIsData: false });
+  const why = `1 ${lab(e, 'a', 1)} ≈ ${(e.f10 / 10).toLocaleString('en-GB')} ${e.b}: ${fromS} ${forward ? '×' : '÷'} ${(e.f10 / 10).toLocaleString('en-GB')} = ${fmt(answer)}`;
+  return wordQ(rng, prompt, fmt(answer), ds, { say, hint: HINT_FWD, hintIsData: false, why });
 }
 
 /** Imperial amount against a metric one: the larger is at least 25 % more than the smaller, judged on the exact conversion. */
@@ -76,7 +77,10 @@ function compare(rng: Rng): Question {
     if (Math.max(exactImp, m) < 1.25 * Math.min(exactImp, m)) continue;
     const impBig = exactImp > m, big = impBig ? c.imp(n) : c.met(m), small = impBig ? c.met(m) : c.imp(n);
     const say = ks2Say(`${c.ask.slice(0, -1)}, ${c.impW(n)} or ${c.metW(m)}?`);
-    return wordQ(rng, c.ask, big, [small], { say, hint: HINT_CMP, hintIsData: false });
+    // #2317: under 10 the conversion keeps one decimal ("3 lb is about 1.4 kg"), so a whole-number round never blurs the comparison
+    const approx = exactImp < 10 ? String(Number(exactImp.toFixed(1))) : c.met(c.nice(exactImp)).split(' ')[0];
+    const why = `${c.imp(n)} is about ${approx} ${c.met(0).split(' ')[1]}, so ${big} is ${c.word}`;
+    return wordQ(rng, c.ask, big, [small], { say, hint: HINT_CMP, hintIsData: false, why });
   }
   throw new Error('y5-imperial: no comparison with a 25 % margin found');
 }

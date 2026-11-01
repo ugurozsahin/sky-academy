@@ -19,7 +19,7 @@ function line(rng: Parameters<Generator>[1], s: number, h: number, fmtTick: (t: 
   const t = s + h, labels = Array.from({ length: 6 }, (_, i) => (i === h ? '?' : fmtTick(s + i)));
   const at = (k: number) => Number((k / 10).toFixed(1));
   return done(rng, {
-    prompt: 'Count in tenths. Which number is hidden?', say: 'Count in tenths. Which number is hidden?', answer: fmtTick(t),
+    prompt: 'Count in tenths. Which number is hidden?', why: h > 0 ? `${fmtTick(t - 1)} + 1 tenth = ${fmtTick(t)}` : `${fmtTick(t)} + 1 tenth = ${fmtTick(t + 1)}`, say: 'Count in tenths. Which number is hidden?', answer: fmtTick(t),
     visual: { type: 'numberline', from: at(s), to: at(s + 5), step: 0.1, mark: at(t), labels },
   }, firstDistinct(fmtTick(t), ds(t)));
 }
@@ -37,14 +37,14 @@ export const y3Tenths: Generator = (d: Difficulty, rng): Question => {
       return line(rng, s, h, dl, k => [misread, dl(k + 1), dl(k + 10), dl(k - 1), dl(k - 10), dl(k + 2)].map(nonNeg));
     }
     const t = ri(rng, 1, 39), more = rng() < 0.5, a = more ? t + 1 : t - 1;
-    return done(rng, { prompt: `What is one tenth ${more ? 'more' : 'less'} than ${dl(t)}?`, say: ks2Say(`What is one tenth ${more ? 'more' : 'less'} than ${dl(t)}`), answer: dl(a) },
+    return done(rng, { prompt: `What is one tenth ${more ? 'more' : 'less'} than ${dl(t)}?`, say: ks2Say(`What is one tenth ${more ? 'more' : 'less'} than ${dl(t)}`), answer: dl(a), why: `${dl(t)} ${more ? '+' : '−'} 0.1 = ${dl(a)}` },
       firstDistinct(dl(a), [dl(t + (more ? 2 : -2)), dl(a + 10), dl(t), dl(a - 10 < 0 ? a + 20 : a - 10)].map(nonNeg)));
   }
   if (rng() < 0.25) {
     const n = ri(rng, 1, 3);
-    return { ...done(rng, { prompt: `How many tenths make ${n}?`, say: `How many tenths make ${ks2Say(String(n))}?`, answer: String(10 * n) }, firstDistinct(String(10 * n), [String(n), String(10 * n + 10), String(100 * n), String(10 * n - 1)])), slow: true };
+    return { ...done(rng, { prompt: `How many tenths make ${n}?`, say: `How many tenths make ${ks2Say(String(n))}?`, answer: String(10 * n), why: `${n} × 10 = ${10 * n} tenths` }, firstDistinct(String(10 * n), [String(n), String(10 * n + 10), String(100 * n), String(10 * n - 1)])), slow: true };
   }
   const n = ri(rng, 1, 9), frac = rng() < 0.5, ans = frac ? fr(n) : dl(n), form = frac ? 'fraction' : 'decimal';
   const nb = [n + 1, n - 1].filter(k => k >= 1 && k <= 9).map(k => (frac ? fr(k) : dl(k)));
-  return { ...done(rng, { prompt: `${n} ÷ 10 = ? (as a ${form})`, say: `What is ${n} divided by 10, as a ${form}?`, answer: ans }, firstDistinct(ans, [String(n * 10), String(n), nb[0], nb[1]])), slow: true };
+  return { ...done(rng, { prompt: `${n} ÷ 10 = ? (as a ${form})`, say: `What is ${n} divided by 10, as a ${form}?`, answer: ans, why: `${n} ÷ 10 = ${ans}` }, firstDistinct(ans, [String(n * 10), String(n), nb[0], nb[1]])), slow: true };
 };

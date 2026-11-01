@@ -11,7 +11,7 @@ export type Row = readonly [text: string, ant: Ant];
 
 export const SUBJ_ONE: readonly Row[] = [
   ['Grandma was very tired. Then ___ went to bed.', 'F'], ['My sister was cold. Then ___ put on a coat.', 'F'],
-  ['The king was very proud. Then ___ gave a speech.', 'M'], ['My brother was hungry. Then ___ ate his lunch.', 'M'],
+  ['The king was very proud. Then ___ gave a speech.', 'M'], ['My brother was hungry. Then ___ ate lunch.', 'M'],
   ['The ball was old. Then ___ rolled away.', 'T'], ['The box was heavy. Then ___ fell down.', 'T'],
 ];
 export const SUBJ_PLURAL: readonly Row[] = [

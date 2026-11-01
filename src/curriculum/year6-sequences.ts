@@ -12,6 +12,9 @@ const digits = (s: string) => s.replace(/\D/g, '');
 const lead = (v: number) => digits(label(v))[0];
 const last = (v: number) => digits(label(v)).slice(-1);
 const terms = (t1: number, s: number, n: number) => Array.from({ length: n }, (_, i) => t1 + i * s);
+const rule1 = (s: number) => `${s < 0 ? '− ' : '+ '}${label(Math.abs(s))}`;
+/** The step found from two neighbouring terms, then the rule it gives (#2317). */
+const stepWhy = (ts: number[], s: number) => `${label(Math.max(ts[0], ts[1]))} − ${label(Math.min(ts[0], ts[1]))} = ${label(Math.abs(s))}, so ${rule1(s)}`;
 const list = (ts: number[]) => ts.map(label).join(', ');
 
 /** The three decoys: `named` slips first (the first always kept), then one sharing the answer's last digit and one its leading digit when #1058's scope applies. */
@@ -39,7 +42,7 @@ function nextCard(rng: Rng, t1: number, s: number, ahead: 1 | 2, u: number): Que
   const text = list(ts);
   const prompt = ahead === 1 ? `${text}, ?` : `Term after next: ${text}`;
   const say = ks2Say(ahead === 1 ? `${text}. What comes next?` : `${text}. What is the term after the next one?`);
-  return wordQ(rng, prompt, label(ans), options(rng, ans, named, u), { say });
+  return wordQ(rng, prompt, label(ans), options(rng, ans, named, u), { say, why: stepWhy(ts, s) });
 }
 
 function d2(rng: Rng): Question {
@@ -68,7 +71,7 @@ function rule(rng: Rng): Question {
   const k = ts[1] % ts[0] === 0 ? ts[1] / ts[0] : 2;
   const wrong = [`${sign(!up)}${s}`, `${sign(up)}${pick(rng, near)}`, `× ${k}`];
   return wordQ(rng, `Which rule makes ${list(ts)}?`, `${sign(up)}${s}`, wrong, {
-    say: ks2Say(`Which rule makes ${list(ts)}?`), optionsAreContent: true,
+    say: ks2Say(`Which rule makes ${list(ts)}?`), optionsAreContent: true, why: stepWhy(ts, up ? s * K : -s * K),
   });
 }
 

@@ -27,11 +27,11 @@ test.describe('Tables Check practice (#1118)', () => {
     await open(page, 'year4');
     await page.click('#mtc');
     await expect(page.locator('.play')).toBeVisible();
-    await page.evaluate(() => window.__sna.setSpeed(20));
+    await page.evaluate(() => window.__sna.setSpeed(10));
     for (let i = 1; i <= 28; i++) {
       await page.waitForFunction(n => { const s = window.__sna.state(); return s.ended || (window.__sna.session.questionsAsked === n && !s.waiting && window.__sna.bubbles().length > 0); }, i, { timeout: 30000 });
       if (i === 1) await expectFitsViewport(page, 'Tables Check card');
-      await page.waitForTimeout(150);   // #1174: an answer takes measurable time, as a child's does
+      await page.waitForTimeout(300);   // #1174: measurable time, as a child's answer takes; #2470: past the clock's arm delay (1.5 s / speed), inside its 6 s / speed budget
       while (!await page.evaluate(() => window.__sna.answer()) && !await page.evaluate(() => window.__sna.state().ended)) await page.waitForTimeout(50);
     }
     const results = page.locator('.results');

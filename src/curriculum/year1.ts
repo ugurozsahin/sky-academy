@@ -309,9 +309,19 @@ const y1Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 10 : 20, d === 3 ? 
 const y1Line: Generator = (d, rng) => lineQ(rng, d === 1 ? 0 : ri(rng, 0, d === 2 ? 10 : 90), 1, 6);
 
 /** Shapes (2-D) — properties and recognition. Tables live in util.ts (SHAPES_2D/SHAPES_3D). */
+/**
+ * Decoys for "Which is a …?" are the shapes a child mixes up with it (#2320): the nearest side count first
+ * (pentagon with hexagon, triangle with a four-sided shape), never the square/rectangle pair (sameShape), and
+ * the round circle only when nothing closer is left. Ties are broken by the rng so cards still vary.
+ */
+export function shapeDecoys(name: string, sides: number, rng: () => number): string[] {
+  const far = (n: number) => n === 0 ? 99 : n;
+  return shuffle(rng, SHAPES_2D.filter(x => !sameShape(x[1], name)))
+    .sort((a, b) => Math.abs(far(a[2]) - far(sides)) - Math.abs(far(b[2]) - far(sides))).slice(0, 3).map(x => x[0]);
+}
 const y1Shapes: Generator = (d, rng) => {
   const [g, name, sides] = pick(rng, SHAPES_2D);
-  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_2D.filter(x => !sameShape(x[1], name))).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape', hintIsData: false });
+  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shapeDecoys(name, sides, rng), { hint: 'Slice the shape', hintIsData: false });
   if (sides === 0) return y1Shapes(d, rng);
   return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2] });
 };
@@ -499,8 +509,16 @@ const y1Days: Generator = (d, rng) => {
   const day = pick(rng, DAYS);
   if (d === 3) return spellQ(rng, day, '📅', 3);   // days keep their capital letter (Y1 grammar)
   const idx = ri(rng, 1, Math.min(4, day.length - 1));
-  return gapQ(rng, day, idx, gapLetters(day, idx), '📅', `Which letter is missing from ${day}?`);
+  return gapQ(rng, day, idx, daysDecoyPool(day, idx), '📅', `Which letter is missing from ${day}?`);
 };
+/** #2320: a decoy is a letter that could fill the gap in a child's spelling — a vowel for a vowel, a common consonant for a consonant — never q, z or x (`F_iday` offering q, c, z was a giveaway). */
+const COMMON_CONSONANTS = 'bcdfghlmnprstwy';
+export function daysDecoyPool(day: string, idx: number): string[] {
+  const all = gapLetters(day, idx);
+  const isVowel = 'aeiou'.includes(day[idx].toLowerCase());
+  const same = all.filter(l => isVowel ? 'aeiou'.includes(l) : COMMON_CONSONANTS.includes(l));
+  return same.length >= 3 ? same : all;
+}
 const Y1_SENTS: Sent[][] = [
   [['The frog can jump high.', '🐸'], ['My mum has a red car.', '🚗'], ['We like to play outside.', '⚽'], ['The little bird can sing.', '🐦'], ['I have two pet fish.', '🐟'], ['The ship sails on the sea.', '🚢'], ['Can you see the rainbow?', '🌈'], ['The king has a gold crown.', '👑'], ['We went to the park.', '🌳'], ['My friend has a kite.', '🪁']],
   [['The little dog ran very fast.', '🐶'], ['We had chips for our tea.', '🍟'], ['Can you find my blue sock?', '🧦'], ['The moon shines at night.', '🌙'], ['I love to read in bed.', '📖'], ['The sheep are in the field.', '🐑'], ['My dad made a big cake.', '🎂'], ['Is it raining today?', '🌧️'], ['The snail moved along slowly.', '🐌'], ['Look at that huge whale!', '🐋']],

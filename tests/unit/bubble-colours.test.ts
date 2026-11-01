@@ -33,6 +33,21 @@ describe('colour-word bubbles (#2269)', () => {
   });
 });
 
+describe('storytime colour cards (#2437)', () => {
+  it('every y1-storytime question whose options are all colour words sets a colour for each, over 200 seeds', () => {
+    const t = TOPICS.find(x => x.id === 'y1-storytime')!;
+    let seen = 0;
+    for (let seed = 1; seed <= 200; seed++) for (const d of [1, 2, 3] as const) {
+      const q = t.gen(d, seeded(seed * 5 + d));
+      if (!q.options.some(o => /^(red|blue|green|yellow|purple|black|white|brown|pink|orange|grey)$/.test(o))) continue;
+      seen++;
+      expect(q.options.every(o => o in COLOUR_BUBBLE), `${q.prompt} options are map colours`).toBe(true);
+      for (const o of q.options) expect(q.colours?.[o], `${q.prompt} ${o}`).toBe(COLOUR_BUBBLE[o]);
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
+});
+
 describe('pie-chart bubbles (#2269)', () => {
   it('a Year 6 "which was chosen" bubble is planned in the colour of its slice, over 200 seeds', () => {
     const pie = TOPICS.find(t => t.id === 'y6-pie')!;

@@ -43,6 +43,15 @@ export const y2Compare: Generator = (d, rng) => {
 /** "Build the answer" card (#1016): slice the digits of the result in order. Five bubbles whatever the answer's length (#481). */
 const digitsQ = (rng: Rng, p: string, n: number): Question =>
   buildQ(rng, { prompt: p, say: `${q(p).say} Slice the digits of the answer.`, answer: String(n), total: 5, hint: 'Slice the digits in order' });
+/** "1 ten", "4 tens". */
+const tens = (n: number): string => `${n} ${n === 1 ? 'ten' : 'tens'}`;
+/** #2317: tens and ones added apart ("47 + 35 = 70 + 12"); never a line that restates the sum — whole tens add as tens, and a ten-number plus ones names its tens. At most 8 words. */
+export const addWhy = (a: number, b: number): string => {
+  const ta = a - a % 10, tb = b - b % 10, ones = a % 10 + b % 10;
+  if (ones === 0) return `${ta / 10} + ${tb / 10} = ${tens((ta + tb) / 10)}`;
+  if (ta === a && tb === 0) return `${tens(ta / 10)} + ${b} = ${a + b}`;
+  return `${a} + ${b} = ${ta + tb} + ${ones}`;
+};
 export const y2Add: Generator = (d, rng) => {
   let a: number, b: number;
   if (d === 1) { a = ri(rng, 10, 89); b = ri(rng, 1, 9); }          // 2-digit + ones
@@ -50,8 +59,26 @@ export const y2Add: Generator = (d, rng) => {
   else { a = ri(rng, 10, 60); b = ri(rng, 10, 99 - a); }             // 2-digit + 2-digit
   if (a + b > 100) return y2Add(d, rng);
   const p = `${a} + ${b} = ?`;
-  if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a + b));
-  return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p) }));
+  // #2317: the tens added together and the ones added together ("47 + 35 = 70 + 12"), the same split at every difficulty.
+  const why = addWhy(a, b);
+  if (d === 3 && rng() < 0.5) return slowAtD3(d, { ...digitsQ(rng, p, a + b), why });
+  return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p), why }));
+};
+/** #2319: the slips 2-digit subtraction invites — the smaller units digit taken from the larger (52 − 17 = 45), a borrow forgotten or doubled (±10), adding instead. Never a random neighbour. */
+export const subSlips = (a: number, b: number): number[] => {
+  const ans = a - b, ua = a % 10, ub = b % 10;
+  const swapped = (Math.floor(a / 10) - Math.floor(b / 10)) * 10 + Math.abs(ua - ub);
+  return [swapped, ans + 10, ans - 10, a + b].filter(v => v !== ans && v >= 0 && v <= 100 && v !== a);
+};
+/** #2317: the step that makes a 2-digit subtraction mechanical — within the ones, across a ten (equal difference), tens first. At most 8 words. */
+export const subWhy = (a: number, b: number): string => {
+  const ua = a % 10, ub = b % 10;
+  if (b < 10 && (a === 10 || ua === b)) return `${a} = ${a - b} + ${b}`;   // a number bond: never "x − x = 0" or a leading zero
+  if (b < 10 && ua === 0) return `${a} − ${b} = ${a - 10} + ${10 - b}`;
+  if (b < 10) return ub <= ua ? `${ua} − ${b} = ${ua - b}, so ${a - b}` : `${a} − ${b} = ${a - ua} − ${b - ua}`;
+  if (ub === 0 && ua !== 0 && a - ua === b) return `${a} = ${b} + ${ua}`;
+  if (ub === 0) return ua === 0 ? `${a / 10} − ${b / 10} = ${tens((a - b) / 10)}` : `${a - ua} − ${b} = ${a - ua - b}, plus ${ua}`;
+  return `${a} − ${b - ub} = ${a - b + ub}, − ${ub}`;
 };
 export const y2Sub: Generator = (d, rng) => {
   let a: number, b: number;
@@ -59,8 +86,9 @@ export const y2Sub: Generator = (d, rng) => {
   else if (d === 2) { a = ri(rng, 30, 99); b = 10 * ri(rng, 1, 2); }
   else { a = ri(rng, 30, 99); b = ri(rng, 10, a - 1); }
   const p = `${a} − ${b} = ?`;
-  if (d === 3 && rng() < 0.5) return slowAtD3(d, digitsQ(rng, p, a - b));
-  return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p) }));
+  const why = subWhy(a, b);
+  if (d === 3 && rng() < 0.5) return slowAtD3(d, { ...digitsQ(rng, p, a - b), why });
+  return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p), distractors: subSlips(a, b), why }));
 };
 export const y2Three: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 9;
@@ -96,10 +124,10 @@ export const y2Fractions: Generator = (d, rng) => {
   return numQ(rng, `${num}/${den} of ${whole} = ?`, ans, { min: 0, max: 24, say: `What is ${num} ${den === 2 ? 'half' : den === 3 ? 'third' : 'quarter'}${num > 1 ? 's' : ''} of ${whole}?`, visual: { type: 'objects', emoji: '⭐', n: whole } });
 };
 export const y2Money: Generator = (d, rng) => {
-  if (d === 1) { const coins = Array.from({ length: 3 }, () => pick(rng, [2, 5, 10, 20, 50])); return unitQ(rng, coins.reduce((s, c) => s + c, 0), coins); }
+  if (d === 1) { const coins = Array.from({ length: 3 }, () => pick(rng, [2, 5, 10, 20, 50])); const sum = coins.reduce((s, c) => s + c, 0); return { ...unitQ(rng, sum, coins), why: `${coins.map(c => `${c}p`).join(' + ')} = ${sum}p` }; }
   // £ and p recorded separately, never `£1.50` — decimal money is Year 4 (#298 slice 2). `coinLabel` is the
   // one source for the label, so the distractors are filtered as amounts before they are ever formatted.
-  if (d === 2) { const coins = Array.from({ length: 2 }, () => pick(rng, [50, 100, 200])); const total = coins.reduce((s, c) => s + c, 0); const ds = [total + 50, total - 50, total + 100].filter(p => p > 0 && p !== total); return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: 'How much money altogether?' }); }
+  if (d === 2) { const coins = Array.from({ length: 2 }, () => pick(rng, [50, 100, 200])); const total = coins.reduce((s, c) => s + c, 0); const ds = [total + 50, total - 50, total + 100].filter(p => p > 0 && p !== total); return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: 'How much money altogether?', why: `${coins.map(c => `${c}p`).join(' + ')} = ${total}p` }); }
   const price = 5 * ri(rng, 1, 19);
   const change = 100 - price;
   // At exactly one price (50p), `price` as a decoy equals `change` (the answer) — wordQ's own de-dup then
@@ -109,7 +137,7 @@ export const y2Money: Generator = (d, rng) => {
   // this — it collided with `price` at 55p too, silently saved only by wordQ's own dedup, with no margin
   // left). 15 is not a multiple of 10 and not ±5, so this candidate can never equal `price`, `change` or
   // either of the other two decoys, at any price in range.
-  return wordQ(rng, `Change from £1 for ${price}p?`, `${change}p`, [`${change + 5}p`, `${change - 5}p`, `${price}p`, `${change + 15}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
+  return wordQ(rng, `Change from £1 for ${price}p?`, `${change}p`, [`${change + 5}p`, `${change - 5}p`, `${price}p`, `${change + 15}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?`, why: `100p − ${price}p = ${change}p` });
 };
 /**
  * The clock phrase for `h:mm` on a 12-hour dial — `3 o'clock`, `quarter past 3`, `half past 3`, `quarter to 4`,

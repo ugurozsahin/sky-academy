@@ -10,7 +10,7 @@ const vis = (grid: string[]) => ({ visual: { type: 'symmetry' as const, grid, mi
 const hint = 'Volume counts the cubes: cubes in one layer × the number of layers';
 
 /** Decoys: the named slips first, then (answers of 20 or more) one decoy sharing the leading digit and one sharing the last (#1058). */
-function card(rng: Rng, prompt: string, say: string, answer: number, named: number[], grid: Grid): Question {
+function card(rng: Rng, prompt: string, say: string, answer: number, named: number[], grid: Grid, why: string): Question {
   const ds = [...new Set(named.filter(v => v >= 1 && v !== answer))].slice(0, answer >= 20 ? 1 : 3);
   if (answer >= 20) {
     const has = (f: (v: number) => boolean) => ds.some(f);
@@ -19,7 +19,7 @@ function card(rng: Rng, prompt: string, say: string, answer: number, named: numb
     if (!has(v => last(v) === last(answer))) ds.push(answer > 10 && rng() < 0.5 ? answer - 10 : answer + 10);
   }
   for (const v of named) if (ds.length < 3 && v >= 1 && v !== answer && !ds.includes(v)) ds.push(v);
-  return opts(rng, prompt, answer, ds, { say: ks2Say(say), hint, ...vis(rows(grid)) });
+  return opts(rng, prompt, answer, ds, { say: ks2Say(say), hint, why, ...vis(rows(grid)) });
 }
 
 /** An L: a rectangle with a rectangular corner taken out. */
@@ -36,7 +36,8 @@ function layered(rng: Rng, g: Grid, layers: number): Question {
   const text = layers === 1 ? 'One layer of 1 cm³ cubes.' : `${layers} layers like this, each cube 1 cm³.`;
   const spoken = layers === 1 ? 'This is one layer of one cubic centimetre cubes.' : `There are ${layers} layers like this, and each cube is one cubic centimetre.`;
   const named = layers === 1 ? [perimeter(g), g[0].length + g.length, layer + 1] : [layer + layers, layer, perimeter(g) * layers];
-  return card(rng, `${text} Volume = ? cm³`, `${spoken} What is the volume in cubic centimetres?`, v, named, g);
+  return card(rng, `${text} Volume = ? cm³`, `${spoken} What is the volume in cubic centimetres?`, v, named, g,
+    layers === 1 ? `${layer} cubes in the layer = ${v} cm³` : `${layer} cubes × ${layers} layers = ${v} cm³`);
 }
 
 const rect = (rng: Rng, max: number): Grid => { for (;;) { const g = fill(ri(rng, 2, 6), ri(rng, 2, 4)); if (cells(g) <= max) return g; } };
@@ -53,7 +54,7 @@ function capacity(rng: Rng): Question {
   const [thing, ml] = pick(rng, CAPACITY);
   const slips = [ml * 10, ml / 10, ml * 100, ml / 100, ml * 1000].filter(v => Number.isInteger(v) && v >= 1 && (v < 1000 || v % 100 === 0) && capLabel(v).length <= 7);   // a long label spills out of its bubble
   const ds = shuffle(rng, slips).slice(0, 3);
-  return wordQ(rng, `About how much does ${thing} hold?`, capLabel(ml), ds.map(capLabel), { say: `About how much does ${thing} hold?`, hint: 'Think of a real one. Is it a sip, a mug, a bucket or a bath?', hintIsData: false });
+  return wordQ(rng, `About how much does ${thing} hold?`, capLabel(ml), ds.map(capLabel), { why: `${thing[0].toUpperCase()}${thing.slice(1)} holds about ${capLabel(ml)}`, say: `About how much does ${thing} hold?`, hint: 'Think of a real one. Is it a sip, a mug, a bucket or a bath?', hintIsData: false });
 }
 
 export const y5Volume: Generator = (level: Difficulty, rng) => {
