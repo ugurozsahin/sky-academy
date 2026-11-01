@@ -32,15 +32,16 @@ export function moneyDecoys(answer: number, first: number[]): number[] {
 }
 
 const lab = (p: number) => pounds(p);
-function ask(rng: Rng, prompt: string, say: string, answer: number, decoys: number[], hint: string): Question {
-  return wordQ(rng, prompt, lab(answer), decoys.map(lab), { say, hint, hintIsData: false });
+/** `why` (#2317) is the same sum in whole pence, which is how every amount here is held. */
+function ask(rng: Rng, prompt: string, say: string, answer: number, decoys: number[], hint: string, why: string): Question {
+  return wordQ(rng, prompt, lab(answer), decoys.map(lab), { say, hint, hintIsData: false, why });
 }
 
 /** d1: pence to pounds. 305p must offer £30.50 (the place-value shift) and £3.50 (the zero dropped). */
 function notation(rng: Rng): Question {
   const l = ri(rng, 1, 9), r = rng() < 0.4 ? ri(rng, 1, 9) : ri(rng, 10, 99), p = l * 100 + r;
   const shifted = p * 10, second = r < 10 ? l * 100 + r * 10 : swapPence(p);
-  return ask(rng, `${p}p = ?`, `${p} pence is how much in pounds?`, p, moneyDecoys(p, [shifted, p + sign(rng) * 100, second]), 'Every hundred pence make one pound, so split the pence into pounds and pence');
+  return ask(rng, `${p}p = ?`, `${p} pence is how much in pounds?`, p, moneyDecoys(p, [shifted, p + sign(rng) * 100, second]), 'Every hundred pence make one pound, so split the pence into pounds and pence', `100p make £1, so ${p}p = ${lab(p)}`);
 }
 
 /** d1 only: "Which is more: £4.05 or 399p?" — two bubbles, both written £x.yy. */
@@ -48,24 +49,24 @@ export function compareCard(rng: Rng): Question {
   const p = ri(rng, 131, 969), q = p + sign(rng) * ri(rng, 1, 30), pounds1 = rng() < 0.5;
   const a = pounds1 ? q : p, b = pounds1 ? p : q;
   return wordQ(rng, `Which is more: ${lab(a)} or ${b}p?`, lab(Math.max(p, q)), [lab(Math.min(p, q))],
-    { say: `Which is more: ${poundsSay(a)} or ${b} pence?`, hint: 'Write both amounts in pence, then compare', hintIsData: false });
+    { say: `Which is more: ${poundsSay(a)} or ${b} pence?`, hint: 'Write both amounts in pence, then compare', hintIsData: false, why: `${a}p and ${b}p, so ${Math.max(a, b)}p is more` });
 }
 
 /** d2: add or subtract two amounts, or change from £5, £10 or £20. */
 function sums(rng: Rng): Question {
   const k = rng();
-  let prompt: string, say: string, ans: number;
+  let prompt: string, say: string, ans: number, why: string;
   if (k < 0.34) {
-    const a = ri(rng, 100, 4900), b = ri(rng, 50, 4900); ans = a + b;
+    const a = ri(rng, 100, 4900), b = ri(rng, 50, 4900); ans = a + b; why = `${a}p + ${b}p = ${ans}p`;
     prompt = `${lab(a)} + ${lab(b)} = ?`; say = `${poundsSay(a)} plus ${poundsSay(b)} equals what?`;
   } else if (k < 0.67) {
-    const a = ri(rng, 300, 9500), b = ri(rng, 50, a - 50); ans = a - b;
+    const a = ri(rng, 300, 9500), b = ri(rng, 50, a - 50); ans = a - b; why = `${a}p − ${b}p = ${ans}p`;
     prompt = `${lab(a)} − ${lab(b)} = ?`; say = `${poundsSay(a)} take away ${poundsSay(b)} equals what?`;
   } else {
-    const pay = pick(rng, [500, 1000, 2000]), cost = ri(rng, 105, pay - 5); ans = pay - cost;
+    const pay = pick(rng, [500, 1000, 2000]), cost = ri(rng, 105, pay - 5); ans = pay - cost; why = `${pay}p − ${cost}p = ${ans}p`;
     prompt = `${lab(cost)} from ${lab(pay).replace('.00', '')}. Change?`; say = `You pay with ${poundsSay(pay)} for ${poundsSay(cost)}. What is the change?`;
   }
-  return ask(rng, prompt, say, ans, moneyDecoys(ans, [ans + sign(rng) * 100, ans + sign(rng) * 10, swapPence(ans)]), 'Add or take away the pounds and the pence, and watch for a carry');
+  return ask(rng, prompt, say, ans, moneyDecoys(ans, [ans + sign(rng) * 100, ans + sign(rng) * 10, swapPence(ans)]), 'Add or take away the pounds and the pence, and watch for a carry', why);
 }
 
 const ITEMS = ['book', 'kite', 'scarf', 'game', 'puzzle', 'toy car', 'football', 'diary'];
@@ -80,14 +81,16 @@ function problems(rng: Rng): Question {
     if (t === 4) {
       const item = pick(rng, SMALL), ans = unit * n;
       return ask(rng, `${n} ${item}s at ${lab(unit)} each. How much?`, `${n} ${item}s at ${poundsSay(unit)} each. How much?`, ans,
-        moneyDecoys(ans, [unit, ans + sign(rng) * 100, unit * (n + sign(rng)), ans + sign(rng) * 10]), 'Multiply the cost of one by how many');
+        moneyDecoys(ans, [unit, ans + sign(rng) * 100, unit * (n + sign(rng)), ans + sign(rng) * 10]), 'Multiply the cost of one by how many', `${n} × ${unit}p = ${ans}p`);
     }
     const total = unit * n;
     return ask(rng, `${lab(total)} is shared equally by ${n} friends. Each gets?`, `${poundsSay(total)} is shared equally by ${n} friends. How much does each get?`, unit,
-      moneyDecoys(unit, [unit + sign(rng) * 100, total, unit + sign(rng) * 10, swapPence(unit)]), 'Divide the money by the number of friends');
+      moneyDecoys(unit, [unit + sign(rng) * 100, total, unit + sign(rng) * 10, swapPence(unit)]), 'Divide the money by the number of friends', `${total}p ÷ ${n} = ${unit}p`);
   }
   const [num, den] = pick(rng, FRACS), u = ri(rng, 10, Math.floor(MAX / den / 2)), price = u * den, off = u * num, item = pick(rng, ITEMS);
   const f = `${num}/${den}`, fs = ks2Say(f);
+  const offWhy = num === 1 ? `${price}p ÷ ${den} = ${off}p` : `${price}p ÷ ${den} = ${u}p, × ${num} = ${off}p`;
+  const newWhy = `${f} off is ${off}p, so ${price}p − ${off}p = ${price - off}p`;
   const tpl = [
     [`A ${item} costs ${lab(price)}. It is ${f} off. How much is taken off?`, `A ${item} costs ${poundsSay(price)}. It is ${fs} off. How much is taken off?`, off, [price - off, u, off + sign(rng) * 100, off + sign(rng) * 10]],
     [`${f} off a ${lab(price)} ${item}. What is the saving?`, `${fs} off a ${poundsSay(price)} ${item}. What is the saving?`, off, [price - off, u, off + sign(rng) * 100, off + sign(rng) * 10]],
@@ -95,7 +98,7 @@ function problems(rng: Rng): Question {
     [`${lab(price)} ${item}, sale: ${f} off. Pay?`, `A ${poundsSay(price)} ${item} in a sale: ${fs} off. How much do you pay?`, price - off, [off, price - off + sign(rng) * 100, price - u, price - off + sign(rng) * 10]],
   ][t] as [string, string, number, number[]];
   // the unit-fraction amount (u) is a real decoy only when it differs from the answer, i.e. on a non-unit fraction
-  return ask(rng, tpl[0], tpl[1], tpl[2], moneyDecoys(tpl[2], shuffle(rng, tpl[3].slice(0, 2)).concat(tpl[3].slice(2))), 'Find one part first, then take the right number of parts');
+  return ask(rng, tpl[0], tpl[1], tpl[2], moneyDecoys(tpl[2], shuffle(rng, tpl[3].slice(0, 2)).concat(tpl[3].slice(2))), 'Find one part first, then take the right number of parts', t <= 1 ? offWhy : newWhy);
 }
 
 /** Every card but the d1 "Which is more?" form, which prints both options in its prompt (#1058 leak test). */
