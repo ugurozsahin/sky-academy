@@ -36,22 +36,25 @@ function pair(add: boolean, rng: () => number): { a: number; b: number } {
 }
 
 export const y3Money: Generator = (d, rng): Question => {
-  let prompt: string, say: string, answer: number, wrongOp: number | null = null, visual: Question['visual'];
+  let prompt: string, say: string, answer: number, wrongOp: number | null = null, visual: Question['visual'], why: string;
   if (d === 1) {
     let coins: number[], total: number;
     do { coins = Array.from({ length: ri(rng, 2, 4) }, () => pick(rng, COINS)); total = coins.reduce((s, c) => s + c, 0); } while (total < 10 || total > MAX);
     prompt = 'How much money?'; say = 'How much money is there altogether?'; answer = total; visual = { type: 'coins', coins };
+    why = `${coins.map(c => `${c}p`).join(' + ')} = ${total}p`;           // #2317: every coin in pence, then the sum
   } else if (d === 2) {
     const add = rng() < 0.5, { a, b } = pair(add, rng);
     answer = add ? a + b : a - b; wrongOp = add ? a - b : a + b;
+    why = `${a}p ${add ? '+' : '−'} ${b}p = ${answer}p`;
     prompt = `${coinLabel(a)} ${add ? '+' : '−'} ${coinLabel(b)} = ?`;
     say = `What is ${coinLabel(a)} ${add ? 'plus' : 'take away'} ${coinLabel(b)}?`;
   } else {
     const note = pick(rng, [500, 1000]), price = 5 * ri(rng, 21, (note - 5) / 5);
     answer = note - price; wrongOp = note + price;
+    why = `${note}p − ${price}p = ${answer}p`;
     prompt = `Change from ${coinLabel(note)} for ${coinLabel(price)}?`;
     say = `How much change from ${coinLabel(note)} for ${coinLabel(price)}?`;
   }
-  const card = wordQ(rng, prompt, coinLabel(answer), decoys(answer, wrongOp).map(coinLabel), { say, visual });
+  const card = wordQ(rng, prompt, coinLabel(answer), decoys(answer, wrongOp).map(coinLabel), { say, visual, why });
   return d === 3 ? { ...card, slow: true } : card;
 };
