@@ -9,6 +9,9 @@ import { dec, fmt } from './ks2num';
 const MAX = 9999999;
 const f = (n: number) => fmt(dec(n, 0));
 
+/** `why` (#2317): the 2-digit multiplier split into tens and ones, each part multiplied, so the child sees the partial products. */
+const whyOf = (a: number, b: number) => { const t = b - (b % 10), u = b % 10; return `${f(a)} × ${t} = ${f(a * t)}, ${f(a)} × ${u} = ${f(a * u)}`; };
+
 const lastOf = (v: number) => f(v).slice(-1), leadOf = (v: number) => f(v)[0];
 const twins = (ds: number[], answer: number) => ds.some(v => lastOf(v) === lastOf(answer)) && ds.some(v => leadOf(v) === leadOf(answer));
 
@@ -38,7 +41,7 @@ const twoDigit = (rng: Rng, lo = 12) => { for (;;) { const b = ri(rng, lo, 99); 
 
 function pickOne(a: number, b: number, rng: Rng): Question {
   const sum = `${f(a)} × ${f(b)} = ?`;
-  return wordQ(rng, sum, f(a * b), decoys(a, b, rng).map(f), { say: q(sum).say });
+  return wordQ(rng, sum, f(a * b), decoys(a, b, rng).map(f), { say: q(sum).say, why: whyOf(a, b) });
 }
 
 export const y6LongMult: Generator = (d: Difficulty, rng): Question => {
@@ -46,5 +49,5 @@ export const y6LongMult: Generator = (d: Difficulty, rng): Question => {
   if (d === 2) return pickOne(ri(rng, 100, 999), twoDigit(rng), rng);
   const a = ri(rng, 1000, 9999), b = twoDigit(rng, 11), sum = `${f(a)} × ${f(b)} = ?`, answer = f(a * b);
   const slots = answer.replace(/\D/g, '').length;   // 5 or 6: 11,000 to 989,901
-  return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer, total: Math.min(10, slots + 3), hint: 'Slice the digits in order' }), slow: true };
+  return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer, total: Math.min(10, slots + 3), hint: 'Slice the digits in order' }), why: whyOf(a, b), slow: true };
 };
