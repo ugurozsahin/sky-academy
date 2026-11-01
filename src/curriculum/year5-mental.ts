@@ -18,7 +18,9 @@ const count = (n: number, w: string) => `${f(n)} ${w}${n === 1 ? '' : 's'}`;
 function stepWhy(a: number, b: number, add: boolean, diff: number): string {
   const op = add ? '+' : '−', ans = add ? a + b : a - b;
   if (diff) { const r = b + diff, mid = add ? a + r : a - r; return `${f(a)} ${op} ${f(r)} = ${f(mid)}, ${add ? '−' : '+'} ${diff}`; }
-  const ta = Math.floor(a / 1000), tb = b / 1000, tr = Math.floor(ans / 1000);
+  const ta = Math.floor(a / 1000), tb = b / 1000, tr = Math.floor(ans / 1000), rest = a % 1000;
+  // A first number with units below the thousands keeps them: say so, or the line reads as a wrong total.
+  if (rest) return `${f(ta)} ${op} ${f(tb)} = ${count(tr, 'thousand')}, ${f(rest)} stays`;
   return `${count(ta, 'thousand')} ${op} ${count(tb, 'thousand')} = ${count(tr, 'thousand')}`;
 }
 

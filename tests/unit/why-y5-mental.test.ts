@@ -8,7 +8,7 @@ const t = TOPICS.find(x => x.id === 'y5-mental')!;
 
 describe('y5-mental whys (#2317)', () => {
   it('every card has a short why that is true of its own card', () => {
-    let kinds = { thousands: 0, comp: 0, inverse: 0 };
+    let kinds = { thousands: 0, rest: 0, comp: 0, inverse: 0 };
     for (const d of [1, 2, 3] as Difficulty[]) for (let s = 0; s < 200; s++) {
       const q = t.gen(d, rngOf((s + 1) * 104729 + d)), w = q.why!;
       expect(w, q.prompt).toBeTruthy();
@@ -16,11 +16,13 @@ describe('y5-mental whys (#2317)', () => {
       const m = nums(w), p = nums(q.prompt), ans = nums(q.answer)[0];
       if (/thousand/.test(w)) {
         kinds.thousands++;
-        const [a, b] = p, add = q.prompt.includes('+');
-        expect(m[0] * 1000).toBe(Math.floor(a / 1000) * 1000);
+        const [a, b] = p, add = q.prompt.includes('+'), rest = /stays/.test(w) ? m[3] : 0;
+        if (rest) kinds.rest++;
+        expect(rest, w).toBe(a % 1000);
+        expect(m[0] * 1000 + rest).toBe(Math.floor(a / 1000) * 1000 + a % 1000);
         expect(m[1] * 1000).toBe(b);
         expect(add ? m[0] + m[1] : m[0] - m[1]).toBe(m[2]);
-        expect(m[2]).toBe(Math.floor(ans / 1000));
+        expect(m[2] * 1000 + rest, w).toBe(ans);
       } else if (/^[\d,]+ [+−] [\d,]+ = [\d,]+, [+−] \d$/.test(w)) {
         kinds.comp++;
         const [a] = p, add = q.prompt.includes('+');
@@ -30,11 +32,13 @@ describe('y5-mental whys (#2317)', () => {
       } else {
         kinds.inverse++;
         expect(w).toMatch(/^[\d,]+ [+−] [\d,]+ = [\d,]+$/);
+        expect(p).toContain(m[0] === ans ? -1 : m[0]);
         expect(m[2]).toBe(ans);
         expect(w.includes('+') ? m[0] + m[1] : m[0] - m[1]).toBe(m[2]);
       }
     }
     expect(kinds.thousands).toBeGreaterThan(0);
+    expect(kinds.rest).toBeGreaterThan(0);
     expect(kinds.comp).toBeGreaterThan(0);
     expect(kinds.inverse).toBeGreaterThan(0);
   });
