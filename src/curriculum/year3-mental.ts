@@ -28,6 +28,17 @@ function draw(d: Difficulty, form: Form, add: boolean, rng: () => number): { a: 
 const columnSlip = (a: number, b: number, add: boolean): number[] =>
   [b * 10, b / 10].filter(x => Number.isInteger(x) && x >= 1).map(x => add ? a + x : a - x).filter(v => v >= 100 && v <= 999);
 
+const count = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+/** #2317: the step in the head, never a restatement — ones within the ten or across it, tens counted as tens, hundreds as hundreds. At most 8 words. */
+export const mentalWhy = (a: number, b: number, add: boolean): string => {
+  const op = add ? '+' : MINUS, ans = add ? a + b : a - b;
+  if (b >= 100) return `${count(hundreds(a), 'hundred')} ${op} ${count(b / 100, 'hundred')} = ${count(hundreds(ans), 'hundred')}`;
+  if (b >= 10) return `${count(Math.floor(a / 10), 'ten')} ${op} ${count(b / 10, 'ten')} = ${count(Math.floor(ans / 10), 'ten')}`;
+  const u = a % 10;
+  if (u === 0) return add ? `${count(a / 10, 'ten')} + ${b} = ${ans}` : `${a} − ${b} = ${a - 10} + ${10 - b}`;
+  if (add) return u + b <= 10 ? `${u} + ${b} = ${u + b}, so ${ans}` : `${a} + ${10 - u} = ${a + 10 - u}, + ${b - 10 + u}`;
+  return u >= b ? `${u} − ${b} = ${u - b}, so ${ans}` : `${a} − ${u} = ${a - u}, − ${b - u}`;
+};
 export const y3Mental: Generator = (d, rng): Question => {
   const form: Form = d === 1 ? pick(rng, ['ones', 'hundreds'] as const) : d === 2 ? 'tens' : pick(rng, ['ones', 'tens', 'hundreds'] as const);
   const add = rng() < 0.5;
@@ -43,6 +54,6 @@ export const y3Mental: Generator = (d, rng): Question => {
   if (extra.length && spare >= 0) decoys[spare] = extra[0];
   const prompt = `${a} ${add ? '+' : MINUS} ${b} = ?`;
   const options = shuffle(rng, [answer, ...decoys].map(String));
-  const card: Question = { ...q(prompt), answer: String(answer), options };
+  const card: Question = { ...q(prompt), answer: String(answer), options, why: mentalWhy(a, b, add) };
   return d === 3 ? { ...card, slow: true } : card;
 };
