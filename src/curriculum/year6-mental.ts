@@ -9,7 +9,7 @@ import { ks2Say } from './ks2say';
 const MINUS = '−', MAX = 10_000_000;
 const show = (n: number) => fmt(dec(n, 0));
 /** One card before options: `named` are the plausible wrong answers (wrong operation, first step alone). */
-type Item = { prompt: string; ans: number; named: number[] };
+type Item = { prompt: string; ans: number; named: number[]; why: string };
 const lead = (n: number) => String(n)[0];
 
 /** d1: add or subtract multiples of 10,000 (sometimes 50,000); the answer is 100,000 to 10,000,000. */
@@ -19,25 +19,27 @@ function round(rng: Rng): Item {
     const a = step * ri(rng, 2, MAX / step - 1), b = step * ri(rng, 1, 1_000_000 / step);
     const ans = add ? a + b : a - b;
     if (ans < 100_000 || ans > MAX || b < 10_000) continue;
-    return { prompt: `${show(a)} ${add ? '+' : MINUS} ${show(b)} = ?`, ans, named: [add ? a - b : a + b] };
+    const u = (n: number) => show(n / 10_000);   // #2317: count in ten thousands, then say so
+    return { prompt: `${show(a)} ${add ? '+' : MINUS} ${show(b)} = ?`, ans, named: [add ? a - b : a + b], why: `${u(a)} ${add ? '+' : MINUS} ${u(b)} = ${u(ans)} ten thousands` };
   }
 }
 
 /** A table fact `a × b` with `i + j` zeros shared out, so the card reads "60 × 700". Returns the two factors and their product. */
-function fact(rng: Rng): { x: number; y: number; prod: number } {
+function fact(rng: Rng): { x: number; y: number; prod: number; a: number; b: number; k: number } {
   for (;;) {
     const a = ri(rng, 2, 12), b = ri(rng, 2, 12), i = ri(rng, 0, 3), j = ri(rng, 0, 3);
     if (i + j < 1 || a * b * 10 ** (i + j) > MAX) continue;
-    return { x: a * 10 ** i, y: b * 10 ** j, prod: a * b * 10 ** (i + j) };
+    return { x: a * 10 ** i, y: b * 10 ** j, prod: a * b * 10 ** (i + j), a, b, k: i + j };
   }
 }
 
 /** d2: `x × y`, or the inverse `prod ÷ y` with a whole quotient. */
 function scaled(rng: Rng): Item {
-  const { x, y, prod } = fact(rng);
+  const { x, y, prod, a, b, k } = fact(rng);
+  const zeros = (n: number) => n === 0 ? 'no zeros' : `${n} zero${n > 1 ? 's' : ''}`;   // #2317: the table fact, then the zeros
   return rng() < 0.5
-    ? { prompt: `${show(x)} × ${show(y)} = ?`, ans: prod, named: [x + y] }
-    : { prompt: `${show(prod)} ÷ ${show(y)} = ?`, ans: x, named: [prod - y] };
+    ? { prompt: `${show(x)} × ${show(y)} = ?`, ans: prod, named: [x + y], why: `${a} × ${b} = ${a * b}, then ${zeros(k)} on` }
+    : { prompt: `${show(prod)} ÷ ${show(y)} = ?`, ans: x, named: [prod - y], why: `${a * b} ÷ ${b} = ${a}, then ${zeros(Math.log10(x / a))} on` };
 }
 
 /** d3: a × or ÷ first, then a + or − of a near-round number. Answers stay 1 to 10,000,000. */
@@ -48,7 +50,8 @@ function twoStep(rng: Rng): Item {
     const ans = add ? first + c : first - c;
     if (ans < 1 || ans > MAX || first < 100) continue;
     const head = times ? `${show(x)} × ${show(y)}` : `${show(prod)} ÷ ${show(y)}`;
-    return { prompt: `${head} ${add ? '+' : MINUS} ${show(c)} = ?`, ans, named: [first, add ? first - c : first + c] };
+    return { prompt: `${head} ${add ? '+' : MINUS} ${show(c)} = ?`, ans, named: [first, add ? first - c : first + c],
+      why: `${head} = ${show(first)}, then ${show(first)} ${add ? '+' : MINUS} ${show(c)} = ${show(ans)}` };
   }
 }
 
@@ -70,11 +73,11 @@ function decoys(rng: Rng, ans: number, named: number[]): number[] {
 }
 
 export const y6Mental: Generator = (d: Difficulty, rng: Rng): Question => {
-  const { prompt, ans, named } = d === 1 ? round(rng) : d === 2 ? scaled(rng) : twoStep(rng);
+  const { prompt, ans, named, why } = d === 1 ? round(rng) : d === 2 ? scaled(rng) : twoStep(rng);
   const options = shuffle(rng, [ans, ...decoys(rng, ans, named)].map(show));
   const card: Question = {
     prompt, say: ks2Say(prompt.replace('=', 'equals').replace('?', 'what')), answer: show(ans),
-    options, wide: wideFor(options),
+    options, wide: wideFor(options), why,
   };
   return d === 3 ? { ...card, slow: true } : card;
 };
