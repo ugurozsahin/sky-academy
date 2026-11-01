@@ -27,6 +27,9 @@ export function decoys(named: string[], fills: string[], answer: string): string
   return out;
 }
 
+/** `why` (#2317): the multiplication that checks the division, with any remainder named as what is left over. */
+const checkWhy = (quotient: number, d: number, r = 0) => r ? `${f(quotient)} × ${d} = ${f(quotient * d)}, plus ${r} left over` : `${f(quotient)} × ${d} = ${f(quotient * d)}`;
+
 /** d1: a short-division-friendly divisor and a whole quotient. */
 function d1(rng: Rng): Question {
   const d = pick(rng, [11, 12, 15, 20, 25]), quotient = ri(rng, Math.ceil(110 / d), Math.floor(9999 / d));
@@ -36,7 +39,7 @@ function d1(rng: Rng): Question {
   const named = [quotient * 10, quotient % 10 === 0 ? quotient / 10 : quotient - 10, quotient + pick(rng, [1, -1])];
   const fills = shuffle(rng, [10, 100, 1, 2].flatMap(m => [quotient + m, quotient - m]));
   const ds = decoys(named.filter(ok).map(f), fills.filter(ok).map(f), f(quotient));
-  return wordQ(rng, sum, f(quotient), ds, { say: q(sum).say });
+  return wordQ(rng, sum, f(quotient), ds, { say: q(sum).say, why: checkWhy(quotient, d) });
 }
 
 /** d2: a two-digit divisor, a remainder that is not 0 and at most 5 digits in all. */
@@ -44,7 +47,7 @@ function d2(rng: Rng): Question {
   const d = ri(rng, 11, 99), r = ri(rng, 1, d - 1);
   const quotient = ri(rng, Math.max(8, Math.ceil((100 - r) / d)), Math.floor((9999 - r) / d));
   const sum = `${f(quotient * d + r)} ÷ ${d} = ?`;
-  return buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer with the remainder.`, answer: `${quotient} r ${r}`, total: 8, hint: 'Slice the digits in order' });
+  return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer with the remainder.`, answer: `${quotient} r ${r}`, total: 8, hint: 'Slice the digits in order' }), why: checkWhy(quotient, d, r) };
 }
 
 /** [text with `#` for the dividend then the divisor, the question, whether the answer rounds up]. */
@@ -67,7 +70,7 @@ function context(rng: Rng): Question {
   const answer = up ? quotient + 1 : quotient;
   const named = [up ? quotient : quotient + 1, `${quotient} r ${r}`, r].map(v => typeof v === 'number' ? f(v) : v);
   const fills = shuffle(rng, [10, 1, 2, 20].flatMap(m => [answer + m, answer - m])).filter(v => v > 0).map(f);
-  return wordQ(rng, prompt, f(answer), decoys(named, fills, f(answer)), { say: `${prompt} Pick the answer.` });
+  return wordQ(rng, prompt, f(answer), decoys(named, fills, f(answer)), { say: `${prompt} Pick the answer.`, why: up ? `${f(quotient)} are full, ${r} left over, so one more` : `${f(quotient)} are full, ${r} left over` });
 }
 
 /** d3, the remainder as a fraction: a mixed number in its simplest form. */
@@ -81,7 +84,7 @@ function mixed(rng: Rng): Question {
   // The unsimplified form (when there is one) and the remainder read as a decimal, then the quotient out by one.
   const named = [frac.d === d ? '' : show(quotient, plain), r % 10 === 0 ? '' : `${quotient}.${r}`, show(quotient + pick(rng, [1, -1]))].filter(Boolean);
   const fills = shuffle(rng, [1, -1, 2, -2, 10, -10].map(m => quotient + m).filter(v => v > 0).map(v => show(v)));
-  return wordQ(rng, prompt, answer, decoys(named, fills, answer), { say: `${n} divided by ${d} as a mixed number in its simplest form. Pick the answer.` });
+  return wordQ(rng, prompt, answer, decoys(named, fills, answer), { say: `${n} divided by ${d} as a mixed number in its simplest form. Pick the answer.`, why: frac.d === d ? `${f(quotient)} r ${r}: the ${r} left over is ${r}/${d}` : `${f(quotient)} r ${r}: ${r}/${d} simplifies to ${frac.n}/${frac.d}` });
 }
 
 export const y6LongDiv: Generator = (d: Difficulty, rng): Question => d === 1 ? d1(rng) : d === 2 ? d2(rng) : rng() < 0.5 ? mixed(rng) : context(rng);
