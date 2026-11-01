@@ -1,6 +1,7 @@
 import type { Question, YearId } from '../curriculum';
 import type { WaveOpts } from '../game/arena';
 import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow rule wordQ uses, not a second one
+import { BUBBLE_SCALE } from '../game/bubbles';
 
 /**
  * The spawn options for one question's wave, shared between this screen and `tests/unit/sim.test.ts`'s
@@ -14,11 +15,11 @@ import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow
  * function otherwise has no reason to take: it only ever affects a non-sequence question's single
  * `gentleTarget`, so a scenario that does not care about it can go on calling this with three arguments.
  * `remaining` (#919) defaults to the whole sequence: omitted means "nothing sliced yet", not "nothing left". */
-export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean, timing?: WaveOpts['timing'], capWords?: boolean): WaveOpts {
+export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean, timing?: WaveOpts['timing'], capWords?: boolean, yearId?: YearId): WaveOpts {
   const labels = capWords && capApplies(q, info.labels) ? capWordBubbles(info.labels, q.answer) : info.labels;
   return {
     labels, speed: info.speed, wide: !!q.wide || wideFor(labels), colours: q.colours,
-    ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined, timing,
+    ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined, timing, scale: yearId && BUBBLE_SCALE[yearId],
   };
 }
 

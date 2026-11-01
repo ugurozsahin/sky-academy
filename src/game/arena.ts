@@ -8,7 +8,7 @@ import { watchBox } from './box-watch'; import { gameSpeed } from './speed';   /
 import type { Rng } from '../curriculum/types'; import { boxMoved, holdUnderCard, insetMax, nextInset } from './wave-bounds';   // #2184
 import {
   hittable, GOOD, RELAUNCH_DELAY, MAX_RELAUNCHES, COLLIDE,
-  layoutWave, reanchorBubble, bubbleRadius, resolveCollisions,
+  layoutWave, reanchorBubble, waveRadius, resolveCollisions,
   fitLabelLines, warnUnfitLabel,
 } from './bubbles';
 import type { Bubble, WaveOpts, ArenaBox, ClampCounts } from './bubbles';
@@ -139,7 +139,7 @@ export class Arena {
     // unrescaled box, so each one's next move must re-seat its anchor rather than draw from a stale point
   }
 
-  radius(wide: boolean) { return bubbleRadius(this.W, this.H, wide); }   // bubble radius scales with viewport; words get wider bubbles
+  scale = 1; radius(wide: boolean) { return waveRadius(this.W, this.H, wide, 1, this.scale); }   // the wave's year scale (#2288), so a ghost bubble matches; words get wider bubbles
 
   /**
    * `shared` is how two arenas put up **the same wave** — the Ninja Duel's two halves (#389). Two of
@@ -161,7 +161,7 @@ export class Arena {
     // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
     // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
     // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
-    const plan = layoutWave(o, { W: this.W, H: this.H, topInset: this.topInset }, gameSpeed(), shared?.now ?? performance.now(), shared?.rng ?? Math.random);
+    this.scale = o.scale ?? 1; const plan = layoutWave(o, { W: this.W, H: this.H, topInset: this.topInset }, gameSpeed(), shared?.now ?? performance.now(), shared?.rng ?? Math.random);
     this.waveT = plan.waveT; this.batchSpan = plan.batchSpan;
     for (const p of plan.bubbles) {
       const fit = fitLabelLines(p.label, plan.r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });   // #28: fit once here, not every frame
