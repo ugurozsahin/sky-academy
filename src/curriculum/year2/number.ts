@@ -102,7 +102,9 @@ export const y2Inverse: Generator = (d, rng) => {
   const kind = ri(rng, 0, 2);
   const p = kind === 0 ? `? − ${b} = ${a - b}` : kind === 1 ? `${a - b} + ? = ${a}` : `${a} − ? = ${b}`;
   const ans = kind === 0 ? a : kind === 1 ? b : a - b;
-  return slowAtD3(d, numQ(rng, p, ans, { min: 0, max: 100, ...q(p) }));
+  // #2317: the inverse that finds the missing number, worked from the numbers shown (5 words, inside the KS1 limit).
+  const why = kind === 0 ? `${a - b} + ${b} = ${a}` : kind === 1 ? `${a} − ${a - b} = ${b}` : `${a} − ${b} = ${a - b}`;
+  return slowAtD3(d, numQ(rng, p, ans, { min: 0, max: 100, why, ...q(p) }));
 };
 /** `a/b` written as text has the same value as num/den (cross-multiplied, so 2/4 and 1/2 are equal). */
 export const sameFraction = (text: string, num: number, den: number) => { const [a, b] = text.split('/').map(Number); return a * den === num * b; };
