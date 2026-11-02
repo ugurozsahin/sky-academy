@@ -19,8 +19,9 @@ export const y2Related: Generator = (d, rng) => {
   const t = (n: number) => String(n * 10);
   const prompt = hidden === 'b' ? `${t(x)} ${op} ? = ${t(z)}` : `${t(x)} ${op} ${t(y)} = ?`;
   const known = hidden === 'b' ? y : z;                      // the unscaled fact number the child is hunting for
+  const why = `${x} ${op} ${y} = ${z}, so ${z} tens`;   // the known fact, then its tens (8 words, the KS1 limit)
   return numQ(rng, prompt, known * 10, {
-    min: 0, max: 100,
+    min: 0, max: 100, why,
     distractors: [known, known * 10 - 10, known * 10 + 10],
     visual: { type: 'word', text: fact },
     say: `${symSay(fact)}. So ${symSay(prompt)}`,
