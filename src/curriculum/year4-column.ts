@@ -3,6 +3,7 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, shuffle, wordQ, q } from './util';
 import { buildQ } from './build';
+import { columnWhy } from './column-why';
 import { dec, fmt } from './ks2num';
 
 const MINUS = '−';
@@ -28,7 +29,7 @@ function build(ex: number, rng: Rng): Question {
   const add = rng() < 0.5;
   const { a, b } = draw(ex, add, rng);
   const sum = `${f(a)} ${add ? '+' : MINUS} ${f(b)} = ?`;
-  return buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer: f(add ? a + b : a - b), total: 6, hint: 'Slice the digits in order' });
+  return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer: f(add ? a + b : a - b), total: 6, hint: 'Slice the digits in order' }), why: columnWhy(a, b, add) };
 }
 
 /** d3 check card: the answer is the calculation's first number; decoys are the wrong operation and the dropped carry (±100, ±10). */
@@ -43,7 +44,7 @@ function check(rng: Rng): Question {
   const wrong = [...new Set(pool.filter(v => v !== a && v >= 0))];
   for (const v of shuffle(rng, [a - 100, a + 100, a - 10, a + 10, a - 1000, a + 1000])) if (wrong.length < 3 && v !== a && v >= 0 && !wrong.includes(v)) wrong.push(v);
   const prompt = `${given}. Check: ${back}`;
-  return wordQ(rng, prompt, f(a), wrong.slice(0, 3).map(f), { say: `${q(given).say}. Check: ${q(back).say}` });
+  return wordQ(rng, prompt, f(a), wrong.slice(0, 3).map(f), { say: `${q(given).say}. Check: ${q(back).say}`, why: columnWhy(c, b, !add) });
 }
 
 export const y4Column: Generator = (d: Difficulty, rng): Question => d === 3 && rng() < 0.5 ? check(rng) : build(d === 1 ? 0 : d === 2 ? 1 : 2, rng);

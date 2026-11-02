@@ -3,6 +3,7 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, shuffle, q } from './util';
 import { buildQ } from './build';
+import { columnWhy } from './column-why';
 
 const MINUS = '−';
 const TOTAL = 7;
@@ -47,7 +48,7 @@ function missing(rng: Rng): Question {
   const prompt = `Missing digit: ${shown} ${add ? '+' : MINUS} ${b} = ${result}`;
   const spoken = digitsOf(a).map((x, i) => i === pos ? 'missing digit' : x).join(', ');
   const say = `${spoken}, ${add ? 'plus' : 'minus'} ${b}, equals ${result}. Which digit is missing?`;
-  return { prompt, say, answer: String(truth), options: shuffle(rng, [truth, ...wrong].map(String)), slow: true };
+  return { prompt, say, answer: String(truth), options: shuffle(rng, [truth, ...wrong].map(String)), slow: true, why: add ? `${result} ${MINUS} ${b} = ${a}` : `${result} + ${b} = ${a}` };
 }
 
 export const y3Column: Generator = (d: Difficulty, rng): Question => {
@@ -56,5 +57,5 @@ export const y3Column: Generator = (d: Difficulty, rng): Question => {
   const { a, b } = draw(d, add, rng);
   const sum = `${a} ${add ? '+' : MINUS} ${b} = ?`;
   const answer = withComma(add ? a + b : a - b);
-  return buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer, total: TOTAL, hint: 'Slice the digits in order' });
+  return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer, total: TOTAL, hint: 'Slice the digits in order' }), why: columnWhy(a, b, add) };
 };
