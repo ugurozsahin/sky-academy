@@ -15,7 +15,7 @@ function fractionCard(rng: Rng, asked: '1/2' | '2/4', visual?: Question['visual'
   const ds = YEAR2_SET.filter(f => !sameFraction(f, num, den));
   const prompt = visual ? `${asked} is shaded. Which is the same?` : `Which is the same as ${asked}?`;
   const say = visual ? `${cap(SAY[asked])} is shaded. Which fraction is the same?` : `Which fraction is the same as ${SAY[asked]}?`;
-  return wordQ(rng, prompt, answer, ds, { say, ...(visual ? { visual } : {}) });
+  return wordQ(rng, prompt, answer, ds, { why: `${asked} = ${answer}: 2 quarters make 1 half`, say, ...(visual ? { visual } : {}) });
 }
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
@@ -30,6 +30,7 @@ function quantityCard(rng: Rng): Question {
   const whole = 4 * ri(rng, 1, 6), half = whole / 2;
   return numQ(rng, `1/2 of ${whole} = ${half}. So 2/4 of ${whole} = ?`, half, {
     min: 0, max: 24, distractors: [whole / 4, whole * 3 / 4, whole],
+    why: `2/4 is the same as 1/2, so ${half}`,
     say: `One half of ${whole} is ${half}. So what is two quarters of ${whole}?`,
   });
 }
