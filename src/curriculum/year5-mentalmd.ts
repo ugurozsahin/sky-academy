@@ -23,8 +23,11 @@ function decoys(answer: number, near: number[], rng: Rng): number[] {
   return out;
 }
 
-const card = (rng: Rng, prompt: string, answer: number, near: number[], say = q(prompt).say): Question =>
-  wordQ(rng, prompt, f(answer), decoys(answer, near, rng).map(f), { say });
+const card = (rng: Rng, prompt: string, answer: number, near: number[], why: string, say = q(prompt).say): Question =>
+  wordQ(rng, prompt, f(answer), decoys(answer, near, rng).map(f), { say, why });
+
+/** #2317: the table fact, then the zeros that scale it. */
+const zeros = (n: number) => `then ${n} zero${n > 1 ? 's' : ''} on`;
 
 /** `a × b` or `b × a`, so the multiple is not always second. */
 const times = (rng: Rng, a: number, b: number) => rng() < 0.5 ? `${f(a)} × ${f(b)} = ?` : `${f(b)} × ${f(a)} = ?`;
@@ -34,14 +37,14 @@ function fact(rng: Rng) { return { a: ri(rng, 2, 9), b: ri(rng, 2, 9) }; }
 
 function d1(rng: Rng): Question {
   const { a, b } = fact(rng), s = 10 ** ri(rng, 1, 2), p = a * b;
-  if (rng() < 0.5) return card(rng, times(rng, a, b * s), p * s, [(p + a) * s, (p - a) * s, (p + b) * s, (p - b) * s]);
-  return card(rng, `${f(p * s)} ÷ ${a} = ?`, b * s, [(b + 1) * s, (b - 1) * s]);
+  if (rng() < 0.5) return card(rng, times(rng, a, b * s), p * s, [(p + a) * s, (p - a) * s, (p + b) * s, (p - b) * s], `${a} × ${b} = ${p}, ${zeros(Math.log10(s))}`);
+  return card(rng, `${f(p * s)} ÷ ${a} = ?`, b * s, [(b + 1) * s, (b - 1) * s], `${p} ÷ ${a} = ${b}, ${zeros(Math.log10(s))}`);
 }
 
 function d2(rng: Rng): Question {
   const { a, b } = fact(rng), i = ri(rng, 1, 2), j = ri(rng, 1, 2), p = a * b, s = 10 ** (i + j);
-  if (rng() < 0.5) return card(rng, times(rng, a * 10 ** i, b * 10 ** j), p * s, [(p + a) * s, (p - a) * s, (p + b) * s, (p - b) * s]);
-  return card(rng, `${f(p * s)} ÷ ${f(a * 10 ** i)} = ?`, b * 10 ** j, [(b + 1) * 10 ** j, (b - 1) * 10 ** j]);
+  if (rng() < 0.5) return card(rng, times(rng, a * 10 ** i, b * 10 ** j), p * s, [(p + a) * s, (p - a) * s, (p + b) * s, (p - b) * s], `${a} × ${b} = ${p}, ${zeros(i + j)}`);
+  return card(rng, `${f(p * s)} ÷ ${f(a * 10 ** i)} = ?`, b * 10 ** j, [(b + 1) * 10 ** j, (b - 1) * 10 ** j], `${p} ÷ ${a} = ${b}, ${zeros(j)}`);
 }
 
 /** d3 "use a given fact": x × y = P, then the same fact scaled up, as a product or as the division that undoes it. */
@@ -50,23 +53,23 @@ function given(rng: Rng): Question {
   const sx = x * 10 ** i, sy = y * 10 ** j, total = p * 10 ** (i + j);
   if (rng() < 0.5) {
     const prompt = `${head} What is ${f(sx)} × ${f(sy)}?`;
-    return card(rng, prompt, total, [(p + x) * 10 ** (i + j), (p - y) * 10 ** (i + j)], `${prompt} Pick the answer.`);
+    return card(rng, prompt, total, [(p + x) * 10 ** (i + j), (p - y) * 10 ** (i + j)], `${x} × ${y} = ${p}, ${zeros(i + j)}`, `${prompt} Pick the answer.`);
   }
   const prompt = `${head} What is ${f(total)} ÷ ${f(sy)}?`;
-  return card(rng, prompt, sx, [(x + 1) * 10 ** i, (x - 1) * 10 ** i], `${prompt} Pick the answer.`);
+  return card(rng, prompt, sx, [(x + 1) * 10 ** i, (x - 1) * 10 ** i], `${p} ÷ ${y} = ${x}, ${zeros(i)}`, `${prompt} Pick the answer.`);
 }
 
 /** Double one factor and halve the other: 35 × 4 is 70 × 2. Always an odd multiple of 5 times an even number, so it ends in 0. */
 function doubling(rng: Rng): Question {
   const a = pick(rng, [15, 25, 35, 45, 55, 75]), b = pick(rng, [4, 6, 8, 12, 16]), p = a * b;
-  return card(rng, times(rng, a, b), p, [p / 2, p + a, p - a]);
+  return card(rng, times(rng, a, b), p, [p / 2, p + a, p - a], `${a} × ${b} = ${a * 2} × ${b / 2} = ${p}`);
 }
 
 /** `? × a = c`: the missing number is the multiple; the wrong operation (subtracting, or multiplying) is a named decoy. */
 function missing(rng: Rng): Question {
   const { a, b } = fact(rng), i = ri(rng, 1, 2), j = ri(rng, 1, 2), c = a * b * 10 ** (i + j), m = a * 10 ** i, answer = b * 10 ** j;
   const prompt = rng() < 0.5 ? `? × ${f(m)} = ${f(c)}` : `${f(m)} × ? = ${f(c)}`;
-  return card(rng, prompt, answer, [c - m, c * m < MAX ? c * m : c + m, (b + 1) * 10 ** j, (b - 1) * 10 ** j], `${prompt.replace('?', 'what')}. Pick the missing number.`);
+  return card(rng, prompt, answer, [c - m, c * m < MAX ? c * m : c + m, (b + 1) * 10 ** j, (b - 1) * 10 ** j], `${a * b} ÷ ${a} = ${b}, ${zeros(j)}`, `${prompt.replace('?', 'what')}. Pick the missing number.`);
 }
 
 export const y5MentalMd: Generator = (d: Difficulty, rng): Question =>
