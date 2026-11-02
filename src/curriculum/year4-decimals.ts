@@ -52,13 +52,26 @@ function dedupe(answer: Opt, cands: Opt[]): Opt[] {
   return out.slice(0, 3);
 }
 
+/** "1 tenth", "5 tenths". */
+const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** #2317: the place value that fixes the decimal — tenths, hundredths, or the whole and its tenths. */
+export function whyOf(s: Spec, answer: string): string {
+  const f = `${s.n}/${s.den}`, tens = Math.floor(s.n / 10), ones = s.n % 10;
+  if (s.den === 100) return `${f} is ${tens ? `${unit(tens, 'tenth')} and ` : ''}${unit(ones, 'hundredth')}, ${answer}`;
+  if (s.den === 10) return s.n < 10 ? `${f} is ${unit(s.n, 'tenth')}, ${answer}` : `${f} is ${tens} whole and ${unit(ones, 'tenth')}, ${answer}`;
+  if (s.den === 2) return `${f} is ${unit(s.n * 5, 'tenth')}, ${answer}`;
+  if (s.den === 4) return `${f} is ${unit(s.n * 25, 'hundredth')}, ${answer}`;
+  throw new Error(`y4-decimals: no why for ${f}`);
+}
+
 function card(rng: Rng, s: Spec): Question {
   const toDecimal = rng() < 0.5;
   const f = fracOpt(s.n, s.den), d = decimalOf(s);
   const [from, to] = toDecimal ? [f, d] : [d, f];
   const ds = toDecimal ? decimalDecoys(rng, s) : fractionDecoys(rng, s);
   return wordQ(rng, `${from.label} = ?`, to.label, ds.map(o => o.label),
-    { say: `${ks2Say(from.label)} equals what?`, hint: toDecimal ? 'Tenths have one decimal place, hundredths have two' : 'Read the decimal places: one is tenths, two is hundredths', hintIsData: false });
+    { why: whyOf(s, d.label), say: `${ks2Say(from.label)} equals what?`, hint: toDecimal ? 'Tenths have one decimal place, hundredths have two' : 'Read the decimal places: one is tenths, two is hundredths', hintIsData: false });
 }
 
 /** d1: tenths, 1/10 to 9/10. */
