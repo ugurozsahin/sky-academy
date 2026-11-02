@@ -5,6 +5,7 @@
 import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, shuffle, wordQ, q } from './util';
 import { buildQ } from './build';
+import { columnWhy } from './column-why';
 import { dec, fmt } from './ks2num';
 
 const MINUS = '−';
@@ -69,7 +70,7 @@ function draw(d: Difficulty, rng: Rng): { a: number; b: number; add: boolean } {
 function pickOne(d: Difficulty, rng: Rng): Question {
   const { a, b, add } = draw(d, rng);
   const sum = `${f(a)} ${add ? '+' : MINUS} ${f(b)} = ?`;
-  return wordQ(rng, sum, f(add ? a + b : a - b), decoys(a, b, add, rng).map(f), { say: q(sum).say });
+  return wordQ(rng, sum, f(add ? a + b : a - b), decoys(a, b, add, rng).map(f), { say: q(sum).say, why: columnWhy(a, b, add) });
 }
 
 /** d3 (a): 5-digit − 5-digit with a difference of 1,000–9,999; the child slices the 4-digit answer, the comma already printed. */
@@ -78,7 +79,7 @@ function build(rng: Rng): Question {
     const a = ri(rng, 20000, 99999), b = a - ri(rng, 1000, 9999);
     if (b < 10000 || exchanges(a, b, false).length < 1) continue;
     const sum = `${f(a)} ${MINUS} ${f(b)} = ?`;
-    return buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer: f(a - b), total: 6, hint: 'Slice the digits in order' });
+    return { ...buildQ(rng, { prompt: sum, say: `${q(sum).say}. Build the answer.`, answer: f(a - b), total: 6, hint: 'Slice the digits in order' }), why: columnWhy(a, b, false) };
   }
 }
 
@@ -103,7 +104,7 @@ function estimate(rng: Rng): Question {
     const ds = estimateDecoys(a, b, p, add, rng), sum = `${f(a)} ${add ? '+' : MINUS} ${f(b)}`;
     if (ds.length < 3) continue;
     const say = `Round both numbers to the nearest ${PLACE_WORD[p]} to estimate. ${q(`${sum} = ?`).say}`;
-    return wordQ(rng, `Round both numbers to the nearest ${f(p)} to estimate ${sum}`, f(answer), ds.map(f), { say });
+    return wordQ(rng, `Round both numbers to the nearest ${f(p)} to estimate ${sum}`, f(answer), ds.map(f), { say, why: `${f(roundTo(a, p))} ${add ? '+' : MINUS} ${f(roundTo(b, p))} = ${f(answer)}` });
   }
 }
 
