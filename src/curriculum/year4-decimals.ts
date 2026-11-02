@@ -52,12 +52,17 @@ function dedupe(answer: Opt, cands: Opt[]): Opt[] {
   return out.slice(0, 3);
 }
 
+/** "1 tenth", "5 tenths". */
+const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
 /** #2317: the place value that fixes the decimal — tenths, hundredths, or the whole and its tenths. */
-export function whyOf(s: Spec, dec: string): string {
-  const f = `${s.n}/${s.den}`;
-  if (s.den === 100) return `${f} is ${Math.floor(s.n / 10)} tenths and ${s.n % 10} hundredths, ${dec}`;
-  if (s.den === 10) return s.n < 10 ? `${f} is ${s.n} tenths, ${dec}` : `${f} is ${Math.floor(s.n / 10)} whole and ${s.n % 10} tenths, ${dec}`;
-  return s.den === 2 ? `${f} is 5 tenths, ${dec}` : `${f} is ${s.n * 25} hundredths, ${dec}`;
+export function whyOf(s: Spec, answer: string): string {
+  const f = `${s.n}/${s.den}`, tens = Math.floor(s.n / 10), ones = s.n % 10;
+  if (s.den === 100) return `${f} is ${tens ? `${unit(tens, 'tenth')} and ` : ''}${unit(ones, 'hundredth')}, ${answer}`;
+  if (s.den === 10) return s.n < 10 ? `${f} is ${unit(s.n, 'tenth')}, ${answer}` : `${f} is ${tens} whole and ${unit(ones, 'tenth')}, ${answer}`;
+  if (s.den === 2) return `${f} is ${unit(s.n * 5, 'tenth')}, ${answer}`;
+  if (s.den === 4) return `${f} is ${unit(s.n * 25, 'hundredth')}, ${answer}`;
+  throw new Error(`y4-decimals: no why for ${f}`);
 }
 
 function card(rng: Rng, s: Spec): Question {
