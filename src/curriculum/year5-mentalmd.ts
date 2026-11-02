@@ -62,7 +62,7 @@ function given(rng: Rng): Question {
 /** Double one factor and halve the other: 35 × 4 is 70 × 2. Always an odd multiple of 5 times an even number, so it ends in 0. */
 function doubling(rng: Rng): Question {
   const a = pick(rng, [15, 25, 35, 45, 55, 75]), b = pick(rng, [4, 6, 8, 12, 16]), p = a * b;
-  return card(rng, times(rng, a, b), p, [p / 2, p + a, p - a], `${a} × ${b} = ${a * 2} × ${b / 2} = ${p}`);
+  return card(rng, times(rng, a, b), p, [p / 2, p + a, p - a], `${a} × ${b} = ${a * 2} × ${b / 2} = ${f(p)}`);
 }
 
 /** `? × a = c`: the missing number is the multiple; the wrong operation (subtracting, or multiplying) is a named decoy. */
