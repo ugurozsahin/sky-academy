@@ -11,13 +11,13 @@ describe('y2-related whys (#2317)', () => {
       const q = t.gen(d, rngOf((s + 1) * 104729 + d)), w = q.why!;
       expect(w, q.prompt).toBeTruthy();
       expect(w.split(/\s+/).length, w).toBeLessThanOrEqual(8);
-      const m = /^(\d+) ([+−]) (\d+) = (\d+), so (\d+) tens$/.exec(w);
+      const m = /^(\d+) ([+−]) (\d+) = (\d+), so (\d+) tens?$/.exec(w);
       expect(m, w).not.toBeNull();
       const [x, y, z] = [Number(m![1]), Number(m![3]), Number(m![4])];
       expect(m![2] === '+' ? x + y : x - y, w).toBe(z);
-      expect(Number(m![5]), w).toBe(z);
-      // the question is this fact times ten: its prompt shows the tens numbers, its answer is a tens number of the fact
-      expect([x * 10, y * 10, z * 10].map(String).includes(q.answer), w).toBe(true);
+            // the count is the tens the child is hunting for, the answer itself
+      expect(q.answer, w).toBe(String(Number(m![5]) * 10));
+      expect(w.endsWith(m![5] === '1' ? ' ten' : ' tens'), w).toBe(true);
     }
   });
 });
