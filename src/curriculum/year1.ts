@@ -149,13 +149,13 @@ const y1Skip: Generator = (d, rng) => {
 const y1CountBack: Generator = (d, rng) => {
   const s = d === 3 && rng() < 1 / 3 ? 10 * ri(rng, 1, 9) + ri(rng, 0, 2) : ri(rng, 3, d === 1 ? 30 : d === 2 ? 60 : 100);
   const run = `${s}, ${s - 1}, ${s - 2}`, ans = s - 3;
-  return numQ(rng, `Count back: ${run}, ?`, ans, { min: 0, max: 100, say: `Count back: ${run}. What comes next?`, distractors: [ans - 1, ans + 1, ans - 10, ans + 10] });
+  return numQ(rng, `Count back: ${run}, ?`, ans, { min: 0, max: 100, say: `Count back: ${run}. What comes next?`, distractors: [ans - 1, ans + 1, ans - 10, ans + 10], why: `One less each time: ${s}, ${s - 1}, ${s - 2}, ${ans}.` });
 };
 const y1MoreLess: Generator = (d, rng) => {
   if (rng() < 0.5) return y1CountBack(d, rng);
   const n = ri(rng, 1, d === 1 ? 30 : d === 2 ? 60 : 99);
   const more = rng() < 0.5;
-  return numQ(rng, `One ${more ? 'more' : 'less'} than ${n}?`, more ? n + 1 : n - 1, { min: 0, max: 100 });
+  return numQ(rng, `One ${more ? 'more' : 'less'} than ${n}?`, more ? n + 1 : n - 1, { min: 0, max: 100, why: `${more ? n + 1 : n - 1} is one ${more ? 'more' : 'less'} than ${n}.` });
 };
 const y1Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 1 : 10, d === 3 ? 20 : d === 2 ? 15 : 10);
