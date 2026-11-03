@@ -67,6 +67,11 @@ function nearOppositeDecoys(rng: Rng, targets: number[], count: number, used: Se
   return decoys;
 }
 
+/** #2317: the rule the ones digit gives, as a short line: "Evens end in 0, 2, 4, 6, 8." */
+const endsRule = (even: boolean): string => `${even ? 'Evens' : 'Odds'} end in ${even ? '0, 2, 4, 6, 8' : '1, 3, 5, 7, 9'}.`;
+/** #2317: why one number is odd or even — its ones digit decides. */
+const digitWhy = (n: number): string => `${n} ends in ${n % 10}, so it is ${n % 2 ? 'odd' : 'even'}.`;
+
 /**
  * The "Slice Them All" form (#926): "Slice every even/odd number" over six distinct 1–100 numbers, 2–4 of
  * them targets.
@@ -80,7 +85,7 @@ function y2OddEvenAnyOrder(rng: Rng): ReturnType<typeof anyOrderQ> {
   const decoys = nearOppositeDecoys(rng, targets, 6 - targetCount, used, isWant);
   const word = wantEven ? 'even' : 'odd';
   return anyOrderQ(rng, `Slice every ${word} number`, targets.map(String), decoys.map(String), {
-    say: `Slice every ${word} number`, hint: `Which numbers are ${word}?`, hintIsData: false,
+    say: `Slice every ${word} number`, hint: `Which numbers are ${word}?`, hintIsData: false, why: endsRule(wantEven),
   });
 }
 
@@ -92,15 +97,15 @@ function y2OddEvenAnyOrder(rng: Rng): ReturnType<typeof anyOrderQ> {
  */
 export const y2OddEven: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 20 : 100);
-  if (d === 1) return wordQ(rng, `Is ${n} odd or even?`, n % 2 ? 'odd' : 'even', ['odd', 'even']);
+  if (d === 1) return wordQ(rng, `Is ${n} odd or even?`, n % 2 ? 'odd' : 'even', ['odd', 'even'], { why: digitWhy(n) });
   if (rng() < 1 / 3) return y2OddEvenAnyOrder(rng);
-  if (rng() < 0.5) return wordQ(rng, `Is ${n} odd or even?`, n % 2 ? 'odd' : 'even', ['odd', 'even']);
+  if (rng() < 0.5) return wordQ(rng, `Is ${n} odd or even?`, n % 2 ? 'odd' : 'even', ['odd', 'even'], { why: digitWhy(n) });
   const wantEven = rng() < 0.5;
   let ans = ri(rng, 1, 100);
   if ((ans % 2 === 0) !== wantEven) ans = ans === 100 ? ans - 1 : ans + 1;
   const ds = d === 3 ? shuffle(rng, nearOppositeParity(ans)).slice(0, 3) : anyOppositeParity(rng, ans, wantEven);
   return numQ(rng, `Which number is ${wantEven ? 'even' : 'odd'}?`, ans, {
     min: 1, max: 100, distractors: ds,
-    say: `Which of these numbers is ${wantEven ? 'even' : 'odd'}?`, hint: `Slice the ${wantEven ? 'even' : 'odd'} number`, hintIsData: false,
+    say: `Which of these numbers is ${wantEven ? 'even' : 'odd'}?`, hint: `Slice the ${wantEven ? 'even' : 'odd'} number`, hintIsData: false, why: digitWhy(ans),
   });
 };
