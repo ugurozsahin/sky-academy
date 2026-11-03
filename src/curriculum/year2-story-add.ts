@@ -38,11 +38,14 @@ export const y2StoryAdd: Generator = (d, rng): Question => {
   const story = (spoken: boolean) => [d === 1 ? `${a} ${start.match(/# (\w+)/)![1]}.` : fill(start, a, spoken), fill(add ? plus : minus, b, spoken),
     d === 1 ? 'How many?' : spoken ? ask.replace(/^How many now\?$/, 'How many are there now?') : ask].join(' ');
   const visual = { type: 'word' as const, text: label, emoji };
+  // #2317: the number sentence the story tells, e.g. "45 - 7 = 38" (5 words, inside the KS1 limit). No unit:
+  // the spoken why reads the text as written, and "l" or "ml" would be mispronounced.
+  const why = `${a} ${add ? '+' : '-'} ${b} = ${ans}`;
   // The other operation (the child added when the story takes away), then ±10 and ±1; ±2 and ±20 are spares.
   const pool = [add ? a - b : a + b, ans + 10, ans - 10, ans + 1, ans - 1, ans + 2, ans - 2, ans + 20, ans - 20];
   const ok = pool.filter((x, i) => x >= 0 && x <= 100 && x !== ans && pool.indexOf(x) === i);
   const keep = ok[0] === pool[0] ? [ok[0]] : []; // the other operation is the design's main distractor
   const ds = [...keep, ...shuffle(rng, ok.slice(keep.length, 5)), ...ok.slice(5)].slice(0, 3);
-  if (!unit) return numQ(rng, story(false), ans, { min: 0, max: 100, distractors: ds, say: story(true), visual });
-  return wordQ(rng, story(false), `${ans} ${unit}`, ds.map(x => `${x} ${unit}`), { say: story(true), visual });
+  if (!unit) return numQ(rng, story(false), ans, { min: 0, max: 100, distractors: ds, say: story(true), visual, why });
+  return wordQ(rng, story(false), `${ans} ${unit}`, ds.map(x => `${x} ${unit}`), { say: story(true), visual, why });
 };
