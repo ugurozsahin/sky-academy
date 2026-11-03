@@ -30,5 +30,5 @@ export function y1SkipAnyOrder(rng: Rng): ReturnType<typeof anyOrderQ> {
   // Tail spare: every target sits at an edge or neighbours are used up, so top up with any non-multiple.
   for (let guard = 0; decoys.length < 6 - targets.length && guard < 200; guard++) take(ri(rng, 1, 100));
   const say = `Slice every multiple of ${step}`;
-  return anyOrderQ(rng, say, targets.map(String), decoys.map(String), { say, hint: `Count in ${step}s: which numbers do you land on?`, hintIsData: false });
+  return anyOrderQ(rng, say, targets.map(String), decoys.map(String), { say, hint: `Count in ${step}s: which numbers do you land on?`, hintIsData: false, why: `Multiples of ${step} end in ${step === 5 ? '0 or 5' : '0'}.` });
 }
