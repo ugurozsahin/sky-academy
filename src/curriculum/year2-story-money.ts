@@ -20,27 +20,30 @@ function basket(rng: Rng, lo: number, hi: number, step: number, cap: number) {
 }
 
 export const y2StoryMoney: Generator = (d, rng): Question => {
-  let prompt: string, say: string, ans: number, prices: number[], items: string[];
+  let prompt: string, say: string, why: string, ans: number, prices: number[], items: string[];
   if (d === 1) {
     const { x, y, p, q } = basket(rng, 1, 50, 1, 100);
     // d1 (#2323) is at most 8 words, spoken and written alike.
     prompt = cap1(`${a(x)} ${coinLabel(p)}, ${a(y)} ${coinLabel(q)}. How much?`);
     say = cap1(`${a(x)} ${spoken(p)}, ${a(y)} ${spoken(q)}. How much?`);
     ans = p + q; prices = [p, q]; items = [x, y];
+    why = `${coinLabel(p)} + ${coinLabel(q)} = ${coinLabel(ans)}`; // #2317: the sum the shop story tells
   } else if (d === 2) {
     const item = pick(rng, ITEMS), p = 5 * ri(rng, 1, 9);
     prompt = `You pay 50p for ${a(item)} costing ${coinLabel(p)}. How much change?`;
     say = `You pay ${spoken(50)} for ${a(item)} costing ${spoken(p)}. How much change?`;
     ans = 50 - p; prices = [p]; items = [item];
+    why = `50p − ${coinLabel(p)} = ${coinLabel(ans)}`;
   } else {
     const { x, y, p, q } = basket(rng, 5, 50, 5, 95);
     prompt = `You pay £1 for ${a(x)} at ${coinLabel(p)} and ${a(y)} at ${coinLabel(q)}. How much change?`;
     say = `You pay ${spoken(100)} for ${a(x)} at ${spoken(p)} and ${a(y)} at ${spoken(q)}. How much change?`;
     ans = 100 - p - q; prices = [p, q]; items = [x, y];
+    why = `£1 − ${coinLabel(p)} − ${coinLabel(q)} = ${coinLabel(ans)}`;
   }
   // d3's main decoy forgets an item (the change from £1 for the dearer one alone); then ±5, ±10 and the prices.
   const forgot = d === 3 ? [100 - Math.max(...prices)] : [];
   const pool = [...forgot, ...shuffle(rng, [ans + 5, ans - 5, ans + 10, ans - 10, ...prices]), ans + 15, ans - 15, ans + 20];
   const ok = pool.filter((n, i) => n > 0 && n <= 100 && n !== ans && pool.indexOf(n) === i);
-  return wordQ(rng, prompt, coinLabel(ans), ok.slice(0, 3).map(coinLabel), { say, visual: { type: 'word', text: items.join(' + '), emoji: items.map(i => EMOJI[i as (typeof ITEMS)[number]]).join(' ') } });
+  return wordQ(rng, prompt, coinLabel(ans), ok.slice(0, 3).map(coinLabel), { say, why, visual: { type: 'word', text: items.join(' + '), emoji: items.map(i => EMOJI[i as (typeof ITEMS)[number]]).join(' ') } });
 };
