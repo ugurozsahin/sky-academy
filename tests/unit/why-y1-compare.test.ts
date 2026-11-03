@@ -13,13 +13,20 @@ describe('y1-compare whys (#2317)', () => {
       expect(w, q.prompt).toBeTruthy();
       expect(w.split(/\s+/).length, w).toBeLessThanOrEqual(8);
       let m: RegExpExecArray | null;
+      const v = q.visual as { n?: number; n2?: number } | undefined;
       if ((m = /^(\d+) and (\d+) are equal\.$/.exec(w))) {
-        expect(m[1]).toBe(m[2]); expect(q.answer).toBe('equal'); seen.add('eq');
+        expect(m[1]).toBe(m[2]); expect(q.answer).toBe('equal');
+        expect(v?.n).toBe(v?.n2); expect(Number(m[1])).toBe(v?.n); seen.add('eq');
       } else if ((m = /^(\d+) is (more|fewer) than (\d+)\.$/.exec(w))) {
         const [x, y] = [Number(m[1]), Number(m[3])];
-        expect(m[2] === 'more' ? x > y : x < y).toBe(true); expect(q.answer).not.toBe('equal'); seen.add('groups');
+        expect(m[2] === 'more' ? x > y : x < y).toBe(true); expect(q.answer).not.toBe('equal');
+        // the two numbers are the two counts pictured, and the word follows the question asked
+        expect([x, y].sort()).toEqual([v!.n!, v!.n2!].sort());
+        expect(m[2] === 'fewer').toBe(q.prompt.includes('fewer')); seen.add('groups');
       } else if ((m = /^(\d+) is the (most|least) here\.$/.exec(w))) {
-        expect(q.answer).toBe(m[1]); expect(q.prompt).toBe(`Which number is the ${m[2]}?`); seen.add('ml');
+        expect(q.answer).toBe(m[1]); expect(q.prompt).toBe(`Which number is the ${m[2]}?`);
+        const shown = q.options.map(Number);
+        expect(Number(m[1])).toBe(m[2] === 'most' ? Math.max(...shown) : Math.min(...shown)); seen.add('ml');
       } else throw new Error(`unexpected why: ${w}`);
     }
     expect([...seen].sort()).toEqual(['eq', 'groups', 'ml']);
