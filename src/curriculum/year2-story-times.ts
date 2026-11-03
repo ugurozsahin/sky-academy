@@ -30,22 +30,24 @@ const fill = (s: string, v: Record<string, number>) => s.replace(/\{(\w)\}/g, (_
 export const y2StoryTimes: Generator = (d: Difficulty, rng: Rng): Question => {
   const times = d === 1 || (d === 3 && rng() < 0.5);
   const table = pick(rng, [2, 5, 10]);
-  let prompt: string, ans: number, other: number, visual: Question['visual'];
+  let prompt: string, ans: number, other: number, why: string, visual: Question['visual'];
   if (times) {
     // d1 keeps the array on the card: at most 3 rows of up to 10: more rows push the sideways duel bar past its budget.
     const g = d === 1 ? ri(rng, 2, 3) : ri(rng, 2, 10);
     ans = g * table; other = g + table;
     prompt = fill(pick(rng, TIMES), { g, e: table });
+    why = `${g} × ${table} = ${ans}`; // #2317: the number sentence the story tells
     if (d === 1) visual = { type: 'array', rows: g, cols: table };
   } else {
     const n = ri(rng, 2, 10);
     ans = n; other = n * table + table;
     prompt = fill(pick(rng, rng() < 0.5 ? SHARE : GROUP), { t: n * table, k: table });
+    why = `${n * table} ÷ ${table} = ${ans}`;
   }
   // The two numbers added (the repeated-addition slip), then ± the table and ± 1; ± 2 is the spare.
   const pool = [other, ans + table, ans - table, ans + 1, ans - 1, ans + 2];
   const ok = pool.filter((x, i) => x >= 0 && x <= 100 && x !== ans && pool.indexOf(x) === i);
   const keep = ok[0] === other ? [other] : [];
   const ds = [...keep, ...shuffle(rng, ok.slice(keep.length))].slice(0, 3);
-  return numQ(rng, prompt, ans, { min: 0, max: 100, distractors: ds, visual, say: prompt });
+  return numQ(rng, prompt, ans, { min: 0, max: 100, distractors: ds, visual, say: prompt, why });
 };
