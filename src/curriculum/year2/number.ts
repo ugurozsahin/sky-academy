@@ -34,11 +34,23 @@ export const y2PlaceValue: Generator = (d, rng) => {
   if (kind === 1) return numQ(rng, `${n}: how many ones?`, o, { min: 0, max: 9, say: `In ${n}, how many ones?`, distractors: [t, o + 1, o - 1], why: `${n} is ${t} ${t === 1 ? 'ten' : 'tens'} and ${o} ${o === 1 ? 'one' : 'ones'}` });
   const tw = t === 1 ? '1 ten' : `${t} tens`, ow = o === 1 ? '1 one' : `${o} ones`; return numQ(rng, `${tw} and ${ow} = ?`, n, { min: 10, max: 99, say: `${tw} and ${ow}. What number is that?`, distractors: [t + o * 10, n + 10, n - 1], why: `${t * 10} + ${o} = ${n}` });
 };
+/** #2317: the digit that decides a comparison — tens first, then ones; equal numbers say so. At most 8 words. */
+export const compareWhy = (a: number, b: number): string => {
+  if (a === b) return `${a} and ${b} are the same number.`;
+  const ta = Math.floor(a / 10), tb = Math.floor(b / 10), t = (n: number) => `${n} ${n === 1 ? 'ten' : 'tens'}`;
+  if (ta !== tb) {
+    const [big, small] = a > b ? [a, b] : [b, a], tbig = Math.floor(big / 10), tsmall = Math.floor(small / 10);
+    if (tsmall === 0) return `${small} has no tens, but ${big} does.`;
+    return a > b ? `${t(tbig)} is more than ${t(tsmall)}.` : `${t(tsmall)} is fewer than ${t(tbig)}.`;
+  }
+  const lead = ta === 0 ? 'Single digits:' : 'Same tens, and';
+  return a > b ? `${lead} ${a % 10} is more than ${b % 10}.` : `${lead} ${a % 10} is less than ${b % 10}.`;
+};
 export const y2Compare: Generator = (d, rng) => {
   const max = d === 1 ? 20 : 100;
   const a = ri(rng, 0, max), b = d === 3 && rng() < 0.2 ? a : ri(rng, 0, max);
   const ans = a < b ? '<' : a > b ? '>' : '=';
-  return wordQ(rng, `${a} ? ${b}`, ans, ['<', '>', '='], { say: `${a} compared with ${b}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
+  return wordQ(rng, `${a} ? ${b}`, ans, ['<', '>', '='], { say: `${a} compared with ${b}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false, why: compareWhy(a, b) });
 };
 /** "Build the answer" card (#1016): slice the digits of the result in order. Five bubbles whatever the answer's length (#481). */
 const digitsQ = (rng: Rng, p: string, n: number): Question =>
