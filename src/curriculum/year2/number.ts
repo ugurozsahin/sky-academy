@@ -94,7 +94,9 @@ export const y2Three: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 9;
   const a = ri(rng, 1, max), b = ri(rng, 1, max), c = ri(rng, 1, max);
   const p = `${a} + ${b} + ${c} = ?`;
-  return numQ(rng, p, a + b + c, { min: 3, max: 27, ...q(p) });
+  // #2317: the first two added, then the third added on (6 words, inside the KS1 limit).
+  const why = `${a}+${b} = ${a + b}, ${a + b}+${c} = ${a + b + c}`;
+  return numQ(rng, p, a + b + c, { min: 3, max: 27, why, ...q(p) });
 };
 export { y2Tables } from '../tables';
 export const y2Inverse: Generator = (d, rng) => {
