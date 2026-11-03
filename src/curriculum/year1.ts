@@ -201,7 +201,7 @@ const y1Half: Generator = (d, rng) => {
 const y1Doubles: Generator = (d, rng) => {
   const n = d === 1 ? ri(rng, 1, 5) : d === 2 ? ri(rng, 1, 10) : ri(rng, 6, 10);
   const p = `Double ${n} = ?`;
-  return numQ(rng, p, n * 2, { min: 0, max: 20, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined, ...q(p) });
+  return numQ(rng, p, n * 2, { min: 0, max: 20, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined, ...q(p), why: `Double ${n} is ${n} + ${n} = ${n * 2}.` });
 };
 /** The "Doubles and halves" drill (#921): `Double n` or `Half of 2n`, n on y1Doubles's ladder, no picture; the inverse's answer is a decoy where it fits. */
 const y1DoublesHalves: Generator = (d, rng) => {
@@ -209,7 +209,7 @@ const y1DoublesHalves: Generator = (d, rng) => {
   const half = rng() < 0.5;
   const p = half ? `Half of ${n * 2} = ?` : `Double ${n} = ?`;
   const say = half ? `What is half of ${n * 2}?` : `What is double ${n}?`;
-  return numQ(rng, p, half ? n : n * 2, { min: 0, max: 20, say, distractors: [half ? n * 2 : n] });
+  return numQ(rng, p, half ? n : n * 2, { min: 0, max: 20, say, distractors: [half ? n * 2 : n], why: half ? `${n} + ${n} = ${n * 2}: half is ${n}.` : `Double ${n} is ${n} + ${n} = ${n * 2}.` });
 };
 const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
 /**
