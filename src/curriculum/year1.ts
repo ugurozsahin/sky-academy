@@ -54,7 +54,7 @@ const y1Add: Generator = (d, rng) => {
   const max = d === 1 ? 10 : d === 2 ? 15 : 20;
   const a = ri(rng, 0, max), b = ri(rng, 0, max - a);
   const p = `${a} + ${b} = ?`;
-  return numQ(rng, p, a + b, { min: 0, max: 20, ...q(p) });
+  return numQ(rng, p, a + b, { min: 0, max: 20, ...q(p), why: `${a} + ${b} = ${a + b}` });
 };
 /**
  * #981: Year 1 must "solve one-step problems ... using concrete objects and pictorial representations"
@@ -102,7 +102,7 @@ const y1Sub: Generator = (d, rng) => {
   const max = d === 1 ? 10 : d === 2 ? 15 : 20;
   const a = ri(rng, 1, max), b = ri(rng, 0, a);
   const p = `${a} − ${b} = ?`;
-  return numQ(rng, p, a - b, { min: 0, max: 20, ...q(p) });
+  return numQ(rng, p, a - b, { min: 0, max: 20, ...q(p), why: `${a} − ${b} = ${a - b}` });
 };
 const y1Missing: Generator = (d, rng) => {
   const max = d === 1 ? 10 : 20;
@@ -112,12 +112,14 @@ const y1Missing: Generator = (d, rng) => {
     const shape = ri(rng, 0, 3);
     const mp = [`${a - b} = ? − ${b}`, `${b} = ${a} − ?`, `${a} = ? + ${b}`, `${a} = ${b} + ?`][shape];
     const left = shape === 0 ? a - b : shape === 1 ? b : a;
-    return numQ(rng, mp, shape === 0 ? a : a - b, { min: 0, max: 20, distractors: [left], ...q(mp) });
+    const mw = [`${a - b} = ${a} − ${b}`, `${b} = ${a} − ${a - b}`, `${a} = ${a - b} + ${b}`, `${a} = ${b} + ${a - b}`][shape];
+    return numQ(rng, mp, shape === 0 ? a : a - b, { min: 0, max: 20, distractors: [left], ...q(mp), why: mw });
   }
   const kind = ri(rng, 0, 2);
   const p = kind === 0 ? `${b} + ? = ${a}` : kind === 1 ? `${a} − ? = ${b}` : `? − ${b} = ${a - b}`;
   const ans = kind === 0 ? a - b : kind === 1 ? a - b : a;
-  return numQ(rng, p, ans, { min: 0, max: 20, ...q(p) });
+  const mw = kind === 0 ? `${b} + ${a - b} = ${a}` : kind === 1 ? `${a} − ${a - b} = ${b}` : `${a} − ${b} = ${a - b}`;
+  return numQ(rng, p, ans, { min: 0, max: 20, ...q(p), why: mw });
 };
 const y1Skip: Generator = (d, rng) => {
   if (d >= 2 && rng() < 1 / 3) return y1SkipAnyOrder(rng); // "Slice every multiple of 5/10" (#920)
