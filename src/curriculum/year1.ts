@@ -138,7 +138,7 @@ const y1Skip: Generator = (d, rng) => {
   // of the range (`ans` = 100 in tens) `ans + 1` and `ans + step` are both filtered out, and `numQ`'s top-up
   // can then collide with `ans - 1` and hand the child a three-bubble card. Named decoys keep them near
   // misses rather than whatever `nearby()` scrapes together (#366).
-  return numQ(rng, p, ans, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [ans + 1, ans - 1, ans + step, ans - step + 1, ans - 2] });
+  return numQ(rng, p, ans, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [ans + 1, ans - 1, ans + step, ans - step + 1, ans - 2], why: `Add ${step} each time: ${seq.join(', ')}, ${ans}.` });
 };
 /**
  * "Count back: 42, 41, 40, ?" (#983): a run of three one-steps down. At d3 a third of cards start at 10k, 10k+1 or
