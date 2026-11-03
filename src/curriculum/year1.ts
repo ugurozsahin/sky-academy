@@ -305,7 +305,7 @@ const y1Share: Generator = (d, rng) => {
   const ans = ri(rng, 1, Math.floor((d === 1 ? 12 : 20) / k)), total = k * ans;
   const p = share ? `Share ${total} between ${k} — how many each?` : `How many groups of ${k} in ${total}?`;
   const say = share ? `Share ${total} equally between ${k}. How many does each one get?` : `How many groups of ${k} can you make from ${total}?`;
-  return numQ(rng, p, ans, { min: 0, max: 20, n: d === 1 ? 2 : 3, say, visual: { type: 'objects', emoji: '🍪', n: total }, distractors: [total, k, ans + 1, ans - 1], why: share ? `${ans} × ${k} = ${total}, so ${ans} each` : `${ans} groups of ${k} make ${total}` });
+  return numQ(rng, p, ans, { min: 0, max: 20, n: d === 1 ? 2 : 3, say, visual: { type: 'objects', emoji: '🍪', n: total }, distractors: [total, k, ans + 1, ans - 1], why: share ? `${ans} × ${k} = ${total}, so ${ans} each` : ans === 1 ? `1 group of ${k} makes ${total}` : `${ans} groups of ${k} make ${total}` });
 };
 const y1Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 10 : 20, d === 3 ? 4 : 3);
 const y1Line: Generator = (d, rng) => lineQ(rng, d === 1 ? 0 : ri(rng, 0, d === 2 ? 10 : 90), 1, 6);

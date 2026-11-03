@@ -13,6 +13,8 @@ const run = (id: string, each: (q: { prompt: string; answer: string; why: string
   }
 };
 
+const singular = (id: string) => { let n = 0; run(id, q => { if (q.answer === '1' && q.why.includes('group')) { n++; expect(q.why).toMatch(/^1 group of \d+ makes \d+$/); } }); return n; };
+
 describe('y1-arrays / y1-share whys (#2317)', () => {
   it('y1-arrays: rows of the same number added up to the answer', () => run('y1-arrays', q => {
     const m = /^(\d+) rows of (\d+)/.exec(q.prompt)!;
@@ -23,8 +25,9 @@ describe('y1-arrays / y1-share whys (#2317)', () => {
     if (share) expect(q.why).toBe(`${q.answer} × ${share[2]} = ${share[1]}, so ${q.answer} each`);
     else {
       const g = /^How many groups of (\d+) in (\d+)/.exec(q.prompt)!;
-      expect(q.why).toBe(`${q.answer} groups of ${g[1]} make ${g[2]}`);
+      expect(q.why).toBe(q.answer === '1' ? `1 group of ${g[1]} makes ${g[2]}` : `${q.answer} groups of ${g[1]} make ${g[2]}`);
       expect(Number(q.answer) * Number(g[1])).toBe(Number(g[2]));
     }
   }));
+  it('y1-share: an answer of 1 reads "1 group … makes" (singular agreement)', () => expect(singular('y1-share')).toBeGreaterThan(0));
 });
