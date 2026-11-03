@@ -44,5 +44,5 @@ export const y2CoinCombo: Generator = (d, rng): Question => {
   const tol = nearTolerance(target);
   const others = all.filter(c => gap(c) >= 1);
   const near = [...shuffle(rng, others.filter(c => gap(c) <= tol)), ...others.filter(c => gap(c) > tol).sort((x, y) => gap(x) - gap(y))];
-  return wordQ(rng, `Which coins make ${coinLabel(target)}?`, comboLabel(ans), near.slice(0, 3).map(comboLabel), { say: `Which coins make ${spoken(target)}?` });
+  return wordQ(rng, `Which coins make ${coinLabel(target)}?`, comboLabel(ans), near.slice(0, 3).map(comboLabel), { say: `Which coins make ${spoken(target)}?`, why: `${ans.map(coinLabel).join(' + ')} = ${coinLabel(target)}` });
 };
