@@ -8,7 +8,7 @@ const mostLeast = (d: number, rng: () => number) => {
   while (set.size < (d === 3 ? 4 : 3)) set.add(ri(rng, 0, 20));
   const nums = [...set], ans = most ? Math.max(...nums) : Math.min(...nums);
   const word = most ? 'most' : 'least';
-  return numQ(rng, `Which number is the ${word}?`, ans, { min: 0, max: 20, n: nums.length - 1, say: `Which number is the ${word}?`, distractors: nums.filter(x => x !== ans) });
+  return numQ(rng, `Which number is the ${word}?`, ans, { min: 0, max: 20, n: nums.length - 1, say: `Which number is the ${word}?`, distractors: nums.filter(x => x !== ans), why: `${ans} is the ${word} here.` });
 };
 
 /** #985 form A: two groups of 1–10 — "more", "fewer" (never when equal) or "equal". */
@@ -26,6 +26,8 @@ const groups = (d: number, rng: () => number) => {
   return wordQ(rng, prompt, ans, [e1, e2, 'equal'], {
     say: fewer ? 'Which group has fewer?' : 'Are there more in the first group or the second group, or are they equal?',
     visual: { type: 'objects', emoji: e1, n: a, emoji2: e2, n2: b },
+    // #2317: the two counts side by side, then the word that fits them.
+    why: a === b ? `${a} and ${b} are equal.` : fewer ? `${Math.min(a, b)} is fewer than ${Math.max(a, b)}.` : `${Math.max(a, b)} is more than ${Math.min(a, b)}.`,
   });
 };
 
