@@ -178,7 +178,9 @@ export const y2Skip: Generator = (d, rng) => {
   const start = back ? step * ri(rng, 5, 10) : step * ri(rng, 0, 6) + (step === 10 ? ri(rng, 0, 9) : 0);
   const s = back ? -step : step;
   const seq = [start, start + s, start + 2 * s];
-  return numQ(rng, `${seq.join(', ')}, ?`, start + 3 * s, { min: 0, max: 120, say: `${seq.join(', ')}. What comes next?`, distractors: [start + 3 * s + 1, start + 3 * s - 1, start + 4 * s] });
+  // #2317: the jump the sequence makes, then the last number moved on by it (8 words, inside the KS1 limit).
+  const why = `${back ? '−' : '+'}${step} each time: ${seq[2]} ${back ? '−' : '+'} ${step} = ${start + 3 * s}`;
+  return numQ(rng, `${seq.join(', ')}, ?`, start + 3 * s, { min: 0, max: 120, why, say: `${seq.join(', ')}. What comes next?`, distractors: [start + 3 * s + 1, start + 3 * s - 1, start + 4 * s] });
 };
 export const y2Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 30 : 100, d === 1 ? 3 : 4);
 export const y2Line: Generator = (d, rng) => { const step = d === 1 ? 1 : d === 2 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 3, 5, 10]); return lineQ(rng, step * ri(rng, 0, d === 1 ? 90 : 6), step, 6); };
