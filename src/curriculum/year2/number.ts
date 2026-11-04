@@ -133,11 +133,11 @@ export const y2Fractions: Generator = (d, rng) => {
     // misconception is offered on the 1/4, 1/3 and 3/4 cards; for 1/2 and 2/4 it is filtered and the spare
     // decoy at the end takes its place.
     const ds = [`${den}/${num}`, '1/2', `${num}/${den + 1}`, `${den - num}/${den}`, `${num + 1}/${den}`].filter(x => !sameFraction(x, num, den));
-    return wordQ(rng, 'What fraction is shaded?', `${num}/${den}`, ds, { visual: { type: 'fraction', parts, shaded }, say: 'What fraction of the shape is shaded?' });
+    return wordQ(rng, 'What fraction is shaded?', `${num}/${den}`, ds, { visual: { type: 'fraction', parts, shaded }, say: 'What fraction of the shape is shaded?', why: `${shaded} of ${parts} equal parts shaded.` });
   }
   const whole = den * ri(rng, 1, d === 3 ? 6 : 3);
   const ans = whole / den * num;
-  return numQ(rng, `${num}/${den} of ${whole} = ?`, ans, { min: 0, max: 24, say: `What is ${num} ${den === 2 ? 'half' : den === 3 ? 'third' : 'quarter'}${num > 1 ? 's' : ''} of ${whole}?`, visual: { type: 'objects', emoji: '⭐', n: whole } });
+  return numQ(rng, `${num}/${den} of ${whole} = ?`, ans, { min: 0, max: 24, say: `What is ${num} ${den === 2 ? 'half' : den === 3 ? 'third' : 'quarter'}${num > 1 ? 's' : ''} of ${whole}?`, visual: { type: 'objects', emoji: '⭐', n: whole }, why: `${whole} ÷ ${den} = ${whole / den}${num > 1 ? `, × ${num}` : ''}` });
 };
 export const y2Money: Generator = (d, rng) => {
   if (d === 1) { const coins = Array.from({ length: 3 }, () => pick(rng, [2, 5, 10, 20, 50])); const sum = coins.reduce((s, c) => s + c, 0); return { ...unitQ(rng, sum, coins), why: `${coins.map(c => `${c}p`).join(' + ')} = ${sum}p` }; }
