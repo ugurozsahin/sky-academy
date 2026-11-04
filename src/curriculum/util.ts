@@ -238,10 +238,10 @@ export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: stri
   });
 }
 /** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */
-export function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
-  const [thing, unit] = pick(rng, things);
-  return wordQ(rng, `Best unit for a ${thing}?`, unit, [unit === small ? large : small], {
-    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false,
+export function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string, how: [string, string]): Question {
+  const [thing, unit] = pick(rng, things), a = /^[aeiou]/.test(thing) ? 'an' : 'a';
+  return wordQ(rng, `Best unit for ${a} ${thing}?`, unit, [unit === small ? large : small], {
+    say: `Would you ${verb} ${a} ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false, why: `${a === 'an' ? 'An' : 'A'} ${thing} ${how[unit === small ? 0 : 1]}, so ${unit}.`,
   });
 }
 
@@ -262,7 +262,7 @@ export function measureSum(rng: Rng, unit: string, verb: [string, string]): Ques
   const word = UNIT_WORD[unit];
   return wordQ(rng, `${a} ${unit} ${add ? '+' : '−'} ${b} ${unit} = ?`, `${ans} ${unit}`,
     [`${ans + 10} ${unit}`, `${ans - 10} ${unit}`, `${add ? a - b : a + b} ${unit}`],
-    { say: `${a} ${word} ${add ? 'plus' : 'take away'} ${b} ${word}. ${add ? verb[0] : verb[1]}` });
+    { say: `${a} ${word} ${add ? 'plus' : 'take away'} ${b} ${word}. ${add ? verb[0] : verb[1]}`, why: `${a} ${unit} ${add ? '+' : '−'} ${b} ${unit} = ${ans} ${unit}.` });
 }
 
 /**

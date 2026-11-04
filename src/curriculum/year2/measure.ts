@@ -17,7 +17,7 @@ export const y2Length: Generator = (d, rng) => {
   if (kind === 0) return rng() < 0.5
     ? measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', LONGER, 10, 99)
     : measureCompare(rng, d, pick(rng, ['fence', 'wall', 'ladder', 'pipe']), 'm', LONGER, 2, 40);
-  if (kind === 1) return unitChoice(rng, [['pencil', 'cm'], ['finger', 'cm'], ['book', 'cm'], ['door', 'm'], ['room', 'm'], ['garden', 'm'], ['playground', 'm']], 'cm', 'm', 'measure');
+  if (kind === 1) return unitChoice(rng, [['pencil', 'cm'], ['finger', 'cm'], ['book', 'cm'], ['door', 'm'], ['room', 'm'], ['garden', 'm'], ['playground', 'm']], 'cm', 'm', 'measure', ['is short', 'is long']);
   return measureSum(rng, 'cm', ['How long altogether?', 'How long is left?']);
 };
 export const y2Mass: Generator = (d, rng) => {
@@ -25,7 +25,7 @@ export const y2Mass: Generator = (d, rng) => {
   if (kind === 0) return rng() < 0.5
     ? measureCompare(rng, d, pick(rng, ['spoon', 'sock', 'pebble', 'candle']), 'g', HEAVIER, 20, 99)
     : measureCompare(rng, d, pick(rng, ['sack', 'crate', 'suitcase', 'barrel']), 'kg', HEAVIER, 2, 20);
-  if (kind === 1) return unitChoice(rng, [['feather', 'g'], ['apple', 'g'], ['coin', 'g'], ['cat', 'kg'], ['dog', 'kg'], ['bag of flour', 'kg']], 'g', 'kg', 'weigh');
+  if (kind === 1) return unitChoice(rng, [['feather', 'g'], ['apple', 'g'], ['coin', 'g'], ['cat', 'kg'], ['dog', 'kg'], ['bag of flour', 'kg']], 'g', 'kg', 'weigh', ['is light', 'is heavy']);
   return measureSum(rng, 'g', ['How heavy altogether?', 'How much is left?']);
 };
 export const y2Capacity: Generator = (d, rng) => {
@@ -33,7 +33,7 @@ export const y2Capacity: Generator = (d, rng) => {
   if (kind === 0) return rng() < 0.5
     ? measureCompare(rng, d, pick(rng, ['eggcup', 'lid', 'spoon', 'pot']), 'ml', HOLDS, 20, 99)
     : measureCompare(rng, d, pick(rng, ['bucket', 'tank', 'barrel', 'watering can']), 'l', HOLDS, 2, 20);
-  if (kind === 1) return unitChoice(rng, [['teaspoon', 'ml'], ['cup', 'ml'], ['mug', 'ml'], ['bath', 'l'], ['bucket', 'l'], ['paddling pool', 'l']], 'ml', 'l', 'measure');
+  if (kind === 1) return unitChoice(rng, [['teaspoon', 'ml'], ['cup', 'ml'], ['mug', 'ml'], ['bath', 'l'], ['bucket', 'l'], ['paddling pool', 'l']], 'ml', 'l', 'measure', ['holds a little', 'holds lots']);
   return measureSum(rng, 'ml', ['How much altogether?', 'How much is left?']);
 };
 /** Minimum °C between an estimate's answer and each decoy, and between decoys (#296). */

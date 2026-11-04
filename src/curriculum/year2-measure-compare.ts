@@ -28,5 +28,5 @@ export const y2MeasureCompare: Generator = (d, rng) => {
   const [a, b] = pairFor(d, rng);
   const ans = a < b ? '<' : a > b ? '>' : '=';
   const w = UNIT_WORD[unit];
-  return wordQ(rng, `${a} ${unit} ? ${b} ${unit}`, ans, ['<', '>', '='], { say: `${a} ${w} compared with ${b} ${w}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
+  return wordQ(rng, `${a} ${unit} ? ${b} ${unit}`, ans, ['<', '>', '='], { say: `${a} ${w} compared with ${b} ${w}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false, why: a === b ? `${a} equals ${b}.` : `${a} is ${a < b ? 'less' : 'greater'} than ${b}.` });
 };
