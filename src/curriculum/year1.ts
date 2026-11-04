@@ -234,7 +234,7 @@ const y1Coins: Generator = (d, rng) => {
   if (d === 1) {
     const c = pick(rng, MONEY);
     const kind = isNote(c) ? 'note' : 'coin';
-    return wordQ(rng, `Which ${kind} is this?`, coinLabel(c), shuffle(rng, MONEY.filter(x => x !== c)).slice(0, 3).map(coinLabel), { visual: { type: 'coins', coins: [c] }, say: `How much is this ${kind} worth?` });
+    return wordQ(rng, `Which ${kind} is this?`, coinLabel(c), shuffle(rng, MONEY.filter(x => x !== c)).slice(0, 3).map(coinLabel), { visual: { type: 'coins', coins: [c] }, say: `How much is this ${kind} worth?`, why: `This ${kind} is worth ${coinLabel(c)}.` });
   }
   if (d === 2) {
     // Compare two coins by value. Notes stay at d1: the owner's decision is "which is worth more?" between
@@ -245,10 +245,12 @@ const y1Coins: Generator = (d, rng) => {
     return wordQ(rng, `Which is worth ${more ? 'more' : 'less'}?`, coinLabel(want), [coinLabel(want === a ? b : a)], {
       visual: { type: 'coins', coins: [a, b] },
       say: `${coinLabel(a)} or ${coinLabel(b)}. Which is worth ${more ? 'more' : 'less'}?`,
+      why: `${coinLabel(want)} is worth ${more ? 'more' : 'less'} than ${coinLabel(want === a ? b : a)}.`,
     });
   }
   const coins = [pick(rng, Y1_ADD_COINS), pick(rng, Y1_ADD_COINS)];
-  return unitQ(rng, coins.reduce((s, c) => s + c, 0), coins, 20);
+  const total = coins.reduce((s, c) => s + c, 0);
+  return { ...unitQ(rng, total, coins, 20), why: `${coins.map(c => `${c}p`).join(' + ')} = ${total}p` };
 };
 const y1Time: Generator = (d, rng) => {
   const h = ri(rng, 1, 12);
