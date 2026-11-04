@@ -234,7 +234,7 @@ export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: stri
     // The options are the colours, so this hint is the only place the sizes being compared appear — it is
     // data, not the instruction line `hint` usually carries, and the play screen must keep it on a short screen (#328). `unitChoice` below deliberately does NOT set it: there the units are the bubbles.
     hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,
-    visual: barVisual(cols, vals), say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`, colours: Object.fromEntries(cols.map(c => [c, COLOUR_BUBBLE[c]])),
+    why: `${vals[idx]} ${unit} ${verb} ${n === 2 ? `${adj} than ${vals[1 - idx]} ${unit}` : `the ${adj}`}.`, visual: barVisual(cols, vals), say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`, colours: Object.fromEntries(cols.map(c => [c, COLOUR_BUBBLE[c]])),
   });
 }
 /** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */
