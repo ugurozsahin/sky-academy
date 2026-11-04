@@ -19,10 +19,17 @@ describe('Year 2 measure whys (#2317)', () => {
           expect(Number(op === '+' ? Number(a) + Number(b) : Number(a) - Number(b))).toBe(Number(r));
           expect(q.answer).toBe(`${r} ${u}`);
           kinds.add('sum');
-        } else if (/^A .+ is (small|big), so \S+\.$/.test(w)) {
+        } else if (/^An? .+ (is|holds) .+, so \S+\.$/.test(w)) {
           expect(w.endsWith(`so ${q.answer}.`), w).toBe(true);
+          const adj = ({ cm: ['is short'], m: ['is long'], g: ['is light'], kg: ['is heavy'], ml: ['holds a little'], l: ['holds lots'] } as Record<string, string[]>)[q.answer];
+          expect(w, w).toContain(` ${adj[0]}, so `);
+          expect(w, w).toMatch(/^(An [aeiou]|A [^aeiou])/i);
           kinds.add('unit');
-        } else kinds.add('compare');
+        } else {
+          // the shared comparison: "<n> <unit> is/holds <comparative> than <m> <unit>." or "...the <superlative>."
+          expect(w, w).toMatch(/^\d+ (cm|m|g|kg|ml|l) (is|holds) /);
+          kinds.add('compare');
+        }
       }
       expect([...kinds].sort()).toEqual(['compare', 'sum', 'unit']);
     });

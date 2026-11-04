@@ -238,10 +238,10 @@ export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: stri
   });
 }
 /** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */
-export function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
-  const [thing, unit] = pick(rng, things);
-  return wordQ(rng, `Best unit for a ${thing}?`, unit, [unit === small ? large : small], {
-    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false, why: `A ${thing} is ${unit === small ? 'small' : 'big'}, so ${unit}.`,
+export function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string, how: [string, string]): Question {
+  const [thing, unit] = pick(rng, things), a = /^[aeiou]/.test(thing) ? 'an' : 'a';
+  return wordQ(rng, `Best unit for ${a} ${thing}?`, unit, [unit === small ? large : small], {
+    say: `Would you ${verb} ${a} ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false, why: `${a === 'an' ? 'An' : 'A'} ${thing} ${how[unit === small ? 0 : 1]}, so ${unit}.`,
   });
 }
 
