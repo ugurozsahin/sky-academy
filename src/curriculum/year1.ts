@@ -178,20 +178,20 @@ const HALF_WORDS = ['a half', 'a quarter', 'a whole'];
 const y1HalfShape: Generator = (d, rng) => {
   if (d === 3 && rng() < 0.5) {
     const quarters = rng() < 0.5;
-    return numQ(rng, `How many ${quarters ? 'quarters' : 'halves'} make a whole?`, quarters ? 4 : 2, { min: 1, max: 4, say: `How many ${quarters ? 'quarters' : 'halves'} make a whole?` });
+    return numQ(rng, `How many ${quarters ? 'quarters' : 'halves'} make a whole?`, quarters ? 4 : 2, { min: 1, max: 4, say: `How many ${quarters ? 'quarters' : 'halves'} make a whole?`, why: quarters ? '4 quarters make 1 whole.' : '2 halves make 1 whole.' });
   }
   const word = d === 1 ? pick(rng, [HALF_WORDS[0], HALF_WORDS[2]]) : pick(rng, HALF_WORDS);
   const parts = word === 'a half' ? 2 : word === 'a quarter' ? 4 : pick(rng, [2, 3, 4]);
   const shaded = word === 'a whole' ? parts : 1;
   const others = HALF_WORDS.filter(w => w !== word && (d > 1 || w !== 'a quarter'));
-  return wordQ(rng, 'What part is shaded?', word, others, { visual: { type: 'fraction', parts, shaded, shape: d === 1 || rng() < 0.5 ? 'circle' : 'bar' }, say: 'What part of the shape is shaded?' });
+  return wordQ(rng, 'What part is shaded?', word, others, { visual: { type: 'fraction', parts, shaded, shape: d === 1 || rng() < 0.5 ? 'circle' : 'bar' }, say: 'What part of the shape is shaded?', why: word === 'a whole' ? `All ${parts} parts shaded: a whole.` : `${parts} equal parts: one is ${word}.` });
 };
 const y1Half: Generator = (d, rng) => {
   if (rng() < 0.5) return y1HalfShape(d, rng);
   const quarter = d >= 2 && rng() < 0.5;
   const n = quarter ? 4 * ri(rng, 1, d === 3 ? 5 : 3) : 2 * ri(rng, 1, d === 1 ? 5 : 10);
   const ans = quarter ? n / 4 : n / 2;
-  return numQ(rng, `${quarter ? 'A quarter' : 'Half'} of ${n} = ?`, ans, { min: 0, max: 20, visual: { type: 'objects', emoji: '🍪', n }, say: `What is ${quarter ? 'a quarter' : 'half'} of ${n}?` });
+  return numQ(rng, `${quarter ? 'A quarter' : 'Half'} of ${n} = ?`, ans, { min: 0, max: 20, visual: { type: 'objects', emoji: '🍪', n }, say: `What is ${quarter ? 'a quarter' : 'half'} of ${n}?`, why: quarter ? `4 groups of ${ans} make ${n}.` : `Half of ${n}: ${ans} + ${ans} = ${n}.` });
 };
 /**
  * Year 1's addition stops at 20, so doubling stops at double 10 (#298 slice 5). d3 used to roll up to 12 and
