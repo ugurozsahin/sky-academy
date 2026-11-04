@@ -241,8 +241,7 @@ export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: stri
 export function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
   const [thing, unit] = pick(rng, things);
   return wordQ(rng, `Best unit for a ${thing}?`, unit, [unit === small ? large : small], {
-    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false,
-    why: `A ${thing} is ${unit === small ? 'small' : 'big'}, so ${unit}.`,
+    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false, why: `A ${thing} is ${unit === small ? 'small' : 'big'}, so ${unit}.`,
   });
 }
 
