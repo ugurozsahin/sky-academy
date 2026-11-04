@@ -6,6 +6,18 @@ import { columnWhy } from '../../src/curriculum/column-why';
 const rngOf = (seed: number) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const nums = (s: string) => (s.match(/\d[\d,]*/g) ?? []).map(x => Number(x.replace(/,/g, '')));
 
+const COLS = ['Units', 'Tens', 'Hundreds', 'Thousands', 'Ten thousands', 'Hundred thousands'];
+const digitAt = (n: number, col: number) => Math.floor(n / 10 ** col) % 10;
+const roundTo = (n: number, to: number) => Math.round(n / to) * to;
+/** #2525: true when the why's numbers come from the card's own operands (the part of the prompt the child is asked about). */
+function tiedToOperands(prompt: string, why: string): boolean {
+  const m = nums(why), col = COLS.findIndex(c => why.startsWith(c + ':'));
+  const shown = nums(prompt.includes('Check:') ? prompt.split('Check:')[1] : prompt);
+  if (col >= 0) { const [a, b] = shown; return m[0] === digitAt(a, col) && m[1] === digitAt(b, col); }
+  if (/^Round/.test(prompt)) { const to = shown[0], [a, b] = shown.slice(1); return m[0] === roundTo(a, to) && m[1] === roundTo(b, to); }
+  return nums(prompt).includes(m[0]) && nums(prompt).includes(m[1]); // missing digit: the inverse reuses the prompt's numbers
+}
+
 describe('columnWhy (#2317)', () => {
   it('fixed cases read as the step a child follows', () => {
     expect(columnWhy(347, 285, true)).toBe('Units: 7 + 5 = 12, write 2, carry 1');
@@ -42,5 +54,21 @@ describe('columnWhy (#2317)', () => {
       if (/^Round/.test(q.prompt)) { est++; expect(nums(q.why!).pop(), q.why).toBe(nums(q.answer)[0]); }
     }
     expect(est).toBeGreaterThan(0);
+  });
+  it('every why is built from its own card\'s operands, not another number (#2525)', () => {
+    for (const id of ['y3-column', 'y4-column', 'y5-column']) {
+      const t = TOPICS.find(x => x.id === id)!;
+      for (const d of [1, 2, 3] as Difficulty[]) for (let s = 0; s < 200; s++) {
+        const q = t.gen(d, rngOf((s + 1) * 15485863 + d));
+        expect(tiedToOperands(q.prompt, q.why!), `${q.prompt} → ${q.why}`).toBe(true);
+      }
+    }
+  });
+  it('the operand check rejects a swapped or foreign why', () => {
+    expect(tiedToOperands('347 + 285 = ?', columnWhy(347, 285, true))).toBe(true);
+    expect(tiedToOperands('347 + 285 = ?', columnWhy(285, 347, true))).toBe(false);
+    expect(tiedToOperands('503 − 178 = ?', columnWhy(178, 503, false))).toBe(false);
+    expect(tiedToOperands('6,499 + 174 = 6,673. Check: 6,673 − 174 = ?', columnWhy(6499, 174, false))).toBe(false);
+    expect(tiedToOperands('6,499 + 174 = 6,673. Check: 6,673 − 174 = ?', columnWhy(6673, 174, false))).toBe(true);
   });
 });
