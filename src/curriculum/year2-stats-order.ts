@@ -32,12 +32,13 @@ const y2StatsOrderRaw: Generator = (d, rng) => {
     : { type: 'chart', kind, rows };
   const chart = kind === 'tally' ? 'tally chart' : kind === 'pictogram' ? 'pictogram' : 'block diagram';
 
-  const sorted = survey.rows.map(([, name], k) => ({ name, n: counts[k] })).sort((a, b) => b.n - a.n).map(r => r.name);
+  const ranked = survey.rows.map(([, name], k) => ({ name, n: counts[k] })).sort((a, b) => b.n - a.n);
+  const sorted = ranked.map(r => r.name);
   return {
     prompt: 'Most to least!',
     say: `Look at the ${chart}. Slice from the most to the least.`,
     answer: sorted.join(','), sequence: sorted, options: shuffle(rng, sorted), visual,
-    hint: 'Slice the biggest number first', hintIsData: false,
+    hint: 'Slice the biggest number first', hintIsData: false, why: `${ranked.map(r => `${r.name} ${r.n}`).join(', ')}.`,
   };
 };
 export const y2StatsOrder = colourBubbles(y2StatsOrderRaw);   // #2301: the options are the colours
