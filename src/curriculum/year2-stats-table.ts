@@ -31,7 +31,7 @@ const y2StatsTableRaw: Generator = (d, rng) => {
   if (ask === 'total') {
     return numQ(rng, 'How many children altogether?', sum, {
       distractors: counts.map(c => sum - c),
-      visual, hint: 'Add up the table', hintIsData: false, say: 'Look at the table. How many children are there altogether?',
+      visual, hint: 'Add up the table', hintIsData: false, why: `${counts.join(' + ')} = ${sum}.`, say: 'Look at the table. How many children are there altogether?',
     });
   }
   if (ask === 'more') {
@@ -39,19 +39,19 @@ const y2StatsTableRaw: Generator = (d, rng) => {
     const [hiIcon, hiName] = survey.rows[hi], [loIcon, loName] = survey.rows[lo];
     return numQ(rng, `How many more ${hiIcon} than ${loIcon}?`, counts[hi] - counts[lo], {
       distractors: [counts[hi] + counts[lo], counts[hi], counts[lo]], max: counts[hi] + counts[lo],
-      visual, say: `Look at the table. How many more children chose ${hiName} than ${loName}?`,
+      visual, why: `${counts[hi]} − ${counts[lo]} = ${counts[hi] - counts[lo]}.`, say: `Look at the table. How many more children chose ${hiName} than ${loName}?`,
     });
   }
   if (ask === 'most') {
     const best = counts.indexOf(Math.max(...counts));
     return wordQ(rng, 'Which did most children choose?', survey.rows[best][1],
       survey.rows.filter((_, k) => k !== best).map(r => r[1]),
-      { visual, say: 'Look at the table. Which one did most children choose?' });
+      { visual, why: `${survey.rows[best][1]} has ${counts[best]}, the most.`, say: 'Look at the table. Which one did most children choose?' });
   }
   const k = ri(rng, 0, survey.rows.length - 1);
   return numQ(rng, `How many chose ${survey.rows[k][0]}?`, counts[k], {
     distractors: counts.filter((_, m) => m !== k), min: 1, max: 21,
-    visual, hint: 'Read the table', hintIsData: false, say: 'Look at the table. How many children chose this one?',
+    visual, hint: 'Read the table', hintIsData: false, why: `${survey.rows[k][1]}: ${counts[k]} children.`, say: 'Look at the table. How many children chose this one?',
   });
 };
 export const y2StatsTable = colourBubbles(y2StatsTableRaw);   // #2301: the options are the colours
