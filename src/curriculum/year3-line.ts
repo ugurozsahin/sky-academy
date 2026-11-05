@@ -23,7 +23,7 @@ function decoys(rng: Rng, answer: number, count: number, gap: number, lo: number
 export const y3Line: Generator = (d, rng) => {
   const stretch = d === 3, unit = stretch ? 10 : 100, from = stretch ? 100 * ri(rng, 1, 9) : 0, to = from + (stretch ? 100 : 1000);
   const gap = d === 1 ? 300 : 200, count = d === 1 ? 2 : 3, gapUse = stretch ? 20 : gap;
-  const mark = from + unit * ri(rng, 1, 9);
+  const k = ri(rng, 1, 9), mark = from + unit * k;
   const ds = decoys(rng, mark, count, gapUse, from, to, unit);
   const labels = Array.from({ length: 11 }, (_, i) => fmtN(from + i * unit));
   const options = shuffle(rng, [mark, ...ds]).map(fmtN);
@@ -32,5 +32,6 @@ export const y3Line: Generator = (d, rng) => {
     visual: { type: 'numberline', from, to, step: unit, mark, ends: true, labels },
     say: `The line goes from ${fmtN(from)} to ${fmtN(to)}. Which number is at the question mark?`,
     hint: 'Slice the number at the ?', hintIsData: false,
+    why: `${k} step${k === 1 ? '' : 's'} of ${unit} from ${fmtN(from)}: ${fmtN(mark)}`,
   };
 };
