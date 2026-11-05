@@ -22,13 +22,13 @@ export function tableCard(rng: Rng): Question {
   const visual: Question['visual'] = { type: 'chart', kind: 'table', rows, head: [bank.head, 'Children'] };
   const [a, b, c] = shuffle(rng, words.map((_, k) => k));
   const [hi, lo] = counts[a] > counts[b] ? [a, b] : [b, a];
-  const finish = (prompt: string, spoken: string, answer: number, named: number[]) =>
-    numQ(rng, prompt, answer, { min: 0, max: 1000, distractors: decoys(answer, named, 3), visual, say: ks2Say(`Look at the table. ${spoken}`), slow: true });
+  const finish = (prompt: string, spoken: string, answer: number, named: number[], why: string) =>
+    numQ(rng, prompt, answer, { min: 0, max: 1000, distractors: decoys(answer, named, 3), visual, say: ks2Say(`Look at the table. ${spoken}`), slow: true, why });
   const ask = pick(rng, ['more', 'fewer', 'together', 'top2'] as const);
   if (ask === 'more' || ask === 'fewer') {
     const [x, y] = ask === 'more' ? [hi, lo] : [lo, hi], answer = counts[hi] - counts[lo];
     return finish(`How many ${ask} chose ${words[x]} than ${words[y]}?`, `How many ${ask} children chose ${words[x]} than ${words[y]}?`,
-      answer, [counts[hi] + counts[lo], counts[hi], counts[lo]]);
+      answer, [counts[hi] + counts[lo], counts[hi], counts[lo]], `${counts[hi]} − ${counts[lo]} = ${answer}.`);
   }
   if (ask === 'together') {
     // The smallest of the three rows is taken away, so the answer is positive.
@@ -36,9 +36,10 @@ export function tableCard(rng: Rng): Question {
     const answer = counts[pair[0]] + counts[pair[1]] - counts[small];
     return finish(`How many more chose ${words[pair[0]]} and ${words[pair[1]]} together than ${words[small]}?`,
       `How many more children chose ${words[pair[0]]} and ${words[pair[1]]} together than ${words[small]}?`,
-      answer, [counts[pair[0]] + counts[pair[1]], counts[small], answer + 10, answer - 10]);
+      answer, [counts[pair[0]] + counts[pair[1]], counts[small], answer + 10, answer - 10],
+      `${counts[pair[0]]} + ${counts[pair[1]]} = ${counts[pair[0]] + counts[pair[1]]}, then ${counts[pair[0]] + counts[pair[1]]} − ${counts[small]} = ${answer}.`);
   }
   const [t1, t2] = [...counts].sort((m, n) => n - m);
   const answer = t1 + t2;
-  return finish('How many children chose the two most popular?', 'How many children chose the two most popular ones?', answer, [t1, answer + 10, answer - 10]);
+  return finish('How many children chose the two most popular?', 'How many children chose the two most popular ones?', answer, [t1, answer + 10, answer - 10], `${t1} + ${t2} = ${answer}.`);
 }
