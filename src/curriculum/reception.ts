@@ -46,7 +46,7 @@ const rOneMore: Generator = (d, rng) => {
   const more = rng() < 0.5;
   const ans = more ? n + 1 : n - 1;
   if (ans < 0) return rOneMore(d, rng);
-  return numQ(rng, `One ${more ? 'more' : 'less'} than ${n}?`, ans, { min: 0, max: 20, visual: d < 3 ? { type: 'tenframe', n } : undefined });
+  return numQ(rng, `One ${more ? 'more' : 'less'} than ${n}?`, ans, { min: 0, max: 20, visual: d < 3 ? { type: 'tenframe', n } : undefined, why: `${more ? 'One more' : 'One less'} than ${n} is ${ans}.` });
 };
 // #971: Development Matters "compare length, weight and capacity" — hand-keyed [bigger, smaller] pairs, answered
 // from real-world knowledge. No numbers, no units, and the two emoji are drawn the same size (not to scale).
@@ -70,18 +70,18 @@ const rMeasure: Generator = (d, rng) => {
 const rBonds: Generator = (d, rng) => {
   const total = d === 1 ? 5 : d === 2 ? pick(rng, [5, 6, 7, 8]) : 10;
   const a = ri(rng, 0, total);
-  return numQ(rng, `${a} + ? = ${total}`, total - a, { min: 0, max: 10, visual: { type: 'tenframe', n: a }, say: `${a} and how many more make ${total}?` });
+  return numQ(rng, `${a} + ? = ${total}`, total - a, { min: 0, max: 10, visual: { type: 'tenframe', n: a }, say: `${a} and how many more make ${total}?`, why: `${a} + ${total - a} = ${total}.` });
 };
 const rAdd: Generator = (d, rng) => {
   const max = d === 1 ? 5 : d === 2 ? 8 : 10;
   const a = ri(rng, 1, max - 1), b = ri(rng, 1, max - a);
   const e1 = pick(rng, OBJECTS);
-  return numQ(rng, `${a} + ${b} = ?`, a + b, { min: 0, max: 10, visual: { type: 'objects', emoji: e1, n: a, n2: b, emoji2: e1 }, say: `${a} plus ${b}?` });
+  return numQ(rng, `${a} + ${b} = ?`, a + b, { min: 0, max: 10, visual: { type: 'objects', emoji: e1, n: a, n2: b, emoji2: e1 }, say: `${a} plus ${b}?`, why: `${a} and ${b} more make ${a + b}.` });
 };
 const rSub: Generator = (d, rng) => {
   const max = d === 1 ? 5 : d === 2 ? 8 : 10;
   const a = ri(rng, 2, max), b = ri(rng, 1, a);
-  return numQ(rng, `${a} − ${b} = ?`, a - b, { min: 0, max: 10, visual: { type: 'objects', emoji: pick(rng, OBJECTS), n: a, n2: -b }, say: `${a} take away ${b}?` });
+  return numQ(rng, `${a} − ${b} = ?`, a - b, { min: 0, max: 10, visual: { type: 'objects', emoji: pick(rng, OBJECTS), n: a, n2: -b }, say: `${a} take away ${b}?`, why: `${a} take away ${b} leaves ${a - b}.` });
 };
 const rCompare: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 10;
@@ -110,7 +110,7 @@ const rCompare: Generator = (d, rng) => {
 };
 const rCountOn: Generator = (d, rng) => {
   const start = ri(rng, 1, d === 3 ? 25 : d === 2 ? 15 : 8);
-  return numQ(rng, `${start}, ${start + 1}, ${start + 2}, ?`, start + 3, { min: 0, max: 30, say: `What comes next? ${start}, ${start + 1}, ${start + 2}…` });
+  return numQ(rng, `${start}, ${start + 1}, ${start + 2}, ?`, start + 3, { min: 0, max: 30, say: `What comes next? ${start}, ${start + 1}, ${start + 2}…`, why: `Counting on: ${start + 2}, ${start + 3}.` });
 };
 /**
  * Reception doubles (#299 slice 1). One ELG sentence covers this topic and the two below it: "explore and
@@ -131,8 +131,8 @@ const rCountOn: Generator = (d, rng) => {
  */
 const rDoubles: Generator = (d, rng) => {
   const n = d === 1 ? ri(rng, 1, 4) : d === 2 ? ri(rng, 1, 5) : ri(rng, 2, 5);
-  if (d === 3 && rng() < 0.5) return numQ(rng, `Double ? = ${n * 2}`, n, { min: 0, max: 10, say: `Double what makes ${n * 2}?` });
-  return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 10, visual: { type: 'tenframe', n, n2: n }, say: `What is double ${n}?` });
+  if (d === 3 && rng() < 0.5) return numQ(rng, `Double ? = ${n * 2}`, n, { min: 0, max: 10, say: `Double what makes ${n * 2}?`, why: `Double ${n} is ${n} + ${n} = ${n * 2}.` });
+  return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 10, visual: { type: 'tenframe', n, n2: n }, say: `What is double ${n}?`, why: `Double ${n} is ${n} + ${n} = ${n * 2}.` });
 };
 /**
  * Reception shapes (#969) — naming circle, square, triangle and rectangle, in both directions.
