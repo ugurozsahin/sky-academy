@@ -221,13 +221,22 @@ function orderThree(rng: () => number): Question {
   const h = ri(rng, 1, 9) * 100, set = new Set<number>();
   while (set.size < 3) set.add(h + ri(rng, 0, 99));
   const sorted = [...set].sort((x, y) => x - y).map(fmtN), shown = shuffle(rng, sorted);
-  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false };
+  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false, why: `Compare tens, then ones: ${sorted.join(', ')}.` };
+}
+
+const COL_UNITS = ['hundred', 'ten', 'one'] as const;
+
+/** The first column that tells the two numbers apart, e.g. `473 > 437: 7 tens is more than 3 tens.` (#2317). */
+function compareWhy(a: number, b: number): string {
+  if (a === b) return `${fmtN(a)} and ${fmtN(b)} are the same number.`;
+  const da = digitsOf3(a), db = digitsOf3(b), i = da.findIndex((x, k) => x !== db[k]);
+  return `${fmtN(a)} ${a > b ? '>' : '<'} ${fmtN(b)}: ${plural(da[i], COL_UNITS[i])} is ${da[i] > db[i] ? 'more' : 'less'} than ${plural(db[i], COL_UNITS[i])}.`;
 }
 
 export const y3Compare: Generator = (d, rng) => {
   if (d === 3 && rng() < 0.4) return orderThree(rng);
   const [x, y] = comparePair(d, rng), [a, b] = rng() < 0.5 ? [x, y] : [y, x];
-  return wordQ(rng, `${fmtN(a)} ? ${fmtN(b)}`, a < b ? '<' : a > b ? '>' : '=', ['<', '>', '='], { say: `${fmtN(a)} compared with ${fmtN(b)}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
+  return wordQ(rng, `${fmtN(a)} ? ${fmtN(b)}`, a < b ? '<' : a > b ? '>' : '=', ['<', '>', '='], { say: `${fmtN(a)} compared with ${fmtN(b)}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false, why: compareWhy(a, b) });
 };
 
 // ---- y3-words (#1081): numbers to 1,000 in words. Long words stay on the card; bubbles are numerals ----
