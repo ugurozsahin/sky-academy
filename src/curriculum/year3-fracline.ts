@@ -13,6 +13,9 @@ const tick = (k: number, d: number) => (k === 0 ? '0' : k === d ? '1' : k === 2 
 /** Only the whole numbers are written: the child counts the gaps to place a fraction, rather than continuing a printed pattern (#2274). */
 const anchor = (k: number, d: number) => (k % d === 0 ? tick(k, d) : '');
 
+/** The reading behind the answer: the gaps counted from 0, each worth one 1/den (#2317). */
+const gaps = (k: number, den: number) => `${k} ${k === 1 ? 'gap' : 'gaps'} of 1/${den} from 0 is ${lab(k, den)}.`;
+
 /** Three decoys, none worth the answer or each other: the neighbouring ticks, ticks counted instead of gaps, top and bottom swapped. */
 function decoys(t: number, d: number, rng: Rng): string[] {
   const ans: Frac = { n: t, d }, out: Frac[] = [];
@@ -34,7 +37,7 @@ function read(d: Difficulty, rng: Rng): Question {
   return {
     prompt: 'Which fraction is at the question mark?', say: `The line goes ${where}. Which fraction is at the question mark?`, answer,
     options: shuffle(rng, [answer, ...ds]), visual: { type: 'numberline', from: s, to, step: 1, mark: t, labels },
-    hint: 'Slice the fraction at the ?', hintIsData: false,
+    hint: 'Slice the fraction at the ?', hintIsData: false, why: gaps(t, den),
   };
 }
 
@@ -48,7 +51,7 @@ function lettered(rng: Rng): Question {
   return {
     prompt: `Which letter is at ${lab(k, den)}?`, say: `The line goes from zero to one in ${NAME[den]}. Which letter is at ${f}?`, answer,
     options: letters, visual: { type: 'numberline', from: 0, to: den, step: 1, labels: Array.from({ length: den + 1 }, (_, i) => anchor(i, den)), marks },
-    hint: 'Slice the letter', hintIsData: false,
+    hint: 'Slice the letter', hintIsData: false, why: `${answer}: ${gaps(k, den)}`,
   };
 }
 
