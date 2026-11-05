@@ -25,5 +25,6 @@ export const y2Estimate: Generator = (d, rng) => {
     visual: { type: 'numberline', from: 0, to, step: unit, mark, ends: true },
     say: `The line goes from 0 to ${to}. Which number is at the question mark?`,
     hint: 'Slice the number at the ?', hintIsData: false,
+    why: `${k} step${k === 1 ? '' : 's'} of ${unit} from 0: ${mark}`,
   });
 };
