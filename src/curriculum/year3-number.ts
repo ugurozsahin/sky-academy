@@ -5,6 +5,7 @@ import type { Difficulty, Generator, Question, Topic } from './types';
 import { ri, pick, shuffle, wordQ, numberWord, NUM_WORDS } from './util';
 import { dec, fmt, columnName } from './ks2num';
 import { swappedDigits } from './mistakes';
+import { MINUS } from './year4-mistake';
 import { y3Line } from './year3-line';
 
 // #1050: this topic hand-builds its `Question`s instead of using `numQ()` because its options must be
@@ -68,7 +69,9 @@ function countRun(d: Difficulty, rng: () => number): Question {
   const prompt = terms.map((t, i) => i === gapIndex ? '?' : fmtN(t)).join(', ');
   const printed = new Set(terms.filter((_, i) => i !== gapIndex));
   const options = shuffle(rng, [answer, ...runDecoys(answer, step, localStep, printed, rng)]).map(fmtN);
-  return { prompt: `${prompt} = ?`, say: `Count in ${step}s. ${prompt.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options };
+  const before = terms[gapIndex - 1]; // the gap is never the first term, so the term before it is always printed (#2317)
+  const why = `Count ${localStep > 0 ? 'on' : 'back'} ${step} each time: ${fmtN(before)}, ${fmtN(answer)}.`;
+  return { prompt: `${prompt} = ?`, say: `Count in ${step}s. ${prompt.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options, why };
 }
 
 /** A decoy sharing the answer's leading digit, the same way `mistakes.ts`'s `fillLead` guarantees one for its
@@ -126,7 +129,7 @@ function moreOrLess(d: Difficulty, rng: () => number): Question {
     if (v !== answer && v >= 0 && v <= 1099 && !pool.has(v)) pool.add(v);
   }
   const options = shuffle(rng, [answer, ...[...pool].slice(0, 3)]).map(fmtN);
-  return { prompt, say: prompt, answer: fmtN(answer), options };
+  return { prompt, say: prompt, answer: fmtN(answer), options, why: `${fmtN(base)} ${more ? '+' : MINUS} ${amt} = ${fmtN(answer)}` };
 }
 
 export const y3Count: Generator = (d, rng) => rng() < 0.5 ? countRun(d, rng) : moreOrLess(d, rng);
