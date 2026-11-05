@@ -10,6 +10,7 @@ import { y3Line } from './year3-line';
 // #1050: this topic hand-builds its `Question`s instead of using `numQ()` because its options must be
 // comma-formatted via `fmt()` ("1,005"), never `numQ`'s bare `String(answer)`.
 const fmtN = (n: number) => fmt(dec(n, 0));
+const MINUS = '−'; // the true minus sign, as the other years' whys use it (not imported: a year3 file never imports another year)
 
 const STEPS = [4, 8, 50, 100] as const;
 type Step = typeof STEPS[number];
@@ -68,7 +69,9 @@ function countRun(d: Difficulty, rng: () => number): Question {
   const prompt = terms.map((t, i) => i === gapIndex ? '?' : fmtN(t)).join(', ');
   const printed = new Set(terms.filter((_, i) => i !== gapIndex));
   const options = shuffle(rng, [answer, ...runDecoys(answer, step, localStep, printed, rng)]).map(fmtN);
-  return { prompt: `${prompt} = ?`, say: `Count in ${step}s. ${prompt.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options };
+  const before = terms[gapIndex - 1]; // the gap is never the first term, so the term before it is always printed (#2317)
+  const why = `Count ${localStep > 0 ? 'on' : 'back'} ${step} each time: ${fmtN(before)}, ${fmtN(answer)}.`;
+  return { prompt: `${prompt} = ?`, say: `Count in ${step}s. ${prompt.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options, why };
 }
 
 /** A decoy sharing the answer's leading digit, the same way `mistakes.ts`'s `fillLead` guarantees one for its
@@ -100,6 +103,9 @@ function pickBase(d: Difficulty, amt: 10 | 100, sign: 1 | -1, rng: () => number)
   return base;
 }
 
+/** The sum behind a 10/100 more-or-less card, e.g. `250 − 100 = 150` (#2317). */
+const sumWhy = (base: number, delta: number, answer: number) => `${fmtN(base)} ${delta > 0 ? '+' : MINUS} ${Math.abs(delta)} = ${fmtN(answer)}`;
+
 /** 10 or 100 more/less than a given number (#1050 y3-count). */
 function moreOrLess(d: Difficulty, rng: () => number): Question {
   const amt: 10 | 100 = d === 2 ? 100 : d === 3 ? pick(rng, [10, 100] as const) : 10;
@@ -126,7 +132,7 @@ function moreOrLess(d: Difficulty, rng: () => number): Question {
     if (v !== answer && v >= 0 && v <= 1099 && !pool.has(v)) pool.add(v);
   }
   const options = shuffle(rng, [answer, ...[...pool].slice(0, 3)]).map(fmtN);
-  return { prompt, say: prompt, answer: fmtN(answer), options };
+  return { prompt, say: prompt, answer: fmtN(answer), options, why: sumWhy(base, amt * sign, answer) };
 }
 
 export const y3Count: Generator = (d, rng) => rng() < 0.5 ? countRun(d, rng) : moreOrLess(d, rng);
