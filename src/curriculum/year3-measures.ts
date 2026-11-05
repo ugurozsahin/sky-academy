@@ -35,7 +35,8 @@ const SCALES = [
 function readScale(rng: Rng): Question {
   const { unit, top, prompt, icon } = pick(rng, SCALES), step = top / 5, mark = step * ri(rng, 1, 4), half = step / 2;
   return card(rng, unit, mark, [mark - step, mark + step, mark - half, mark + half], `${icon} ${prompt}`, `${prompt} The scale goes from 0 to ${top} ${WORD[unit]}.`,
-    { visual: { type: 'numberline', from: 0, to: top, step, mark, ends: true }, hint: 'Slice the number at the ?' });
+    { visual: { type: 'numberline', from: 0, to: top, step, mark, ends: true }, hint: 'Slice the number at the ?',
+      why: `Each gap is ${n(step)} ${unit}, so the mark is ${n(mark)} ${unit}.` });
 }
 
 const KINDS = [
@@ -51,7 +52,7 @@ function oneUnit(rng: Rng, d: Difficulty): Question {
   const x = add ? ri(rng, 10, (1000 - b) / 10) * 10 : ri(rng, b / 10 + 5, 99) * 10, ans = add ? x + b : x - b;
   const sign = add ? '+' : '−';
   return card(rng, unit, ans, add ? [x - b, ans + 100, ans - 100, ans + 10, ans - 10] : [x + b, ans + 100, ans - 100, ans + 10, ans - 10],
-    `${n(x)} ${unit} ${sign} ${n(b)} ${unit} = ?`, `${n(x)} ${WORD[unit]} ${add ? 'plus' : 'take away'} ${n(b)} ${WORD[unit]}. What is the answer?`, { hint: 'Work it out, then slice' });
+    `${n(x)} ${unit} ${sign} ${n(b)} ${unit} = ?`, `${n(x)} ${WORD[unit]} ${add ? 'plus' : 'take away'} ${n(b)} ${WORD[unit]}. What is the answer?`, { hint: 'Work it out, then slice', why: `${n(x)} ${sign} ${n(b)} = ${n(ans)} ${unit}.` });
 }
 
 const PAIRS = [
@@ -65,7 +66,7 @@ function mixed(rng: Rng): Question {
   const ans = b * f + s;
   const cands = [b * f / 10 + s, b * f * 10 + s, b + s, ans + f, ans - f, ans + 10, ans - 10, ans + 100];
   const both = equiv ? `${b} ${big}` : `${b} ${big} and ${s} ${small}`, bothSay = equiv ? `${b} ${WORD[big]}` : `${b} ${WORD[big]} and ${s} ${WORD[small]}`;
-  return card(rng, small, ans, cands, `${both} = ? ${small}`, `${bothSay} is how many ${WORD[small]}?`, { hint: `Change the ${big} into ${small}` });
+  return card(rng, small, ans, cands, `${both} = ? ${small}`, `${bothSay} is how many ${WORD[small]}?`, { hint: `Change the ${big} into ${small}`, why: equiv ? `1 ${big} is ${n(f)} ${small}, so ${b} ${big} is ${n(ans)} ${small}.` : `${b} ${big} is ${n(b * f)} ${small}, plus ${s} ${small} is ${n(ans)} ${small}.` });
 }
 
 export const y3Measures: Generator = (d: Difficulty, rng) => d === 1 ? readScale(rng) : d === 2 ? oneUnit(rng, d) : mixed(rng);
