@@ -126,6 +126,7 @@ function statsAnswer(rng: Rng, c: { survey: Survey; counts: number[]; i: number;
     const total = counts.reduce((a, b) => a + b, 0);
     return numQ(rng, `How many children altogether?`, total, {
       visual, hint: `Add up the ${chart}`, hintIsData: false, say: `Look at the ${chart}. How many children are there altogether?`,
+      why: `${counts.join(' + ')} = ${total}.`,
     });
   }
   if (ask === 'more') {
@@ -133,18 +134,20 @@ function statsAnswer(rng: Rng, c: { survey: Survey; counts: number[]; i: number;
     const [hiIcon, hiName] = survey.rows[hi], [loIcon, loName] = survey.rows[lo];
     return numQ(rng, `How many more ${hiIcon} than ${loIcon}?`, counts[hi] - counts[lo], {
       visual, say: `Look at the ${chart}. How many more children chose ${hiName} than ${loName}?`,
+      why: `${counts[hi]} − ${counts[lo]} = ${counts[hi] - counts[lo]}.`,
     });
   }
   if (ask === 'most') {
     const best = counts.indexOf(Math.max(...counts));
     return wordQ(rng, `Which did most children choose?`, survey.rows[best][1],
       survey.rows.filter((_, k) => k !== best).map(r => r[1]),
-      { visual, say: `Look at the ${chart}. Which one did most children choose?` });
+      { visual, say: `Look at the ${chart}. Which one did most children choose?`, why: `${survey.rows[best][1][0].toUpperCase()}${survey.rows[best][1].slice(1)} has the most: ${counts[best]}.` });
   }
   const k = ri(rng, 0, survey.rows.length - 1);
   const [icon] = survey.rows[k];
   return numQ(rng, `How many chose ${icon}?`, counts[k], {
     visual, hint: `Read the ${chart}`, hintIsData: false, say: `Look at the ${chart}. How many children chose this one?`,
+    why: `${survey.rows[k][1][0].toUpperCase()}${survey.rows[k][1].slice(1)}: ${counts[k]}.`,
   });
 }
 /**
