@@ -14,8 +14,8 @@ describe('y2-scales why (#2317)', () => {
   });
   it('names the step and the reading', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draw(d)) {
-      expect(q.why).toMatch(/^Each step is \d+ (cm|g|ml|°C): \d+ (cm|g|ml|°C)\.$/);
-      expect(q.why).toContain(q.answer);
+      const step = (q.visual as { step: number }).step, unit = q.answer.split(' ')[1];
+      expect(q.why).toBe(`Each step is ${step} ${unit}: ${q.answer}.`);
     }
   });
 });
