@@ -40,8 +40,8 @@ function pairDecoys(rng: Rng, size: number, answer: Pt, pool: Pt[]): string[] {
   for (let tries = 0; out.length < 3 && tries < 50; tries++) add({ x: Math.max(0, Math.min(size, answer.x + ri(rng, -2, 2))), y: Math.max(0, Math.min(size, answer.y + ri(rng, -2, 2))) });
   return out.slice(0, 3);
 }
-const card = (prompt: string, answer: string, options: string[], size: number, points: Pts, hint: string, join?: string[]): Question => ({
-  prompt, say: say(prompt), answer, options, wide: wideFor(options),
+const card = (prompt: string, answer: string, options: string[], size: number, points: Pts, hint: string, why: string, join?: string[]): Question => ({
+  prompt, say: say(prompt), answer, options, wide: wideFor(options), why,
   visual: { type: 'coords', size, points, ...(join ? { join } : {}) }, hint, hintIsData: false,
 });
 
@@ -53,10 +53,10 @@ function readCard(rng: Rng): Question {
     const others = points.filter(p => p !== target).map(p => ({ x: p.x, y: p.y }));
     const pool = [{ x: ans.y, y: ans.x }, { x: ans.x + 1, y: ans.y }, { x: ans.x, y: ans.y + 1 }, { x: ans.x - 1, y: ans.y }, { x: ans.x, y: ans.y - 1 }, ...others];
     const options = shuffle(rng, [fmt(ans), ...pairDecoys(rng, size, ans, pool)]);
-    return card(`What are the coordinates of ${target.label}?`, coordsAnswer.read(points, target.label), options, size, points, 'Slice the coordinates');
+    return card(`What are the coordinates of ${target.label}?`, coordsAnswer.read(points, target.label), options, size, points, 'Slice the coordinates', `${target.label} is ${target.x} along and ${target.y} up.`);
   }
   const target = pick(rng, points);
-  return card(`Which point is at ${fmt(target)}?`, coordsAnswer.at(points, target), shuffle(rng, points.map(p => p.label)), size, points, 'Slice the right letter');
+  return card(`Which point is at ${fmt(target)}?`, coordsAnswer.at(points, target), shuffle(rng, points.map(p => p.label)), size, points, 'Slice the right letter', `${fmt(target)} is ${target.x} along and ${target.y} up.`);
 }
 
 /** d2: "A moves 3 right and 2 up. Where does it land?" — a move in one or both directions, always ending on the grid. */
@@ -74,7 +74,7 @@ function moveCard(rng: Rng): Question {
     ];
     const decoys = pairDecoys(rng, size, to, pool);
     if (decoys.length < 3) continue;
-    return card(`A moves ${parts.join(' and ')}. Where does it land?`, coordsAnswer.move(from, dx, dy), shuffle(rng, [fmt(to), ...decoys]), size, [{ ...from, label: 'A' }], 'Slice the coordinates');
+    return card(`A moves ${parts.join(' and ')}. Where does it land?`, coordsAnswer.move(from, dx, dy), shuffle(rng, [fmt(to), ...decoys]), size, [{ ...from, label: 'A' }], 'Slice the coordinates', `${parts.join(' and ')} from ${fmt(from)} lands on ${fmt(to)}.`);
   }
 }
 
@@ -97,7 +97,7 @@ function cornerCard(rng: Rng): Question {
     const cands = shuffle(rng, [want, decoys[0], decoys[1]]), answer = 'DEF'[cands.indexOf(want)];
     const points = [...labelled([a, b, c], 'ABC'), ...labelled(cands, 'DEF')];
     const shape = Math.abs(a.y - b.y) === Math.abs(c.x - b.x) ? 'square' : 'rectangle';
-    return card(`Which point completes the ${shape}?`, answer, ['D', 'E', 'F'], size, points, 'Slice the right letter', ['A', 'B', 'C']);
+    return card(`Which point completes the ${shape}?`, answer, ['D', 'E', 'F'], size, points, 'Slice the right letter', `${answer} is ${fmt(want)}: along with C, up with A.`, ['A', 'B', 'C']);
   }
 }
 
