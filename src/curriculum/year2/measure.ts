@@ -175,7 +175,7 @@ function intervalCompare(rng: Rng, n: number): Question {
   // No hint: the bubbles *are* the durations, so a hint listing them again would only repeat the question —
   // and a hint is the one line a landscape phone can hide (#328). `optionsAreContent` tells `repeatKey`
   // (#451) that this generator's question lives in `options`, since no other field carries it.
-  return wordQ(rng, ask, target.label, chosen.filter(c => c !== target).map(c => c.label), { say: `${chosen.map(c => c.label).join(', ')}. ${ask}`, optionsAreContent: true });
+  return wordQ(rng, ask, target.label, chosen.filter(c => c !== target).map(c => c.label), { say: `${chosen.map(c => c.label).join(', ')}. ${ask}`, optionsAreContent: true, why: `${target.mins} minutes is the ${n === 2 ? (big ? 'longer' : 'shorter') : (big ? 'longest' : 'shortest')}.` });
 }
 /**
  * "It starts at 3 o'clock and lasts half an hour. When does it end?" — a start on the quarter grid plus a
@@ -198,12 +198,12 @@ function endTime(rng: Rng): Question {
   }
   const said = `It starts at ${clockPhrase(h, m)} and lasts ${phrase}. When does it end?`;
   // The start time is drawn so the child has a clock to count on from (#2271); the end stays unseen.
-  return wordQ(rng, said, ans, ds, { say: said, visual: { type: 'clock', h, m } });
+  return wordQ(rng, said, ans, ds, { say: said, visual: { type: 'clock', h, m }, why: `Add ${mins} minutes: ${ans}.` });
 }
 export const y2Duration: Generator = (d, rng) => {
   if (d === 1) {
     const { phrase, n } = pick(rng, DUR_FACTS);
-    return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 100, say: `How many ${phrase}?`, distractors: DUR_FACTS.map(f => f.n).filter(v => v !== n) });
+    return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 100, say: `How many ${phrase}?`, why: `${n} ${phrase}.`, distractors: DUR_FACTS.map(f => f.n).filter(v => v !== n) });
   }
   if (d === 2) return intervalCompare(rng, rng() < 0.5 ? 2 : 3);
   return endTime(rng);
