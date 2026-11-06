@@ -61,27 +61,28 @@ export const y3Charts: Generator = (d: Difficulty, rng: Rng): Question => {
     ? { type: 'chart', kind: 'pictogram', rows, each: step, icon: SYMBOL }
     : { type: 'chart', kind: 'bar', rows, step, max: Math.ceil(Math.max(...n) / step) * step };
   const chart = p.pictogram ? 'pictogram' : 'bar chart';
-  const finish = (prompt: string, spoken: string, answer: number, named: number[]): Question =>
-    numQ(rng, prompt, answer, { min: 0, max: 1000, distractors: decoys(answer, named, 3), visual, say: ks2Say(`Look at the ${chart}. ${spoken}`), slow: d === 3 });
+  const finish = (prompt: string, spoken: string, answer: number, named: number[], why: string): Question =>
+    numQ(rng, prompt, answer, { min: 0, max: 1000, distractors: decoys(answer, named, 3), visual, say: ks2Say(`Look at the ${chart}. ${spoken}`), slow: d === 3, why });
   return ASK[p.ask](p, finish);
 };
 
-type Finish = (prompt: string, spoken: string, answer: number, named: number[]) => Question;
+type Finish = (prompt: string, spoken: string, answer: number, named: number[], why: string) => Question;
 // Each slip is a real misreading: the gridline count (the scale read as 1s), a neighbouring bar, the wrong
 // operation, or one step off.
 const ASK: Record<Ask, (p: Plan, finish: Finish) => Question> = {
-  one: ({ cats, n, a, b, step }, finish) =>
-    finish(`How many chose ${cats[a]}?`, `How many children chose ${cats[a]}?`, n[a], [n[a] / step, n[b], n[a] + step, n[a] - step]),
+  one: ({ cats, n, a, b, step, pictogram }, finish) =>
+    finish(`How many chose ${cats[a]}?`, `How many children chose ${cats[a]}?`, n[a], [n[a] / step, n[b], n[a] + step, n[a] - step],
+      pictogram ? `Each ${SYMBOL} is ${step}, so ${cats[a]} is ${n[a]}.` : `The ${cats[a]} bar reaches ${n[a]}.`),
   more: (p, finish) => compare(p, finish, true),
   fewer: (p, finish) => compare(p, finish, false),
   together: ({ cats, n, a, b, c, step }, finish) => {
     const answer = n[a] + n[b] - n[c];
     return finish(`How many more chose ${cats[a]} and ${cats[b]} together than ${cats[c]}?`,
-      `How many more children chose ${cats[a]} and ${cats[b]} together than ${cats[c]}?`, answer, [answer / step, n[a] + n[b], n[c], answer + step, answer - step]);
+      `How many more children chose ${cats[a]} and ${cats[b]} together than ${cats[c]}?`, answer, [answer / step, n[a] + n[b], n[c], answer + step, answer - step], `${n[a]} + ${n[b]} = ${n[a] + n[b]}, then ${n[a] + n[b]} − ${n[c]} = ${answer}.`);
   },
   total: ({ n, step }, finish) => {
     const total = n.reduce((s, v) => s + v, 0);
-    return finish('How many children were asked altogether?', 'How many children were asked altogether?', total, [total / step, total - Math.min(...n), total + step, total - step]);
+    return finish('How many children were asked altogether?', 'How many children were asked altogether?', total, [total / step, total - Math.min(...n), total + step, total - step], `${n.join(' + ')} = ${total}.`);
   },
 };
 
@@ -90,5 +91,5 @@ function compare({ cats, n, a, b, step }: Plan, finish: Finish, more: boolean): 
   const [x, y] = more ? [hi, lo] : [lo, hi];
   const answer = n[hi] - n[lo], word = more ? 'more' : 'fewer';
   return finish(`How many ${word} chose ${cats[x]} than ${cats[y]}?`, `How many ${word} children chose ${cats[x]} than ${cats[y]}?`,
-    answer, [answer / step, n[hi], n[hi] + n[lo], answer + step, answer - step]);
+    answer, [answer / step, n[hi], n[hi] + n[lo], answer + step, answer - step], `${n[hi]} − ${n[lo]} = ${answer}.`);
 }
