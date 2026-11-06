@@ -29,5 +29,6 @@ export const y2Scales: Generator = (d, rng): Question => {
     visual: { type: 'numberline', from: 0, to, step, mark, ...(d > 1 ? { ends: true } : {}) },
     say: `${inst.say} The scale goes from 0 to ${to} ${unitWord}.`,
     hint: 'Slice the number at the ?', hintIsData: false,
+    why: `Each step is ${step} ${inst.unit}: ${answer}.`,
   };
 };
