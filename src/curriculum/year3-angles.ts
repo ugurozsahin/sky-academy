@@ -35,8 +35,24 @@ export function geoAnswer(parts: GeoPart[], ask: GeoAsk): string[] {
   return parts.filter(ok).map(p => p.label ?? '');
 }
 
-const card = (prompt: string, parts: GeoPart[], ask: GeoAsk, rng: Rng): Question => ({
-  ...q(prompt), answer: geoAnswer(parts, ask)[0] ?? (() => { throw new Error(`y3-angles: no part answers "${prompt}"`); })(), options: shuffle(rng, LETTERS.slice()),
+/** The rule that makes the lettered answer right (#2317), named for the letter and the property asked. */
+const WHY: Record<GeoAsk, string> = {
+  right: 'is a square corner, so it is a right angle',
+  less: 'is a narrower corner than a right angle',
+  greater: 'is a wider corner than a right angle',
+  horizontal: 'is level, like the horizon',
+  vertical: 'goes straight up and down',
+  parallel: 'stay the same distance apart and never meet',
+  perpendicular: 'meet at a right angle, a square corner',
+};
+
+const card = (prompt: string, parts: GeoPart[], ask: GeoAsk, rng: Rng): Question => {
+  const answer = geoAnswer(parts, ask)[0] ?? (() => { throw new Error(`y3-angles: no part answers "${prompt}"`); })();
+  const who = ask === 'parallel' || ask === 'perpendicular' ? `Pair ${answer}'s lines` : ask === 'horizontal' || ask === 'vertical' ? `Line ${answer}` : `Angle ${answer}`;
+  return { ...cardOf(prompt, parts, answer, rng), why: `${who} ${WHY[ask]}.` };
+};
+const cardOf = (prompt: string, parts: GeoPart[], answer: string, rng: Rng): Question => ({
+  ...q(prompt), answer, options: shuffle(rng, LETTERS.slice()),
   visual: { type: 'geometry', parts }, hint: 'Slice the right letter', hintIsData: false,
 });
 
@@ -103,13 +119,14 @@ export const y3Angles: Generator = (d: Difficulty, rng: Rng): Question => {
   if (d === 1) {
     if (rng() < 0.4) {
       const [name, n] = pick(rng, TURNS);
-      return { ...q(`How many right angles make ${name}?`), answer: String(n), options: shuffle(rng, ['1', '2', '3', '4']) };
+      return { ...q(`How many right angles make ${name}?`), answer: String(n), options: shuffle(rng, ['1', '2', '3', '4']), why: `${name[0].toUpperCase()}${name.slice(1)} is ${n} right angles.` };
     }
     const right = rng() < 0.5;
     const deg = right ? 90 : pick(rng, [step5(rng, 30, 65), step5(rng, 115, 160)]);
     const dir = right && rng() < 0.7 ? pick(rng, [20, 35, 50, 65, 125, 140, 205, 220, 305, 320]) : step5(rng, 0, 355);
     return {
       ...q('Is this a right angle?'), answer: right ? 'Yes' : 'No', options: shuffle(rng, ['Yes', 'No']), wide: true,
+      why: right ? 'It is a square corner, so it is a right angle.' : deg < 90 ? 'It is narrower than a square corner.' : 'It is wider than a square corner.',
       visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir, deg, len: 26 }] }, hint: 'Slice Yes or No', hintIsData: false,
     };
   }
