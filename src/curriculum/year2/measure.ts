@@ -47,13 +47,13 @@ export const y2Temp: Generator = (d, rng) => {
     // ladder of `TEMP_STEP` (20 °C) either side of it — none is defensible (a fridge at 24 °C, a summer day at
     // 8 °C) and none is close to another. The ladder is derived from `TEMP_GAP`, the floor the rail holds.
     const ds = shuffle(rng, [1, 2, 3, -1, -2, -3].map(k => t + k * TEMP_STEP).filter(x => x >= 0 && x <= 100)).slice(0, 3).map(x => `${x}°C`);
-    return wordQ(rng, `Temperature of ${thing}?`, `${t}°C`, ds, { say: `About what temperature is ${thing}?` });
+    return wordQ(rng, `Temperature of ${thing}?`, `${t}°C`, ds, { say: `About what temperature is ${thing}?`, why: `${thing[0].toUpperCase()}${thing.slice(1)} is about ${t}°C.` });
   }
   const warmer = rng() < 0.5;
   let a = ri(rng, 0, 35), b = a; while (b === a) b = ri(rng, 0, 35);
   const [ta, tb] = [`${a}°C`, `${b}°C`], first = warmer ? a > b : a < b;
   // #2322: the two temperatures are the bubbles (no place names to read); the bars draw them and the voice says them
-  return wordQ(rng, `Which is ${warmer ? 'warmer' : 'colder'}?`, first ? ta : tb, [first ? tb : ta], { hint: warmer ? 'Warmer is the bigger number' : 'Colder is the smaller number', hintIsData: false, visual: barVisual([ta, tb], [a, b]), say: `${a} degrees or ${b} degrees. Which is ${warmer ? 'warmer' : 'colder'}?` });
+  return wordQ(rng, `Which is ${warmer ? 'warmer' : 'colder'}?`, first ? ta : tb, [first ? tb : ta], { hint: warmer ? 'Warmer is the bigger number' : 'Colder is the smaller number', hintIsData: false, visual: barVisual([ta, tb], [a, b]), say: `${a} degrees or ${b} degrees. Which is ${warmer ? 'warmer' : 'colder'}?`, why: `${first ? a : b}°C is ${warmer ? 'more' : 'less'} than ${first ? b : a}°C.` });
 };
 // Y2 statistics (#8). Each survey is three categories the child picks out by emoji, so the chart can be read
 // without reading the words — the labels carry the emoji and so does the prompt.
