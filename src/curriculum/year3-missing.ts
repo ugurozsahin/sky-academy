@@ -49,8 +49,12 @@ export const y3Missing: Generator = (d, rng): Question => {
   const sign = add ? '+' : MINUS;
   const shown = (k: Gap | 'c') => k === gap ? '?' : digits({ a, b, c }[k]);
   const calc = `${shown('a')} ${sign} ${shown('b')}`;
-  const prompt = d === 3 && rng() < 0.5 ? `${shown('c')} = ${calc}` : `${calc} = ${shown('c')}`;
+  const eqFirst = d === 3 && rng() < 0.5;
+  const prompt = eqFirst ? `${shown('c')} = ${calc}` : `${calc} = ${shown('c')}`;
   const options = shuffle(rng, [x, ...decoys(x, { a, b, c }, gap, add, rng)].map(String));
-  const card: Question = { ...q(prompt), answer: String(x), options };
+  // The why is the same sentence with the gap filled, so the child sees the numbers fit.
+  const whyCalc = `${a} ${sign} ${b}`;
+  const why = eqFirst ? `${c} = ${whyCalc}` : `${whyCalc} = ${c}`;
+  const card: Question = { ...q(prompt), answer: String(x), options, why };
   return d === 3 ? { ...card, slow: true } : card;
 };
