@@ -63,32 +63,32 @@ function series(rng: Rng, b: Bank, count: number): number[] {
 export const y5LineGraph: Generator = (d: Difficulty, rng: Rng): Question => {
   const b = pick(rng, BANKS), count = ri(rng, 5, 6), labels = labelsOf(b, count), n = series(rng, b, count);
   const visual: Question['visual'] = { type: 'chart', kind: 'line', rows: labels.map((label, k) => ({ label, n: n[k] })), step: b.step, max: b.max };
-  const num = (prompt: string, said: string, answer: number, named: number[], cap = b.max) => numQ(rng, `${prompt} (${b.unit})`, answer, {
-    min: 0, max: 999, distractors: decoys(answer, named, 3, b.step, cap), visual, say: sayQ(`Look at the graph. ${said} Answer in ${b.say}.`), slow: d === 3,
+  const num = (prompt: string, said: string, answer: number, named: number[], why: string, cap = b.max) => numQ(rng, `${prompt} (${b.unit})`, answer, {
+    min: 0, max: 999, distractors: decoys(answer, named, 3, b.step, cap), visual, why, say: sayQ(`Look at the graph. ${said} Answer in ${b.say}.`), slow: d === 3,
   });
-  const word = (prompt: string, answer: string, others: string[]) =>
-    wordQ(rng, prompt, answer, others, { visual, say: sayQ(`Look at the graph. ${prompt}`), slow: true });
+  const word = (prompt: string, answer: string, others: string[], why: string) =>
+    wordQ(rng, prompt, answer, others, { visual, why, say: sayQ(`Look at the graph. ${prompt}`), slow: true });
   const [i, j] = shuffle(rng, labels.map((_, k) => k));
   const [lo, hi] = n[i] < n[j] ? [i, j] : [j, i];
   const askPeak = rng() < 0.5, ext = askPeak ? n.indexOf(Math.max(...n)) : n.indexOf(Math.min(...n));
   if (d === 1) {
     const nb = n[i + 1] ?? n[i - 1];
-    return num(b.read(labels[i]), `${b.read(spoken(labels[i]))}`, n[i], [nb, n[i] + b.step, n[i] - b.step]);
+    return num(b.read(labels[i]), `${b.read(spoken(labels[i]))}`, n[i], [nb, n[i] + b.step, n[i] - b.step], `At ${labels[i]} the line reaches ${n[i]} ${b.unit}.`);
   }
   if (d === 2 && rng() < 0.5) {
     return num(b.diff(labels[hi], labels[lo]), b.diff(spoken(labels[hi]), spoken(labels[lo])), n[hi] - n[lo],
-      [n[hi] + n[lo], n[hi], n[hi] - n[lo] + b.step]);
+      [n[hi] + n[lo], n[hi], n[hi] - n[lo] + b.step], `${n[hi]} − ${n[lo]} = ${n[hi] - n[lo]} ${b.unit}.`);
   }
   if (d === 2 || (d === 3 && rng() < 0.4)) {
     const others = [labels[ext + 1] ?? labels[ext - 1], labels[0], labels[count - 1], ...labels].filter(l => l !== labels[ext]);
-    return word(askPeak ? b.peak : b.low, labels[ext], others);
+    return word(askPeak ? b.peak : b.low, labels[ext], others, `The ${askPeak ? 'highest' : 'lowest'} point is ${n[ext]} ${b.unit}, at ${labels[ext]}.`);
   }
   if (b.x === 'days' && rng() < 0.6) {
     const s = ri(rng, 0, count - 3), sum = n[s] + n[s + 1] + n[s + 2];
     return num(`Total ${b.noun}, ${labels[s]} to ${labels[s + 2]}?`.replace('?', ''), `What is the total ${b.noun} from ${labels[s]} to ${labels[s + 2]}?`, sum,
-      [n[s] + n[s + 2], n[s + 1] * 3, sum - b.step, sum + b.step], 3 * b.max);
+      [n[s] + n[s + 2], n[s + 1] * 3, sum - b.step, sum + b.step], `${n[s]} + ${n[s + 1]} + ${n[s + 2]} = ${sum} ${b.unit}.`, 3 * b.max);
   }
   const answer = Math.max(...n) - Math.min(...n);
   return num(`Highest take lowest ${b.noun}?`.replace('?', ''), `What is the difference between the highest and lowest ${b.noun}?`, answer,
-    [Math.max(...n) + Math.min(...n), Math.max(...n), answer + b.step], 2 * b.max);
+    [Math.max(...n) + Math.min(...n), Math.max(...n), answer + b.step], `${Math.max(...n)} − ${Math.min(...n)} = ${answer} ${b.unit}.`, 2 * b.max);
 };
