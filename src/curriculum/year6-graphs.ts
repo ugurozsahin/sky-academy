@@ -34,14 +34,14 @@ function numCard(rng: Rng, prompt: string, answer: number, named: number[], extr
 function kmToMiles(rng: Rng): Question {
   const k = pick(rng, KM.slice(1)), a = miles(k);
   return numCard(rng, `Use the graph. ${k} km is about ? miles`, a, [k, k - 3, a + 5, a - 5], {
-    visual: convGraph(), say: `Use the graph. About how many miles is ${k} kilometres?` });
+    visual: convGraph(), why: `${k} km is ${a} miles: 8 km is 5 miles.`, say: `Use the graph. About how many miles is ${k} kilometres?` });
 }
 
 /** d2: miles to km, read backwards from the value to the x label. The slips copy the given number, add 8, or are one label out. */
 function milesToKm(rng: Rng): Question {
   const m = pick(rng, [5, 10, 15, 20, 25]), a = km(m);
   return numCard(rng, `Use the graph. ${m} miles is about ? km`, a, [m, m + 8, a + 8, a - 8], {
-    visual: convGraph(), say: `Use the graph. About how many kilometres is ${m} miles?` });
+    visual: convGraph(), why: `${m} miles is ${a} km: 5 miles is 8 km.`, say: `Use the graph. About how many kilometres is ${m} miles?` });
 }
 
 const hh = (i: number) => `${String(8 + i).padStart(2, '0')}:00`;
@@ -53,7 +53,7 @@ function cyclist(rng: Rng): Question {
   const s = ri(rng, 0, count - 2), a = n[s + 1] - n[s], visual: Line = { type: 'chart', kind: 'line', rows: n.map((v, i) => ({ label: hh(i), n: v })), step: 5, max: 40, yTitle: 'km' };
   const from = hh(s), to = hh(s + 1);
   return numCard(rng, `Cyclist: how far from ${from} to ${to}? (km)`, a, [n[s + 1], n[s] + n[s + 1], a + 5, Math.max(5, a - 5)], {
-    visual, say: `The graph shows how far a cyclist has gone. How far did the cyclist go from ${oclock(s)} to ${oclock(s + 1)}, in kilometres?`, hint: 'Take the first reading from the second', });
+    visual, why: `${n[s + 1]} − ${n[s]} = ${a} km.`, say: `The graph shows how far a cyclist has gone. How far did the cyclist go from ${oclock(s)} to ${oclock(s + 1)}, in kilometres?`, hint: 'Take the first reading from the second', });
 }
 
 /** d3: two people, one measured in miles and one in km; how many km further is the one who is further. The slips forget to convert. */
@@ -63,7 +63,7 @@ function furtherCard(rng: Rng): Question {
     const who = k > c ? 'Ben' : 'Ali', diff = Math.abs(k - c);
     if (c === k || diff === m || diff === k) continue;   // the answer is never also a number the card states
     return numCard(rng, `Ali: ${m} miles. Ben: ${k} km. How many km further is ${who}?`, diff, [Math.abs(k - m), k, c, diff + 8], {
-      visual: convGraph(), say: `Ali walked ${m} miles and Ben walked ${k} kilometres. Use the graph. How many kilometres further did ${who} walk?`,
+      visual: convGraph(), why: `${m} miles is ${c} km, and ${Math.max(k, c)} − ${Math.min(k, c)} = ${diff}.`, say: `Ali walked ${m} miles and Ben walked ${k} kilometres. Use the graph. How many kilometres further did ${who} walk?`,
       hint: 'Change Ali\'s miles into km first' });
   }
 }
@@ -72,7 +72,7 @@ function furtherCard(rng: Rng): Question {
 function beyondCard(rng: Rng): Question {
   const m = 5 * ri(rng, 6, 20), a = km(m);
   return numCard(rng, `Use the graph. ${m} miles is about ? km`, a, [m, a + 8, a - 8, m + 8], {
-    visual: convGraph(), say: `Use the graph. About how many kilometres is ${m} miles?`, hint: 'The line carries on in the same pattern' });
+    visual: convGraph(), why: `5 miles is 8 km, so ${m} miles is ${a} km.`, say: `Use the graph. About how many kilometres is ${m} miles?`, hint: 'The line carries on in the same pattern' });
 }
 
 export const y6Graphs: Generator = (d: Difficulty, rng: Rng): Question =>
