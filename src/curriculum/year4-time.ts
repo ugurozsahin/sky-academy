@@ -36,7 +36,7 @@ function clockCard(rng: Rng): Question {
   const named = [`${hr}:${p2(m === 0 ? ri(rng, 1, 11) : m / 5)}`, `${next}:${p2(m)}`, `${swapH}:${p2(hr % 12 * 5)}`, `${(hr + 10) % 12 + 1}:${p2(m)}`,
     `${hr}:${p2((m + 5) % 60)}`, `${hr}:${p2((m + 55) % 60)}`].filter((o, i, a) => o !== ans && a.indexOf(o) === i);
   return wordQ(rng, 'What time does the clock show?', ans, named, { visual: { type: 'clock', h: hr, m }, say: 'What time does the clock show?', hint: 'The short hand shows the hour, the long hand the minutes', hintIsData: false,
-    why: `Hour hand near ${hr}, minute hand on ${m / 5 || 12}: ${ans}.` });
+    why: `Hour hand ${m === 0 ? 'on' : 'just past'} ${hr}, minute hand on ${m / 5 || 12}: ${ans}.` });
 }
 
 /** The rule that makes hour `t` (0-23) read `h24(t, m)`: 12 am is 00, 12 pm stays 12, am stays, pm adds 12. */

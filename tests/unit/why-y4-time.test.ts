@@ -29,14 +29,15 @@ describe('y4-time why (#2317)', () => {
       else if (h > 12) { expect(w).toMatch(new RegExp(`^pm: ${h - 12} \\+ 12 = ${h},`)); seen.add('pm'); }
       else { expect(w).toMatch(/^am hours stay/); seen.add('am'); }
     }
-    expect(seen.has('pm') && seen.has('am')).toBe(true);
+    expect(seen.has('pm') && seen.has('am') && seen.has('12pm') && seen.has('12am')).toBe(true);
   });
   it('the analogue clock card names the minute-hand number, including 12 at the hour', () => {
     const cards = draw(1);
     expect(cards.some(q => /minute hand on 12:/.test(q.why!))).toBe(true);
+    expect(cards.some(q => (q.visual as { m: number }).m >= 30 && /just past/.test(q.why!))).toBe(true);
     for (const q of cards) {
       const h = (q.visual as { h: number; m: number }).h, m = (q.visual as { m: number }).m;
-      expect(q.why).toBe(`Hour hand near ${h}, minute hand on ${m / 5 || 12}: ${q.answer}.`);
+      expect(q.why).toBe(`Hour hand ${m === 0 ? 'on' : 'just past'} ${h}, minute hand on ${m / 5 || 12}: ${q.answer}.`);
     }
   });
 });
