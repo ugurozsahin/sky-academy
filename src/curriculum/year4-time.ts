@@ -35,7 +35,8 @@ function clockCard(rng: Rng): Question {
   const next = hr % 12 + 1, swapH = m / 5 || 12;
   const named = [`${hr}:${p2(m === 0 ? ri(rng, 1, 11) : m / 5)}`, `${next}:${p2(m)}`, `${swapH}:${p2(hr % 12 * 5)}`, `${(hr + 10) % 12 + 1}:${p2(m)}`,
     `${hr}:${p2((m + 5) % 60)}`, `${hr}:${p2((m + 55) % 60)}`].filter((o, i, a) => o !== ans && a.indexOf(o) === i);
-  return wordQ(rng, 'What time does the clock show?', ans, named, { visual: { type: 'clock', h: hr, m }, say: 'What time does the clock show?', hint: 'The short hand shows the hour, the long hand the minutes', hintIsData: false });
+  return wordQ(rng, 'What time does the clock show?', ans, named, { visual: { type: 'clock', h: hr, m }, say: 'What time does the clock show?', hint: 'The short hand shows the hour, the long hand the minutes', hintIsData: false,
+    why: `Hour hand near ${hr}, minute hand on ${m / 5 || 12}: ${ans}.` });
 }
 
 /** d2/d3 text card: either direction. `t` is the hour of the day, `m` the minute. */
@@ -43,7 +44,10 @@ function textCard(rng: Rng, t: number, m: number, to24: boolean, d: Difficulty):
   const prompt = to24 ? `What is ${h12(t, m)} in 24-hour time?` : `What is ${h24(t, m)} in 12-hour time?`;
   const src = to24 ? say12(t, m) : say24(t, m);
   const say = `What is ${src} in ${to24 ? 'twenty-four' : 'twelve'} hour time?`;
-  const extra = { say, hint: to24 ? 'Add twelve to the hour for pm times' : 'Take twelve off hours past twelve and write pm', hintIsData: false, ...(d === 3 ? { slow: true } : {}) };
+  // pm hours add 12 (12 pm stays 12); 12 am is 00; am hours stay as they are.
+  const why = to24 ? (t === 0 ? `12 am is 00 in 24-hour time: ${h24(t, m)}.` : t === 12 ? `12 pm stays 12: ${h24(t, m)}.` : t < 12 ? `am hours stay the same: ${h24(t, m)}.` : `pm: ${hour12(t)} + 12 = ${t}, so ${h24(t, m)}.`)
+    : (t === 0 ? `00 is 12 am: ${h12(t, m)}.` : t === 12 ? `12 is 12 pm: ${h12(t, m)}.` : t < 12 ? `Before 12 is am: ${h12(t, m)}.` : `pm: ${t} − 12 = ${hour12(t)}, so ${h12(t, m)}.`);
+  const extra = { why, say, hint: to24 ? 'Add twelve to the hour for pm times' : 'Take twelve off hours past twelve and write pm', hintIsData: false, ...(d === 3 ? { slow: true } : {}) };
   return to24 ? wordQ(rng, prompt, h24(t, m), wrong24(rng, t, m, TAIL), extra) : wordQ(rng, prompt, h12(t, m), wrong12(rng, t, m, TAIL), extra);
 }
 
@@ -53,6 +57,7 @@ function partCard(rng: Rng): Question {
   const [word, lo, hi] = pick(rng, PARTS), t = ri(rng, lo, hi), m = ri(rng, 0, 11) * 5;
   const wrong = wrong24(rng, t, m, TAIL);
   return wordQ(rng, `It is ${word}. What is this time on a 24-hour clock?`, h24(t, m), wrong, { visual: { type: 'clock', h: hour12(t), m }, slow: true,
+    why: `${word.replace('in the ', '').replace('at ', '')}: ${t < 12 ? 'am' : 'pm'} hours ${t < 12 ? 'stay the same' : `add 12 to ${hour12(t)}`}, so ${h24(t, m)}.`,
     say: `It is ${word}. What is this time on a twenty-four hour clock?`, hint: 'Read the clock, then think about the part of the day', hintIsData: false });
 }
 
