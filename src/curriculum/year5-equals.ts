@@ -50,7 +50,8 @@ export const y5Equals: Generator = (d, rng) => {
     const g = gap(rng, go, fin.T); if (!g || g.ans === fin.T || g.text.length > 11 || fin.text.length > 11) continue;
     const finishedLeft = rng() < 0.5;
     const [l, r] = finishedLeft ? [fin.text, g.text] : [g.text, fin.text];
-    return balanceQ(rng, l, r, g.ans, MAX, { distractors: decoys(rng, g.ans, fin.T, g.b) });
+    const q = balanceQ(rng, l, r, g.ans, MAX, { distractors: decoys(rng, g.ans, fin.T, g.b) });
+    return { ...q, why: `${fin.text} = ${f(fin.T)}, so the gap is ${f(g.ans)}.` };
   }
-  return balanceQ(rng, '36 × 4', '12 × ?', 12, MAX, { distractors: [144, 156, 132] });
+  return { ...balanceQ(rng, '36 × 4', '12 × ?', 12, MAX, { distractors: [144, 156, 132] }), why: '36 × 4 = 144, so the gap is 12.' };
 };
