@@ -9,7 +9,7 @@ type Pair = [number, number];
 const label = ([a, b]: Pair) => `${a} and ${b}`;
 
 /** An equation card: the prompt, the answer pair, the test every pair must fail and the slip pairs worth offering. */
-interface Card { prompt: string; ans: Pair; fits: (p: Pair) => boolean; slips: Pair[]; say: string; }
+interface Card { prompt: string; ans: Pair; fits: (p: Pair) => boolean; slips: Pair[]; say: string; why: string; }
 
 /** Three distinct decoys that fail the equation, slips first, then near misses of the answer. */
 function decoys(c: Card, rng: Rng): Pair[] {
@@ -23,18 +23,18 @@ function decoys(c: Card, rng: Rng): Pair[] {
 const d1 = (rng: Rng): Card => {
   const a = ri(rng, 1, 20), b = ri(rng, 1, 20), t = a + b;
   if (t < 6 || t > 30 || a === b) return d1(rng);
-  return { prompt: `a + b = ${t}. Which pair could a and b be?`, ans: [a, b], fits: p => p[0] + p[1] === t, slips: [[a + 1, b + 1]], say: `a plus b equals ${t}. Which pair could a and b be?` };
+  return { prompt: `a + b = ${t}. Which pair could a and b be?`, ans: [a, b], fits: p => p[0] + p[1] === t, slips: [[a + 1, b + 1]], why: `${a} + ${b} = ${t}.`, say: `a plus b equals ${t}. Which pair could a and b be?` };
 };
 
 const d2Forms: ((r: Rng) => Card)[] = [
   r => {
     const k = ri(r, 2, 3), a = ri(r, 1, 12), b = ri(r, 1, 12), t = k * a + b;
     if (a === b) return d2Forms[0](r);
-    return { prompt: `${k}a + b = ${t}. Which pair could a and b be?`, ans: [a, b], fits: p => k * p[0] + p[1] === t, slips: [[b, a]], say: `${k} a plus b equals ${t}. Which pair could a and b be?` };
+    return { prompt: `${k}a + b = ${t}. Which pair could a and b be?`, ans: [a, b], fits: p => k * p[0] + p[1] === t, slips: [[b, a]], why: `${k} × ${a} + ${b} = ${t}.`, say: `${k} a plus b equals ${t}. Which pair could a and b be?` };
   },
   r => {
     const a = ri(r, 2, 9), b = ri(r, a + 1, 12), p = a * b;
-    return { prompt: `a × b = ${p}, and a is less than b. Which pair could a and b be?`, ans: [a, b], fits: q => q[0] * q[1] === p && q[0] < q[1], slips: [[a + 1, b], [a, b + 1]], say: `a times b equals ${p}, and a is less than b. Which pair could a and b be?` };
+    return { prompt: `a × b = ${p}, and a is less than b. Which pair could a and b be?`, ans: [a, b], fits: q => q[0] * q[1] === p && q[0] < q[1], slips: [[a + 1, b], [a, b + 1]], why: `${a} × ${b} = ${p}, and ${a} < ${b}.`, say: `a times b equals ${p}, and a is less than b. Which pair could a and b be?` };
   },
 ];
 
@@ -45,6 +45,13 @@ export const countPairs = (m: number, t: number, mode: 'less' | 'order' | 'equal
     if (a + b === t && (mode === 'order' ? a !== b : mode === 'less' ? a < b : a <= b)) n++;
   return n;
 };
+
+/** The pairs themselves, counted: 1 + 8, 2 + 7 … (order matters lists both ways round), then the total. */
+function listPairs(m: number, t: number, ordered: boolean): string {
+  const ps: string[] = [];
+  for (let a = 1; a <= m; a++) for (let b = ordered ? 1 : a + 1; b <= m; b++) if (a + b === t && (!ordered || a !== b)) ps.push(`${a}+${b}`);
+  return `${ps.join(', ')}: ${ps.length} pairs.`;
+}
 
 function d3(rng: Rng): Question {
   for (;;) {
@@ -59,12 +66,12 @@ function d3(rng: Rng): Question {
       ? `a and b are different whole numbers from 1 to ${m}. Order matters. a plus b equals ${t}. How many pairs?`
       : `a and b are whole numbers from 1 to ${m}, and a is less than b. a plus b equals ${t}. How many pairs?`;
     const ds = [...new Set([flip, equal, ans + 1, ans - 1, ans + 2].filter(v => v >= 1 && v !== ans))].slice(0, 3);
-    return { ...wordQ(rng, prompt, String(ans), ds.map(String), { say: ks2Say(spoken) }), slow: true };
+    return { ...wordQ(rng, prompt, String(ans), ds.map(String), { say: ks2Say(spoken), why: listPairs(m, t, ordered) }), slow: true };
   }
 }
 
 export const y6TwoUnknowns: Generator = (d: Difficulty, rng): Question => {
   if (d === 3) return d3(rng);
   const c = d === 1 ? d1(rng) : pick(rng, d2Forms)(rng);
-  return wordQ(rng, c.prompt, label(c.ans), decoys(c, rng).map(label), { say: c.say });
+  return wordQ(rng, c.prompt, label(c.ans), decoys(c, rng).map(label), { say: c.say, why: c.why });
 };
