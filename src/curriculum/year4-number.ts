@@ -46,7 +46,9 @@ function countRun(d: Difficulty, rng: () => number): Question {
   const answer = terms[gapIndex];
   const shown = terms.map((t, i) => i === gapIndex ? '?' : fmtN(t)).join(', ');
   const options = shuffle(rng, [answer, ...runDecoys(answer, step, local, rng)]).map(fmtN);
-  return { prompt: `${shown} = ?`, say: `Count in ${step === 1000 ? '1,000' : step}s. ${shown.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options };
+  const prev = terms[gapIndex - 1];   // #2317: the term before the gap, then one step in the run's direction
+  const why = `${fmtN(prev)} ${local < 0 ? '−' : '+'} ${fmtN(step)} = ${fmtN(answer)}`;
+  return { prompt: `${shown} = ?`, say: `Count in ${step === 1000 ? '1,000' : step}s. ${shown.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options, why };
 }
 
 /** "1,000 more/less than n": d1 stays within 1,000–9,999, d2 any 4-digit number, d3 crosses ten thousand (9,450 → 10,450). */
@@ -65,7 +67,7 @@ function moreOrLess(d: Difficulty, rng: () => number): Question {
     if (v !== answer && inRange(v)) pool.add(v);
   }
   const prompt = `1,000 ${more ? 'more' : 'less'} than ${fmtN(base)} = ?`;
-  return { prompt, say: prompt.replace(' = ?', '. What is it?'), answer: fmtN(answer), options: shuffle(rng, [answer, ...[...pool].slice(0, 3)]).map(fmtN) };
+  return { prompt, say: prompt.replace(' = ?', '. What is it?'), answer: fmtN(answer), options: shuffle(rng, [answer, ...[...pool].slice(0, 3)]).map(fmtN), why: `${fmtN(base)} ${more ? '+' : '−'} 1,000 = ${fmtN(answer)}` };
 }
 
 export const y4Count: Generator = (d, rng) => rng() < 0.5 ? countRun(d, rng) : moreOrLess(d, rng);
