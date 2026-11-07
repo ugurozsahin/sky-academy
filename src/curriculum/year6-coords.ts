@@ -27,8 +27,10 @@ export const coordsAnswer = {
 
 /** The slips on a pair, swapped pair first: swapped x and y, a minus on x only, on y only, on both. */
 const slips = (p: Pt): Pt[] => [{ x: p.y, y: p.x }, { x: -p.x, y: p.y }, { x: p.x, y: -p.y }, { x: -p.x, y: -p.y }];
-const card = (prompt: string, answer: string, options: string[], points: Pts, hint: string, join?: string[]): Question => ({
-  prompt, say: say(prompt), answer, options, wide: wideFor(options),
+/** x is across, y is up (down when negative): the walk from the origin, said in words. */
+const walk = (p: Pt) => `Across ${num(p.x)}, ${p.y < 0 ? 'down' : 'up'} ${Math.abs(p.y)}`;
+const card = (prompt: string, answer: string, options: string[], points: Pts, hint: string, why: string, join?: string[]): Question => ({
+  prompt, say: say(prompt), answer, options, wide: wideFor(options), why,
   visual: { type: 'coords', size: SIZE, min: MIN, points, ...(join ? { join } : {}) }, hint, hintIsData: false,
 });
 
@@ -38,7 +40,7 @@ function readCard(rng: Rng): Question {
   while (pts.length < n) { const p = { x: coord(rng), y: coord(rng) }; if (!seen.has(key(p))) { seen.add(key(p)); pts.push(p); } }
   const points: Pts = pts.map((p, i) => ({ ...p, label: 'ABCD'[i] })), target = pick(rng, points), ans = fmt(target);
   const decoys = [...new Set(slips(target).map(fmt))].filter(o => o !== ans).slice(0, 3);
-  return card(`What are the coordinates of ${target.label}?`, coordsAnswer.read(points, target.label), shuffle(rng, [ans, ...decoys]), points, 'Slice the coordinates');
+  return card(`What are the coordinates of ${target.label}?`, coordsAnswer.read(points, target.label), shuffle(rng, [ans, ...decoys]), points, 'Slice the coordinates', `${walk(target)}: ${ans}.`);
 }
 
 /** d2: "Which point is at (−2, −5)?" — the other three letters sit at the target's swapped and sign-slip places. */
@@ -49,7 +51,7 @@ function findCard(rng: Rng): Question {
     const [swap, ...signs] = slips(t), others = [swap, ...shuffle(rng, signs).slice(0, 2)];
     const places = shuffle(rng, [t, ...others]);
     const points: Pts = places.map((p, i) => ({ ...p, label: 'ABCD'[i] }));
-    return card(`Which point is at ${fmt(t)}?`, coordsAnswer.at(points, t), points.map(p => p.label), points, 'Slice the right letter');
+    return card(`Which point is at ${fmt(t)}?`, coordsAnswer.at(points, t), points.map(p => p.label), points, 'Slice the right letter', `${walk(t)} is point ${coordsAnswer.at(points, t)}.`);
   }
 }
 
@@ -62,7 +64,7 @@ function cornerCard(rng: Rng): Question {
     const want = coordsAnswer.corner(a, b, c), ans = fmt(want);
     const decoys = [...new Set(slips(want).map(fmt))].filter(o => o !== ans).slice(0, 3);
     const points: Pts = [{ ...a, label: 'A' }, { ...b, label: 'B' }, { ...c, label: 'C' }];
-    return card('A, B, C: three corners of a rectangle. Fourth corner?', ans, shuffle(rng, [ans, ...decoys]), points, 'Slice the coordinates', ['B', 'A', 'C']);
+    return card('A, B, C: three corners of a rectangle. Fourth corner?', ans, shuffle(rng, [ans, ...decoys]), points, 'Slice the coordinates', `The fourth corner takes B's x and C's y: ${ans}.`, ['B', 'A', 'C']);
   }
 }
 
