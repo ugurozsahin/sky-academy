@@ -60,24 +60,24 @@ function series(rng: Rng, b: Bank, count: number, half: boolean): number[] {
   return shuffle(rng, Array.from({ length: top }, (_, i) => (i + 1) * unit)).slice(0, count).map(v => v - (half ? unit / 2 : 0));
 }
 
-type Finish = (prompt: string, said: string, answer: number, named: number[]) => Question;
+type Finish = (prompt: string, said: string, answer: number, named: number[], why: string) => Question;
 const lineCard = (d: Difficulty, rng: Rng, half: boolean): Question => {
   const b = pick(rng, BANKS), count = ri(rng, 4, 5);
   const labels = b.labels(count), n = series(rng, b, count, half);
   const visual: Question['visual'] = { type: 'chart', kind: 'line', rows: labels.map((label, k) => ({ label, n: n[k] })), step: b.step, max: b.max };
-  const finish: Finish = (prompt, said, answer, named) =>
-    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, say: sayQ(`Look at the graph. ${said}`), slow: d === 3 });
+  const finish: Finish = (prompt, said, answer, named, why) =>
+    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, why, say: sayQ(`Look at the graph. ${said}`), slow: d === 3 });
   const [i, j] = shuffle(rng, labels.map((_, k) => k));
   if (d === 2 && rng() < 0.5 || d === 3 && rng() < 0.5) {
     // Difference: the later reading is the larger one, so the answer is never negative.
     const [lo, hi] = n[i] < n[j] ? [i, j] : [j, i], answer = n[hi] - n[lo];
     return finish(`How much ${b.more} was it ${b.at} ${labels[hi]} than ${b.at} ${labels[lo]}? (${b.unit})`,
       `By how many ${b.say} was the ${b.noun} greater ${b.at} ${spoken(labels[hi])} than ${b.at} ${spoken(labels[lo])}?`, answer,
-      [n[hi] + n[lo], n[hi], answer / b.step, answer + b.step, answer - b.step]);
+      [n[hi] + n[lo], n[hi], answer / b.step, answer + b.step, answer - b.step], `${n[hi]} − ${n[lo]} = ${answer}.`);
   }
   const k = i, nb = n[k + 1] ?? n[k - 1];
   return finish(`What was the ${b.noun} ${b.at} ${labels[k]}? (${b.unit})`, `What was the ${b.noun} ${b.at} ${spoken(labels[k])}? Answer in ${b.say}.`, n[k],
-    [nb, n[k] / b.step, n[k] + b.step, n[k] - b.step]);
+    [nb, n[k] / b.step, n[k] + b.step, n[k] - b.step], `${labels[k]}: ${n[k]} ${b.unit}.`);
 };
 
 function peakCard(rng: Rng): Question {
@@ -87,7 +87,7 @@ function peakCard(rng: Rng): Question {
   // Slips: the point beside the peak, the first point, the last point.
   const others = [labels[top + 1] ?? labels[top - 1], labels[0], labels[count - 1], ...labels].filter(l => l !== labels[top]);
   return wordQ(rng, `When was the ${b.noun} ${b.most}?`, labels[top], others,
-    { visual, say: sayQ(`Look at the graph. When was the ${b.noun} ${b.most}?`), slow: true });
+    { visual, why: `${labels[top]}: ${n[top]} ${b.unit}, the ${b.most}.`, say: sayQ(`Look at the graph. When was the ${b.noun} ${b.most}?`), slow: true });
 }
 
 function barCard(d: Difficulty, rng: Rng): Question {
@@ -99,20 +99,20 @@ function barCard(d: Difficulty, rng: Rng): Question {
   if (n[a] === n[b]) n[a] = n[b] < step * topN ? n[b] + step : n[b] - step;
   const rows: ChartRow[] = cats.map((label, k) => ({ label, n: n[k] }));
   const visual: Question['visual'] = { type: 'chart', kind: 'bar', rows, step, max: Math.ceil(Math.max(...n) / step) * step };
-  const finish: Finish = (prompt, said, answer, named) =>
-    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, say: sayQ(`Look at the bar chart. ${said}`), slow: d === 3 });
+  const finish: Finish = (prompt, said, answer, named, why) =>
+    numQ(rng, prompt, answer, { min: 0, max: 999, distractors: decoys(answer, named, 3), visual, why, say: sayQ(`Look at the bar chart. ${said}`), slow: d === 3 });
   const [hi, lo] = n[a] > n[b] ? [a, b] : [b, a];
-  if (d === 1 && rng() < 0.5) return finish(`How many chose ${cats[a]}?`, `How many children chose ${cats[a]}?`, n[a], [n[a] / step, n[b], n[a] + step, n[a] - step]);
+  if (d === 1 && rng() < 0.5) return finish(`How many chose ${cats[a]}?`, `How many children chose ${cats[a]}?`, n[a], [n[a] / step, n[b], n[a] + step, n[a] - step], `${cats[a]}: ${n[a]}.`);
   if (d === 1) {
     const answer = n[hi] - n[lo];
-    return finish(`How many more chose ${cats[hi]} than ${cats[lo]}?`, `How many more children chose ${cats[hi]} than ${cats[lo]}?`, answer, [n[hi] + n[lo], n[hi], answer / step, answer + step]);
+    return finish(`How many more chose ${cats[hi]} than ${cats[lo]}?`, `How many more children chose ${cats[hi]} than ${cats[lo]}?`, answer, [n[hi] + n[lo], n[hi], answer / step, answer + step], `${n[hi]} − ${n[lo]} = ${answer}.`);
   }
   if (d === 2) {
     const answer = n[a] + n[b];
-    return finish(`How many chose ${cats[a]} and ${cats[b]} altogether?`, `How many children chose ${cats[a]} and ${cats[b]} altogether?`, answer, [n[hi] - n[lo], n[a], answer / step, answer + step]);
+    return finish(`How many chose ${cats[a]} and ${cats[b]} altogether?`, `How many children chose ${cats[a]} and ${cats[b]} altogether?`, answer, [n[hi] - n[lo], n[a], answer / step, answer + step], `${n[a]} + ${n[b]} = ${answer}.`);
   }
   const [s1, s2, s3] = [...n].sort((x, y) => x - y), answer = s1 + s2;
-  return finish('What is the total of the two smallest bars?', 'What is the total of the two smallest bars?', answer, [s1 + s2 + s3, s1, answer / step, answer + step]);
+  return finish('What is the total of the two smallest bars?', 'What is the total of the two smallest bars?', answer, [s1 + s2 + s3, s1, answer / step, answer + step], `${s1} + ${s2} = ${answer}.`);
 }
 
 function tableCard(rng: Rng): Question {
@@ -121,7 +121,7 @@ function tableCard(rng: Rng): Question {
   const visual: Question['visual'] = { type: 'chart', kind: 'table', rows: words.map((label, k) => ({ label, n: counts[k] })), head: [bank.head, 'Children'] };
   const [a, b] = shuffle(rng, words.map((_, k) => k)), [hi, lo] = counts[a] > counts[b] ? [a, b] : [b, a], answer = counts[hi] - counts[lo];
   return numQ(rng, `How many more chose ${words[hi]} than ${words[lo]}?`, answer, {
-    min: 0, max: 999, distractors: decoys(answer, [counts[hi] + counts[lo], counts[hi], counts[lo]], 3), visual,
+    min: 0, max: 999, distractors: decoys(answer, [counts[hi] + counts[lo], counts[hi], counts[lo]], 3), visual, why: `${counts[hi]} − ${counts[lo]} = ${answer}.`,
     say: sayQ(`Look at the table. How many more children chose ${words[hi]} than ${words[lo]}?`), slow: true,
   });
 }
