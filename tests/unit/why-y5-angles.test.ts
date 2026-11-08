@@ -24,6 +24,7 @@ describe('y5-angles why (#2317)', () => {
     for (const q of draw('y5-angles', 2)) {
       const deg = (q.visual as { parts: { deg: number }[] }).parts[0].deg;
       if (deg % 10 === 5) { ties++; expect(q.why).toBe(`${deg}° is halfway, so round up to ${q.answer}.`); }
+      else if (`${deg}°` === q.answer) expect(q.why).toBe(`${deg}° is already a multiple of 10.`);
       else expect(q.why).toBe(`${deg}° is nearest to ${q.answer}.`);
     }
     expect(ties).toBeGreaterThan(0);
@@ -39,8 +40,8 @@ describe('y5-angles why (#2317)', () => {
 describe('y5-anglefacts why (#2317)', () => {
   it('d1 states the turn and its size', () => {
     for (const q of draw('y5-anglefacts', 1)) {
-      expect(q.why!.endsWith(` is ${q.answer}.`), q.why).toBe(true);
-      expect(q.why!.slice(0, -` is ${q.answer}.`.length), q.why).toBe(q.prompt.replace(' = ?°', ''));
+      expect(q.why!.endsWith(` = ${q.answer}.`), q.why).toBe(true);
+      expect(q.why!.slice(0, -` = ${q.answer}.`.length), q.why).toBe(q.prompt.replace(' = ?°', ''));
     }
   });
   it('d2 subtracts the known angles from the total and lands on the answer', () => {

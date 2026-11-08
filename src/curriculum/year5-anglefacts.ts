@@ -33,7 +33,7 @@ const TURNS: [string, string, number][] = [
 function turnCard(rng: Rng): Question {
   const [text, spoken, a] = pick(rng, TURNS);
   const say = spoken[0].toUpperCase() + spoken.slice(1);
-  return degCard(rng, `${text} = ?°`, a, [90, 180, 270, 360, 45].filter(v => v !== a), { say: `${say} equals how many degrees?`, why: `${text} is ${a}°.` });
+  return degCard(rng, `${text} = ?°`, a, [90, 180, 270, 360, 45].filter(v => v !== a), { say: `${say} equals how many degrees?`, why: `${text} = ${a}°.` });
 }
 
 /** d2: adjacent angles sharing one vertex, one labelled `?`. `total` is 180 (a line) or 360 (a point). */
