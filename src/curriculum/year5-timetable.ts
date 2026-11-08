@@ -78,7 +78,7 @@ function readCard(rng: Rng): Question {
   const near = [j.at[k - 1], j.at[k + 1]].filter((x): x is number => x !== undefined);
   const prompt = `When does the ${j.vehicle} reach ${j.stops[k]}?`, answer = clock(t);
   const fills = [10, -10, 5, -5, 20, -20, 15, -15, 60, -60].map(s => t + s).filter(x => x >= FIRST && x <= LAST).map(clock);
-  return wordQ(rng, prompt, answer, decoys(rng, answer, near.map(clock), fills), { visual: table(j), say: say(prompt), ...OPTS });
+  return wordQ(rng, prompt, answer, decoys(rng, answer, near.map(clock), fills), { visual: table(j), say: say(prompt), why: `${j.stops[k]} is at ${answer} on the timetable.`, ...OPTS });
 }
 
 function gapCard(rng: Rng, crossing: boolean): Question {
@@ -93,7 +93,7 @@ function gapCard(rng: Rng, crossing: boolean): Question {
     a + 1 !== b ? j.at[a + 1] - j.at[a] : j.at[b] - j.at[a] + 5,        // only the first leg
   ].filter(x => x > 0 && x !== answer).map(String);
   const fills = [10, -10, 5, -5, 20, -20, 15, -15, 30, -30].map(s => answer + s).filter(x => x > 0).map(String);
-  return wordQ(rng, prompt, String(answer), decoys(rng, String(answer), slips, fills), { visual: table(j), say: say(prompt), ...OPTS });
+  return wordQ(rng, prompt, String(answer), decoys(rng, String(answer), slips, fills), { visual: table(j), say: say(prompt), why: `${clock(j.at[a])} to ${clock(j.at[b])} is ${answer} min.`, ...OPTS });
 }
 
 function completeCard(rng: Rng): Question {
@@ -101,7 +101,7 @@ function completeCard(rng: Rng): Question {
   const prompt = `${j.stops[i]} to ${j.stops[k]} takes ${gap} min. Time at ${j.stops[k]}?`, answer = clock(j.at[k]);
   const slips = [j.at[i], j.at[k - 1], j.at[k + 1]].filter((x): x is number => x !== undefined && x !== j.at[k]).map(clock);
   const fills = [10, -10, 5, -5, 20, -20, 15, -15, 60, -60].map(s => j.at[k] + s).filter(x => x >= FIRST && x <= LAST).map(clock);
-  return wordQ(rng, prompt, answer, decoys(rng, answer, slips, fills), { visual: table(j, k), say: say(prompt), slow: true, ...OPTS });
+  return wordQ(rng, prompt, answer, decoys(rng, answer, slips, fills), { visual: table(j, k), say: say(prompt), slow: true, why: `${clock(j.at[i])} + ${gap} min = ${answer}.`, ...OPTS });
 }
 
 export const y5Timetable: Generator = (d: Difficulty, rng: Rng): Question =>
