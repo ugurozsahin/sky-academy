@@ -13,19 +13,19 @@ const SAY: Record<string, string> = { '×': ' times ', '÷': ' divided by ', '+'
 const sayEq = (s: string) => s.replace(/(\d)([a-z])/g, '$1 $2').replace(/[×÷+−=]/g, c => SAY[c]).replace(/\s+/g, ' ').trim();
 
 /** A card: the equation, the answer n and its slips (the one every card must offer comes first). */
-interface Card { eq: string; ans: number; slips: number[]; }
-const card = (eq: string, ans: number, slips: number[]): Card => ({ eq, ans, slips });
+interface Card { eq: string; ans: number; slips: number[]; why: string; }
+const card = (eq: string, ans: number, slips: number[], why: string): Card => ({ eq, ans, slips, why });
 
 const d1Forms: ((r: Rng) => Card)[] = [
-  r => { const n = ri(r, 2, 150), b = ri(r, 3, 50); return card(`n + ${b} = ${n + b}`, n, [n + 2 * b, n + b]); },
-  r => { const c = ri(r, 2, 100), b = ri(r, 3, 60); return card(`n − ${b} = ${c}`, c + b, [c - b, c, c + 2 * b]); },
-  r => { const a = ri(r, 2, 12), n = ri(r, 2, 20); return card(`${a} × n = ${a * n}`, n, [a * n - a, a * n + a, a * n * a < 1000 ? a * n * a : n + a]); },
-  r => { const a = ri(r, 2, 10), c = ri(r, 2, 20); return card(`n ÷ ${a} = ${c}`, a * c, [a + c, c, a * c + a]); },
+  r => { const n = ri(r, 2, 150), b = ri(r, 3, 50); return card(`n + ${b} = ${n + b}`, n, [n + 2 * b, n + b], `${n + b} − ${b} = ${n}.`); },
+  r => { const c = ri(r, 2, 100), b = ri(r, 3, 60); return card(`n − ${b} = ${c}`, c + b, [c - b, c, c + 2 * b], `${c} + ${b} = ${c + b}.`); },
+  r => { const a = ri(r, 2, 12), n = ri(r, 2, 20); return card(`${a} × n = ${a * n}`, n, [a * n - a, a * n + a, a * n * a < 1000 ? a * n * a : n + a], `${a * n} ÷ ${a} = ${n}.`); },
+  r => { const a = ri(r, 2, 10), c = ri(r, 2, 20); return card(`n ÷ ${a} = ${c}`, a * c, [a + c, c, a * c + a], `${c} × ${a} = ${a * c}.`); },
 ];
 
 const d2Forms: ((r: Rng) => Card)[] = [
-  r => { const a = ri(r, 2, 9), n = ri(r, 1, 25), b = ri(r, 1, 20), c = a * n + b; return card(`${a}n + ${b} = ${c}`, n, [c - b, (c + b) / a, n + 1, n - 1]); },
-  r => { const a = ri(r, 2, 9), n = ri(r, 2, 25), b = ri(r, 1, Math.min(20, a * n - 1)), c = a * n - b; return card(`${a}n − ${b} = ${c}`, n, [c + b, (c - b) / a, n + 1, n - 1]); },
+  r => { const a = ri(r, 2, 9), n = ri(r, 1, 25), b = ri(r, 1, 20), c = a * n + b; return card(`${a}n + ${b} = ${c}`, n, [c - b, (c + b) / a, n + 1, n - 1], `${c} − ${b} = ${c - b}, then ${c - b} ÷ ${a} = ${n}.`); },
+  r => { const a = ri(r, 2, 9), n = ri(r, 2, 25), b = ri(r, 1, Math.min(20, a * n - 1)), c = a * n - b; return card(`${a}n − ${b} = ${c}`, n, [c + b, (c - b) / a, n + 1, n - 1], `${c} + ${b} = ${c + b}, then ${c + b} ÷ ${a} = ${n}.`); },
 ];
 
 /** Three distinct decoys: the card's first slip, then last- and leading-digit twins of the answer (#1058), then its other slips. */
@@ -49,16 +49,16 @@ const d3Forms: ((r: Rng) => Question)[] = [
     const b = 5 * ri(rng, 4, 28), c = 5 * ri(rng, 4, 28), a = 180 - b - c;
     if (a < 10 || a === b || a === c) return d3Forms[0](rng);
     const prompt = `The angles in a triangle are ${b}°, ${c}° and a. What is a?`;
-    return degCard(rng, prompt, a, [360 - (b + c), 180 - c, b + c], { say: ks2Say(prompt), slow: true });
+    return degCard(rng, prompt, a, [360 - (b + c), 180 - c, b + c], { say: ks2Say(prompt), slow: true, why: `180 − ${b} − ${c} = ${a}.` });
   },
   rng => {
     const k = 5 * ri(rng, 4, 32), prompt = `Angles on a straight line: ${k}° and x. What is x?`;
-    return degCard(rng, prompt, 180 - k, [360 - k, k, 180 + k], { say: ks2Say(prompt), slow: true });
+    return degCard(rng, prompt, 180 - k, [360 - k, k, 180 + k], { say: ks2Say(prompt), slow: true, why: `180 − ${k} = ${180 - k}.` });
   },
   rng => {
-    const l = ri(rng, 4, 20), w = ri(rng, 2, l - 1), p = 2 * (l + w), c = { eq: '', ans: w, slips: [p - l, p / 2, p - 2 * l] };
+    const l = ri(rng, 4, 20), w = ri(rng, 2, l - 1), p = 2 * (l + w), c = { eq: '', ans: w, slips: [p - l, p / 2, p - 2 * l], why: `${p} ÷ 2 = ${p / 2}, then ${p / 2} − ${l} = ${w}.` };
     const prompt = `Rectangle: perimeter ${p} cm, length ${l} cm, width w. What is w?`;
-    return { ...wordQ(rng, prompt, `${w} cm`, decoys(c, rng).map(v => `${v} cm`), { say: ks2Say(prompt) }), slow: true };
+    return { ...wordQ(rng, prompt, `${w} cm`, decoys(c, rng).map(v => `${v} cm`), { say: ks2Say(prompt), why: c.why }), slow: true };
   },
 ];
 
@@ -68,7 +68,7 @@ export const y6Algebra: Generator = (d: Difficulty, rng): Question => {
     const c = pick(rng, d === 1 ? d1Forms : d2Forms)(rng);
     if (!Number.isInteger(c.slips[0]) || c.slips[0] < 0 || c.slips[0] === c.ans) continue;
     const prompt = `${c.eq}. What is n?`;
-    return wordQ(rng, prompt, String(c.ans), decoys(c, rng).map(String), { say: `${sayEq(c.eq)}. What is n?` });
+    return wordQ(rng, prompt, String(c.ans), decoys(c, rng).map(String), { say: `${sayEq(c.eq)}. What is n?`, why: c.why });
   }
   throw new Error('y6-algebra: no card drawn');
 };
