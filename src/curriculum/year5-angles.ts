@@ -53,7 +53,7 @@ function estimateCard(rng: Rng): Question {
     if (kept.length < 4 && c >= 10 && c <= 350 && kept.every(k => Math.abs(k - c) >= 40)) kept.push(c);
   }
   return wordQ(rng, 'About how many degrees?', `${e}°`, kept.slice(1).map(v => `${v}°`), {
-    ...drawn(rng, deg), say: 'About how many degrees is this angle?', hint: 'Compare it with a right angle and a straight line', hintIsData: false, why: `${deg}° is nearest to ${e}°.`,
+    ...drawn(rng, deg), say: 'About how many degrees is this angle?', hint: 'Compare it with a right angle and a straight line', hintIsData: false, why: deg % 10 === 5 ? `${deg}° is halfway, so round up to ${e}°.` : `${deg}° is nearest to ${e}°.`,
   });
 }
 
