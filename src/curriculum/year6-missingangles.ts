@@ -53,6 +53,7 @@ function crossCard(rng: Rng, opposite: boolean): Question {
   ];
   return degCard(rng, opposite ? `Two lines cross: one angle is ${deg(k)}. Opposite = ?°` : `Angles on a straight line: ${deg(k)} and ?°`, answer, opposite ? [180 - k, 90, 360 - k] : [k, 90, 360 - k], {
     visual: { type: 'geometry', parts },
+    why: opposite ? `Opposite angles are equal: ${deg(k)}.` : `180° − ${deg(k)} = ${deg(answer)}.`,
     say: opposite ? 'Two straight lines cross. Angles opposite each other are equal. What is the missing angle?' : 'Two straight lines cross. Angles next to each other on a straight line add up to 180 degrees. What is the missing angle?',
     hint: opposite ? 'Angles opposite each other at a crossing are equal' : 'Angles on a straight line make a half turn',
   });
@@ -70,7 +71,7 @@ function pointCard(rng: Rng): Question {
     const p: GeoPart = { kind: 'angle', at: [50, 38], dir: dir % 360, deg: v, label: isUnk ? '?' : deg(v), len: 15 }; dir += v; return p;
   });
   return degCard(rng, `Angles at a point: ${knownSizes.map(deg).join(', ')} and ?°`, answer, [Math.abs(180 - sum), sum, 90 + answer], {
-    visual: { type: 'geometry', parts }, say: 'Angles at a point add up to 360 degrees. What is the missing angle?', hint: 'Angles at a point make a whole turn',
+    visual: { type: 'geometry', parts }, why: `${knownSizes.map(deg).join(' + ')} = ${deg(sum)}; 360° − ${deg(sum)} = ${deg(answer)}.`, say: 'Angles at a point add up to 360 degrees. What is the missing angle?', hint: 'Angles at a point make a whole turn',
   });
 }
 
@@ -85,18 +86,18 @@ function shapeCard(rng: Rng): Question {
   if (r < 0.4) {
     const a = ri(rng, 20, 100), b = ri(rng, 20, 150 - a), s = a + b;
     return degCard(rng, `Triangle: angles ${a}° and ${b}°. Third angle = ?°`, 180 - s, [360 - s, s, 90], {
-      say: `A triangle has angles of ${a} degrees and ${b} degrees. What is the third angle? The angles of a triangle add up to 180 degrees.`, hint: 'The angles of a triangle make a half turn' });
+      say: `A triangle has angles of ${a} degrees and ${b} degrees. What is the third angle? The angles of a triangle add up to 180 degrees.`, hint: 'The angles of a triangle make a half turn', why: `${a}° + ${b}° = ${s}°; 180° − ${s}° = ${deg(180 - s)}.` });
   }
   if (r < 0.7) {
     const t = 2 * ri(rng, 10, 70);
     return degCard(rng, `Isosceles triangle: top angle ${t}°. Each base angle = ?°`, (180 - t) / 2, [180 - t, t, 360 - t], {
-      say: `An isosceles triangle has a top angle of ${t} degrees. What is each base angle? The two base angles are equal.`, hint: 'Take the top angle from the triangle total, then share the rest between the two equal base angles' });
+      say: `An isosceles triangle has a top angle of ${t} degrees. What is each base angle? The two base angles are equal.`, hint: 'Take the top angle from the triangle total, then share the rest between the two equal base angles', why: `180° − ${t}° = ${180 - t}°; half of that is ${deg((180 - t) / 2)}.` });
   }
   for (;;) {
     const a = ri(rng, 60, 130), b = ri(rng, 60, 130), c = ri(rng, 60, 130), s = a + b + c, d = 360 - s;
     if (d < 40 || d > 150 || s === 270) continue;
     return degCard(rng, `Quadrilateral: angles ${a}°, ${b}° and ${c}°. Fourth = ?°`, d, [s - 180, s, 180 - d], {
-      say: `A quadrilateral has angles of ${a}, ${b} and ${c} degrees. What is the fourth angle? The angles of a quadrilateral add up to 360 degrees.`, hint: 'The angles of a quadrilateral make a whole turn' });
+      say: `A quadrilateral has angles of ${a}, ${b} and ${c} degrees. What is the fourth angle? The angles of a quadrilateral add up to 360 degrees.`, hint: 'The angles of a quadrilateral make a whole turn', why: `${a}° + ${b}° + ${c}° = ${s}°; 360° − ${s}° = ${deg(d)}.` });
   }
 }
 
@@ -107,18 +108,18 @@ function polygonCard(rng: Rng): Question {
   if (r < 0.4) {
     const n = pick(rng, [5, 6, 8, 9, 10, 12]), each = 180 * (n - 2) / n;
     return degCard(rng, `Each angle of a regular ${NAMES[n]} = ?°`, each, [360 / n, 180 * (n - 2), 180 - each + 90], {
-      say: `What is each angle of a regular ${NAMES[n]}? Add up the angles inside, then share them between the equal angles.`, hint: 'Add up the angles inside, then share them equally' });
+      say: `What is each angle of a regular ${NAMES[n]}? Add up the angles inside, then share them between the equal angles.`, hint: 'Add up the angles inside, then share them equally', why: `${n - 2} triangles = ${deg(180 * (n - 2))}; ÷ ${n} = ${deg(each)}.` });
   }
   if (r < 0.6) {
     const n = pick(rng, [5, 6, 7, 8]);
     return degCard(rng, `The angles in a ${NAMES[n]} add up to ?°`, 180 * (n - 2), [180 * n, 180 * (n - 1), 180 * (n - 3)], {
-      say: `The angles inside a ${NAMES[n]} add up to how many degrees? Split it into triangles.`, hint: 'Sides take away two gives the triangles; each is a half turn' }, 1500);
+      say: `The angles inside a ${NAMES[n]} add up to how many degrees? Split it into triangles.`, hint: 'Sides take away two gives the triangles; each is a half turn', why: `${n} sides make ${n - 2} triangles: ${n - 2} × 180° = ${deg(180 * (n - 2))}.` }, 1500);
   }
   for (;;) {
     const k = Array.from({ length: 4 }, () => 5 * ri(rng, 16, 30)), s = k.reduce((x, y) => x + y, 0), f = 540 - s;
     if (f < 60 || f > 160) continue;
     return degCard(rng, `Pentagon: angles ${k[0]}°, ${k[1]}°, ${k[2]}° and ${k[3]}°. Fifth = ?°`, f, [s - 360, 360 - f, 180 - f], {
-      say: `A pentagon has four angles of ${k[0]}, ${k[1]}, ${k[2]} and ${k[3]} degrees. What is the fifth angle? The angles of a pentagon add up to 540 degrees.`, hint: 'Take the four angles from the pentagon total' });
+      say: `A pentagon has four angles of ${k[0]}, ${k[1]}, ${k[2]} and ${k[3]} degrees. What is the fifth angle? The angles of a pentagon add up to 540 degrees.`, hint: 'Take the four angles from the pentagon total', why: `${k.map(v => `${v}°`).join(' + ')} = ${s}°; 540° − ${s}° = ${deg(f)}.` });
   }
 }
 
