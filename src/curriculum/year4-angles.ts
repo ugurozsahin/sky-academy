@@ -29,6 +29,8 @@ export function angleAnswer(parts: GeoPart[], ask: AngleAsk): string[] {
   return angles.filter(a => ask === 'largest' ? a.deg === top : angleClass(a.deg) === (ask === 'obtuse' ? 'Obtuse' : 'Acute')).map(a => a.label ?? '');
 }
 
+const degOf = (parts: GeoPart[], label: string) => (parts.find(p => p.kind === 'angle' && p.label === label) as Angle).deg;
+
 /** A first-ray direction (a multiple of 15°) that keeps the angle's bisector within 45° of straight up or down, so labels and neighbours never meet. */
 function dirFor(rng: Rng, deg: number): number {
   const ok: number[] = [];
@@ -67,6 +69,7 @@ export const y4Angles: Generator = (d: Difficulty, rng: Rng): Question => {
       ...q('Is this angle acute, right or obtuse?'), answer: angleClass(deg), options: shuffle(rng, NAMES.slice()), wide: true,
       visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir: dirFor(rng, deg), deg, len: pick(rng, [24, 26, 28]) }] },
       hint: 'Slice the right word', hintIsData: false,
+      why: deg === 90 ? '90° is a right angle.' : `${deg}° is ${deg < 90 ? 'less' : 'more'} than 90°, so ${angleClass(deg).toLowerCase()}.`,
     };
   }
   if (d === 2) {
@@ -75,9 +78,11 @@ export const y4Angles: Generator = (d: Difficulty, rng: Rng): Question => {
     const degs = triple(() => any(rng), x => ask === 'largest' || count(x, ask === 'obtuse' ? 'Obtuse' : 'Acute') === 1);
     const parts = draw(rng, degs, armSet(rng));
     const prompt = ask === 'largest' ? 'Which is the largest angle?' : `Which angle is ${ask}?`;
+    const answer = angleAnswer(parts, ask)[0];
     return {
-      ...q(prompt), answer: angleAnswer(parts, ask)[0], options: shuffle(rng, LETTERS.slice()),
+      ...q(prompt), answer, options: shuffle(rng, LETTERS.slice()),
       visual: { type: 'geometry', parts }, hint: 'Slice the right letter', hintIsData: false,
+      why: `${answer} is ${degOf(parts, answer)}°${ask === 'largest' ? ', the largest.' : `, ${ask === 'obtuse' ? 'more' : 'less'} than 90°.`}`,
     };
   }
   const degs = triple(() => rng() < 0.12 ? 180 : any(rng), () => true);
@@ -90,5 +95,6 @@ export const y4Angles: Generator = (d: Difficulty, rng: Rng): Question => {
   return {
     prompt: 'Smallest angle to largest!', say: 'Slice the angles from the smallest to the largest', answer: order.join(','), sequence: order,
     options: shuffle(rng, LETTERS.slice()), visual: { type: 'geometry', parts }, hint: 'Slice the smallest angle first', hintIsData: false,
+    why: `${order.map(l => `${l} ${degOf(parts, l)}°`).join(', ')}: smallest first.`,
   };
 };
