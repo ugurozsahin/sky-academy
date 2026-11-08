@@ -52,6 +52,7 @@ function extreme(rng: Rng): Question {
     const word = most ? 'most' : 'least', colours = sliceColours(labels);
     return wordQ(rng, `Which was chosen ${word}?`, labels[hit], labels, {
       visual: { type: 'pie', slices: ns.map((n, i) => ({ label: labels[i], n, colour: colours[labels[i]] })) }, say: `${LOOK}Which was chosen ${word}?`, wide: true, colours,
+      why: `${labels[hit]} has the ${most ? 'biggest' : 'smallest'} slice.`,
     });
   }
 }
@@ -71,6 +72,8 @@ function fraction(rng: Rng): Question {
   }
   return wordQ(rng, `What fraction chose ${labels[k]}?`, text, ds.slice(0, 3), {
     visual: { type: 'pie', slices: rows }, say: `${LOOK}What fraction chose ${labels[k]}?`,
+    // The slice is `n` of `den` equal parts; when that is not already simplest, the why shows the step to the answer.
+    why: `${rows[k].n} of ${den} equal parts is ${rows[k].n}/${den}${equal(ans, { n: rows[k].n, d: den }) && ans.d === den ? '' : `, which is ${text}`}.`,
   });
 }
 
@@ -81,7 +84,7 @@ function count(rng: Rng): Question {
     const [den, split] = pick(rng, fits), labels = shuffle(rng, pick(rng, THEMES)).slice(0, split.length);
     const { rows, k } = ask(rng, split, labels, total / den), ans = rows[k].n;
     const ok = (v: number) => Number.isInteger(v) && v > 0 && v !== ans;
-    const frac = simplify({ n: ans, d: total }), near = rows[(k + 1) % rows.length].n;
+    const part = total / den, frac = simplify({ n: ans, d: total }), near = rows[(k + 1) % rows.length].n;
     const ds: number[] = [];
     for (const v of [ans * 360 / total, frac.d, near, total - ans, ans + 1, ans - 1, ans + 2, ans * 2]) if (ok(v) && !ds.includes(v)) ds.push(v);
     // #1058: an answer of 20 or more needs one decoy sharing its units digit, or that digit gives it away.
@@ -92,6 +95,7 @@ function count(rng: Rng): Question {
     if (ds.slice(0, 3).length < 3 || new Set(ds.slice(0, 3)).size < 3) continue;
     return wordQ(rng, `${total} children were asked. How many chose ${labels[k]}?`, String(ans), ds.slice(0, 3).map(String), {
       visual: { type: 'pie', slices: rows }, say: `${LOOK}${total} children were asked. How many chose ${labels[k]}?`, slow: true,
+      why: ans === part ? `${total} ÷ ${den} = ${ans}.` : `${total} ÷ ${den} = ${part} for one part, so ${ans / part} parts make ${ans}.`,
     });
   }
 }
