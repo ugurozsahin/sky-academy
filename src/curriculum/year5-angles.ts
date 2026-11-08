@@ -30,6 +30,9 @@ function dirFor(rng: Rng, deg: number): number {
   return pick(rng, ok);
 }
 
+const RULE: Record<Exclude<AngleKind, 'Right'>, string> = { Acute: 'less than 90°', Obtuse: 'between 90° and 180°', Reflex: 'more than 180°' };
+const kindWhy = (deg: number) => { const k = angleKind(deg); return k === 'Right' ? '90° is a right angle.' : `${deg}° is ${RULE[k]}, so ${k.toLowerCase()}.`; };
+
 const drawn = (rng: Rng, deg: number): { visual: { type: 'geometry'; parts: GeoPart[] } } =>
   ({ visual: { type: 'geometry', parts: [{ kind: 'angle', at: [50, 38], dir: dirFor(rng, deg), deg, len: pick(rng, [24, 26, 28]) }] } });   // ≥ 120 px across at 390 px (#2278)
 
@@ -39,7 +42,7 @@ function kindCard(rng: Rng): Question {
   const deg = kind === 'Right' ? 90 : sizeOf(rng, kind);
   return wordQ(rng, 'What kind of angle is this?', angleKind(deg), KINDS.filter(k => k !== angleKind(deg)), {
     ...drawn(rng, deg), say: 'What kind of angle is this? Acute is small, obtuse is wide, reflex is more than a straight line.',
-    hint: 'Acute is less than a right angle, obtuse is wider, reflex is wider than a straight line', hintIsData: false,
+    hint: 'Acute is less than a right angle, obtuse is wider, reflex is wider than a straight line', hintIsData: false, why: kindWhy(deg),
   });
 }
 
@@ -50,7 +53,7 @@ function estimateCard(rng: Rng): Question {
     if (kept.length < 4 && c >= 10 && c <= 350 && kept.every(k => Math.abs(k - c) >= 40)) kept.push(c);
   }
   return wordQ(rng, 'About how many degrees?', `${e}°`, kept.slice(1).map(v => `${v}°`), {
-    ...drawn(rng, deg), say: 'About how many degrees is this angle?', hint: 'Compare it with a right angle and a straight line', hintIsData: false,
+    ...drawn(rng, deg), say: 'About how many degrees is this angle?', hint: 'Compare it with a right angle and a straight line', hintIsData: false, why: deg % 10 === 5 ? `${deg}° is halfway, so round up to ${e}°.` : deg === e ? `${deg}° is already a multiple of 10.` : `${deg}° is nearest to ${e}°.`,
   });
 }
 
@@ -65,7 +68,7 @@ function statedCard(rng: Rng): Question {
   const label = want.toLowerCase();
   return wordQ(rng, `Which angle is ${label}?`, `${vals[0]}°`, vals.slice(1).map(v => `${v}°`), {
     say: `Which angle is ${label}? Acute is less than 90 degrees, obtuse is between 90 and 180, reflex is more than 180.`,
-    hint: 'Reflex is wider than a straight line, obtuse is wider than a right angle', hintIsData: false,
+    hint: 'Reflex is wider than a straight line, obtuse is wider than a right angle', hintIsData: false, why: kindWhy(vals[0]),
   });
 }
 

@@ -133,11 +133,8 @@
 "y5-mixed",
 "y5-story-measure",
 "y5-3d",
-"y5-angles",
-"y5-anglefacts",
 "y5-polygons",
 "y5-transform",
-
 "y5-factopinion",
 "y5-wordlist",
 "y5-cious",
@@ -154,13 +151,10 @@
 "y5-cohesion",
 "y5-perfect",
 "y6-story",
-
 "y6-nets",
 "y6-missingangles",
 "y6-circles",
-
 "y6-transform",
-
 "y6-inference",
 "y6-figurative",
 "y6-ough",
