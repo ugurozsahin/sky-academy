@@ -33,7 +33,7 @@ const TURNS: [string, string, number][] = [
 function turnCard(rng: Rng): Question {
   const [text, spoken, a] = pick(rng, TURNS);
   const say = spoken[0].toUpperCase() + spoken.slice(1);
-  return degCard(rng, `${text} = ?°`, a, [90, 180, 270, 360, 45].filter(v => v !== a), { say: `${say} equals how many degrees?` });
+  return degCard(rng, `${text} = ?°`, a, [90, 180, 270, 360, 45].filter(v => v !== a), { say: `${say} equals how many degrees?`, why: `${text} is ${a}°.` });
 }
 
 /** d2: adjacent angles sharing one vertex, one labelled `?`. `total` is 180 (a line) or 360 (a point). */
@@ -57,6 +57,7 @@ function missingCard(rng: Rng): Question {
   const bad = onLine ? [known[0], 90 - known[0], answer + 10, answer - 10] : [Math.abs(180 - sum), sum, 360 - sum + 90];
   return degCard(rng, onLine ? 'Angles on a line. Missing angle = ?°' : 'Angles at a point. Missing angle = ?°', answer, bad, {
     visual: { type: 'geometry', parts },
+    why: known.length === 1 ? `${total}° − ${sum}° = ${answer}°.` : `${known.join('° + ')}° = ${sum}°; ${total}° − ${sum}° = ${answer}°.`,
     say: onLine ? 'Angles on a straight line add up to 180 degrees. What is the missing angle?' : 'Angles at a point add up to 360 degrees. What is the missing angle?',
     hint: onLine ? 'Angles on a straight line make a half turn' : 'Angles at a point make a whole turn', hintIsData: false,
   }, onLine ? 180 : 360);
@@ -68,16 +69,16 @@ function rectCard(rng: Rng): Question {
   if (r < 0.34) {
     const l = ri(rng, 4, 15), w = ri(rng, 2, l - 1), p = 2 * (l + w);
     return opts(rng, `Rectangle: ${l} cm long, perimeter ${p} cm. Width = ? cm`, w, [p - l, l + w, l], {
-      say: `A rectangle is ${l} centimetres long and its perimeter is ${p} centimetres. What is its width in centimetres?`, hint: 'Half the perimeter is a length plus a width', hintIsData: false });
+      say: `A rectangle is ${l} centimetres long and its perimeter is ${p} centimetres. What is its width in centimetres?`, hint: 'Half the perimeter is a length plus a width', hintIsData: false, why: `Half of ${p} is ${l + w}; ${l + w} − ${l} = ${w}.` });
   }
   if (r < 0.67) {
     const a = 5 * ri(rng, 4, 14);
     return degCard(rng, `Diagonal splits a rectangle's corner: ${a}° and ?°`, 90 - a, [90 + a, 180 - a, a], {
-      say: `A diagonal splits the corner of a rectangle into two angles. One is ${a} degrees. What is the other, in degrees?`, hint: 'A rectangle corner is a right angle', hintIsData: false });
+      say: `A diagonal splits the corner of a rectangle into two angles. One is ${a} degrees. What is the other, in degrees?`, hint: 'A rectangle corner is a right angle', hintIsData: false, why: `90° − ${a}° = ${90 - a}°.` });
   }
   const s = ri(rng, 3, 15);
   return opts(rng, `Rectangle: one side ${s} cm. Opposite side = ? cm`, s, [2 * s, s + 2, s - 2], {
-    say: `One side of a rectangle is ${s} centimetres. How long is the opposite side, in centimetres?`, hint: 'Opposite sides of a rectangle are equal', hintIsData: false });
+    say: `One side of a rectangle is ${s} centimetres. How long is the opposite side, in centimetres?`, hint: 'Opposite sides of a rectangle are equal', hintIsData: false, why: `Opposite sides of a rectangle are equal: ${s} cm.` });
 }
 
 export const y5AngleFacts: Generator = (level: Difficulty, rng) => (level === 1 ? turnCard : level === 2 ? missingCard : rectCard)(rng);
