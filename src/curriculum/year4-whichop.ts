@@ -67,7 +67,7 @@ export function numbersFor(op: Op, d: Difficulty, rng: Rng): { a: number; b: num
 }
 
 const f = (n: number) => fmt(dec(n, 0));
-const KIND: Record<Op, string> = { '+': 'Join them', '−': 'Find the difference', '×': 'Equal groups', '÷': 'Share equally' };
+const KIND: Record<Op, string> = { '+': 'Join them', '−': 'Take away or compare', '×': 'Equal groups', '÷': 'Make equal groups' };
 /** The why (#2317): what the operation does, then the sum with the story's answer filled in. */
 export const whyOp = (op: Op, a: number, b: number): string => `${KIND[op]}: ${f(a)} ${op} ${f(b)} = ${f(apply(op, a, b))}.`;
 
