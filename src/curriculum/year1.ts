@@ -258,7 +258,7 @@ const y1Time: Generator = (d, rng) => {
   const ans = half ? `half past ${h}` : `${h} o'clock`;
   const others = shuffle(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].filter(x => x !== h)).slice(0, 3).map(x => (half ? `half past ${x}` : `${x} o'clock`));
   if (d === 3 && rng() < 0.5) others[0] = half ? `${h} o'clock` : `half past ${h}`;
-  return wordQ(rng, 'What time is it?', ans, others, { visual: { type: 'clock', h, m: half ? 30 : 0 } });
+  return wordQ(rng, 'What time is it?', ans, others, { visual: { type: 'clock', h, m: half ? 30 : 0 }, why: half ? `Long hand on 6: half past ${h}.` : `Long hand on 12: ${h} o'clock.` });
 };
 /**
  * Year 1 time words (#988): "quicker, slower, earlier, later" and the three units hours, minutes, seconds.
@@ -278,19 +278,19 @@ const y1TimeWords: Generator = (d, rng) => {
     const [fast, slow] = pick(rng, SPEED_PAIRS);
     const quick = rng() < 0.5;
     const [a, b] = shuffle(rng, [fast, slow]);
-    return wordQ(rng, `Which is ${quick ? 'quicker' : 'slower'}, ${a} or ${b}?`, quick ? fast : slow, [quick ? slow : fast], { say: `Which is ${quick ? 'quicker' : 'slower'}?` });
+    return wordQ(rng, `Which is ${quick ? 'quicker' : 'slower'}, ${a} or ${b}?`, quick ? fast : slow, [quick ? slow : fast], { say: `Which is ${quick ? 'quicker' : 'slower'}?`, why: `${quick ? fast : slow} is ${quick ? 'quicker' : 'slower'} than ${quick ? slow : fast}.` });
   }
   if (form === 1) {
     const [a, b] = shuffle(rng, DAY_EVENTS).slice(0, 2);
     const early = rng() < 0.5;
     const first = DAY_EVENTS.findIndex(e => e === a) < DAY_EVENTS.findIndex(e => e === b) ? a : b;
     const want = early ? first : first === a ? b : a;
-    return wordQ(rng, `Which is ${early ? 'earlier' : 'later'}, ${a[1]} or ${b[1]}?`, want[1], [want === a ? b[1] : a[1]], { say: `Which is ${early ? 'earlier' : 'later'}, ${a[1]} or ${b[1]}?` });
+    return wordQ(rng, `Which is ${early ? 'earlier' : 'later'}, ${a[1]} or ${b[1]}?`, want[1], [want === a ? b[1] : a[1]], { say: `Which is ${early ? 'earlier' : 'later'}, ${a[1]} or ${b[1]}?`, why: `${first[1][0].toUpperCase()}${first[1].slice(1)} comes before ${first === a ? b[1] : a[1]}.` });
   }
   const unit = pick(rng, Object.keys(TIME_UNITS));
   const act = pick(rng, TIME_UNITS[unit]);
   const p = `Would you measure ${act}`;
-  return wordQ(rng, `${p} in seconds, minutes or hours?`, unit, Object.keys(TIME_UNITS).filter(u => u !== unit), { say: `${p} in seconds, minutes or hours?` });
+  return wordQ(rng, `${p} in seconds, minutes or hours?`, unit, Object.keys(TIME_UNITS).filter(u => u !== unit), { say: `${p} in seconds, minutes or hours?`, why: `${act[0].toUpperCase()}${act.slice(1)} takes ${unit}.` });
 };
 const y1Arrays: Generator = (d, rng) => {
   const rows = ri(rng, 2, d === 1 ? 2 : 3), cols = ri(rng, 2, d === 1 ? 5 : d === 3 ? 5 : 4);
