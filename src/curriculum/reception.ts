@@ -169,7 +169,7 @@ const rShapes: Generator = (d, rng) => {
 const rShare: Generator = (d, rng) => {
   const total = d === 1 ? pick(rng, [2, 4, 6]) : d === 2 ? pick(rng, [4, 6, 8, 10]) : pick(rng, [6, 8, 10]);
   const emoji = pick(rng, OBJECTS);
-  return numQ(rng, `Share ${total} between 2 — how many each?`, total / 2, { min: 0, max: 10, distractors: [total], visual: { type: 'objects', emoji, n: total }, say: `Share ${total} equally between two. How many does each one get?` });
+  return numQ(rng, `Share ${total} between 2 — how many each?`, total / 2, { min: 0, max: 10, distractors: [total], why: `${total / 2} and ${total / 2} make ${total}.`, visual: { type: 'objects', emoji, n: total }, say: `Share ${total} equally between two. How many does each one get?` });
 };
 /**
  * Reception odds and evens (#299 slice 1) — "evens and odds", by pairing rather than by the ×2 rule.
@@ -185,9 +185,11 @@ const rShare: Generator = (d, rng) => {
 const rOddEven: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 6 : 10);
   const even = n % 2 === 0;
+  const k = Math.floor(n / 2);
+  const why = k === 0 ? `${n} is on its own.` : `${n} in twos: ${k} pair${k > 1 ? 's' : ''}, ${even ? 'none' : 'one'} left over.`;
   const visual = { type: 'objects', emoji: pick(rng, OBJECTS), n } as const;
-  if (d === 3) return wordQ(rng, `${n} — odd or even?`, even ? 'even' : 'odd', ['odd', 'even'], { visual, hint: 'Put them in twos', hintIsData: false, say: `Is ${n} odd or even?` });
-  return wordQ(rng, 'Can they all find a partner?', even ? '✅' : '❌', ['✅', '❌'], { visual, hint: 'Put them in twos', hintIsData: false, say: `There are ${n}. Can they all find a partner?` });
+  if (d === 3) return wordQ(rng, `${n} — odd or even?`, even ? 'even' : 'odd', ['odd', 'even'], { visual, why, hint: 'Put them in twos', hintIsData: false, say: `Is ${n} odd or even?` });
+  return wordQ(rng, 'Can they all find a partner?', even ? '✅' : '❌', ['✅', '❌'], { visual, why, hint: 'Put them in twos', hintIsData: false, say: `There are ${n}. Can they all find a partner?` });
 };
 const rOrder: Generator = (d, rng) => orderQ(rng, d === 1 ? 5 : 10, 3);
 /** Continue a repeating pattern (#970): two whole repeats show, the gap is always the last cell. */
