@@ -37,6 +37,8 @@ function clockDecoys(h: number, m: number, sfx?: Sfx): { named: string[]; spare:
   return { named, spare: [t12(h, m === 59 ? 58 : m + 1, sfx), t12(mod12(h + 1), m, sfx), t12(h, m === 0 ? 55 : m - 1, sfx)] };
 }
 
+const mins = (m: number) => m === 0 ? 'no minutes' : `${m} minute${m === 1 ? '' : 's'}`;
+
 /** d1/d2 clock cards: the visual shows h:m; d2 also names the part of the day and adds am/pm. */
 function clockCard(d: Difficulty, rng: () => number, roman = false): Question {
   const h = d === 1 ? ri(rng, 1, 12) : ri(rng, 1, 11); // d2 keeps off 12, where am/pm is noon or midnight
@@ -44,7 +46,8 @@ function clockCard(d: Difficulty, rng: () => number, roman = false): Question {
   const sfx: Sfx | undefined = d === 2 ? pick(rng, ['am', 'pm'] as const) : undefined;
   const answer = t12(h, m, sfx), { named, spare } = clockDecoys(h, m, sfx);
   const prompt = sfx ? `It is the ${partOfDay(h, sfx)}. What time is it?` : 'What time is it?';
-  return { prompt, say: speak(prompt), answer, options: build(answer, named, spare, rng), visual: roman ? { type: 'clock', h, m, roman: true } : { type: 'clock', h, m, marks: true } };
+  const why = `Hour ${h}, ${mins(m)}${sfx ? `, in the ${partOfDay(h, sfx)}` : ''}: ${answer}.`;
+  return { prompt, say: speak(prompt), answer, why, options: build(answer, named, spare, rng), visual: roman ? { type: 'clock', h, m, roman: true } : { type: 'clock', h, m, marks: true } };
 }
 
 /** d2 vocabulary: "Which time is just after noon?" — the same four labels, so the answer is the whole question. */
@@ -55,7 +58,8 @@ function vocabCard(rng: () => number): Question {
   const answer = after ? afterL(noon ? 'pm' : 'am') : beforeL(noon ? 'am' : 'pm');
   const options = shuffle(rng, [afterL('am'), afterL('pm'), beforeL('am'), beforeL('pm')]);
   const prompt = `Which time is just ${after ? 'after' : 'before'} ${noon ? 'noon' : 'midnight'}?`;
-  return { prompt, say: speak(prompt), answer, options, optionsAreContent: true };
+  const why = `${after ? 'After' : 'Before'} ${noon ? 'noon' : 'midnight'} is ${after === noon ? 'pm' : 'am'}: ${answer}.`;
+  return { prompt, say: speak(prompt), answer, why, options, optionsAreContent: true };
 }
 
 /** d3: 12-hour ↔ 24-hour with no clock, plus the noon and midnight cards. */
@@ -65,18 +69,21 @@ function convertCard(rng: () => number): Question {
     const noon = rng() < 0.5, h = noon ? 12 : 0, answer = t24(h, 0);
     const prompt = `${noon ? 'Noon' : 'Midnight'} on a 24-hour clock?`;
     const named = noon ? ['00:00', '11:00', '01:00', '22:00'] : ['12:00', '01:00', '02:00', '10:00'];
-    return { prompt, say: speak(prompt), answer, options: build(answer, named, [], rng) };
+    const why = noon ? 'Noon is halfway through the day: 12:00.' : 'Midnight starts the day: 00:00.';
+    return { prompt, say: speak(prompt), answer, why, options: build(answer, named, [], rng) };
   }
   const h = ri(rng, 0, 23), m = ri(rng, 0, 59), h12 = h % 12 || 12;
   const spare = [1, 23, 2, 22].map(s => (h + s) % 24);
   if (kind === 'to24') {
     const prompt = `${from24(h, m)} on a 24-hour clock?`, answer = t24(h, m);
     const named = [(h + 12) % 24, (h12 + 10) % 24, (h + 10) % 24, (h + 14) % 24].map(x => t24(x, m));
-    return { prompt, say: speak(prompt), answer, options: build(answer, named, spare.map(x => t24(x, m)), rng) };
+    const why = h === 0 ? `12 am is midnight: ${answer}.` : h === 12 ? `12 pm is noon: ${answer}.` : h < 12 ? `am hours stay the same: ${answer}.` : `pm: ${h12} + 12 = ${h}, so ${answer}.`;
+    return { prompt, say: speak(prompt), answer, why, options: build(answer, named, spare.map(x => t24(x, m)), rng) };
   }
   const prompt = `${t24(h, m)} in 12-hour time?`, answer = from24(h, m);
   const named = [(h + 12) % 24, (h + 14) % 24, (h + 10) % 24].map(x => from24(x, m));
-  return { prompt, say: speak(prompt), answer, options: build(answer, named, spare.map(x => from24(x, m)), rng) };
+  const why = h === 0 ? `00:${two(m)} is just after midnight: ${answer}.` : h === 12 ? `12:${two(m)} is just after noon: ${answer}.` : h < 12 ? `Before 12:00 is am: ${answer}.` : `${h} − 12 = ${h12}, so pm: ${answer}.`;
+  return { prompt, say: speak(prompt), answer, why, options: build(answer, named, spare.map(x => from24(x, m)), rng) };
 }
 
 export const y3Time: Generator = (d, rng) =>
