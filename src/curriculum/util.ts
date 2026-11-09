@@ -179,7 +179,7 @@ export function orderQ(rng: Rng, max: number, count: number): Question {
   while (set.size < count && guard++ < 100) set.add(ri(rng, 0, max));
   const nums = [...set]; const sorted = nums.slice().sort((a, b) => a - b).map(String);
   const shown = shuffle(rng, sorted);
-  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false };
+  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), why: `${sorted.join(', ')}: smallest to biggest.`, sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false };
 }
 
 /** Number line: one label is hidden. Year 1, Year 2. */
