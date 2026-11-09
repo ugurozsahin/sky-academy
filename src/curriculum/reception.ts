@@ -21,7 +21,7 @@ const rCount: Generator = (d, rng) => {
   const max = d === 1 ? 5 : d === 2 ? 8 : 10;
   const n = ri(rng, 1, max);
   const emoji = pick(rng, OBJECTS);
-  return numQ(rng, 'How many?', n, { min: 1, max, visual: { type: 'objects', emoji, n }, say: 'How many can you count?' });
+  return numQ(rng, 'How many?', n, { min: 1, max, why: `Count them one by one: ${n}.`, visual: { type: 'objects', emoji, n }, say: 'How many can you count?' });
 };
 // #973: the reverse of rCount — the numeral is on the card, the child slices the group of dots that matches it.
 // `say` is the instruction only: reading the numeral is the skill, so the number is never spoken.
@@ -33,13 +33,14 @@ const rNumeral: Generator = (d, rng) => {
   const want = d === 3 ? 3 : 2;
   for (const k of rest) if (decoys.size < want) decoys.add(k);
   return wordQ(rng, 'Find this many', '●'.repeat(n), [...decoys].map(k => '●'.repeat(k)), {
+    why: `The numeral ${n} matches ${n} dots.`,
     visual: { type: 'word', text: String(n) },
     say: 'Find the group that matches the number',
   });
 };
 const rSubitise: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 4 : d === 2 ? 5 : 6);
-  return numQ(rng, 'How many dots?', n, { min: 1, max: 6, visual: { type: 'dots', n } });
+  return numQ(rng, 'How many dots?', n, { min: 1, max: 6, why: `Count the dots: ${n}.`, visual: { type: 'dots', n } });
 };
 const rOneMore: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 1 : 0, d === 3 ? 19 : 9);
