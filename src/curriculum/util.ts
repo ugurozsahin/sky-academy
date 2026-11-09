@@ -207,7 +207,7 @@ export function name3dQ(rng: Rng, from: readonly (readonly [string, string, ...u
 export function balanceQ(rng: Rng, left: string, right: string, answer: number, max: number, extra: { say?: string; distractors?: number[]; pans?: [string, string] } = {}): Question {
   const p = `${left} = ${right}`;
   const [pl, pr] = extra.pans ?? [left, right];
-  return numQ(rng, p, answer, { min: 0, max, visual: { type: 'scales', left: pl, right: pr }, say: extra.say ?? `Balance the scales! ${symSay(p)}`, hint: 'Make both sides the same', hintIsData: false, distractors: extra.distractors });
+  return numQ(rng, p, answer, { min: 0, max, why: p.replace('?', String(answer)), visual: { type: 'scales', left: pl, right: pr }, say: extra.say ?? `Balance the scales! ${symSay(p)}`, hint: 'Make both sides the same', hintIsData: false, distractors: extra.distractors });
 }
 
 // ---------- Measurement — shared Year 1 / Year 2 (#8, #298) ----------
