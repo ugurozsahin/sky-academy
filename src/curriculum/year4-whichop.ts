@@ -67,6 +67,9 @@ export function numbersFor(op: Op, d: Difficulty, rng: Rng): { a: number; b: num
 }
 
 const f = (n: number) => fmt(dec(n, 0));
+const KIND: Record<Op, string> = { '+': 'Join them', '−': 'Take away or compare', '×': 'Equal groups', '÷': 'Make equal groups' };
+/** The why (#2317): what the operation does, then the sum with the story's answer filled in. */
+export const whyOp = (op: Op, a: number, b: number): string => `${KIND[op]}: ${f(a)} ${op} ${f(b)} = ${f(apply(op, a, b))}.`;
 
 export const y4WhichOp: Generator = (d, rng): Question => {
   const rows = d === 3 ? TRAPS : d === 1 ? PLAIN.filter(r => r[1] === '+' || r[1] === '−') : PLAIN;
@@ -76,6 +79,6 @@ export const y4WhichOp: Generator = (d, rng): Question => {
     const prompt = text.replace('{a}', f(a)).replace('{b}', f(b));
     if (prompt.length > 72) continue; // three lines at 390 px (#1051)
     const card = wordQ(rng, prompt, op, OPS.filter(o => o !== op), { say: `${ks2Say(prompt.replace(/\?$/, ''))}? Which operation solves it?`, hint: 'Which operation solves it?', hintIsData: false });
-    return { ...card, options: [...OPS], wide: false };
+    return { ...card, options: [...OPS], wide: false, why: whyOp(op, a, b) };
   }
 };
