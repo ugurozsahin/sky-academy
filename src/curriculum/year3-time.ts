@@ -82,7 +82,7 @@ function convertCard(rng: () => number): Question {
   }
   const prompt = `${t24(h, m)} in 12-hour time?`, answer = from24(h, m);
   const named = [(h + 12) % 24, (h + 14) % 24, (h + 10) % 24].map(x => from24(x, m));
-  const why = h === 0 ? `00:${two(m)} is just after midnight: ${answer}.` : h === 12 ? `12:${two(m)} is just after noon: ${answer}.` : h < 12 ? `Before 12:00 is am: ${answer}.` : `${h} − 12 = ${h12}, so pm: ${answer}.`;
+  const why = h === 0 ? `00:${two(m)} is ${m === 0 ? '' : 'just after '}midnight: ${answer}.` : h === 12 ? `12:${two(m)} is ${m === 0 ? '' : 'just after '}noon: ${answer}.` : h < 12 ? `Before 12:00 is am: ${answer}.` : `${h} − 12 = ${h12}, so pm: ${answer}.`;
   return { prompt, say: speak(prompt), answer, why, options: build(answer, named, spare.map(x => from24(x, m)), rng) };
 }
 

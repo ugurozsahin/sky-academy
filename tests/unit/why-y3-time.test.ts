@@ -13,23 +13,37 @@ describe('y3-time why (#2317)', () => {
     }
   });
   it('clock cards name the hour and the minutes the answer shows', () => {
+    let n = 0;
     for (const d of [1, 2] as Difficulty[]) for (const q of draw(d).filter(x => x.visual)) {
+      n++;
       const [h, m] = q.answer.split(' ')[0].split(':').map(Number);
       expect(q.why!.startsWith(`Hour ${h}, `), q.why).toBe(true);
-      expect(q.why, q.why).toContain(m === 0 ? 'no minutes' : `${m} minute`);
+      expect(q.why, q.why).toMatch(m === 0 ? /no minutes/ : new RegExp(`, ${m} minutes?[,:]`));
     }
+    expect(n).toBeGreaterThan(0);
   });
   it('the vocabulary cards give the right am/pm rule', () => {
-    for (const q of draw(2).filter(x => /^Which time/.test(x.prompt))) {
-      expect(q.why!.includes(' is pm: ') ? q.answer.endsWith('pm') : q.answer.endsWith('am'), q.why).toBe(true);
+    const qs = draw(2).filter(x => /^Which time/.test(x.prompt));
+    expect(qs.length).toBeGreaterThan(0);
+    for (const q of qs) {
+      const pm = q.why!.includes(' is pm: '), am = q.why!.includes(' is am: ');
+      expect(pm !== am, q.why).toBe(true);
+      expect(q.answer.endsWith(pm ? 'pm' : 'am'), q.why).toBe(true);
     }
   });
-  it('the 24-hour sums add up', () => {
+  it('the 24-hour sums add up and land on the answer hour', () => {
+    let n = 0;
     for (const q of draw(3)) {
-      const sum = q.why!.match(/^(\d+) ([+−]) 12 = (\d+)/) ?? q.why!.match(/pm: (\d+) \+ 12 = (\d+)/);
-      if (!sum) continue;
-      const nums = sum.slice(1).filter(x => /^\d+$/.test(x)).map(Number);
-      expect(sum[0].includes('+') ? nums[0] + 12 : nums[0] - 12, q.why).toBe(nums[1]);
+      const to24 = q.why!.match(/^pm: (\d+) \+ 12 = (\d+)/), to12 = q.why!.match(/^(\d+) − 12 = (\d+), so pm/);
+      if (to24) { n++; expect(Number(to24[1]) + 12, q.why).toBe(Number(to24[2])); expect(Number(to24[2]), q.why).toBe(Number(q.answer.slice(0, 2))); }
+      if (to12) { n++; expect(Number(to12[1]) - 12, q.why).toBe(Number(to12[2])); expect(Number(to12[2]), q.why).toBe(Number(q.answer.split(':')[0])); }
     }
+    expect(n).toBeGreaterThan(0);
+  });
+  it('exact noon and midnight are not "just after"', () => {
+    let n = 0;
+    const t = TOPICS.find(x => x.id === 'y3-time')!;
+    for (const q of Array.from({ length: 20000 }, (_, i) => t.gen(3, rngOf(i + 1)))) if (/^(00|12):00 is /.test(q.why!)) { n++; expect(q.why).not.toMatch(/just after/); }
+    expect(n).toBeGreaterThan(0);
   });
 });
