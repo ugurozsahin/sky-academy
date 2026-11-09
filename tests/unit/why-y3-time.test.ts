@@ -46,4 +46,16 @@ describe('y3-time why (#2317)', () => {
     for (const q of Array.from({ length: 20000 }, (_, i) => t.gen(3, rngOf(i + 1)))) if (/^(00|12):00 is /.test(q.why!)) { n++; expect(q.why).not.toMatch(/just after/); }
     expect(n).toBeGreaterThan(0);
   });
+  it('to-24 noon and midnight whys say "just after" unless the minutes are 00', () => {
+    let exact = 0, after = 0;
+    const t = TOPICS.find(x => x.id === 'y3-time')!;
+    for (const q of Array.from({ length: 20000 }, (_, i) => t.gen(3, rngOf(i + 1)))) {
+      const w = q.why!.match(/^12 (pm|am) is (just after )?(noon|midnight)/);
+      if (!w) continue;
+      if (w[2]) { after++; expect(q.answer, q.why).not.toMatch(/^(12|00):00$/); }
+      else { exact++; expect(q.answer, q.why).toMatch(/^(12|00):00$/); }
+    }
+    expect(exact).toBeGreaterThan(0);
+    expect(after).toBeGreaterThan(0);
+  });
 });
