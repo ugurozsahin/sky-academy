@@ -62,6 +62,18 @@ function vocabCard(rng: () => number): Question {
   return { prompt, say: speak(prompt), answer, why, options, optionsAreContent: true };
 }
 
+/** Why a 12-hour time becomes this 24-hour label. */
+const to24Why = (h: number, h12: number, answer: string) =>
+  h === 0 ? `12 am is midnight: ${answer}.` : h === 12 ? `12 pm is noon: ${answer}.` : h < 12 ? `am hours stay the same: ${answer}.` : `pm: ${h12} + 12 = ${h}, so ${answer}.`;
+
+/** Why a 24-hour time becomes this 12-hour label; exact noon and midnight are not "just after". */
+function to12Why(h: number, m: number, h12: number, answer: string): string {
+  const after = m === 0 ? '' : 'just after ';
+  if (h === 0) return `00:${two(m)} is ${after}midnight: ${answer}.`;
+  if (h === 12) return `12:${two(m)} is ${after}noon: ${answer}.`;
+  return h < 12 ? `Before 12:00 is am: ${answer}.` : `${h} − 12 = ${h12}, so pm: ${answer}.`;
+}
+
 /** d3: 12-hour ↔ 24-hour with no clock, plus the noon and midnight cards. */
 function convertCard(rng: () => number): Question {
   const kind = pick(rng, ['to24', 'to12', 'to24', 'to12', 'word'] as const);
@@ -77,12 +89,12 @@ function convertCard(rng: () => number): Question {
   if (kind === 'to24') {
     const prompt = `${from24(h, m)} on a 24-hour clock?`, answer = t24(h, m);
     const named = [(h + 12) % 24, (h12 + 10) % 24, (h + 10) % 24, (h + 14) % 24].map(x => t24(x, m));
-    const why = h === 0 ? `12 am is midnight: ${answer}.` : h === 12 ? `12 pm is noon: ${answer}.` : h < 12 ? `am hours stay the same: ${answer}.` : `pm: ${h12} + 12 = ${h}, so ${answer}.`;
+    const why = to24Why(h, h12, answer);
     return { prompt, say: speak(prompt), answer, why, options: build(answer, named, spare.map(x => t24(x, m)), rng) };
   }
   const prompt = `${t24(h, m)} in 12-hour time?`, answer = from24(h, m);
   const named = [(h + 12) % 24, (h + 14) % 24, (h + 10) % 24].map(x => from24(x, m));
-  const why = h === 0 ? `00:${two(m)} is ${m === 0 ? '' : 'just after '}midnight: ${answer}.` : h === 12 ? `12:${two(m)} is ${m === 0 ? '' : 'just after '}noon: ${answer}.` : h < 12 ? `Before 12:00 is am: ${answer}.` : `${h} − 12 = ${h12}, so pm: ${answer}.`;
+  const why = to12Why(h, m, h12, answer);
   return { prompt, say: speak(prompt), answer, why, options: build(answer, named, spare.map(x => from24(x, m)), rng) };
 }
 
