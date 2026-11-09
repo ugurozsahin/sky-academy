@@ -20,6 +20,7 @@ const diameterSeg = (c: Pt, r: number, deg: number, label?: string): GeoPart => 
 const PARTS = ['radius', 'diameter', 'circumference'] as const;
 type Part = typeof PARTS[number];
 
+const WHYS: Record<Part, string> = { radius: 'The radius runs from the centre to the edge.', diameter: 'The diameter goes across, through the centre.', circumference: 'The circumference is all the way round.' };
 const HINTS: Record<Part, string> = { radius: 'Centre to the edge', diameter: 'Across, through the centre', circumference: 'All the way round' };
 
 /** d1: A, B and C name the radius, the diameter and the circumference in a shuffled order; the card asks for one. */
@@ -29,7 +30,7 @@ function partCard(rng: Rng): Question {
   const parts: GeoPart[] = [{ kind: 'circle', at: C, r: R, label: at.circumference }, diameterSeg(C, R, dDeg, at.diameter), radiusSeg(C, R, rDeg, at.radius)];
   const prompt = `Which is the ${ask}?`;
   return wordQ(rng, prompt, at[ask], letters.filter(l => l !== at[ask]), {
-    visual: { type: 'geometry', parts }, say: `Which letter shows the ${ask}?`, hint: HINTS[ask], hintIsData: false,
+    visual: { type: 'geometry', parts }, say: `Which letter shows the ${ask}?`, why: WHYS[ask], hint: HINTS[ask], hintIsData: false,
   });
 }
 
@@ -56,10 +57,10 @@ function convertCard(rng: Rng): Question {
   const r = ri(rng, 2, 15), rDeg = pick(rng, [135, 225, 315]) + pick(rng, [-10, 0, 10]), dDeg = pick(rng, [0, 10, -10]);
   if (rng() < 0.5) {
     return numCard(rng, `Radius ${cm(r)}. Diameter = ? cm`, 2 * r, [r % 2 ? 0 : r / 2, r + 2, r * r, 3 * r], {
-      visual: { type: 'geometry', parts: [{ kind: 'circle', at: C, r: R }, radiusSeg(C, R, rDeg, cm(r))] }, say: `A circle has a radius of ${r} centimetres. What is its diameter, in centimetres?` });
+      visual: { type: 'geometry', parts: [{ kind: 'circle', at: C, r: R }, radiusSeg(C, R, rDeg, cm(r))] }, say: `A circle has a radius of ${r} centimetres. What is its diameter, in centimetres?`, why: `Diameter = 2 × radius: 2 × ${r} = ${2 * r} cm.` });
   }
   return numCard(rng, `Diameter ${cm(2 * r)}. Radius = ? cm`, r, [4 * r, 2 * r - 2, r * r, 2 * r + 2], {
-    visual: { type: 'geometry', parts: [{ kind: 'circle', at: C, r: R }, diameterSeg(C, R, dDeg, cm(2 * r))] }, say: `A circle has a diameter of ${2 * r} centimetres. What is its radius, in centimetres?` });
+    visual: { type: 'geometry', parts: [{ kind: 'circle', at: C, r: R }, diameterSeg(C, R, dDeg, cm(2 * r))] }, say: `A circle has a diameter of ${2 * r} centimetres. What is its radius, in centimetres?`, why: `Radius = half the diameter: ${2 * r} ÷ 2 = ${r} cm.` });
 }
 
 /** d3: reasoning, every prompt at most 60 characters. */
@@ -69,17 +70,17 @@ function reasoning(rng: Rng): Question {
     const r = ri(rng, 2, 9), c1: Pt = [30, 36], c2: Pt = [70, 36];
     return numCard(rng, `Two circles, radius ${cm(r)}, side by side. Width = ? cm`, 4 * r, [2 * r, 3 * r, r * r, 4 * r + 2], {
       visual: { type: 'geometry', parts: [{ kind: 'circle', at: c1, r: 20 }, { kind: 'circle', at: c2, r: 20 }, radiusSeg(c1, 20, 135, cm(r))] },
-      say: `Two circles, each with a radius of ${r} centimetres, sit side by side and touch. How wide are they together, in centimetres?` });
+      say: `Two circles, each with a radius of ${r} centimetres, sit side by side and touch. How wide are they together, in centimetres?`, why: `Each diameter is 2 × ${r} = ${2 * r} cm; two make ${4 * r} cm.` });
   }
   if (k < 0.67) {
     const r = ri(rng, 1, 9);
     return numCard(rng, `Radius ${cm(`${r}.5`)}. Diameter = ? cm`, 2 * r + 1, [2 * r, 2 * r + 2, r + 1, r + 3], {
-      visual: { type: 'geometry', parts: [{ kind: 'circle', at: C, r: R }, radiusSeg(C, R, 135, cm(`${r}.5`))] }, say: `A circle has a radius of ${r} and a half centimetres. What is its diameter, in centimetres?` });
+      visual: { type: 'geometry', parts: [{ kind: 'circle', at: C, r: R }, radiusSeg(C, R, 135, cm(`${r}.5`))] }, say: `A circle has a radius of ${r} and a half centimetres. What is its diameter, in centimetres?`, why: `Diameter = 2 × ${r}.5 = ${2 * r + 1} cm.` });
   }
   const r = ri(rng, 4, 12), s = 2 * r, [x0, x1, y0, y1] = [C[0] - R, C[0] + R, C[1] - R, C[1] + R];
   return numCard(rng, `A circle just fits in a ${cm(s)} square. Radius = ? cm`, r, [s, 2 * s, r - 2, s - 2], {
     visual: { type: 'geometry', parts: [{ kind: 'polygon', pts: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], sides: [cm(s)] }, { kind: 'circle', at: C, r: R }] },
-    say: `A circle just fits inside a square with sides of ${s} centimetres. What is the radius of the circle, in centimetres?` });
+    say: `A circle just fits inside a square with sides of ${s} centimetres. What is the radius of the circle, in centimetres?`, why: `The diameter is the side, ${s} cm; half is ${r} cm.` });
 }
 
 export const y6Circles: Generator = (d: Difficulty, rng: Rng): Question => (d === 1 ? partCard : d === 2 ? convertCard : reasoning)(rng);
