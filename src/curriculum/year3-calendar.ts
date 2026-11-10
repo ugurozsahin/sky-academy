@@ -29,11 +29,11 @@ function options(rng: Rng, answer: number, named: number[], spare: number[], mus
 
 function fact(rng: Rng): Question {
   const k = ri(rng, 0, 3);
-  if (k === 0) return card(rng, 'How many seconds in a minute?', 60, [100, 50, 30, 24]);
-  if (k === 1) return card(rng, 'How many days in a year?', 365, [366, 360, 355, 12, 52]);
-  if (k === 2) return card(rng, 'How many days in a leap year?', 366, [365, 360, 367, 52, 12]);
+  if (k === 0) return card(rng, 'How many seconds in a minute?', 60, [100, 50, 30, 24], { why: 'A minute is 60 seconds.' });
+  if (k === 1) return card(rng, 'How many days in a year?', 365, [366, 360, 355, 12, 52], { why: 'A year has 365 days.' });
+  if (k === 2) return card(rng, 'How many days in a leap year?', 366, [365, 360, 367, 52, 12], { why: 'A leap year has 366 days.' });
   const [name, days] = pick(rng, MONTHS.filter(m => m[0] !== 'February'));
-  return card(rng, `How many days in ${name}?`, days, [28, 29, 30, 31, 32, 21, 41]);
+  return card(rng, `How many days in ${name}?`, days, [28, 29, 30, 31, 32, 21, 41], { why: `${name} has ${days} days.` });
 }
 
 function card(rng: Rng, prompt: string, answer: number, named: number[], extra: Partial<Question> = {}, must?: number): Question {
@@ -49,13 +49,13 @@ function compare(rng: Rng): Question {
   const list = shuffle(rng, [...secs]), longest = rng() < 0.5, target = longest ? Math.max(...list) : Math.min(...list);
   const letters = ['A', 'B', 'C', 'D'], body = list.map((s, i) => `${letters[i]} ${len(s)}`).join(', ');
   const prompt = `${longest ? 'Longest' : 'Shortest'}? ${body}`;
-  return { prompt, say: speak(`Which is the ${longest ? 'longest' : 'shortest'} time? ${body.replace(/, /g, '. ')}`), answer: letters[list.indexOf(target)], options: letters, optionsAreContent: true, hint: 'Slice the letter', hintIsData: false };
+  return { prompt, say: speak(`Which is the ${longest ? 'longest' : 'shortest'} time? ${body.replace(/, /g, '. ')}`), answer: letters[list.indexOf(target)], options: letters, optionsAreContent: true, why: `${len(target)} is the ${longest ? 'longest' : 'shortest'} time.`, hint: 'Slice the letter', hintIsData: false };
 }
 
 function convert(rng: Rng): Question {
-  if (rng() < 0.25) return card(rng, 'How many seconds in half a minute?', 30, [60, 15, 20, 50, 45]);
+  if (rng() < 0.25) return card(rng, 'How many seconds in half a minute?', 30, [60, 15, 20, 50, 45], { why: 'Half of 60 seconds is 30 seconds.' });
   const m = ri(rng, 2, 5);
-  return card(rng, `How many seconds in ${m} minutes?`, m * 60, [m * 100, m * 10, m * 60 + 60, m * 60 - 60, m * 60 + 10]);
+  return card(rng, `How many seconds in ${m} minutes?`, m * 60, [m * 100, m * 10, m * 60 + 60, m * 60 - 60, m * 60 + 10], { why: `${m} lots of 60 seconds is ${m * 60} seconds.` });
 }
 
 const clock = (mins: number) => { const h = Math.floor(mins / 60), m = mins % 60; return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`; };
@@ -67,7 +67,7 @@ function duration(rng: Rng): Question {
   const hundred = (eh * 100 + em) - (sh * 100 + sm);
   const named = [hundred, Math.abs(em - sm), long + 5, long - 5, long + 60, long - 60];
   const thing = pick(rng, THINGS), prompt = `A ${thing} starts at ${clock(start)} and ends at ${clock(end)}. How many minutes?`;
-  return card(rng, prompt, long, named, { say: speak(prompt) }, hundred);
+  return card(rng, prompt, long, named, { say: speak(prompt), why: `${clock(start)} to ${clock(end)} is ${long} minutes.` }, hundred);
 }
 
 export const y3Calendar: Generator = (d: Difficulty, rng) => d === 1 ? fact(rng) : d === 2 ? (rng() < 0.6 ? compare(rng) : convert(rng)) : duration(rng);
