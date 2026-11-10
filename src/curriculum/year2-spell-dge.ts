@@ -33,5 +33,9 @@ export const G_BANK: readonly SpellRuleRow[] = [
 ];
 
 /** d1: -dge · d2: adds -ge · d3: adds g before e, i and y; 3 bubbles at every stage. */
-export const y2SpellDge: Generator = (d, rng) =>
-  spellRuleQ(rng, pick(rng, d === 1 ? DGE_BANK : d === 2 ? [...DGE_BANK, ...GE_BANK] : [...DGE_BANK, ...GE_BANK, ...G_BANK]), 3);
+export const y2SpellDge: Generator = (d, rng) => {
+  const row = pick(rng, d === 1 ? DGE_BANK : d === 2 ? [...DGE_BANK, ...GE_BANK] : [...DGE_BANK, ...GE_BANK, ...G_BANK]);
+  // #2318: the rule for the bank the word came from
+  const why = DGE_BANK.includes(row) ? '-dge comes after a short vowel.' : GE_BANK.includes(row) ? 'We never end a word in j: -ge.' : 'g can say j before e, i, y.';
+  return spellRuleQ(rng, row, 3, why);
+};

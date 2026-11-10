@@ -38,5 +38,9 @@ export const IL_BANK: readonly SpellRuleRow[] = [
 ];
 
 /** d1: -le, 3 bubbles · d2: adds -el, 4 bubbles · d3: adds -al and -il, 4 bubbles. */
-export const y2SpellLe: Generator = (d, rng) =>
-  spellRuleQ(rng, pick(rng, d === 1 ? LE_BANK : d === 2 ? [...LE_BANK, ...EL_BANK] : [...LE_BANK, ...EL_BANK, ...AL_BANK, ...IL_BANK]), d === 1 ? 3 : 4);
+export const y2SpellLe: Generator = (d, rng) => {
+  const row = pick(rng, d === 1 ? LE_BANK : d === 2 ? [...LE_BANK, ...EL_BANK] : [...LE_BANK, ...EL_BANK, ...AL_BANK, ...IL_BANK]);
+  // #2318: the ending the word has, and where it is usual
+  const why = LE_BANK.includes(row) ? `${row[0]} ends -le, the usual ending.` : `${row[0]} ends -${row[0].slice(-2)}.`;
+  return spellRuleQ(rng, row, d === 1 ? 3 : 4, why);
+};
