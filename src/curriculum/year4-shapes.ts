@@ -56,6 +56,13 @@ const TERM: Record<Cls, string> = {
 };
 const THE: Record<Cls, string> = { ...TERM, equilateral: 'the equilateral triangle', isosceles: 'the isosceles triangle', scalene: 'the scalene triangle', 'right-angled': 'the right-angled triangle' };
 
+/** What makes each class itself — the line shown after a wrong slice (#2317). */
+const PROP: Record<Cls, string> = {
+  equilateral: '3 equal sides', isosceles: '2 equal sides', scalene: 'no equal sides', 'right-angled': 'one right angle',
+  square: '4 equal sides, 4 right angles', rectangle: '4 right angles, opposite sides equal', rhombus: '4 equal sides, opposite sides parallel',
+  parallelogram: 'two pairs of parallel sides', trapezium: 'one pair of parallel sides', kite: 'two pairs of equal sides, side by side', irregular: 'no equal or parallel sides',
+};
+
 const LETTERS = ['A', 'B', 'C'], CELLS = [2, 35, 68], W = 29, TOP = 6, H = 48;
 
 /** `tpl` turned a random multiple of 90°, maybe mirrored, scaled to fit cell `i` (exact coordinates, 2 decimals) and lettered. */
@@ -99,6 +106,7 @@ function cardOf(rng: Rng, pool: Cls[], d: number): Question {
   return {
     ...q(`Which is ${d === 2 ? THE[asked] : TERM[asked]}?`), answer: LETTERS[classes.indexOf(asked)], options: shuffle(rng, LETTERS.slice()),
     visual: { type: 'geometry', parts }, hint: 'Slice the right letter', hintIsData: false,
+    why: `${LETTERS[classes.indexOf(asked)]} is ${TERM[asked]}: ${PROP[asked]}.`,
   };
 }
 
@@ -117,6 +125,7 @@ export const y4Shapes: Generator = (d: Difficulty, rng: Rng): Question => {
       // Drawn the same way every time (first template, upright): the repeat key reads a polygon's points, so a re-rolled turn would make one statement look new.
       visual: { type: 'geometry', parts: [draw(() => 0.2, SHAPES[s.yes][0], 1, false)] },
       hint: 'Check each property', hintIsData: false,
+      why: `${s.has[0].toUpperCase()}${s.has.slice(1)} means ${TERM[s.yes]}.`,
     };
   }
   return cardOf(rng, d === 2 ? TRIANGLES : QUADS, d);
