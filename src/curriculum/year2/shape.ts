@@ -39,17 +39,19 @@ export const y2Position: Generator = (d, rng) => {
     return wordQ(rng, `Face ${DIRS[start][1]}, then ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way now?`, DIRS[end][1], ARROWS.filter(a => a !== DIRS[end][1]), {
       say: `You are facing ${DIRS[start][0]}. Turn ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow', hintIsData: false,
       visual: { type: 'geometry', parts: [facing(start)] },
+      why: `From ${DIRS[start][0]}, ${name} ${cw ? 'clockwise' : 'anti-clockwise'} faces ${DIRS[end][0]}.`,
     });
   }
   if (kind === 1) {                                              // rotation as right angles
     const [name, steps] = pick(rng, TURNS_ALL);
     const turn: Visual = { type: 'geometry', parts: [{ kind: 'angle', at: [50, 35], dir: 0, deg: steps * 90, len: 22 }] };
-    if (rng() < 0.5) return numQ(rng, `${cap(name)} = how many right angles?`, steps, { min: 0, max: 8, visual: turn, say: `How many right angles are the same as ${name}?`, distractors: [steps + 1, steps - 1, steps + 2] });
-    return wordQ(rng, `${steps} right angle${steps === 1 ? '' : 's'} = ?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), { visual: turn, say: `Which turn is the same as ${steps} right angle${steps === 1 ? '' : 's'}?`, hint: 'Slice the turn', hintIsData: false });
+    if (rng() < 0.5) return numQ(rng, `${cap(name)} = how many right angles?`, steps, { min: 0, max: 8, visual: turn, say: `How many right angles are the same as ${name}?`, why: `${cap(name)} is ${steps} right angle${steps === 1 ? '' : 's'}.`, distractors: [steps + 1, steps - 1, steps + 2] });
+    return wordQ(rng, `${steps} right angle${steps === 1 ? '' : 's'} = ?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), { visual: turn, say: `Which turn is the same as ${steps} right angle${steps === 1 ? '' : 's'}?`, hint: 'Slice the turn', hintIsData: false, why: `${steps} right angle${steps === 1 ? ' is' : 's are'} ${name}.` });
   }
   const cw = rng() < 0.5, steps = pick(rng, [1, 2, 3]), start = ri(rng, 0, 3), end = turnEnd(start, steps, cw), name = TURNS_ALL[steps - 1][0];
   return wordQ(rng, `Face ${DIRS[start][1]}, turn ${cw ? 'clockwise' : 'anti-clockwise'} to face ${DIRS[end][1]}. Which turn?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), {
-    say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn', hintIsData: false,   // no picture: two bare rays cannot tell a quarter turn one way from three-quarters the other (#2271)
+    say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn', hintIsData: false,
+    why: `${cap(DIRS[start][0])} to ${DIRS[end][0]} ${cw ? 'clockwise' : 'anti-clockwise'}: ${name}.`,   // no picture: two bare rays cannot tell a quarter turn one way from three-quarters the other (#2271)
   });
 };
 // ---------- Symmetry & repeating patterns (#299 slice 4) ----------

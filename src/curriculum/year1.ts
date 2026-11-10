@@ -300,16 +300,17 @@ const y1Position: Generator = (d, rng) => {
   if (kind === 3) return y1PositionRow(d, rng);
   if (kind === 0) {                                              // name the way an arrow points
     const [word, arrow] = pick(rng, DIRS);
-    return wordQ(rng, `Which way does ${arrow} point?`, word, DIRS.map(x => x[0]).filter(w => w !== word), { say: 'Which way does the arrow point? Up, down, left or right?', hint: 'Slice the word', hintIsData: false });
+    return wordQ(rng, `Which way does ${arrow} point?`, word, DIRS.map(x => x[0]).filter(w => w !== word), { say: 'Which way does the arrow point? Up, down, left or right?', hint: 'Slice the word', hintIsData: false, why: `${arrow} points ${word}.` });
   }
   if (kind === 1) {                                              // pick the arrow for a direction
     const [word, arrow] = pick(rng, DIRS);
-    return wordQ(rng, `Which arrow points ${word}?`, arrow, ARROWS.filter(a => a !== arrow), { say: `Which arrow points ${word}?`, hint: 'Slice the arrow', hintIsData: false });
+    return wordQ(rng, `Which arrow points ${word}?`, arrow, ARROWS.filter(a => a !== arrow), { say: `Which arrow points ${word}?`, hint: 'Slice the arrow', hintIsData: false, why: `${arrow} points ${word}.` });
   }
   const [name, steps] = pick(rng, d === 3 ? TURNS_ALL : TURNS_Y1);   // where do you face after a turn?
   const cw = rng() < 0.5, start = ri(rng, 0, 3), end = turnEnd(start, steps, cw);
   return wordQ(rng, `Face ${DIRS[start][1]}, then ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way now?`, DIRS[end][1], ARROWS.filter(a => a !== DIRS[end][1]), {
     say: `You are facing ${DIRS[start][0]}. Make ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow', hintIsData: false,
+    why: `From ${DIRS[start][0]}, ${name} ${cw ? 'clockwise' : 'anti-clockwise'} faces ${DIRS[end][0]}.`,
   });
 };
 
