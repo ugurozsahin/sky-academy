@@ -991,7 +991,7 @@ test.describe('Sharpwise', () => {
     expect(await runLives()).toBe(YEARS.find(y => y.id === 'year1')!.lives - 1);
     await winMission(page);
     await page.click('#next-topic');                                              // review #1967: "Next topic" is an ordinary mission on the canonical year
-    await expect.poll(runLives).toBe(YEARS.find(y => y.id === 'year1')!.lives);   // polled: the old play screen is still up for a beat
+    await expect.poll(runLives, { timeout: 15_000 }).toBe(YEARS.find(y => y.id === 'year1')!.lives);   // polled: the old play screen is still up for a beat; 15 s, not the 5 s default, which the full desktop run's load beat on 2026-11-10 (#2594)
   });
 
   test('no Legend run · Pro row on Reception (#1297)', async ({ page }) => {
