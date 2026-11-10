@@ -30,5 +30,9 @@ export const CY_BANK: readonly SpellRuleRow[] = [
 ];
 
 /** d1: c before e, 3 bubbles · d2: adds c before i, 4 bubbles · d3: adds c before y, 4 bubbles. */
-export const y2SpellC: Generator = (d, rng) =>
-  spellRuleQ(rng, pick(rng, d === 1 ? CE_BANK : d === 2 ? [...CE_BANK, ...CI_BANK] : [...CE_BANK, ...CI_BANK, ...CY_BANK]), d === 1 ? 3 : 4);
+export const y2SpellC: Generator = (d, rng) => {
+  const row = pick(rng, d === 1 ? CE_BANK : d === 2 ? [...CE_BANK, ...CI_BANK] : [...CE_BANK, ...CI_BANK, ...CY_BANK]);
+  // #2318: the letter that follows the c
+  const next = CE_BANK.includes(row) ? 'e' : CI_BANK.includes(row) ? 'i' : 'y';
+  return spellRuleQ(rng, row, d === 1 ? 3 : 4, `c says s before ${next}.`);
+};

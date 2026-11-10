@@ -28,5 +28,5 @@ export const LONG_BANK: readonly SpellRuleRow[] = [
 /** d1: two-syllable words, 3 bubbles · d2: 4 bubbles · d3: adds the longer words, 4 bubbles. */
 export const y2SpellTion: Generator = (d, rng) => {
   const row = pick(rng, d < 3 ? SHORT_BANK : [...SHORT_BANK, ...LONG_BANK]);
-  return spellRuleQ(rng, d === 1 ? [row[0], row[1], row[2].slice(0, 2)] : row, d === 1 ? 3 : 4);
+  return spellRuleQ(rng, d === 1 ? [row[0], row[1], row[2].slice(0, 2)] : row, d === 1 ? 3 : 4, `${row[0]}: the shun sound is -tion.`);  // #2318
 };
