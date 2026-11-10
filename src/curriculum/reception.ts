@@ -59,6 +59,13 @@ export const MEASURE_PAIRS: Record<Measure, [string, string][]> = {
   'holds more': [['🛁', '☕'], ['🛁', '🥛'], ['🛢️', '🥄'], ['🛢️', '🍼']],
 };
 const MEASURE_OPPOSITE: Record<Measure, string> = { taller: 'shorter', longer: 'shorter', heavier: 'lighter', 'holds more': 'holds less' };
+const MEASURE_WHY: Record<string, string> = {
+  taller: 'Taller means it reaches higher.', shorter: 'Shorter means it reaches less.',
+  longer: 'Longer means it stretches further.', heavier: 'Heavier means harder to lift.',
+  lighter: 'Lighter means easier to lift.', 'holds more': 'It holds more: it fills with more.',
+  'holds less': 'It holds less: it fills up sooner.',
+};
+const measureWhy = (attr: Measure, word: string): string => (attr === 'longer' && word === 'shorter' ? 'Shorter means it stretches less.' : MEASURE_WHY[word]);
 const rMeasure: Generator = (d, rng) => {
   const attrs: Measure[] = d === 1 ? ['taller', 'longer'] : d === 2 ? ['taller', 'longer', 'heavier'] : ['taller', 'longer', 'heavier', 'holds more'];
   const attr = pick(rng, attrs);
@@ -66,7 +73,7 @@ const rMeasure: Generator = (d, rng) => {
   const opposite = d > 1 && rng() < 0.5;
   const word = opposite ? MEASURE_OPPOSITE[attr] : attr;
   const prompt = attr === 'holds more' ? `Which ${word}?` : `Which is ${word}?`;
-  return wordQ(rng, prompt, opposite ? small : big, [opposite ? big : small], { say: prompt });
+  return wordQ(rng, prompt, opposite ? small : big, [opposite ? big : small], { say: prompt, why: measureWhy(attr, word) });
 };
 const rBonds: Generator = (d, rng) => {
   const total = d === 1 ? 5 : d === 2 ? pick(rng, [5, 6, 7, 8]) : 10;
@@ -84,6 +91,7 @@ const rSub: Generator = (d, rng) => {
   const a = ri(rng, 2, max), b = ri(rng, 1, a);
   return numQ(rng, `${a} − ${b} = ?`, a - b, { min: 0, max: 10, visual: { type: 'objects', emoji: pick(rng, OBJECTS), n: a, n2: -b }, say: `${a} take away ${b}?`, why: `${a} take away ${b} leaves ${a - b}.` });
 };
+const moreWhy = (ans: number, other: number, more: boolean): string => `${ans} is ${more ? 'more' : 'fewer'} than ${other}.`;
 const rCompare: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 10;
   // d3 (#891): the ELG asks for "greater than, less than OR THE SAME AS" — one card in three at d3 draws
@@ -96,6 +104,7 @@ const rCompare: Generator = (d, rng) => {
     return wordQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, '=', [String(a), String(near)], {
       visual: { type: 'objects', emoji: '🍎', n: a, emoji2: '🍌', n2: a },
       say: `Which number is ${wantMore ? 'more' : 'fewer'}, ${a} or ${a}, or are they the same?`,
+      why: `${a} and ${a} are the same.`,
     });
   }
   let a = ri(rng, 1, max), b = ri(rng, 1, max);
@@ -105,9 +114,10 @@ const rCompare: Generator = (d, rng) => {
   const other = wantMore ? Math.min(a, b) : Math.max(a, b);
   const say = `Which number is ${wantMore ? 'more' : 'fewer'}, ${a} or ${b}${d === 3 ? ', or are they the same' : ''}?`;
   const visual = { type: 'objects' as const, emoji: '🍎', n: a, emoji2: '🍌', n2: b };
+  const why = moreWhy(ans, other, wantMore);
   return d === 3
-    ? wordQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, String(ans), [String(other), '='], { visual, say })
-    : numQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, ans, { distractors: [other], n: 1, visual, say });
+    ? wordQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, String(ans), [String(other), '='], { visual, say, why })
+    : numQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, ans, { distractors: [other], n: 1, visual, say, why });
 };
 const rCountOn: Generator = (d, rng) => {
   const start = ri(rng, 1, d === 3 ? 25 : d === 2 ? 15 : 8);
@@ -144,6 +154,7 @@ const rDoubles: Generator = (d, rng) => {
  * d1 offers two decoys, d2 every legal decoy; d3 shows the glyph and the bubbles are the names. Counting sides
  * is Year 1 (`y1-shapes`).
  */
+const sidesWhy = (name: string, sides: number): string => `A ${name} has ${sides || 'no straight'} sides.`;
 const rShapes: Generator = (d, rng) => {
   const set = SHAPES_2D.slice(0, 4);
   const [g, name] = pick(rng, set);
@@ -151,7 +162,7 @@ const rShapes: Generator = (d, rng) => {
   // Shuffle first so equal side counts tie at random; the stable sort then puts the closest look-alikes first (#2320).
   const decoys = shuffle(rng, set.filter(s => !sameShape(s[1], name))).sort((a, b) => Math.abs(a[2] - sides) - Math.abs(b[2] - sides));
   const ds = d === 1 ? decoys.slice(0, 2) : decoys;
-  const hint = { hint: 'Slice the shape', hintIsData: false };
+  const hint = { hint: 'Slice the shape', hintIsData: false, why: sidesWhy(name, sides) };
   if (d === 3) return wordQ(rng, 'What is this shape called?', name, ds.map(s => s[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?', ...hint });
   return wordQ(rng, `Which is a ${name}?`, g, ds.map(s => s[0]), { say: `Which one is a ${name}?`, ...hint });
 };
@@ -211,6 +222,7 @@ const rPatterns: Generator = (d, rng) => {
     visual: { type: 'strip', text: [...[...p.cells].map(glyph), '_'].join(' ') },
     say: 'Look at the pattern. What comes next?',
     hint: 'Slice what comes next', hintIsData: false,
+    why: `The pattern repeats every ${p.unit.length} objects.`,
   });
 };
 const rBalance: Generator = (d, rng) => {
