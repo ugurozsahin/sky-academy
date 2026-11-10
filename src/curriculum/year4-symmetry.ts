@@ -45,11 +45,12 @@ export function symmetryLines(g: Grid): { vertical: boolean; horizontal: boolean
 }
 
 const COUNTS = ['0', '1', '2', '4'];
+const COUNT_WHY: Record<string, string> = { 0: 'No fold makes it match itself.', 1: 'One fold makes it match itself.', 2: 'Two folds make it match itself.', 4: 'Four folds make it match itself.' };
 const LETTERS = ['A', 'B', 'C', 'D'];
 
 function letterCard(rng: Rng): Question {
-  return wordQ(rng, 'Which letter has a horizontal line of symmetry?', pick(rng, HORIZONTAL), shuffle(rng, NOT_HORIZONTAL),
-    { say: 'Which letter looks the same when you fold it top to bottom?', hint: 'Slice the letter that folds top to bottom', hintIsData: false });
+  return { ...wordQ(rng, 'Which letter has a horizontal line of symmetry?', pick(rng, HORIZONTAL), shuffle(rng, NOT_HORIZONTAL),
+    { say: 'Which letter looks the same when you fold it top to bottom?', hint: 'Slice the letter that folds top to bottom', hintIsData: false }), why: 'Fold it top to bottom: the halves match.' };
 }
 
 function countCard(rng: Rng): Question {
@@ -58,7 +59,7 @@ function countCard(rng: Rng): Question {
   return {
     ...wordQ(rng, 'How many lines of symmetry does this shape have?', String(symmetryLines(g).total), COUNTS),
     options: shuffle(rng, COUNTS), visual: { type: 'symmetry', grid: g, mirror: false }, wide: false,
-    hint: 'Slice how many ways it folds onto itself', hintIsData: false,
+    hint: 'Slice how many ways it folds onto itself', hintIsData: false, why: COUNT_WHY[symmetryLines(g).total],
   };
 }
 
@@ -89,6 +90,7 @@ function completeCard(rng: Rng): Question {
       prompt: 'Which square makes the pattern symmetrical?', say: 'Which lettered square makes the pattern the same on both sides of the dashed line?',
       answer: LETTERS[order.indexOf(answerCell)], options: LETTERS.slice(), wide: false,
       visual: { type: 'symmetry', grid: grid.map(row => row.join('')) }, hint: 'Slice the square that mirrors across the line', hintIsData: false,
+      why: 'Flip it across the line; don\'t slide it.',
     };
   }
 }
