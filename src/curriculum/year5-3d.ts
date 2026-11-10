@@ -38,6 +38,7 @@ function netCard(rng: Rng, level: Difficulty): Question {
   const shape = yes ? pick(rng, CUBE_NETS) : pick(rng, level === 2 ? OBVIOUS : NEAR_MISSES);
   return wordQ(rng, 'Does this net fold into a cube?', yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
     say: 'Does this net fold into a cube?', hint: 'Picture folding it up. A cube has six faces and none may land on another', hintIsData: false,
+    why: yes ? 'Six squares fold up, none on the same face.' : 'Two squares would land on the same face.',
     visual: { type: 'symmetry', grid: place(rng, shape, level === 3), mirror: false },
   });
 }
@@ -55,7 +56,7 @@ const FACES: Record<string, string[]> = {
 function nameCard(rng: Rng): Question {
   const names = SHAPES_3D.map(s => s[1]), name = pick(rng, names), faces = pick(rng, FACES[name]);
   const ds = shuffle(rng, names.filter(n => !sameShape(n, name))).slice(0, 3);
-  return wordQ(rng, `Which solid has ${faces}?`, name, ds, { say: `Which solid has ${faces}?`, hint: 'Picture each solid. Count its flat faces and look at their shapes', hintIsData: false });
+  return wordQ(rng, `Which solid has ${faces}?`, name, ds, { say: `Which solid has ${faces}?`, hint: 'Picture each solid. Count its flat faces and look at their shapes', hintIsData: false, why: `A ${name} has ${faces}.` });
 }
 
 export const y5Solids: Generator = (level: Difficulty, rng) => (level === 1 ? nameCard(rng) : netCard(rng, level));

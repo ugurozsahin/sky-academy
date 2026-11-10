@@ -1,7 +1,7 @@
 // y2-objects3d (#997): everyday objects matched to the 3-D shape they are. None of the pictures is a SHAPES_3D glyph
 // (y2-shapes already draws those), and a solid is only ever the answer if the bank holds at least two objects for it.
 import type { Difficulty, Generator, Question, Rng } from './types';
-import { pick, shuffle, wordQ, SAME_SOLID, sameShape } from './util';
+import { pick, shuffle, wordQ, SAME_SOLID, SHAPES_3D, sameShape } from './util';
 
 /** [picture, "a/an name", solid]. An object that is only roughly a solid (a carrot is not a cone) stays out. */
 export const OBJECTS_3D: readonly (readonly [string, string, string])[] = [
@@ -33,14 +33,14 @@ const nameCard = (rng: Rng, d: Difficulty): Question => {
   const [emoji, label, solid] = pick(rng, pool);
   const names = d === 1 ? NAME_POOL.slice(0, 5) : NAME_POOL;
   const ds = distinctFrom(rng, names, s => s, solid, 3);
-  return wordQ(rng, `What shape is ${label}?`, solid, ds, { visual: { type: 'word', text: emoji }, say: `What shape is ${label}?` });
+  return wordQ(rng, `What shape is ${label}?`, solid, ds, { visual: { type: 'word', text: emoji }, say: `What shape is ${label}?`, why: SHAPES_3D.find(x => x[1] === solid)![2].why });
 };
 
 const objectCard = (rng: Rng): Question => {
   const solid = pick(rng, ANSWER_SOLIDS);
   const [emoji] = pick(rng, OBJECTS_3D.filter(o => o[2] === solid));
   const ds = distinctFrom(rng, OBJECTS_3D, o => o[2], solid, 3).map(o => o[0]);
-  return wordQ(rng, `Which one is a ${solid}?`, emoji, ds, { say: `Which one is a ${solid}?`, hint: 'Slice the object with that shape', hintIsData: false });
+  return wordQ(rng, `Which one is a ${solid}?`, emoji, ds, { say: `Which one is a ${solid}?`, hint: 'Slice the object with that shape', hintIsData: false, why: SHAPES_3D.find(x => x[1] === solid)![2].why });
 };
 
 export const y2Objects3d: Generator = (d: Difficulty, rng: Rng): Question => {

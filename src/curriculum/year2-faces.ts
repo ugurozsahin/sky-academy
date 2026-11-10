@@ -45,7 +45,7 @@ const faceCard = (rng: Rng): Question => {
   const wrong = SHAPES_2D.map(x => x[1]).filter(f => !has(s, f));
   const ds = decoys(rng, wrong, 3, FLAT_PAIR).map(glyph2);
   const prompt = `Which flat shape is on a ${asName(s)}?`;
-  return wordQ(rng, prompt, glyph2(face), ds, { visual: { type: 'word', text: solid(s)[0] }, say: prompt, hint: 'Look at one flat face', hintIsData: false });
+  return wordQ(rng, prompt, glyph2(face), ds, { visual: { type: 'word', text: solid(s)[0] }, say: prompt, hint: 'Look at one flat face', hintIsData: false, why: `A ${asName(s)} has a ${face} face.` });
 };
 
 /** Face → solid: "Which 3-D shape has a triangle face?" */
@@ -55,7 +55,7 @@ const solidCard = (rng: Rng): Question => {
   const wrong = SHAPES_3D.map(s => s[1]).filter(s => !has(s, face));
   const ds = decoys(rng, wrong, 3, SOLID_PAIR).map(n => solid(n)[0]);
   const prompt = `Which 3-D shape has a ${face} face?`;
-  return wordQ(rng, prompt, solid(right)[0], ds, { say: prompt, hint: 'Slice the 3-D shape', hintIsData: false });
+  return wordQ(rng, prompt, solid(right)[0], ds, { say: prompt, hint: 'Slice the 3-D shape', hintIsData: false, why: `A ${asName(right)} has a ${face} face.` });
 };
 
 /** Sides of a named face: cube and cuboid faces have 4, a triangle face of the pyramid has 3. */
@@ -63,7 +63,7 @@ const sidesCard = (rng: Rng): Question => {
   const [s, face] = pick(rng, [['cube', 'square'], ['cuboid', 'rectangle'], ['pyramid', 'triangle'], ['pyramid', 'square']] as const);
   const sides = SHAPES_2D.find(x => x[1] === face)![2];
   const prompt = `How many sides has a ${face} face of a ${asName(s)}?`;
-  return numQ(rng, prompt, sides, { min: 0, max: 8, say: prompt, visual: { type: 'word', text: solid(s)[0] } });
+  return numQ(rng, prompt, sides, { min: 0, max: 8, say: prompt, visual: { type: 'word', text: solid(s)[0] }, why: `A ${face} has ${sides} sides.` });
 };
 
 export const y2Faces: Generator = (d: Difficulty, rng: Rng): Question => {
