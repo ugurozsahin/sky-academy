@@ -5,13 +5,14 @@ import type { Difficulty, Generator, Question, Rng } from './types';
 import { ri, pick, wordQ, symSay } from './util';
 
 const TABLES = [2, 5, 10];
+const RULE = { '+': 'Adding in any order gives the same.', '×': 'Times in any order gives the same.', '−': 'Subtracting in a different order changes it.', '÷': 'Dividing in a different order changes it.' };
 
 /** Four options for "Which is the same as <prompt>?": `answer` (the operands swapped) and three decoys. */
-function sameQ(rng: Rng, prompt: string, value: number, answer: string, spares: [string, number][]): Question {
+function sameQ(rng: Rng, prompt: string, value: number, answer: string, spares: [string, number][], why: string): Question {
   // A decoy whose value equals the prompt's (`2 + 2` against `2 × 2`) is dropped, so the next spare takes its place.
   const ds = spares.filter(([s, v], i) => v !== value && v <= 100 && s !== answer && spares.findIndex(x => x[0] === s) === i).slice(0, 3).map(x => x[0]);
   if (ds.length < 3) throw new Error(`y2AnyOrder: only ${ds.length} decoy(s) for ${prompt}`);
-  return wordQ(rng, `Which is the same as ${prompt}?`, answer, ds, { say: `Which is the same as ${symSay(prompt)}`, hint: 'Swap the two numbers', hintIsData: false });
+  return wordQ(rng, `Which is the same as ${prompt}?`, answer, ds, { say: `Which is the same as ${symSay(prompt)}`, hint: 'Swap the two numbers', hintIsData: false, why });
 }
 
 function sameAdd(rng: Rng): Question {
@@ -20,7 +21,7 @@ function sameAdd(rng: Rng): Question {
   const hi = Math.max(a, b), lo = Math.min(a, b);
   return sameQ(rng, `${a} + ${b}`, a + b, `${b} + ${a}`, [
     [`${b} + ${a + 1}`, a + b + 1], [`${b} + ${a - 1}`, a + b - 1], [`${hi} − ${lo}`, hi - lo],
-  ]);
+  ], `Add in any order: both make ${a + b}.`);
 }
 
 function sameTimes(rng: Rng): Question {
@@ -31,7 +32,7 @@ function sameTimes(rng: Rng): Question {
   return sameQ(rng, `${t} × ${n}`, t * n, `${n} × ${t}`, [
     [`${hi} × ${t}`, hi * t], [`${lo} × ${t}`, lo * t], [`${n} + ${t}`, n + t],
     [`${n >= 9 ? n - 3 : n + 2} × ${t}`, (n >= 9 ? n - 3 : n + 2) * t],
-  ]);
+  ], `Times in any order: both make ${t * n}.`);
 }
 
 /** "Is 4 + 9 the same as 9 + 4?" — yes for + and ×, no for − and ÷. */
@@ -49,7 +50,7 @@ function yesNo(rng: Rng, op: '+' | '−' | '×' | '÷', d: Difficulty): Question
   }
   // #2322: one line of numerals, "a op b = b op a?", answered Yes / No; the voice still says the whole sentence
   const spoken = `Is ${a} ${op} ${b} the same as ${b} ${op} ${a}`;
-  return wordQ(rng, `${a}${op}${b} = ${b}${op}${a}?`, op === '+' || op === '×' ? 'Yes' : 'No', ['Yes', 'No'], { say: symSay(spoken), hint: 'Swap the two numbers', hintIsData: false });
+  return wordQ(rng, `${a}${op}${b} = ${b}${op}${a}?`, op === '+' || op === '×' ? 'Yes' : 'No', ['Yes', 'No'], { say: symSay(spoken), hint: 'Swap the two numbers', hintIsData: false, why: RULE[op] });
 }
 
 export const y2AnyOrder: Generator = (d, rng) => {
