@@ -26,9 +26,9 @@ export type SpellRuleRow = readonly [word: string, sentence: string, decoys: rea
  * hears which word is meant; with the voice off the sentence still tells them (no-voice play, `types.ts`).
  * `bubbles` counts the answer too.
  */
-export function spellRuleQ(rng: Rng, [word, sentence, decoys]: SpellRuleRow, bubbles: number): Question {
+export function spellRuleQ(rng: Rng, [word, sentence, decoys]: SpellRuleRow, bubbles: number, why?: string): Question {
   return wordQ(rng, 'Which spelling is right?', word, shuffle(rng, decoys).slice(0, bubbles - 1), {
-    visual: { type: 'sentence', text: sentence },
+    visual: { type: 'sentence', text: sentence }, why,
     say: `${word}. ${sentence.replace('___', 'blank')}`,
     hint: 'Slice the right spelling', hintIsData: false,
   });
