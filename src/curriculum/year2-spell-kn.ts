@@ -30,5 +30,8 @@ export const GN_BANK: readonly SpellRuleRow[] = [
 ];
 
 /** d1: kn, 3 bubbles · d2: adds wr, 4 bubbles · d3: adds gn, 4 bubbles. */
-export const y2SpellKn: Generator = (d, rng) =>
-  spellRuleQ(rng, pick(rng, d === 1 ? KN_BANK : d === 2 ? [...KN_BANK, ...WR_BANK] : [...KN_BANK, ...WR_BANK, ...GN_BANK]), d === 1 ? 3 : 4);
+export const y2SpellKn: Generator = (d, rng) => {
+  const row = pick(rng, d === 1 ? KN_BANK : d === 2 ? [...KN_BANK, ...WR_BANK] : [...KN_BANK, ...WR_BANK, ...GN_BANK]);
+  const start = row[0].slice(0, 2);  // #2318: the silent first letter, named
+  return spellRuleQ(rng, row, d === 1 ? 3 : 4, `Silent ${start[0]}: it starts ${start}.`);
+};

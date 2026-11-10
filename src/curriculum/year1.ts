@@ -429,14 +429,16 @@ export const Y1_SPELL_RULES: [string, SpellRuleFamily, [string, string]][] = [
 ];
 const y1SpellRules: Generator = (d, rng) => {
   const families: SpellRuleFamily[] = d === 1 ? ['double'] : d === 2 ? ['double', 'nk', 've'] : ['double', 'nk', 'tch', 've'];
-  const [w, , decoys] = pick(rng, Y1_SPELL_RULES.filter(e => families.includes(e[1])));
-  return spellChoiceQ(rng, w, decoys);
+  const [w, fam, decoys] = pick(rng, Y1_SPELL_RULES.filter(e => families.includes(e[1])));
+  const why = fam === 'double' ? `After a short vowel, it ends -${w.slice(-2)}.` : fam === 'nk' ? 'Write n before k: -nk.' : fam === 'tch' ? 'After a short vowel, /ch/ is -tch.' : 'No English word ends in v: add e.';  // #2318
+  return spellChoiceQ(rng, w, decoys, why);
 };
+const PLURAL_WHY: Record<string, string> = { s: 'just add s.', es: 'add es after x, s, sh, ch.' };  // #2318
 const y1Plurals: Generator = (d, rng) => {
   const S: [string, string][] = [['cat', 's'], ['dog', 's'], ['book', 's'], ['hat', 's'], ['car', 's'], ['tree', 's'], ['fox', 'es'], ['box', 'es'], ['bus', 'es'], ['dish', 'es'], ['bench', 'es'], ['wish', 'es'], ['glass', 'es'], ['brush', 'es']];
   const [w, suf] = pick(rng, d === 1 ? S.filter(x => x[1] === 's') : S);
   // #2322: two bubbles (s, es) until d3, which adds ies; "two cat__" is the whole sentence, the word is on the card
-  return wordQ(rng, `two ${w}__`, suf, d === 3 ? ['s', 'es', 'ies'] : ['s', 'es'], { visual: { type: 'word', text: `${w}_` }, say: `One ${w}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
+  return wordQ(rng, `two ${w}__`, suf, d === 3 ? ['s', 'es', 'ies'] : ['s', 'es'], { visual: { type: 'word', text: `${w}_` }, why: `${w}${suf}: ${PLURAL_WHY[suf]}`, say: `One ${w}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
 };
 /** [root, ending, sentence]. The sentence alone decides the ending (#2272); `tests/unit/topic-suffix-fit.test.ts` pins each one. */
 export const Y1_SUFFIX: ReadonlyArray<readonly [string, string, string]> = [['jump', 'ing', 'She is jump___ now.'], ['play', 'ed', 'Yesterday he play___.'], ['walk', 'ing', 'I am walk___ to school.'], ['look', 'ed', 'We look___ at the sky.'], ['fast', 'er', 'A car is fast___ than a bike.'], ['tall', 'est', 'It is the tall___ tree of all.'], ['help', 'ing', 'Dad is help___ me.'], ['kick', 'ed', 'He kick___ the ball yesterday.'], ['kind', 'er', 'Mia is kind___ than Sam.'], ['small', 'est', 'It is the small___ mouse of all.']];

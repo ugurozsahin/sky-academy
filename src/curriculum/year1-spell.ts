@@ -3,8 +3,8 @@
 import type { Generator } from './types';
 import { pick, wordQ } from './util';
 
-export const spellChoiceQ = (rng: () => number, word: string, decoys: string[]) =>
-  wordQ(rng, 'Find the right spelling', word, decoys, { say: `Which is the right spelling of ${word}?`, listen: word, peek: true, hint: 'Slice the right spelling', hintIsData: false });
+export const spellChoiceQ = (rng: () => number, word: string, decoys: string[], why?: string) =>
+  wordQ(rng, 'Find the right spelling', word, decoys, { why, say: `Which is the right spelling of ${word}?`, listen: word, peek: true, hint: 'Slice the right spelling', hintIsData: false });
 /**
  * Year 1 spelling rules, second half (#991): ai/oi inside a word but ay/oy at the end, -y endings, k (not c)
  * before e/i/y, ph and wh (English Appendix 1, Year 1). Same card as `y1SpellRules`; every decoy is a non-word
@@ -21,8 +21,15 @@ export const Y1_SPELL_RULES2: [string, SpellRule2Family, [string, string]][] = [
   ['dolphin', 'ph', ['dolfin', 'dolfen']], ['alphabet', 'ph', ['alfabet', 'alfabit']], ['elephant', 'ph', ['elefant', 'elefent']], ['phone', 'ph', ['fone', 'foan']], ['photo', 'ph', ['foto', 'fotoe']],
   ['when', 'wh', ['wenn', 'wehn']], ['where', 'wh', ['wehre', 'waire']], ['which', 'wh', ['wihch', 'wich']], ['wheel', 'wh', ['weel', 'wehel']], ['whale', 'wh', ['wayl', 'waehl']],
 ];
+/** #2318: the rule each family teaches, in a few words. */
+const SPELL_RULE2_WHY: Record<SpellRule2Family, string> = {
+  ai: 'Inside a word, /ai/ is spelt ai.', ay: 'At the end, /ai/ is spelt ay.',
+  oi: 'Inside a word, /oi/ is spelt oi.', oy: 'At the end, /oi/ is spelt oy.',
+  y: 'A word ending /ee/ is spelt y.', k: 'Before e, i, y: /k/ is spelt k.',
+  ph: 'The letters ph make the /f/ sound.', wh: 'The letters wh make the /w/ sound.',
+};
 export const y1SpellRules2: Generator = (d, rng) => {
   const families: SpellRule2Family[] = d === 1 ? ['ai', 'ay', 'oi', 'oy'] : d === 2 ? ['ai', 'ay', 'oi', 'oy', 'y', 'k'] : ['ai', 'ay', 'oi', 'oy', 'y', 'k', 'ph', 'wh'];
-  const [w, , decoys] = pick(rng, Y1_SPELL_RULES2.filter(e => families.includes(e[1])));
-  return spellChoiceQ(rng, w, decoys);
+  const [w, fam, decoys] = pick(rng, Y1_SPELL_RULES2.filter(e => families.includes(e[1])));
+  return spellChoiceQ(rng, w, decoys, SPELL_RULE2_WHY[fam]);
 };
