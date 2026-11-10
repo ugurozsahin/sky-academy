@@ -58,9 +58,17 @@ export const S_FOR_ZH: readonly SpellRuleRow[] = [
 /** Every bank with the difficulty it first appears at, for the rule-by-rule tests. */
 export const BANKS = { A_BEFORE_L: 1, O_FOR_UH: 1, EY: 2, A_AFTER_W: 2, W_OR_AR: 3, S_FOR_ZH: 3 } as const;
 
+/** #2318: the rule the word follows, in a few words — the bank the row came from names it. */
+const WHY: ReadonlyArray<[readonly SpellRuleRow[], string]> = [
+  [A_BEFORE_L, 'a before l says or: -all, -alk.'], [O_FOR_UH, 'o can say u: a tricky spelling.'],
+  [EY, 'The -ey ending says ee.'], [A_AFTER_W, 'After w, a can say o.'],
+  [W_OR_AR, 'After w: or says ur, ar says or.'], [S_FOR_ZH, 'The s can say zh.'],
+];
+export const whyOf = (row: SpellRuleRow): string => WHY.find(([bank]) => bank.includes(row))![1];
+
 /** d1: a before l and o for /ʌ/, 3 bubbles · d2: adds -ey and a after w/qu, 4 bubbles · d3: adds or/ar after w and s for /ʒ/. */
 export const y2SpellMore: Generator = (d, rng) => {
   const rows = [...A_BEFORE_L, ...O_FOR_UH, ...(d >= 2 ? [...EY, ...A_AFTER_W] : []), ...(d >= 3 ? [...W_OR_AR, ...S_FOR_ZH] : [])];
   const row = pick(rng, rows);
-  return spellRuleQ(rng, d === 1 ? [row[0], row[1], row[2].slice(0, 2)] : row, d === 1 ? 3 : 4);
+  return spellRuleQ(rng, d === 1 ? [row[0], row[1], row[2].slice(0, 2)] : row, d === 1 ? 3 : 4, whyOf(row));
 };
