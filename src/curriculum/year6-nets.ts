@@ -48,7 +48,7 @@ function countCard(rng: Rng): Question {
   const s = pick(rng, SOLIDS), prop = pick(rng, PROPS), others = PROPS.filter(p => p !== prop);
   const prompt = `How many ${prop} does a ${s.name} have?`;
   return wordQ(rng, prompt, String(s[prop]), countDecoys(rng, s[prop], [...others.map(p => s[p]), byName(s.near)[prop]]), {
-    say: prompt, hint: 'Picture the solid. Count the flat faces, the edges where they meet and the corners', hintIsData: false,
+    say: prompt, hint: 'Picture the solid. Count the flat faces, the edges where they meet and the corners', hintIsData: false, why: `A ${s.name} has ${s[prop]} ${prop}.`,
   });
 }
 
@@ -62,6 +62,7 @@ function netCard(rng: Rng): Question {
   }
   return wordQ(rng, `Is it a ${asked.name}?`, yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
     visual: { type: 'sentence', text: `Net: ${s.net}.` }, say: `A net has ${s.net}. Does it fold into a ${asked.name}?`, hint: 'Count the faces and look at their shapes', hintIsData: false,
+    why: yes ? `${s.net} make a ${s.name}.` : `A ${asked.name} needs ${asked.net}, not ${s.net}.`,
   });
 }
 
@@ -107,6 +108,7 @@ function oppositeCard(rng: Rng): Question {
   return wordQ(rng, prompt, answer, LETTERS.filter(l => l !== asked && l !== answer), {
     visual: { type: 'symmetry', grid: out, mirror: false },
     say: `${prompt} The net is the shaded and lettered squares.`, hint: 'Opposite faces never touch when the cube is folded', hintIsData: false,
+    why: `${answer} is opposite ${asked}: they never touch.`,
   });
 }
 
