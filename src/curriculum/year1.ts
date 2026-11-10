@@ -331,10 +331,10 @@ const y1Capacity: Generator = (d, rng) =>
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const y1Months: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
-  if (kind === 0) { const i = ri(rng, 0, 6), after = rng() < 0.5, ans = DAYS[(i + (after ? 1 : 6)) % 7]; return wordQ(rng, `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?`, ans, shuffle(rng, DAYS.filter(x => x !== ans)).slice(0, 3), { say: `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?` }); }
-  if (kind === 1) { const [phrase, n] = pick(rng, [['days in a week', 7], ['months in a year', 12], ['seasons in a year', 4], ['days in a weekend', 2]] as [string, number][]); return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 20, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n + 2] }); }
+  if (kind === 0) { const i = ri(rng, 0, 6), after = rng() < 0.5, ans = DAYS[(i + (after ? 1 : 6)) % 7]; return wordQ(rng, `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?`, ans, shuffle(rng, DAYS.filter(x => x !== ans)).slice(0, 3), { say: `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?`, why: `${ans} comes ${after ? 'after' : 'before'} ${DAYS[i]}.` }); }
+  if (kind === 1) { const [phrase, n] = pick(rng, [['days in a week', 7], ['months in a year', 12], ['seasons in a year', 4], ['days in a weekend', 2]] as [string, number][]); return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 20, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n + 2], why: `There are ${n} ${phrase}.` }); }
   const i = ri(rng, 0, 11), after = rng() < 0.5, ans = MONTHS[(i + (after ? 1 : 11)) % 12];
-  return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` });
+  return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, why: `${ans} comes ${after ? 'after' : 'before'} ${MONTHS[i]}.` });
 };
 const y1Balance: Generator = (d, rng) => {
   if (d === 1) { const a = ri(rng, 1, 9), b = ri(rng, 1, 10 - a); return rng() < 0.5 ? balanceQ(rng, `${a} + ${b}`, '?', a + b, 20) : balanceQ(rng, '?', `${a} + ${b}`, a + b, 20); }
