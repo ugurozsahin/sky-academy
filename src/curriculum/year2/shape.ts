@@ -101,10 +101,12 @@ export const y2Symmetry: Generator = (d, rng) => {
       visual: { type: 'symmetry', grid }, wide: true,
       say: 'Look at the dotted line. Are the two halves the same? Say yes or no.',
       hint: 'Do both halves match?', hintIsData: false,
+      why: yes ? 'Both halves match.' : "The two halves don't match.",
     });
   }
   return wordQ(rng, 'Which letter has a vertical line of symmetry?', pick(rng, SYM_LETTERS), shuffle(rng, ASYM_LETTERS).slice(0, 3), {
     say: 'Which letter looks the same folded down the middle?', hint: 'Fold it down the middle', hintIsData: false,
+    why: 'Fold it down the middle: the halves match.',
   });
 };
 /**
