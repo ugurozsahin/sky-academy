@@ -286,7 +286,7 @@ export function shapeDecoys(name: string, sides: number, rng: () => number): str
 }
 /** What makes each flat shape itself — the line shown after a wrong slice (#2317). */
 const SHAPE_2D_WHY: Record<string, string> = {
-  triangle: 'A triangle has 3 sides.', square: 'A square has 4 equal sides.', rectangle: 'A rectangle has 4 sides, 2 long.',
+  triangle: 'A triangle has 3 sides.', square: 'A square has 4 equal sides.', rectangle: 'A rectangle has 2 long, 2 short sides.',
   circle: 'A circle is round, with no corners.', pentagon: 'A pentagon has 5 sides.', hexagon: 'A hexagon has 6 sides.',
 };
 const y1Shapes: Generator = (d, rng) => {

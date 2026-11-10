@@ -59,7 +59,7 @@ const THE: Record<Cls, string> = { ...TERM, equilateral: 'the equilateral triang
 /** What makes each class itself — the line shown after a wrong slice (#2317). */
 const PROP: Record<Cls, string> = {
   equilateral: '3 equal sides', isosceles: '2 equal sides', scalene: 'no equal sides', 'right-angled': 'one right angle',
-  square: '4 equal sides, 4 right angles', rectangle: '4 right angles, opposite sides equal', rhombus: '4 equal sides, no right angles',
+  square: '4 equal sides, 4 right angles', rectangle: '4 right angles, opposite sides equal', rhombus: '4 equal sides, opposite sides parallel',
   parallelogram: 'two pairs of parallel sides', trapezium: 'one pair of parallel sides', kite: 'two pairs of equal sides, side by side', irregular: 'no equal or parallel sides',
 };
 

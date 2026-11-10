@@ -23,6 +23,7 @@ describe('y1-shapes and y4-shapes whys (#2317)', () => {
       expect(w, q.prompt).toBeTruthy();
       expect(w.split(/\s+/).length, w).toBeLessThanOrEqual(12);
       if (d > 1) expect(w.startsWith(`${q.answer} is `), w).toBe(true);
+      else expect(w, 'names the class the property means').toMatch(/ means an? [a-z -]+\.$/);
     }
   });
 });
