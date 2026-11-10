@@ -284,11 +284,16 @@ export function shapeDecoys(name: string, sides: number, rng: () => number): str
   return shuffle(rng, SHAPES_2D.filter(x => !sameShape(x[1], name)))
     .sort((a, b) => Math.abs(far(a[2]) - far(sides)) - Math.abs(far(b[2]) - far(sides))).slice(0, 3).map(x => x[0]);
 }
+/** What makes each flat shape itself — the line shown after a wrong slice (#2317). */
+const SHAPE_2D_WHY: Record<string, string> = {
+  triangle: 'A triangle has 3 sides.', square: 'A square has 4 equal sides.', rectangle: 'A rectangle has 4 sides, 2 long.',
+  circle: 'A circle is round, with no corners.', pentagon: 'A pentagon has 5 sides.', hexagon: 'A hexagon has 6 sides.',
+};
 const y1Shapes: Generator = (d, rng) => {
-  const [g, name, sides] = pick(rng, SHAPES_2D);
-  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shapeDecoys(name, sides, rng), { hint: 'Slice the shape', hintIsData: false });
+  const [g, name, sides] = pick(rng, SHAPES_2D), why = SHAPE_2D_WHY[name];
+  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shapeDecoys(name, sides, rng), { hint: 'Slice the shape', hintIsData: false, why });
   if (sides === 0) return y1Shapes(d, rng);
-  return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2] });
+  return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2], why: `A ${name} has ${sides} sides.` });
 };
 /** Year 1: "recognise and name common 3-D shapes (cuboids including cubes, pyramids and spheres)" — names only. */
 const Y1_SOLIDS = SHAPES_3D.filter(([, name]) => ['cube', 'cuboid', 'pyramid', 'sphere'].includes(name));
