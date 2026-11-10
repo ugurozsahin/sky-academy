@@ -42,8 +42,8 @@ function build(rng: Rng, shaded: P[], right: P[], wrong: P[][], mirror?: Coords[
 }
 type Pick3 = { letter: string; letters: string[] };
 const retry = <T>(f: () => T | null): T => { for (let i = 0; i < 500; i++) { const r = f(); if (r) return r; } throw new Error('y5-transform: no card fits the grid'); };
-const letterCard = (prompt: string, say: string, b: { q: Pick3; v: Coords }, hint: string): Question =>
-  ({ prompt, say, answer: b.q.letter, options: b.q.letters, wide: false, visual: b.v, hint, hintIsData: false });
+const letterCard = (prompt: string, say: string, b: { q: Pick3; v: Coords }, hint: string, why: string): Question =>
+  ({ prompt, say, answer: b.q.letter, options: b.q.letters, wide: false, visual: b.v, hint, hintIsData: false, why });
 
 const dir = (n: number, pos: string, neg: string) => `${Math.abs(n)} ${n > 0 ? pos : neg}`;
 
@@ -57,7 +57,7 @@ function translateCard(rng: Rng): Question {
     const b = build(rng, shaded, right, slips.slice(0, 2));
     if (!b) return null;
     const ask = `${dir(dx, 'right', 'left')} and ${dir(dy, 'up', 'down')}`;
-    return letterCard(`Which shape is the shaded one moved ${ask}?`, `Which shape is the shaded one moved ${ask}?`, b, 'Count the squares along, then up or down');
+    return letterCard(`Which shape is the shaded one moved ${ask}?`, `Which shape is the shaded one moved ${ask}?`, b, 'Count the squares along, then up or down', `Every corner moves ${ask}.`);
   });
 }
 
@@ -77,7 +77,7 @@ function reflectCard(rng: Rng): Question {
     for (const sh of shuffle(rng, [-6, -5, -4, -3, 3, 4, 5, 6])) for (const c of shuffle(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9])) {
       const slid = transform.move(shaded, axis === 'x' ? gap : sh, axis === 'y' ? gap : sh);
       const b = build(rng, shaded, right, [slid, transform.reflect(shaded, across, c)], { axis, at });
-      if (b) return letterCard('Which shape is the shaded one reflected in the mirror line?', 'Which shape is the shaded one reflected in the dashed mirror line?', b, 'Each corner is as far behind the mirror as it was in front');
+      if (b) return letterCard('Which shape is the shaded one reflected in the mirror line?', 'Which shape is the shaded one reflected in the dashed mirror line?', b, 'Each corner is as far behind the mirror as it was in front', 'Each corner is as far behind the mirror as before.');
     }
     return null;
   });
@@ -92,7 +92,7 @@ function describeCard(rng: Rng): Question {
   for (let n = 1; ds.length < 3; n++) if (n !== ans && !ds.includes(n)) ds.push(n);
   const what = alongX ? 'squares right' : 'squares up', say = `How many ${what} did A move to reach B?`;
   const v: Coords = { type: 'coords', size: SIZE, points: [], shapes: [{ label: 'A', pts: shaded, shaded: true }, { label: 'B', pts: image }] };
-  return { ...wordQ(rng, `How many ${what} did A move to reach B?`, String(ans), ds.map(String), { say, hint: 'Count the squares one corner moves', hintIsData: false }), visual: v };
+  return { ...wordQ(rng, `How many ${what} did A move to reach B?`, String(ans), ds.map(String), { say, hint: 'Count the squares one corner moves', hintIsData: false, why: `Each corner of A moved ${ans} ${what} to reach B.` }), visual: v };
 }
 
 /** d3 corner: a labelled corner P moves with its shape; where is it now? */
@@ -120,7 +120,7 @@ function cornerQ(rng: Rng, v: Coords, to: P, slips: P[], how: string): Question 
   const ds = [...new Set(slips.filter(s => fits([s]) && fmt(s) !== fmt(to)).map(fmt))].slice(0, 3);
   if (!fits([to]) || ds.length < 3) return null;
   const p = v.points[0], at = `P is at ${fmt([p.x, p.y])}.`;
-  return { ...wordQ(rng, `${at} ${how} Where does P go?`, fmt(to), ds, { say: `${at} ${how} Where does P go?`.replace(/\((\d+), (\d+)\)/g, '$1, $2'), hint: 'Move the corner, not the whole picture', hintIsData: false }), visual: v };
+  return { ...wordQ(rng, `${at} ${how} Where does P go?`, fmt(to), ds, { say: `${at} ${how} Where does P go?`.replace(/\((\d+), (\d+)\)/g, '$1, $2'), hint: 'Move the corner, not the whole picture', hintIsData: false, why: `${how.replace(/\.$/, '')}, so P is at ${fmt(to)}.` }), visual: v };
 }
 
 /** d3 area: a reflection never changes the shape, so the area stays the same. */
@@ -128,7 +128,7 @@ function areaCard(rng: Rng): Question {
   const axis: 'x' | 'y' = rng() < 0.5 ? 'x' : 'y', at = ri(rng, 4, 6);
   const shaded = retry(() => { const s = place(rng), b = box(s); return (axis === 'x' ? b.x1 < at || b.x0 > at : b.y1 < at || b.y0 > at) ? s : null; });
   const v: Coords = { type: 'coords', size: SIZE, points: [], shapes: [{ pts: shaded, shaded: true }], mirror: { axis, at } };
-  const q = wordQ(rng, 'After a reflection, the shape\'s area is…', 'same', ['bigger', 'smaller'], { say: 'After a reflection, is the area of the shape the same, bigger or smaller?', hint: 'A reflection only flips the shape', hintIsData: false });
+  const q = wordQ(rng, 'After a reflection, the shape\'s area is…', 'same', ['bigger', 'smaller'], { say: 'After a reflection, is the area of the shape the same, bigger or smaller?', hint: 'A reflection only flips the shape', hintIsData: false, why: 'A reflection only flips the shape, so its area stays the same.' });
   return { ...q, options: shuffle(rng, ['same', 'bigger', 'smaller']), wide: wideFor(['same', 'bigger', 'smaller']), visual: v };
 }
 

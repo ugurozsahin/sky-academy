@@ -23,8 +23,8 @@ export const transform = {
   half: (pts: P[]): P[] => pts.map(([x, y]) => [-x, -y]),
 };
 
-const card = (prompt: string, spoken: string, answer: string, options: string[], visual: Coords, hint: string): Question =>
-  ({ prompt, say: spoken, answer, options, wide: wideFor(options), visual, hint, hintIsData: false });
+const card = (prompt: string, spoken: string, answer: string, options: string[], visual: Coords, hint: string, why: string): Question =>
+  ({ prompt, say: spoken, answer, options, wide: wideFor(options), visual, hint, hintIsData: false, why });
 const grid = (extra: Partial<Coords>): Coords => ({ type: 'coords', size: SIZE, min: MIN, points: [], ...extra });
 /** Three distinct wrong pairs from `slips` that stay on the grid and differ from `ans`; null when fewer than three do. */
 function decoys(ans: P, slips: P[]): string[] | null {
@@ -45,7 +45,7 @@ function pointMove(rng: Rng): Question {
     if (!ds) continue;
     const m = dirs(dx, dy), start = fmt(p);
     return card(`${start} moves ${m}. Now at?`, say(`The point ${start} moves ${m}. Where is it now?`), fmt(ans), shuffle(rng, [fmt(ans), ...ds]),
-      grid({ points: [{ x: p[0], y: p[1], label: 'A' }] }), 'Count the squares: right is more, left is less, up is more, down is less');
+      grid({ points: [{ x: p[0], y: p[1], label: 'A' }] }), 'Count the squares: right is more, left is less, up is more, down is less', `${start} moves ${m}, so it lands on ${fmt(ans)}.`);
   }
 }
 
@@ -73,7 +73,8 @@ function reflectShape(rng: Rng): Question {
   const visual = grid({ shapes: [{ pts: shaded, shaded: true }, ...order.map((pts, i) => ({ label: letters[i], pts }))] });
   const prompt = `Which is the reflection in the ${axis}-axis?`;
   return card(prompt, `Which shape is the shaded one reflected in the ${axis}-axis?`, letters[order.indexOf(right)], letters, visual,
-    axis === 'y' ? 'The y-axis is the up-and-down line: left and right swap' : 'The x-axis is the across line: up and down swap');
+    axis === 'y' ? 'The y-axis is the up-and-down line: left and right swap' : 'The x-axis is the across line: up and down swap',
+    axis === 'y' ? 'The y-axis flips left and right, so x changes sign.' : 'The x-axis flips up and down, so y changes sign.');
 }
 
 /** The wrong vertices for a d3 card: a reflection alone has the other axis, a half turn and x and y swapped; a move and a reflection add the steps in the wrong order. */
@@ -104,7 +105,8 @@ function vertexCard(rng: Rng): Question {
     const start = fmt(p), steps = d ? dirs(d[0], d[1]) : '';
     const spoken = d ? `Move ${start} ${steps}, then reflect in the ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`;
     return card(d ? `${start}: ${steps}, then reflect in ${axis}-axis.` : `Reflect ${start} in the ${axis}-axis.`, say(spoken), fmt(ans), shuffle(rng, [fmt(ans), ...ds]),
-      grid({ points: [{ x: p[0], y: p[1], label: 'A' }] }), axis === 'y' ? 'Reflecting in the y-axis changes the sign of x' : 'Reflecting in the x-axis changes the sign of y');
+      grid({ points: [{ x: p[0], y: p[1], label: 'A' }] }), axis === 'y' ? 'Reflecting in the y-axis changes the sign of x' : 'Reflecting in the x-axis changes the sign of y',
+      d ? `${fmt(moved)} after the move, then ${fmt(ans)} reflected.` : `${axis === 'y' ? 'x' : 'y'} changes sign, so A is at ${fmt(ans)}.`);
   }
 }
 
