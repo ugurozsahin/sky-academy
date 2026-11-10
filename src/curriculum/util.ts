@@ -149,15 +149,15 @@ export const SHAPES_2D: readonly [string, string, number][] = [['▲', 'triangle
  * mark right or wrong, so the curved shapes carry neither and are never asked for them. The pair is
  * unrepresentable half-filled (#373): a shape carries both `edges` and `vertices`, or neither.
  */
-export type Shape3DProps = { readonly as: string; readonly flat: number } & ({ readonly edges: number; readonly vertices: number } | { readonly edges?: never; readonly vertices?: never });
+export type Shape3DProps = { readonly as: string; readonly flat: number; readonly why: string } & ({ readonly edges: number; readonly vertices: number } | { readonly edges?: never; readonly vertices?: never });
 /** 3-D shapes: glyph, name, properties. One source for maths.ts and Memory Match (#35). */
 export const SHAPES_3D: readonly [string, string, Shape3DProps][] = [
-  ['🎲', 'cube', { as: 'cube', flat: 6, edges: 12, vertices: 8 }],
-  ['⚽', 'sphere', { as: 'sphere', flat: 0 }],
-  ['🥫', 'cylinder', { as: 'cylinder', flat: 2 }],
-  ['🍦', 'cone', { as: 'cone', flat: 1 }],
-  ['🔺', 'pyramid', { as: 'square-based pyramid', flat: 5, edges: 8, vertices: 5 }],
-  ['🧱', 'cuboid', { as: 'cuboid', flat: 6, edges: 12, vertices: 8 }],
+  ['🎲', 'cube', { as: 'cube', flat: 6, why: 'A cube has six square faces.', edges: 12, vertices: 8 }],
+  ['⚽', 'sphere', { as: 'sphere', flat: 0, why: 'A sphere is round all over.' }],
+  ['🥫', 'cylinder', { as: 'cylinder', flat: 2, why: 'A cylinder has two flat ends, curved side.' }],
+  ['🍦', 'cone', { as: 'cone', flat: 1, why: 'A cone has a flat circle, one point.' }],
+  ['🔺', 'pyramid', { as: 'square-based pyramid', flat: 5, why: 'A pyramid has a square base, four triangles.', edges: 8, vertices: 5 }],
+  ['🧱', 'cuboid', { as: 'cuboid', flat: 6, why: 'A cuboid has six rectangle faces.', edges: 12, vertices: 8 }],
 ];
 /** A cube *is* a cuboid, and a square *is* a rectangle (Y1 NC: "cuboids including cubes", "rectangles (including squares)"), so neither pair may be answer and decoy together (#299, #872) — sameShape() checks both. */
 export const SAME_SOLID = new Set(['cube', 'cuboid']), SAME_FLAT = new Set(['square', 'rectangle']);
@@ -195,12 +195,12 @@ export function lineQ(rng: Rng, from: number, step: number, len: number): Questi
  * Year 1, Year 2.
  */
 export function name3dQ(rng: Rng, from: readonly (readonly [string, string, ...unknown[]])[], glyphIsAnswer: boolean): Question {
-  const [g, name] = pick(rng, from);
+  const [g, name] = pick(rng, from), why = SHAPES_3D.find(x => x[1] === name)![2].why;
   const decoys = SHAPES_3D.filter(x => !sameShape(x[1], name));
   const three = shuffle(rng, decoys).slice(0, 3);
   return glyphIsAnswer
-    ? wordQ(rng, `Which is a ${name}?`, g, three.map(x => x[0]), { hint: 'Slice the 3-D shape', hintIsData: false })
-    : wordQ(rng, 'What is this shape?', name, three.map(x => x[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?' });
+    ? wordQ(rng, `Which is a ${name}?`, g, three.map(x => x[0]), { hint: 'Slice the 3-D shape', hintIsData: false, why })
+    : wordQ(rng, 'What is this shape?', name, three.map(x => x[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?', why });
 }
 
 /** Balance the Scales: both pans must weigh the same — find the number that makes them equal (= as balance). Reception, Y1, Y2. */

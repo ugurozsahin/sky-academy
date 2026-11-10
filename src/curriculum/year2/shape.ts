@@ -13,7 +13,7 @@ export const y2Shapes: Generator = (d, rng) => {
   const counts: [string, number][] = [['flat faces', p.flat]];
   if (p.edges !== undefined && (d === 3 || rng() < 0.6)) counts.push(['edges', p.edges], ['vertices', p.vertices]);
   const [label, n] = pick(rng, d === 3 && counts.length > 1 ? counts.slice(1) : counts);
-  return numQ(rng, `How many ${label} has a ${p.as}?`, n, { min: 0, max: 14, visual: { type: 'word', text: g }, say: `How many ${label} has a ${p.as}?` });
+  return numQ(rng, `How many ${label} has a ${p.as}?`, n, { min: 0, max: 14, visual: { type: 'word', text: g }, say: `How many ${label} has a ${p.as}?`, why: `A ${p.as} has ${n} ${n === 1 ? label.replace(/s$/, '') : label}.` });
 };
 export const y2Balance: Generator = (d, rng) => {
   if (d === 1) { const a = ri(rng, 1, 15), b = ri(rng, 1, 20 - a), c = ri(rng, 1, a + b - 1); return balanceQ(rng, `${a} + ${b}`, rng() < 0.5 ? `${c} + ?` : `? + ${c}`, a + b - c, 20, { distractors: [a + b, c] }); }
