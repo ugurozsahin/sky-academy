@@ -174,7 +174,7 @@ export const y2Time: Generator = (d, rng) => {
   const ds = new Set<string>();
   let guard = 0;
   while (ds.size < 3 && guard++ < 30) { const mm = 5 * ri(rng, 0, 11); const hh = rng() < 0.5 ? h : ri(rng, 1, 12); const l = clockPhrase(hh, mm); if (l !== ans) ds.add(l); }
-  return wordQ(rng, 'What time is it?', ans, [...ds], { visual: { type: 'clock', h, m } });
+  return wordQ(rng, 'What time is it?', ans, [...ds], { visual: { type: 'clock', h, m }, why: `Long hand on ${m / 5 || 12}: ${ans}.` });
 };
 export const y2Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 10 : 21, d === 1 ? 20 : d === 2 ? 60 : 100);
