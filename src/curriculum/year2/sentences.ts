@@ -43,6 +43,13 @@ export const SENTENCE_TYPES: ReadonlyArray<readonly [string, SentenceType]> = [
   ['What big ears you have!', 'exclamation'],
   ['How brave you are!', 'exclamation'],
 ];
+/** #2318: what each kind of sentence does, in a few words. */
+export const SENTENCE_TYPE_WHY: Record<SentenceType, string> = {
+  statement: 'A statement tells you something.',
+  question: 'A question asks something.',
+  command: 'A command tells you what to do.',
+  exclamation: 'An exclamation shows a strong feeling.',
+};
 /**
  * d1 is the pair a Year 1 child already meets (a sentence that tells you something, a sentence that asks);
  * d2 adds the command, which shares its full stop with the statement; d3 adds the exclamation.
@@ -57,7 +64,7 @@ export const y2SentenceType: Generator = (d, rng) => {
   // #2322: d1 sentences are 4 to 5 words, and the card asks in two words (the voice still asks in full)
   const [sent, type] = pick(rng, SENTENCE_TYPES.filter(e => allowed.includes(e[1]) && (d > 1 || (e[0].split(' ').length >= 4 && e[0].split(' ').length <= 5))));
   return wordQ(rng, 'What kind?', type, allowed.filter(n => n !== type), {
-    visual: { type: 'sentence', text: sent.replace(/[.?!]$/, '_') }, say: `${sent} What kind of sentence is this?`,
+    visual: { type: 'sentence', text: sent.replace(/[.?!]$/, '_') }, say: `${sent} What kind of sentence is this?`, why: SENTENCE_TYPE_WHY[type],
     hint: 'Does it tell, ask, order or exclaim?', hintIsData: false,
   });
 };
@@ -113,11 +120,13 @@ export const y2Tense: Generator = (d, rng) => {
   const v = pick(rng, TENSE_VERBS);
   if (d === 3) return wordQ(rng, frame, v[col], v.filter(w => w !== v[col]), {
     visual: { type: 'sentence', text: frame }, say: frame.replace('___', 'blank'),
+    why: `${v[col]}: ${tense === 'past' ? 'it has happened already.' : 'it is happening now.'}`,
     hint: 'Which form of the word fits?', hintIsData: false,
   });
   const sent = frame.replace('___', v[col]);
   return wordQ(rng, 'Present or past?', tense, [tense === 'past' ? 'present' : 'past'], {
     visual: { type: 'sentence', text: sent }, say: `${sent} Is this sentence in the present or the past?`,
+    why: tense === 'past' ? `${v[col]}: it has happened already.` : `${v[col]}: it is happening now.`,
     hint: 'Is it happening now, or has it happened already?', hintIsData: false,
   });
 };
