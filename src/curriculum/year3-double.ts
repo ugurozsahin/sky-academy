@@ -18,17 +18,21 @@ export const doubled = (root: string, suffix: string) => root + root.slice(-1) +
 export const plain = (root: string, suffix: string) => root + suffix;
 export const rightSpelling = ([root, suffix, stressed]: DoubleRow) => (stressed ? doubled : plain)(root, suffix);
 
+/** #2318: the stress rule applied to this word, in a few words. */
+export const doubleWhy = (root: string, stressed: boolean): string =>
+  stressed ? `The last part of ${root} is strong, so double the ${root.slice(-1)}.` : `The last part of ${root} is not strong, so do not double it.`;
+
 const spellingCard = (rng: Rng, row: DoubleRow): Question => {
   const [root, suffix, stressed] = row;
   const wrong = (stressed ? plain : doubled)(root, suffix);
   return wordQ(rng, `${root} + ${suffix} = ?`, rightSpelling(row), [wrong],
-    { say: `Add ${suffix} to ${root}. Which spelling is right?`, hint: 'Double the last letter only if the last part is said strongly', hintIsData: false });
+    { why: doubleWhy(root, stressed), say: `Add ${suffix} to ${root}. Which spelling is right?`, hint: 'Double the last letter only if the last part is said strongly', hintIsData: false });
 };
 
 const yesNoCard = (rng: Rng, row: DoubleRow): Question => {
   const [root, suffix, stressed] = row;
   return wordQ(rng, `${root} + ${suffix}: double the last letter?`, stressed ? 'yes' : 'no', [stressed ? 'no' : 'yes'],
-    { say: `Add ${suffix} to ${root}. Do you double the last letter?`, hint: 'Say the word: is the last part the strong one?', hintIsData: false });
+    { why: doubleWhy(root, stressed), say: `Add ${suffix} to ${root}. Do you double the last letter?`, hint: 'Say the word: is the last part the strong one?', hintIsData: false });
 };
 
 export const y3Double: Generator = (d: Difficulty, rng) => {
