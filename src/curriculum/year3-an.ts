@@ -36,12 +36,19 @@ export const AN_D3: readonly AnRow[] = [
   ['We went to ___ university.', 'university', false], ['I saw ___ unicorn toy.', 'unicorn', false], ['It was ___ usual day.', 'usual', false],
 ];
 
+/** #2318: the first sound of the word after the gap decides, so the why names that sound. */
+export function anWhy(word: string, vowelSound: boolean): string {
+  if (vowelSound) return /^[aeiou]/i.test(word) ? `${word} starts with a vowel sound, so we say an.` : `${word} starts with a vowel sound (silent h), so we say an.`;
+  return /^[aeiou]/i.test(word) ? `${word} starts with a consonant sound, "yoo", so we say a.` : `${word} starts with a consonant sound, so we say a.`;
+}
+
 export const y3An: Generator = (d, rng): Question => {
   const bank = d === 1 ? AN_D1 : d === 2 ? AN_D2 : rng() < 0.5 ? AN_D3 : AN_D2;
-  const [sentence, , vowelSound] = pick(rng, bank);
+  const [sentence, word, vowelSound] = pick(rng, bank);
   const answer = vowelSound ? 'an' : 'a';
   return wordQ(rng, 'a or an?', answer, [vowelSound ? 'a' : 'an'], {
     visual: { type: 'sentence', text: sentence }, say: sentence.replace('___', 'blank'),
     hint: "Listen to the next word's first sound", hintIsData: false,
+    why: anWhy(word, vowelSound),
   });
 };
