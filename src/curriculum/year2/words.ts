@@ -45,10 +45,11 @@ export const SUFFIX2_REAL: Readonly<Record<string, readonly string[]>> = {
   care: ['ful', 'less'], hope: ['ful', 'less'], kind: ['ness', 'ly'], slow: ['ly', 'ness'], enjoy: ['ment'],
   help: ['ful', 'less'], quick: ['ly', 'ness'], sad: ['ness', 'ly'], fear: ['less', 'ful'], pay: ['ment'],
 };
+const SUFFIX2_WHY: Record<string, string> = { ful: 'full of', less: 'without', ness: 'the state of being', ly: 'in a way that is', ment: 'the result of' };  // #2318
 export const y2Suffix: Generator = (d, rng) => {
   const [root, suf, sent] = pick(rng, SUFFIX2);
   const decoys = ['ful', 'less', 'ness', 'ly', 'ment'].filter(x => x !== suf && !SUFFIX2_REAL[root].includes(x));
-  return wordQ(rng, sent, suf, decoys.slice(0, d === 1 ? 2 : 3), { visual: { type: 'sentence', text: sent }, say: spokenGap(sent), hint: 'Slice the ending', hintIsData: false });
+  return wordQ(rng, sent, suf, decoys.slice(0, d === 1 ? 2 : 3), { visual: { type: 'sentence', text: sent }, say: spokenGap(sent), hint: 'Slice the ending', hintIsData: false, why: `${root}${suf}: ${SUFFIX2_WHY[suf]} ${root}.` });
 };
 /**
  * Endings that change the root (#299 slice 3, NC English Appendix 1 Year 2): `[root, ending, the new word,
@@ -83,13 +84,14 @@ export const SUFFIX_ROOT: ReadonlyArray<readonly [string, string, string, Suffix
   ['party', 'es', 'parties', 'y-to-i', 'partyes', 'partys'],
 ];
 /** d1 is the rule you can see (an `e` disappears); d2 adds doubling; d3 adds `y → i`, which changes a letter inside the word. */
+const SUFFIX_RULE_WHY: Record<SuffixRule, string> = { 'drop-e': 'drop the e', double: 'double the last letter', 'y-to-i': 'change y to i' };  // #2318
 const SUFFIX_RULES: Record<number, SuffixRule[]> = { 1: ['drop-e'], 2: ['drop-e', 'double'], 3: ['drop-e', 'double', 'y-to-i'] };
 export const y2SuffixRoot: Generator = (d, rng) => {
   const rules = SUFFIX_RULES[d] ?? SUFFIX_RULES[3];
-  const [root, suf, ans, , naive, misrule] = pick(rng, SUFFIX_ROOT.filter(e => rules.includes(e[3])));
+  const [root, suf, ans, rule, naive, misrule] = pick(rng, SUFFIX_ROOT.filter(e => rules.includes(e[3])));
   return wordQ(rng, `${root} + ${suf} = ?`, ans, [naive, misrule], {
     visual: { type: 'word', text: `${root} + ${suf}` },
-    say: `Add ${suf} to ${root}. Which spelling is right?`, hint: 'The root word changes', hintIsData: false,
+    say: `Add ${suf} to ${root}. Which spelling is right?`, hint: 'The root word changes', hintIsData: false, why: `${ans}: ${SUFFIX_RULE_WHY[rule]} before ${suf}.`,
   });
 };
 /**
@@ -100,9 +102,18 @@ export const y2SuffixRoot: Generator = (d, rng) => {
  */
 export const HOMOPHONE_SETS: ReadonlyArray<readonly string[]> = [['to', 'too', 'two'], ['their', 'there', "they're"], ['see', 'sea'], ['sun', 'son'], ['one', 'won'], ['here', 'hear'], ['piece', 'peace'], ['bare', 'bear'], ['blue', 'blew'], ['night', 'knight'], ['be', 'bee'], ['quite', 'quiet']];
 export const HOMOPHONES: ReadonlyArray<readonly [string, readonly string[], string]> = [['I want ___ go home.', ['to', 'too', 'two'], 'to'], ['I have ___ cats.', ['two', 'to', 'too'], 'two'], ['Me ___!', ['too', 'to', 'two'], 'too'], ['___ house is big.', ['Their', 'There', "They're"], 'Their'], ['Look over ___!', ['there', 'their', "they're"], 'there'], ['___ going out.', ["They're", 'Their', 'There'], "They're"], ['I can ___ the sea.', ['see', 'sea'], 'see'], ['The ___ shines.', ['sun', 'son'], 'sun'], ['It is ___ o\'clock.', ['one', 'won'], 'one'], ['We ___ the race!', ['won', 'one'], 'won'], ['The ___ ate the honey.', ['bear', 'bare'], 'bear'], ['The wind ___ my hat off.', ['blew', 'blue'], 'blew'], ['___ is a bird.', ['Here', 'Hear'], 'Here'], ['I can ___ you.', ['hear', 'here'], 'hear'], ['A ___ of bread.', ['piece', 'peace'], 'piece'], ['The ___ rode a horse.', ['knight', 'night'], 'knight'], ['A ___ makes honey.', ['bee', 'be'], 'bee'], ['Please be ___ in the library.', ['quiet', 'quite'], 'quiet']];
+/** One meaning per answer, so the card says which spelling does which job (#2318). */
+const HOMOPHONE_WHY: Record<string, string> = {
+  to: 'to: towards, or before a verb.', two: 'two: the number 2.', too: 'too: also, or more than enough.',
+  their: 'their: belonging to them.', there: 'there: a place.', "they're": "they're: short for they are.",
+  see: 'see: use your eyes.', sea: 'sea: salty water.', sun: 'sun: the star that lights the day.', son: 'son: a boy child.',
+  one: 'one: the number 1.', won: 'won: came first.', bear: 'bear: the big furry animal.', blew: 'blew: moved air, as in blow.',
+  here: 'here: in this place.', hear: 'hear: use your ears.', piece: 'piece: a part of something.',
+  knight: 'knight: a soldier in armour.', bee: 'bee: the insect that makes honey.', quiet: 'quiet: with no noise.',
+};
 export const y2Homophones: Generator = (_d, rng) => {
   const [sent, opts, ans] = pick(rng, HOMOPHONES);
-  return wordQ(rng, sent, ans, opts.filter(o => o !== ans), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the right word', hintIsData: false });
+  return wordQ(rng, sent, ans, opts.filter(o => o !== ans), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the right word', hintIsData: false, why: HOMOPHONE_WHY[ans.toLowerCase()] });
 };
 export const y2Trace: Generator = (d, rng) => {
   const w = pick(rng, d === 1 ? Y1_CEW.filter(x => x.length >= 2 && x.length <= 4) : Y2_CEW.filter(x => x.length <= (d === 2 ? 5 : 7)));
