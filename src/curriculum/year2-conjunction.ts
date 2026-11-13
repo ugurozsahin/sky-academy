@@ -12,6 +12,16 @@ export type JoinRow = [sentence: string, answer: Joiner, decoys: [Joiner, Joiner
 
 export const JOINERS: Joiner[] = ['and', 'or', 'but', 'because', 'when', 'if', 'that'];
 const COORD: Joiner[] = ['and', 'or', 'but'];
+/** #2318: what each joining word does, in KS1's eight words or fewer. */
+export const JOINER_WHY: Record<Joiner, string> = {
+  and: 'and adds one more thing.',
+  or: 'or gives a choice.',
+  but: 'but shows a surprise.',
+  because: 'because gives the reason.',
+  when: 'when tells the time.',
+  if: 'if sets a condition.',
+  that: 'that links what we know or say.',
+};
 
 export const JOIN_BANK: JoinRow[] = [
   ['I like apples ___ pears.', 'and', ['because', 'when', 'that']],
@@ -45,6 +55,6 @@ export const y2Conjunction: Generator = (d: Difficulty, rng) => {
   const rows = d === 3 ? JOIN_BANK : JOIN_BANK.filter(r => COORD.includes(r[1]) === (d === 1));
   const [s, answer, decoys] = pick(rng, rows);
   return wordQ(rng, s, answer, shuffle(rng, decoys).slice(0, d === 3 ? 3 : 2), {
-    visual: { type: 'sentence', text: s }, say: s.replace('___', 'blank'), hint: 'Slice the joining word', hintIsData: false,
+    visual: { type: 'sentence', text: s }, say: s.replace('___', 'blank'), hint: 'Slice the joining word', hintIsData: false, why: JOINER_WHY[answer],
   });
 };
