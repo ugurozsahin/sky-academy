@@ -13,12 +13,16 @@ export const PUNCT_NAMES: [sentence: string, answer: string][] = [
   ['The ducks swam across the pond to ruby.', 'ruby'], ['My uncle lives in a small house in york.', 'york'], ['On wednesday we paint a picture of the sun.', 'wednesday'],
   ['Our friend max has a new red bike.', 'max'], ['We think noah can run very fast.', 'noah'], ['We sing a song every thursday morning.', 'thursday'],
 ];
+/** #2318: the job of each end mark, so a wrong slice learns the rule (KS1: eight words or fewer). */
+export const END_MARK_WHY: Record<string, string> = {
+  '.': 'A telling sentence ends with a full stop.', '?': 'A question ends with a question mark.', '!': 'A shout ends with an exclamation mark.',
+};
 export const y1Punct: Generator = (d, rng) => {
   const u = d === 1 ? 0 : rng();   // d1 first-word capital; d2 thirds: capital / names-and-I / end mark; d3 halves: names-and-I / end mark
   if (d >= 2 && (d === 2 ? u >= 1 / 3 && u < 2 / 3 : u < 0.5)) {
     const [sent, ans] = pick(rng, PUNCT_NAMES);
     const others = [...new Set(sent.slice(0, -1).split(' ').slice(1).filter(w => w !== ans && w === w.toLowerCase()))];
-    return wordQ(rng, 'Which word needs a capital letter?', ans, shuffle(rng, others).slice(0, d), { visual: { type: 'sentence', text: sent }, say: `${sent} Which word needs a capital letter?`, hint: 'Names and I need a capital letter', hintIsData: false });
+    return wordQ(rng, 'Which word needs a capital letter?', ans, shuffle(rng, others).slice(0, d), { visual: { type: 'sentence', text: sent }, say: `${sent} Which word needs a capital letter?`, hint: 'Names and I need a capital letter', hintIsData: false, why: 'Names, days and I need a capital.' });
   }
   if (d === 1 || (d === 2 && u < 1 / 3)) {
     const [s, p] = pick(rng, PUNCT_SENTS);
@@ -26,8 +30,8 @@ export const y1Punct: Generator = (d, rng) => {
     const lower = words[0].toLowerCase() + (words.length > 1 ? ' ' + words.slice(1).join(' ') : '') + p;
     const ans = words[0];
     const ds = shuffle(rng, [words[0].toLowerCase(), words[0].toUpperCase(), (words[1] ?? 'It')]).filter(x => x !== ans).slice(0, 2);
-    return wordQ(rng, `_${lower.slice(words[0].length)}`, ans, ds, { visual: { type: 'sentence', text: lower }, say: `Which word starts the sentence: ${s}?`, hint: 'Sentences start with a capital letter', hintIsData: false });
+    return wordQ(rng, `_${lower.slice(words[0].length)}`, ans, ds, { visual: { type: 'sentence', text: lower }, say: `Which word starts the sentence: ${s}?`, hint: 'Sentences start with a capital letter', hintIsData: false, why: `A sentence starts with a capital: ${ans}.` });
   }
   const [s, p] = pick(rng, PUNCT_SENTS);
-  return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Full stop, question mark or exclamation mark?`, hint: 'Slice the missing punctuation', hintIsData: false });
+  return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Full stop, question mark or exclamation mark?`, hint: 'Slice the missing punctuation', hintIsData: false, why: END_MARK_WHY[p] });
 };
