@@ -61,15 +61,18 @@ export const CLASS_BANK: ClassRow[] = [
 ];
 
 /** #2318: what the answer word does in the sentence, in a few words. */
-const GAP_JOB: Record<string, string> = {
+export const GAP_JOB: Record<string, string> = {
   because: 'gives the reason', so: 'gives the result', when: 'says the time', before: 'says what comes first', after: 'says what comes later',
   while: 'says two things happen together', then: 'says what happens next', next: 'says what happens next', soon: 'says it will not be long',
   therefore: 'gives the result of the first part', during: 'goes before the noun to say when', in: 'goes before the noun to say where',
   'because of': 'goes before a noun to give the reason',
 };
-export const gapWhy = (answer: string): string => `${answer[0].toUpperCase()}${answer.slice(1)} ${GAP_JOB[answer]}.`;
+export const gapWhy = (answer: string): string => {
+  if (!(answer in GAP_JOB)) throw new Error(`y3-conjunctions: no why for "${answer}"`);
+  return `${answer[0].toUpperCase()}${answer.slice(1)} ${GAP_JOB[answer]}.`;
+};
 const CLASS_WHY: Record<WordClass, string> = {
-  conjunction: 'a whole clause follows it, so it joins two parts', preposition: 'a noun phrase follows it, so it is a preposition',
+  conjunction: 'a clause follows it, so it is a conjunction', preposition: 'a noun phrase follows it, so it is a preposition',
   adverb: 'nothing follows it, so it is an adverb',
 };
 export const classWhy = (word: string, cls: WordClass): string => `With ${word}, ${CLASS_WHY[cls]}.`;
