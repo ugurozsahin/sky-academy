@@ -23,19 +23,21 @@ export const PREFIX_WORDS: PrefixRow[] = [
   ['autograph', 'auto', 'graph', 'your own signature'], ['autopilot', 'auto', 'pilot', 'flies a plane by itself'], ['autofocus', 'auto', 'focus', 'a camera that focuses by itself'],
 ];
 
+/** #2318: what the prefix does to the root, in a few words. */
+export const prefixWhy = (prefix: string, root: string, def: string): string => `${prefix}- + ${root} = ${def}.`;
 const PREFIXES = [...new Set(PREFIX_WORDS.map(r => r[1]))];
 const ROOTS = [...new Set(PREFIX_WORDS.map(r => r[2]))];
 
 const d1 = (rng: Rng): Question => {
   const p = pick(rng, Object.keys(PREFIX_MEANING));
   const ds = shuffle(rng, Object.keys(PREFIX_MEANING).filter(x => x !== p)).slice(0, 2);
-  return wordQ(rng, `Which prefix means ${PREFIX_MEANING[p]}?`, p, ds, { hint: `The prefix goes at the front of a word: ${PREFIX_MEANING[p]}`, hintIsData: false });
+  return wordQ(rng, `Which prefix means ${PREFIX_MEANING[p]}?`, p, ds, { why: `${p}- means ${PREFIX_MEANING[p]}, as in ${PREFIX_WORDS.find(r => r[1] === p)![0]}.`, hint: `The prefix goes at the front of a word: ${PREFIX_MEANING[p]}`, hintIsData: false });
 };
 
 const d2 = (rng: Rng): Question => {
   const [word, prefix, root, def] = pick(rng, PREFIX_WORDS);
   const others = shuffle(rng, PREFIX_WORDS.filter(r => group(r[1]) !== group(prefix)).map(r => r[0]));
-  return wordQ(rng, `Which word means ${def}?`, word, [root, ...others.slice(0, 2)], { hint: `Look at the prefix: ${prefix}`, hintIsData: false });
+  return wordQ(rng, `Which word means ${def}?`, word, [root, ...others.slice(0, 2)], { why: prefixWhy(prefix, root, def), hint: `Look at the prefix: ${prefix}`, hintIsData: false });
 };
 
 const d3 = (rng: Rng): Question => {
@@ -43,7 +45,7 @@ const d3 = (rng: Rng): Question => {
   const dp = pick(rng, PREFIXES.filter(p => group(p) !== group(prefix)));
   const dr = pick(rng, ROOTS.filter(r => r !== root));
   return { prompt: `Build the word: ${def}`, say: `Build the word that means ${def}`, answer: word, sequence: [prefix, root],
-    options: shuffle(rng, [prefix, root, dp, dr]), hint: 'Slice the prefix, then the root', hintIsData: false };
+    options: shuffle(rng, [prefix, root, dp, dr]), why: prefixWhy(prefix, root, def), hint: 'Slice the prefix, then the root', hintIsData: false };
 };
 
 export const y3Prefix: Generator = (d: Difficulty, rng) => (d === 1 ? d1 : d === 2 ? d2 : d3)(rng);
