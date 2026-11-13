@@ -41,6 +41,20 @@ export const HOMOPHONE_BANK: HomRow[] = [
 /** d1 the eight concrete two-word sets; d2 adds heel/heal/he'll; d3 adds accept/except and affect/effect. */
 const D1_SETS = [2, 3, 4, 5, 6, 7, 8, 10];
 const SETS_BY_DIFF: Record<Difficulty, number[]> = { 1: D1_SETS, 2: [...D1_SETS, 9], 3: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
+/** #2318: what each spelling means, so the why says which one the sentence needs. */
+export const HOM_MEANING: Record<string, string> = {
+  accept: 'means take what is given', except: 'means leaving out', affect: 'is the verb: to change something', effect: 'is the noun: the change made',
+  ball: 'is the round toy', bawl: 'means cry loudly', berry: 'is the small fruit', bury: 'means put under the ground',
+  brake: 'is what stops a bike', break: 'means snap into pieces', fair: 'means just, or is a funfair', fare: 'is the price of a journey',
+  great: 'means very good or big', grate: 'means rub into little pieces', grown: 'means got bigger', groan: 'is a low sad sound',
+  here: 'means in this place', hear: 'is what ears do', heel: 'is the back of the foot', heal: 'means get better', "he'll": 'is he will',
+  knot: 'is a tied loop of rope', not: 'says no',
+};
+export const homWhy = (answer: string): string => {
+  const w = answer.toLowerCase();
+  if (!(w in HOM_MEANING)) throw new Error(`y3-homophones: no why for "${answer}"`);
+  return `${cap(w)} ${HOM_MEANING[w]}.`;
+};
 const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
 
 export const y3Homophones: Generator = (d, rng) => {
@@ -48,5 +62,5 @@ export const y3Homophones: Generator = (d, rng) => {
   const [sent, si, ans] = pick(rng, HOMOPHONE_BANK.filter(r => sets.includes(r[1])));
   const up = sent.startsWith('___');
   const others = Y34_HOMOPHONE_SETS_1[si].filter(w => w !== ans.toLowerCase()).map(w => (up ? cap(w) : w));
-  return wordQ(rng, sent, ans, others, { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Which spelling fits the sentence?', hintIsData: false });
+  return wordQ(rng, sent, ans, others, { why: homWhy(ans), visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Which spelling fits the sentence?', hintIsData: false });
 };
