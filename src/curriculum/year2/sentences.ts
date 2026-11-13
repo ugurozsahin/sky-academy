@@ -130,18 +130,23 @@ export const y2Tense: Generator = (d, rng) => {
     hint: 'Is it happening now, or has it happened already?', hintIsData: false,
   });
 };
+/** #2318: the job of each mark y2-punct asks for, so a wrong slice learns the rule. */
+export const Y2_PUNCT_WHY: Record<string, string> = {
+  '.': 'A telling sentence ends with a full stop.', '?': 'A question ends with a question mark.', '!': 'A shout ends with an exclamation mark.',
+  ',': 'A comma separates the items in a list.', "'": 'An apostrophe shows who something belongs to.',
+};
 export const y2Punct: Generator = (d, rng) => {
   const k = d === 1 ? 0 : ri(rng, 0, 2);
-  if (k === 0) { const [s, p] = pick(rng, PUNCT_SENTS); return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Which punctuation mark ends this sentence?` }); }
+  if (k === 0) { const [s, p] = pick(rng, PUNCT_SENTS); return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Which punctuation mark ends this sentence?`, why: Y2_PUNCT_WHY[p] }); }
   if (k === 1) {
     // #296: the gap never sits before "and" — English schools teach the list comma without one there.
     const L: [string, string][] = [['I like apples_ pears and plums.', ','], ['We saw lions, tigers_ bears and monkeys.', ','], ['Red, blue_ green and yellow.', ','], ['Bring a hat, coat_ scarf and gloves.', ',']];
     const [s, p] = pick(rng, L);
-    return wordQ(rng, s, p, ['.', '?', ';'], { visual: { type: 'sentence', text: s }, say: 'Which mark separates the items in the list?', hint: 'Commas in a list', hintIsData: false });
+    return wordQ(rng, s, p, ['.', '?', ';'], { visual: { type: 'sentence', text: s }, say: 'Which mark separates the items in the list?', hint: 'Commas in a list', hintIsData: false, why: Y2_PUNCT_WHY[p] });
   }
   const A: [string, string][] = [["The dog_s bone.", "'"], ["Sam_s hat is red.", "'"], ["My mum_s car.", "'"], ["The cat_s tail.", "'"]];
   const [s, p] = pick(rng, A);
-  return wordQ(rng, s, p, [',', '.', '-'], { visual: { type: 'sentence', text: s }, say: 'Which mark shows something belongs to someone?', hint: 'Possessive apostrophe', hintIsData: false });
+  return wordQ(rng, s, p, [',', '.', '-'], { visual: { type: 'sentence', text: s }, say: 'Which mark shows something belongs to someone?', hint: 'Possessive apostrophe', hintIsData: false, why: Y2_PUNCT_WHY[p] });
 };
 // Year 2 subordinates with `when`, `if`, `that` and `because`, and co-ordinates with `or`, `and`, `but`. No
 // other subordinating conjunction belongs in this bank: d3 used to carry "Although it was cold, we went out",
