@@ -442,9 +442,10 @@ const y1Plurals: Generator = (d, rng) => {
 };
 /** [root, ending, sentence]. The sentence alone decides the ending (#2272); `tests/unit/topic-suffix-fit.test.ts` pins each one. */
 export const Y1_SUFFIX: ReadonlyArray<readonly [string, string, string]> = [['jump', 'ing', 'She is jump___ now.'], ['play', 'ed', 'Yesterday he play___.'], ['walk', 'ing', 'I am walk___ to school.'], ['look', 'ed', 'We look___ at the sky.'], ['fast', 'er', 'A car is fast___ than a bike.'], ['tall', 'est', 'It is the tall___ tree of all.'], ['help', 'ing', 'Dad is help___ me.'], ['kick', 'ed', 'He kick___ the ball yesterday.'], ['kind', 'er', 'Mia is kind___ than Sam.'], ['small', 'est', 'It is the small___ mouse of all.']];
+const SUFFIX_WHY: Record<string, string> = { ing: 'it is happening now.', ed: 'it already happened.', er: 'it is more than another.', est: 'it is the most of all.' };  // #2318
 const y1Suffix: Generator = (_d, rng) => {
-  const [, suf, sent] = pick(rng, Y1_SUFFIX);
-  return wordQ(rng, sent, suf, ['ing', 'ed', 'er', 'est'], { visual: { type: 'sentence', text: sent }, say: spokenGap(sent), hint: 'Slice the ending', hintIsData: false });
+  const [root, suf, sent] = pick(rng, Y1_SUFFIX);
+  return wordQ(rng, sent, suf, ['ing', 'ed', 'er', 'est'], { visual: { type: 'sentence', text: sent }, say: spokenGap(sent), hint: 'Slice the ending', hintIsData: false, why: `${root}${suf}: ${SUFFIX_WHY[suf]}` });
 };
 // #977: un- negates an adjective ("not kind") or undoes a verb ("opposite of lock"); the root never changes spelling.
 // Oracle: the answer is exactly 'un' + the root named in the prompt. Every option is a word from this bank.
@@ -457,7 +458,7 @@ const y1Prefix: Generator = (d, rng) => {
   const others = shuffle(rng, [...UN_ADJ, ...UN_VERB].filter(r => r !== root)).map(r => `un${r}`);
   const prompt = verb ? `Which word is the opposite of ${root}?` : `Which word means not ${root}?`;
   return wordQ(rng, prompt, answer, [root, ...others].slice(0, d === 1 ? 2 : 3), {
-    visual: { type: 'word', text: root }, say: prompt, hint: 'Add un- to the front', hintIsData: false,
+    visual: { type: 'word', text: root }, say: prompt, hint: 'Add un- to the front', hintIsData: false, why: `${answer}: un- ${verb ? 'undoes' : 'means not'} ${root}.`,
   });
 };
 // Letter names in order (#976). Oracle: the answer is the shown letter's alphabet neighbour; never "after z" / "before a".

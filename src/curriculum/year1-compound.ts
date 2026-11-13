@@ -17,6 +17,6 @@ export const y1Compound: Generator = (d, rng) => {
   const word = a + b;
   return wordQ(rng, `${a} + ${b} = ?`, word, d === 1 ? decoys.slice(0, 2) : decoys, {
     visual: d === 3 ? undefined : { type: 'word', text: `${a} + ${b}`, emoji: e },
-    say: `${a[0].toUpperCase()}${a.slice(1)} and ${b}. Which is the word ${word}, spelt right?`, hint: 'Join the two words', hintIsData: false,
+    say: `${a[0].toUpperCase()}${a.slice(1)} and ${b}. Which is the word ${word}, spelt right?`, hint: 'Join the two words', hintIsData: false, why: `${a} + ${b} makes one word: ${word}.`,
   });
 };
