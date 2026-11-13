@@ -43,7 +43,7 @@ const D1_SETS = [0, 1, 2, 5, 6, 8];
 const SETS_BY_DIFF: Record<Difficulty, number[]> = { 1: D1_SETS, 2: [...D1_SETS, 7], 3: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
 /** #2318: what each spelling means, so the why says which one the sentence needs. */
 export const HOM2_MEANING: Record<string, string> = {
-  mail: 'is letters and parcels', male: 'means a boy or a man animal', main: 'means the biggest or most important', mane: 'is the long hair on a lion or horse',
+  mail: 'is letters and parcels', male: 'means a boy, a man or a he-animal', main: 'means the biggest or most important', mane: 'is the long hair on a lion or horse',
   meat: 'is food from animals', meet: 'means come together', medal: 'is a prize you wear', meddle: 'means poke into things that are not yours',
   missed: 'means did not catch or hit', mist: 'is thin cloud near the ground', peace: 'means calm and quiet', piece: 'is a part of something',
   plain: 'means simple, with nothing added', plane: 'is a flying machine', rain: 'is water falling from clouds', rein: 'is the strap that steers a horse',
