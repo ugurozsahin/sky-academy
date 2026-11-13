@@ -51,7 +51,7 @@ export const SUFFIX_BANK: ReadonlyArray<SuffixRow> = [
 export const suffixWhy = (root: string, ans: string, rule: SuffixRule): string => ({
   plain: `Just add -ly to the end: ${root} + ly = ${ans}.`,
   'y-to-i': `Change y to i, then add -ly: ${root} → ${ans}.`,
-  le: `Drop the le, then add -y: ${root} → ${ans}.`,
+  le: `Change -le to -ly: ${root} → ${ans}.`,
   ic: `Words ending -ic add -ally: ${root} → ${ans}.`,
   listed: `An exception to learn: ${root} → ${ans}.`,
   ation: root.endsWith('e') ? `Drop the e, then add -ation: ${root} → ${ans}.` : `Add -ation to the root: ${root} → ${ans}.`,
