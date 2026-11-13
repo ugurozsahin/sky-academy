@@ -21,12 +21,17 @@ const NO_WHOLE_WORD = new Set(['patient']);
 const D3_MAX_LETTERS = 9;
 const d3Roots = PREFIX_NOT_ROOTS.filter(([r, p]) => !NO_WHOLE_WORD.has(r) && (p + r).length <= D3_MAX_LETTERS);
 
+/** #2318: the spelling rule for the prefix, so a wrong slice says why. */
+export const PREFIX_RULE: Record<PrefixNotRow[1], string> = { in: 'goes before most letters', il: 'goes before l', im: 'goes before m or p', ir: 'goes before r' };
+export const prefixWhy = (prefix: PrefixNotRow[1], root: string): string =>
+  prefix === 'in' ? `in- goes before ${root[0]}.` : `${prefix}- ${PREFIX_RULE[prefix]}.`;
+
 const prefixCard = (rng: Rng, [root, prefix]: PrefixNotRow, bubbles: number): Question => {
   const others = PREFIXES.filter(p => p !== prefix);
   // The misconception is always "in-" before l, m, p or r, so a card on an il/im/ir root always offers `in`.
   const ds = prefix === 'in' ? shuffle(rng, others) : ['in', ...shuffle(rng, others.filter(p => p !== 'in'))];
   const q = wordQ(rng, `Which prefix makes the opposite of ${root}?`, prefix, ds.slice(0, bubbles - 1),
-    { hint: `Look at the first letter of ${root}`, hintIsData: false });
+    { why: prefixWhy(prefix, root), hint: `Look at the first letter of ${root}`, hintIsData: false });
   q.say = `Which prefix makes the opposite of ${root}?`;
   q.visual = { type: 'word', text: root };
   return q;
@@ -38,7 +43,7 @@ const d2 = (rng: Rng) => prefixCard(rng, pick(rng, PREFIX_NOT_ROOTS), 4);
 const d3 = (rng: Rng): Question => {
   const [root, prefix] = pick(rng, d3Roots);
   const q = wordQ(rng, `Which spelling means not ${root}?`, prefix + root, PREFIXES.filter(p => p !== prefix).map(p => p + root),
-    { hint: `Look at the first letter of ${root}`, hintIsData: false, wide: true });
+    { why: prefixWhy(prefix, root), hint: `Look at the first letter of ${root}`, hintIsData: false, wide: true });
   q.say = `Which spelling means not ${root}?`;
   return q;
 };
