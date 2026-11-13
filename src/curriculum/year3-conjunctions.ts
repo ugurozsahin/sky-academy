@@ -60,6 +60,23 @@ export const CLASS_BANK: ClassRow[] = [
   ['Ali left in May. We have not met since.', 'since', 'adverb'],
 ];
 
+/** #2318: what the answer word does in the sentence, in a few words. */
+export const GAP_JOB: Record<string, string> = {
+  because: 'gives the reason', so: 'gives the result', when: 'says the time', before: 'says what comes first', after: 'says what comes later',
+  while: 'says two things happen together', then: 'says what happens next', next: 'says what happens next', soon: 'says it will not be long',
+  therefore: 'gives the result of the first part', during: 'goes before the noun to say when', in: 'goes before the noun to say where',
+  'because of': 'goes before a noun to give the reason',
+};
+export const gapWhy = (answer: string): string => {
+  if (!(answer in GAP_JOB)) throw new Error(`y3-conjunctions: no why for "${answer}"`);
+  return `${answer[0].toUpperCase()}${answer.slice(1)} ${GAP_JOB[answer]}.`;
+};
+const CLASS_WHY: Record<WordClass, string> = {
+  conjunction: 'a clause follows it, so it is a conjunction', preposition: 'a noun phrase follows it, so it is a preposition',
+  adverb: 'nothing follows it, so it is an adverb',
+};
+export const classWhy = (word: string, cls: WordClass): string => `With ${word}, ${CLASS_WHY[cls]}.`;
+
 const CLASSES: WordClass[] = ['conjunction', 'preposition', 'adverb'];
 const CONJ_ROWS = GAP_BANK.filter(r => r[3] === 'conjunction');
 
@@ -68,14 +85,14 @@ const SHORT_CONJ_ROWS = CONJ_ROWS.filter(r => r[0].split(' ').length <= 7);
 const gap = (rng: Rng, rows: GapRow[], nDecoys: number, short = false): Question => {
   const [s, answer, decoys] = pick(rng, rows);
   return wordQ(rng, short ? 'Which word fits?' : s, answer, shuffle(rng, decoys).slice(0, nDecoys), {
-    visual: { type: 'sentence', text: s }, say: s.replace('___', 'blank'), hint: 'Which word makes sense?', hintIsData: false, ...(short ? { slip: `Which word fits? ${s}` } : {}),
+    why: gapWhy(answer), visual: { type: 'sentence', text: s }, say: s.replace('___', 'blank'), hint: 'Which word makes sense?', hintIsData: false, ...(short ? { slip: `Which word fits? ${s}` } : {}),
   });
 };
 
 const wordClass = (rng: Rng): Question => {
   const [s, word, cls] = pick(rng, CLASS_BANK);
   return wordQ(rng, `What is ${word} in this sentence?`, cls, CLASSES.filter(c => c !== cls), {
-    visual: { type: 'sentence', text: s }, say: `${s} What is ${word} in this sentence?`, hint: 'Look at what comes after it', hintIsData: false,
+    why: classWhy(word, cls), visual: { type: 'sentence', text: s }, say: `${s} What is ${word} in this sentence?`, hint: 'Look at what comes after it', hintIsData: false,
   });
 };
 
