@@ -47,13 +47,23 @@ export const SUFFIX_BANK: ReadonlyArray<SuffixRow> = [
   ['quote', 'ation', 'quotation', 'ation', 'quoteation', 'quottation', 'Read the ___ out loud.'],
 ];
 
+/** #2318: the rule that made the spelling, in a few words (14 at most). */
+export const suffixWhy = (root: string, ans: string, rule: SuffixRule): string => ({
+  plain: `Just add -ly to the end: ${root} + ly = ${ans}.`,
+  'y-to-i': `Change y to i, then add -ly: ${root} → ${ans}.`,
+  le: `Drop the le, then add -y: ${root} → ${ans}.`,
+  ic: `Words ending -ic add -ally: ${root} → ${ans}.`,
+  listed: `An exception to learn: ${root} → ${ans}.`,
+  ation: root.endsWith('e') ? `Drop the e, then add -ation: ${root} → ${ans}.` : `Add -ation to the root: ${root} → ${ans}.`,
+})[rule];
+
 /** d1 is the plain -ly you add straight on; d2 the four exceptions and -ation; d3 mixes every rule, in a sentence. */
 export const y3Suffix: Generator = (d, rng) => {
   const rows = d === 3 ? SUFFIX_BANK : SUFFIX_BANK.filter(r => (r[3] === 'plain') === (d === 1));
-  const [root, suf, ans, , naive, misrule, sentence] = pick(rng, rows);
+  const [root, suf, ans, rule, naive, misrule, sentence] = pick(rng, rows);
   const sum = `${root} + ${suf}`;
   return wordQ(rng, d === 3 ? `${sum}: ${sentence}` : `${sum} = ?`, ans, [naive, misrule], {
     visual: d === 3 ? { type: 'sentence', text: sentence } : { type: 'word', text: sum },
-    say: `Add ${suf} to ${root}. Which spelling is right?`, hint: 'Check the end of the root word', hintIsData: false,
+    say: `Add ${suf} to ${root}. Which spelling is right?`, why: suffixWhy(root, ans, rule), hint: 'Check the end of the root word', hintIsData: false,
   });
 };
