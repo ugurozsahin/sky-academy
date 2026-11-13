@@ -57,3 +57,10 @@ describe('every topic has a why or is on the allow-list (#2316)', () => {
     });
   }
 });
+
+describe('the contraction why names the letters left out (#2318)', () => {
+  it.each([["don't", 'do not', 'o'], ["can't", 'cannot', 'no'], ["I'll", 'I will', 'wi'], ["it's", 'it is', 'i'], ["I'm", 'I am', 'a']])('%s', async (s, l, gap) => {
+    const { contractionWhy } = await import('../../src/curriculum/year1-contractions');
+    expect(contractionWhy(s, l)).toBe(`${s} is ${l}, with ${gap} left out.`);
+  });
+});
