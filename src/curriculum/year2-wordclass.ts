@@ -53,6 +53,11 @@ export const WORD_CLASS_SETS: ReadonlyArray<readonly [string, readonly string[],
   ['The dragon roared and the villagers hid.', ['dragon', 'villagers'], ['roared', 'hid'], []],
 ];
 
+/** #2318: the test for each class, so a wrong slice learns the job of the word (KS1: eight words or fewer). */
+export const CLASS_JOB: Record<(typeof WORD_CLASS_NAMES)[number], string> = {
+  noun: 'names a person or thing.', verb: 'tells what happens.', adjective: 'describes a noun.', adverb: 'tells how it happens.',
+};
+
 /** "Slice every noun/verb": targets are the sentence's words of the class asked, decoys its other content words. */
 function y2WordClassAnyOrder(d: number, rng: Rng): ReturnType<typeof anyOrderQ> {
   const [sent, nouns, verbs, others] = pick(rng, WORD_CLASS_SETS);
@@ -60,6 +65,7 @@ function y2WordClassAnyOrder(d: number, rng: Rng): ReturnType<typeof anyOrderQ> 
   const targets = cls === 'noun' ? nouns : verbs, decoys = [...(cls === 'noun' ? verbs : nouns), ...others];
   return anyOrderQ(rng, `Slice every ${cls}`, [...targets], decoys, {
     visual: { type: 'sentence', text: sent }, say: `${sent} Slice every ${cls}.`, hint: `Which words are ${cls}s?`, hintIsData: false,
+    why: `A ${cls} ${CLASS_JOB[cls]}`,
   });
 }
 /**
@@ -74,6 +80,6 @@ export const y2WordClass: Generator = (d, rng) => {
   const k = ri(rng, 0, d === 1 ? 1 : d === 2 ? 2 : 3);
   const cls = WORD_CLASS_NAMES[k], answer = row[k + 1];
   return wordQ(rng, `Which word is the ${cls}?`, answer, row.slice(1).filter(w => w !== answer), {
-    visual: { type: 'sentence', text: row[0] }, say: `${row[0]} Which word is the ${cls}?`, hint: `Slice the ${cls}`, hintIsData: false,
+    visual: { type: 'sentence', text: row[0] }, say: `${row[0]} Which word is the ${cls}?`, hint: `Slice the ${cls}`, hintIsData: false, why: `${answer} ${CLASS_JOB[cls]}`,
   });
 };
