@@ -1,6 +1,7 @@
 // Year 2 words: spelling, contractions, suffixes, homophones, tracing. Split out of year2.ts (#1416); index.ts re-exports every name.
 import { type Generator } from '../types';
 import { spokenGap } from '../spoken-gap';
+import { contractionWhy } from '../year1-contractions';
 import { pick, shuffle, wordQ, spellQ, Y1_CEW, Y2_CEW } from '../util';
 import { TRICKY, trickyGap } from '../tricky-gaps';
 
@@ -33,9 +34,9 @@ export const y2Contractions: Generator = (d, rng) => {
     const near = CONTRACTIONS.filter(c => c[0] !== long && (c[0].split(' ')[0] === first || c[0].split(' ').pop() === last));
     const rest = CONTRACTIONS.filter(c => c[0] !== long && !near.includes(c));
     const ds = [...shuffle(rng, near), ...shuffle(rng, rest)].slice(0, 3).map(c => c[0]);
-    return wordQ(rng, short, long, ds, { visual: { type: 'word', text: short }, say: `What does ${short} mean?` });
+    return wordQ(rng, short, long, ds, { visual: { type: 'word', text: short }, say: `What does ${short} mean?`, why: contractionWhy(short, long) });
   }
-  return wordQ(rng, long, short, shuffle(rng, contractionDecoys(long, short, 5)).slice(0, n), { visual: { type: 'word', text: long }, say: `Which contraction means ${long}?`, hint: 'Slice the short form', hintIsData: false });
+  return wordQ(rng, long, short, shuffle(rng, contractionDecoys(long, short, 5)).slice(0, n), { visual: { type: 'word', text: long }, say: `Which contraction means ${long}?`, hint: 'Slice the short form', hintIsData: false, why: contractionWhy(short, long) });
 };
 /** [root, ending, sentence]. */
 export const SUFFIX2: ReadonlyArray<readonly [string, string, string]> = [['care', 'ful', 'Be care___ on the road.'], ['hope', 'less', 'The lost sock was hope___.'], ['kind', 'ness', 'Show kind___ to others.'], ['slow', 'ly', 'The snail moved slow___.'], ['enjoy', 'ment', 'We had lots of enjoy___.'], ['help', 'ful', 'A very help___ friend.'], ['quick', 'ly', 'She ran quick___.'], ['sad', 'ness', 'He felt great sad___.'], ['fear', 'less', 'The fear___ ninja jumped.'], ['pay', 'ment', 'Mum made the pay___.']];

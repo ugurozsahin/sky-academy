@@ -18,5 +18,13 @@ function y1ContractionDecoys(answer: string, n: number, rng: () => number): stri
 export const y1Contractions: Generator = (d, rng) => {
   const [c, full, sent] = pick(rng, d === 1 ? Y1_CONTRACTIONS.slice(0, 3) : Y1_CONTRACTIONS);
   const ds = y1ContractionDecoys(full, d === 1 ? 2 : 3, rng);
-  return wordQ(rng, 'Read the word with the apostrophe. Which two words does it stand for?', full, ds, { say: 'Read the word with the apostrophe. Which two words does it stand for?', visual: d === 3 ? { type: 'sentence', text: sent } : { type: 'word', text: d === 1 && c === "we'll" && rng() < 0.5 ? "We'll" : c }, hint: 'The apostrophe shows missing letters', hintIsData: false });
+  return wordQ(rng, 'Read the word with the apostrophe. Which two words does it stand for?', full, ds, { say: 'Read the word with the apostrophe. Which two words does it stand for?', visual: d === 3 ? { type: 'sentence', text: sent } : { type: 'word', text: d === 1 && c === "we'll" && rng() < 0.5 ? "We'll" : c }, hint: 'The apostrophe shows missing letters', hintIsData: false, why: contractionWhy(c, full) });
 };
+
+/** The letters a contraction leaves out ("could not" → "couldn't": "o"), found by matching the short form against the long one in order (#2318). */
+export function contractionWhy(short: string, long: string): string {
+  const bare = short.replace("'", '').toLowerCase(), full = long.replace(' ', '').toLowerCase();
+  let gap = '', j = 0;
+  for (const ch of full) { if (bare[j] === ch) j++; else gap += ch; }
+  return `${short} is ${long}, with ${gap} left out.`;
+}
