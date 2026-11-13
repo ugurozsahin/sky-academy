@@ -44,9 +44,9 @@ export const y2Nouns: Generator = (d, rng) => {
     hint: useCompound ? 'Slice the word that finishes it' : 'Slice the person word', hintIsData: false,
   });
   if (useCompound) {
-    const [, second, s, decoys] = pick(rng, COMPOUND_BANK);
-    return wordQ(rng, s, second, shuffle(rng, decoys).slice(0, 3), extra(s));
+    const [first, second, s, decoys] = pick(rng, COMPOUND_BANK);
+    return wordQ(rng, s, second, shuffle(rng, decoys).slice(0, 3), { ...extra(s), why: `${first} + ${second} makes one word: ${first}${second}.` });
   }
   const [root, s, decoys] = pick(rng, ER_BANK);
-  return wordQ(rng, s, root + 'er', shuffle(rng, decoys).slice(0, d === 1 ? 2 : 3), extra(s));
+  return wordQ(rng, s, root + 'er', shuffle(rng, decoys).slice(0, d === 1 ? 2 : 3), { ...extra(s), why: `${root} + er: ${root}er, the person who ${root}s.` });
 };
