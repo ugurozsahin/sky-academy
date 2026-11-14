@@ -50,7 +50,7 @@ export const TWINS: readonly Twin[] = [
 
 const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
 /** #2318: the test for the class applied to this sentence, never the bare answer. */
-export const detWhy = (word: string, noun: string): string => `${cap(word)} comes before the noun ${noun}, so it is a determiner.`;
+export const detWhy = (word: string): string => `${cap(word)} comes before a noun, so it is a determiner.`;
 export const possWhy = (word: string): string => `${cap(word)} stands on its own with no noun after it: a possessive pronoun.`;
 export const termWhy = (word: string, isDet: boolean): string =>
   isDet ? `"${word}" comes before a noun, so it is a determiner.` : `"${word}" stands on its own, so it is a possessive pronoun.`;
@@ -64,8 +64,7 @@ function find(rng: () => number, bank: readonly Row[], prompt: string, want: Cls
   const dets = Object.keys(words).filter(w => words[w] === 'D' && w !== answer);
   const rest = shuffle(rng, Object.keys(words).filter(w => w !== answer && !dets.includes(w)));
   const decoys = [...dets, ...rest].slice(0, bubbles - 1);
-  const noun = Object.keys(words).find(w => words[w] === 'N')!;
-  return wordQ(rng, prompt, answer, decoys, { why: want === 'D' ? detWhy(answer, noun) : possWhy(answer), visual: { type: 'sentence', text }, say: `${text} ${prompt}`, wide, hint, hintIsData: false });
+  return wordQ(rng, prompt, answer, decoys, { why: want === 'D' ? detWhy(answer) : possWhy(answer), visual: { type: 'sentence', text }, say: `${text} ${prompt}`, wide, hint, hintIsData: false });
 }
 
 function term(rng: () => number): Question {

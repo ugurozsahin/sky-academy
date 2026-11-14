@@ -49,15 +49,15 @@ const WHO: Record<Ant, string> = { F: 'a girl or woman', M: 'a boy or man', T: '
 /** #2318: who the first sentence is about, and the case the gap needs; never the bare answer. */
 export const pronounWhy = (ant: Ant, ans: string, object: boolean): string =>
   object ? `As the object, it is "${ans}": the text is about ${WHO[ant]}.` : `The text is about ${WHO[ant]}, so the subject is "${ans}".`;
-export const clearWhy = (amb: string, noun: string): string => `"${amb}" could mean either one, so say ${noun.toLowerCase()}.`;
+export const clearWhy = (amb: string, noun: string): string => `"${amb}" could mean either one, so say ${noun.replace(/^(The|My) /, m => m.toLowerCase())}.`;
 
 const PROMPT = 'Which word fits best?';
 const PROMPT_CLEAR = 'Which word makes the meaning clear?';
 
-function pronoun(rng: () => number, rows: readonly Row[], forms: Record<Ant, { ans: string; decoys: string[] }>, bubbles: number): Question {
+function pronoun(rng: () => number, rows: readonly Row[], forms: Record<Ant, { ans: string; decoys: string[] }>, bubbles: number, object = false): Question {
   const [text, ant] = pick(rng, rows), f = forms[ant];
   return wordQ(rng, PROMPT, f.ans, shuffle(rng, f.decoys).slice(0, bubbles - 1), {
-    why: pronounWhy(ant, f.ans, forms === OBJ_FORM),
+    why: pronounWhy(ant, f.ans, object),
     visual: { type: 'sentence', text }, say: `${text.replace('___', 'blank')} ${PROMPT}`,
     hint: 'The word has to match who or what the first sentence is about.', hintIsData: false,
   });
@@ -78,5 +78,5 @@ export const y4Pronouns: Generator = (d, rng) => {
   if (d === 1) return pronoun(rng, SUBJ_ONE, SUBJ_FORM, 3);
   if (d === 3 && rng() < 0.5) return clear(rng);
   const r = rng();
-  return r < 0.4 ? pronoun(rng, [...SUBJ_ONE, ...SUBJ_PLURAL], SUBJ_FORM, 4) : pronoun(rng, OBJ, OBJ_FORM, 4);
+  return r < 0.4 ? pronoun(rng, [...SUBJ_ONE, ...SUBJ_PLURAL], SUBJ_FORM, 4) : pronoun(rng, OBJ, OBJ_FORM, 4, true);
 };
