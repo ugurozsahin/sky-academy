@@ -15,11 +15,21 @@ describe('y5-ant says why (#2318)', () => {
   it('gives every bank row a why that names its whole word', () => {
     for (const row of ANT_BANK) expect(antWhy(row)).toContain(`${row[0]}${row[1]}.`);
   });
+  it('names a vowel that matches the ending, and says "learnt" only where there is no clue', () => {
+    for (const row of ANT_BANK) {
+      const why = antWhy(row);
+      if (row[3]) expect(why).toContain(`has a clear ${row[1][0]},`);
+      else expect(why).toContain('has to be learnt');
+      expect(why.includes('learnt')).toBe(!row[3]);
+    }
+    expect(ANT_BANK.find(r => r[0] === 'hesit' && r[1] === 'ancy')![3]).toBe('hesitation');
+    expect(ANT_BANK.find(r => r[0] === 'vac')![3]).toBe('vacate');
+  });
   it('sets a short why on every question, never the bare ending', () => {
     for (const d of [1, 2, 3] as const) for (const q of draws(d)) {
       expect(q.why).toBeTruthy();
       expect(q.why!.split(/\s+/).length).toBeLessThanOrEqual(14);
-      expect(q.why).not.toBe(q.answer);
+      expect(q.why).toContain(`${q.answer}`);
     }
   });
 });

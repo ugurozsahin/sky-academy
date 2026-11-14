@@ -28,8 +28,8 @@ const NOUN: AntRow[] = [
 ];
 /** d3 adds -ancy/-ency and the words that "just have to be learnt", with no clue. */
 const LEARNT: AntRow[] = [
-  ['hesit', 'ancy', 'ency', null, 'She spoke without hesit___.'],
-  ['vac', 'ancy', 'ency', null, 'The hotel has a vac___ for a family.'],
+  ['hesit', 'ancy', 'ency', 'hesitation', 'She spoke without hesit___.'],
+  ['vac', 'ancy', 'ency', 'vacate', 'The hotel has a vac___ for a family.'],
   ['frequ', 'ency', 'ancy', null, 'The frequ___ of the buses is every ten minutes.'],
   ['flu', 'ency', 'ancy', null, 'He reads with great flu___.'],
   ['ag', 'ency', 'ancy', null, 'Mum works for a travel ag___.'],
