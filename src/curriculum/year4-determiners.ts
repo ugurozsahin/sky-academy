@@ -48,6 +48,13 @@ export const TWINS: readonly Twin[] = [
   ['Their team won.', 'Their', 'The prize is theirs.', 'theirs'],
 ];
 
+const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
+/** #2318: the test for the class applied to this sentence, never the bare answer. */
+export const detWhy = (word: string, noun: string): string => `${cap(word)} comes before the noun ${noun}, so it is a determiner.`;
+export const possWhy = (word: string): string => `${cap(word)} stands on its own with no noun after it: a possessive pronoun.`;
+export const termWhy = (word: string, isDet: boolean): string =>
+  isDet ? `"${word}" comes before a noun, so it is a determiner.` : `"${word}" stands on its own, so it is a possessive pronoun.`;
+
 const TERMS = ['determiner', 'pronoun', 'noun', 'adjective'];
 
 function find(rng: () => number, bank: readonly Row[], prompt: string, want: Cls, bubbles: number, wide: boolean, hint: string): Question {
@@ -57,7 +64,8 @@ function find(rng: () => number, bank: readonly Row[], prompt: string, want: Cls
   const dets = Object.keys(words).filter(w => words[w] === 'D' && w !== answer);
   const rest = shuffle(rng, Object.keys(words).filter(w => w !== answer && !dets.includes(w)));
   const decoys = [...dets, ...rest].slice(0, bubbles - 1);
-  return wordQ(rng, prompt, answer, decoys, { visual: { type: 'sentence', text }, say: `${text} ${prompt}`, wide, hint, hintIsData: false });
+  const noun = Object.keys(words).find(w => words[w] === 'N')!;
+  return wordQ(rng, prompt, answer, decoys, { why: want === 'D' ? detWhy(answer, noun) : possWhy(answer), visual: { type: 'sentence', text }, say: `${text} ${prompt}`, wide, hint, hintIsData: false });
 }
 
 function term(rng: () => number): Question {
@@ -65,6 +73,7 @@ function term(rng: () => number): Question {
   const isDet = rng() < 0.5, text = isDet ? det : pron, w = isDet ? dw : pw;
   const prompt = `Which kind of word is "${w}" here?`;
   return wordQ(rng, prompt, isDet ? 'determiner' : 'pronoun', TERMS.filter(t => t !== (isDet ? 'determiner' : 'pronoun')), {
+    why: termWhy(w, isDet),
     visual: { type: 'sentence', text }, say: `${text} ${prompt}`, wide: true,
     hint: 'A determiner comes before a noun. A possessive pronoun stands on its own.', hintIsData: false,
   });

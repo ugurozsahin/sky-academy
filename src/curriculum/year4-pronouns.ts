@@ -45,12 +45,19 @@ const OBJ_FORM: Record<Ant, { ans: string; decoys: string[] }> = {
   T: { ans: 'it', decoys: ['they', 'him', 'her'] }, P: { ans: 'them', decoys: ['they', 'him', 'her', 'it'] },
 };
 
+const WHO: Record<Ant, string> = { F: 'a girl or woman', M: 'a boy or man', T: 'one thing', P: 'more than one' };
+/** #2318: who the first sentence is about, and the case the gap needs; never the bare answer. */
+export const pronounWhy = (ant: Ant, ans: string, object: boolean): string =>
+  object ? `As the object, it is "${ans}": the text is about ${WHO[ant]}.` : `The text is about ${WHO[ant]}, so the subject is "${ans}".`;
+export const clearWhy = (amb: string, noun: string): string => `"${amb}" could mean either one, so say ${noun.toLowerCase()}.`;
+
 const PROMPT = 'Which word fits best?';
 const PROMPT_CLEAR = 'Which word makes the meaning clear?';
 
 function pronoun(rng: () => number, rows: readonly Row[], forms: Record<Ant, { ans: string; decoys: string[] }>, bubbles: number): Question {
   const [text, ant] = pick(rng, rows), f = forms[ant];
   return wordQ(rng, PROMPT, f.ans, shuffle(rng, f.decoys).slice(0, bubbles - 1), {
+    why: pronounWhy(ant, f.ans, forms === OBJ_FORM),
     visual: { type: 'sentence', text }, say: `${text.replace('___', 'blank')} ${PROMPT}`,
     hint: 'The word has to match who or what the first sentence is about.', hintIsData: false,
   });
@@ -60,6 +67,7 @@ function pronoun(rng: () => number, rows: readonly Row[], forms: Record<Ant, { a
 function clear(rng: () => number): Question {
   const [text, noun, amb, obj, wrong] = pick(rng, NOUN_BANK);
   return wordQ(rng, PROMPT_CLEAR, noun, [amb, obj, wrong], {
+    why: clearWhy(amb, noun),
     visual: { type: 'sentence', text }, say: `${text.replace('___', 'blank')} ${PROMPT_CLEAR}`, wide: true,
     hint: 'Two people or things fit the pronoun, so use the noun.', hintIsData: false,
   });
