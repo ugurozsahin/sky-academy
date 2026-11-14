@@ -47,28 +47,33 @@ export const MORE_BANK: readonly SilentRow[] = [
 ];
 export const SILENT_BANK: readonly SilentRow[] = [...ONE_BANK, ...MORE_BANK];
 
+/** #2318: names the word and its silent letter, so the miss teaches which letter is written but not said. */
+export const silentWhy = ([word, at]: SilentRow): string => `In "${word}" the ${word[at]} is written but not said.`;
+
 /** d1: the word is on the card; the silent letter and up to three sounded letters of the same word are the bubbles. */
-export function findQ(rng: Rng, [word, at, , ]: SilentRow): Question {
+export function findQ(rng: Rng, row: SilentRow): Question {
+  const [word, at] = row;
   const silent = word[at];
   const others = [...new Set(word.split('').filter(l => l !== silent))];
   return wordQ(rng, `Which letter is silent in ${word}?`, silent, shuffle(rng, others), {
     visual: { type: 'word', text: word }, say: `Which letter is silent in ${word}?`,
-    hint: 'Say the word. Which letter can you not hear?', hintIsData: false,
+    hint: 'Say the word. Which letter can you not hear?', hintIsData: false, why: silentWhy(row),
   });
 }
 
 /** d2: the sentence shows the word with the silent letter gapped; the voice reads the whole sentence. */
-export function putBackQ(rng: Rng, [word, at, sentence, decoys]: SilentRow): Question {
+export function putBackQ(rng: Rng, row: SilentRow): Question {
+  const [word, at, sentence, decoys] = row;
   const gapped = `${word.slice(0, at)}_${word.slice(at + 1)}`;
   return wordQ(rng, 'Which letter is missing?', word[at], [...decoys], {
     visual: { type: 'sentence', text: sentence.replace(word, gapped) }, say: sentence,
-    hint: 'Say the whole word. Which letter do you not hear?', hintIsData: false,
+    hint: 'Say the whole word. Which letter do you not hear?', hintIsData: false, why: silentWhy(row),
   });
 }
 
 /** d3: hear the word and build all of it; a no-voice device peeks at the word first. */
-export function spellSilentQ(rng: Rng, [word]: SilentRow): Question {
-  return { ...spellQ(rng, word), peek: true, peekHint: 'Slice the letters in order' };
+export function spellSilentQ(rng: Rng, row: SilentRow): Question {
+  return { ...spellQ(rng, row[0]), why: silentWhy(row), peek: true, peekHint: 'Slice the letters in order' };
 }
 
 /** d1 find it · d2 put it back · d3 spell it. */
