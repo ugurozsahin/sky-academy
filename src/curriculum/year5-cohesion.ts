@@ -24,13 +24,17 @@ export const PASSAGES: readonly (readonly [string, string])[] = [
 
 export const cap = (s: string): string => s[0].toUpperCase() + s.slice(1);
 export const kindOf = (adv: string): Kind | undefined => KINDS.find(k => LISTS[k].includes(adv));
+/** #2318: what each kind of adverbial tells the reader, so the answer is a job and not a label to learn. */
+export const JOB: Record<Kind, string> = { time: 'says when', place: 'says where', number: 'gives the order' };
+export const cohesionWhy = (adv: string, kind: Kind): string => `"${cap(adv)}" ${JOB[kind]}: an adverbial of ${kind}.`;
+
 export const passageText = ([a, b]: readonly [string, string]): string => `${a} ___, ${b}`;
 
 function sortCard(rng: Rng): Question {
   const adv = pick(rng, [...TIME, ...PLACE, ...NUMBER]), kind = kindOf(adv)!;
   return wordQ(rng, `What kind of adverbial is '${cap(adv)}'?`, kind, KINDS.filter(k => k !== kind), {
     visual: { type: 'sentence', text: cap(adv) }, say: `What kind of adverbial is ${adv}? Time, place or number.`,
-    hint: 'Does it say when, where or in what order?', hintIsData: false,
+    hint: 'Does it say when, where or in what order?', hintIsData: false, why: cohesionWhy(adv, kind),
   });
 }
 
@@ -41,7 +45,7 @@ function chooseCard(rng: Rng, d: Difficulty): Question {
   const text = passageText(passage), lead = d === 3 ? 'A new paragraph starts. ' : '';
   return wordQ(rng, `Which adverbial of ${kind} ${d === 3 ? 'starts the new paragraph' : 'fits'}?`, opts[kind], shuffle(rng, KINDS.filter(k => k !== kind).map(k => opts[k])), {
     visual: { type: 'sentence', text }, say: `${lead}${text.replace('___', 'blank')} Which adverbial of ${kind} fits?`,
-    hint: `Which one tells you ${kind === 'time' ? 'when' : kind === 'place' ? 'where' : 'the order'}?`, hintIsData: false,
+    hint: `Which one tells you ${kind === 'time' ? 'when' : kind === 'place' ? 'where' : 'the order'}?`, hintIsData: false, why: cohesionWhy(opts[kind], kind),
   });
 }
 
