@@ -31,20 +31,30 @@ const SOUND_L: CiousRow[] = [
 ];
 /** d3 adds the rest of the p.18 words and the exceptions (anxious, initial, financial, commercial, provincial). */
 const REST: CiousRow[] = [
-  ['pre', 'cious', CT, 'The ring is very pre___ to her.'],
-  ['cons', 'cious', CT, 'He was cons___ after the fall.'],
-  ['deli', 'cious', CT, 'The soup was deli___.'],
-  ['suspi', 'cious', CT, 'The cat was suspi___ of the dog.'],
-  ['an', 'xious', CT, 'I felt an___ before the test.'],
-  ['ini', 'tial', ['cial', 'cious', 'tious'], 'Write your ini___ in the box.'],
-  ['finan', 'cial', ['tial', 'tious', 'xious'], 'The bank gives finan___ advice.'],
-  ['commer', 'cial', ['tial', 'tious', 'xious'], 'We saw a commer___ on the television.'],
-  ['provin', 'cial', ['tial', 'tious', 'xious'], 'The provin___ town is far from the capital.'],
+  ['pre', 'cious', CT, 'The ring is very pre___ to her.', 'price'],
+  ['cons', 'cious', CT, 'He was cons___ after the fall.', 'conscience'],
+  ['deli', 'cious', CT, 'The soup was deli___.', 'delicacy'],
+  ['suspi', 'cious', CT, 'The cat was suspi___ of the dog.', 'suspicion'],
+  ['an', 'xious', CT, 'I felt an___ before the test.', 'anxiety'],
+  ['ini', 'tial', ['cial', 'cious', 'tious'], 'Write your ini___ in the box.', 'initiate'],
+  ['finan', 'cial', ['tial', 'tious', 'xious'], 'The bank gives finan___ advice.', 'finance'],
+  ['commer', 'cial', ['tial', 'tious', 'xious'], 'We saw a commer___ on the television.', 'commerce'],
+  ['provin', 'cial', ['tial', 'tious', 'xious'], 'The provin___ town is far from the capital.', 'province'],
 ];
 
 /** The decoy lists above may name the answer's own ending (`CT` is shared); the bank drops it from each. */
 export const CIOUS_BANK: readonly CiousRow[] = [...CLUED, ...SOUND_L, ...REST].map(([s, e, ds, ...r]) => [s, e, ds.filter(d => d !== e), ...r]);
 const WORDS: Record<Difficulty, readonly CiousRow[]> = { 1: CIOUS_BANK.slice(0, CLUED.length), 2: CIOUS_BANK.slice(CLUED.length, CLUED.length + SOUND_L.length), 3: CIOUS_BANK };
+
+const VOWELS = 'aeiou';
+/** #2318: the root, or the vowel/consonant rule; never the bare ending. */
+export const ciousWhy = (stem: string, ending: string, clue?: string): string => {
+  const word = stem + ending;
+  if (clue) return `The root is "${clue}", so it is ${word}.`;
+  const vowel = VOWELS.includes(stem.slice(-1));
+  if (ending === 'cial' && vowel || ending === 'tial' && !vowel) return `After a ${vowel ? 'vowel' : 'consonant'} letter, the ending is -${ending}.`;
+  return `The ending is spelt -${ending} in ${word}.`;
+};
 
 export const ciousQ = (rng: Rng, row: CiousRow, bubbles: number, showClue: boolean): Question => {
   const [stem, ending, decoys, sentence, clue] = row;
@@ -56,7 +66,7 @@ export const ciousQ = (rng: Rng, row: CiousRow, bubbles: number, showClue: boole
   return wordQ(rng, showClue && clue ? `Clue: ${clue}. Which ending?` : 'Which ending is right?', ending, decoyPool, {
     visual: { type: 'sentence', text: sentence },
     say: `${sentence.replace('___', ending)} Which ending spells ${word}?`,
-    hint: 'Slice the right ending', hintIsData: false,
+    hint: 'Slice the right ending', hintIsData: false, why: ciousWhy(stem, ending, clue),
   });
 };
 
