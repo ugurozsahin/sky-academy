@@ -47,12 +47,19 @@ const WORDS: Record<Difficulty, readonly FerRow[]> = { 1: STRESSED, 2: [...STRES
 export const ferGap = ([root, ending]: FerRow) => root.slice(0, -1) + '_' + ending;
 export const ferWord = ([root, ending, doubled]: FerRow, right = true) => root.slice(0, -1) + (doubled === right ? 'rr' : 'r') + ending;
 
+/** #2318: the stress is the reason for the r count; the whole word is named, never the bare `r`/`rr`. */
+export const ferWhy = (row: FerRow): string => row[2]
+  ? `The stress stays on "fer", so the r doubles: ${ferWord(row)}.`
+  : STRESS_MOVES.includes(row[0] + row[1]) ? `The stress moves off "fer", so one r stays: ${ferWord(row)}.`
+  : `"${row[0]}" is never stressed on -fer, so one r: ${ferWord(row)}.`;
+const STRESS_MOVES = ['reference', 'referee', 'preference', 'transference', 'conference', 'inference'];
+
 export const ferQ = (rng: Rng, row: FerRow): Question => {
   const [root, ending, doubled, sentence] = row;
   return wordQ(rng, `${root} + ${ending}`, doubled ? 'rr' : 'r', [doubled ? 'r' : 'rr'], {
     visual: { type: 'sentence', text: sentence.replace('{}', ferGap(row)) },
     say: `${sentence.replace('{}', ferWord(row))} How do you spell ${ferWord(row)}?`,
-    hint: 'One r or two?', hintIsData: false,
+    hint: 'One r or two?', hintIsData: false, why: ferWhy(row),
   });
 };
 
