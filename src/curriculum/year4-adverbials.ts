@@ -41,6 +41,11 @@ export const FIT_BANK: readonly FitRow[] = [
   ['the bus arrived.', 'At last', 'The driver', 'Ran'], ['I wore my new boots.', 'In winter', 'My boots', 'Took'],
 ];
 
+/** #2318: the test that picks the answer, per form; never the bare answer. */
+export const advWhy = (kind: 'comma' | 'fit', adv: string): string => kind === 'comma'
+  ? `The comma goes after "${adv}", the words that start the sentence.`
+  : `"${adv}" tells us when or where, so it starts the sentence.`;
+
 const LETTERS = ['A', 'B', 'C', 'D'];
 
 /** The sentence with `(X)` at each gap (`gaps` are boundaries: gap i sits after word i), letters shuffled in reading order. */
@@ -63,6 +68,7 @@ function whereComma(d: 1 | 2 | 3, rng: () => number): Question {
   const answer = labels[gaps.indexOf(answerAt)];
   const prompt = 'Where does the comma go?';
   return wordQ(rng, prompt, answer, labels.filter(l => l !== answer), {
+    why: advWhy('comma', adv),
     visual: { type: 'sentence', text: render(words, gaps, labels) }, say: `${words.join(' ')} ${prompt}`,
     hint: 'The comma goes straight after the words that start the sentence.', hintIsData: false,
   });
@@ -73,6 +79,7 @@ function fits(rng: () => number): Question {
   const [rest, adv, noun, verb] = pick(rng, FIT_BANK);
   const text = `___, ${rest}`;
   return wordQ(rng, 'Which fits the gap?', adv, [noun, verb], {
+    why: advWhy('fit', adv),
     visual: { type: 'sentence', text }, say: text.replace('___', 'blank'), wide: true,
     hint: 'Which words tell us when or where?', hintIsData: false,
   });
