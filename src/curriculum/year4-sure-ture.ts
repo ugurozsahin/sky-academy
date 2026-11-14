@@ -42,6 +42,12 @@ export const CHER_BANK: readonly SureTureRow[] = [
   ['wat', 'cher', 'The bird wat___ sat very still.'],
 ];
 
+const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
+const SOUND: Record<'sure' | 'ture' | 'sion', string> = { sure: 'zhur', ture: 'chur', sion: 'zhun' };
+/** #2318: what the ending sounds like, or why -cher is a root plus -er; never the bare answer. */
+export const sureWhy = (stem: string, ending: string): string =>
+  ending === 'cher' ? `${cap(stem + ending)} is ${stem}ch plus er, so -cher.` : `${cap(stem + ending)} ends -${ending}, which sounds like "${SOUND[ending as keyof typeof SOUND]}".`;
+
 const ENDINGS = ['sure', 'ture', 'sion', 'cher'];
 
 /** d1: -sure and -ture, 2 bubbles · d2: adds -sion, 3 bubbles · d3: adds the -cher words, 4 bubbles. */
@@ -50,6 +56,7 @@ export const y4SureTure: Generator = (d, rng) => {
   const [stem, ending, sentence] = pick(rng, banks.flat());
   const word = stem + ending;
   return wordQ(rng, 'Which ending is right?', ending, shuffle(rng, ENDINGS.slice(0, banks.length).filter(e => e !== ending)), {
+    why: sureWhy(stem, ending),
     visual: { type: 'sentence', text: sentence },
     say: `${word}. ${sentence.replace('___', ending)}`,
     hint: 'Slice the right ending', hintIsData: false,
