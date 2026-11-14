@@ -47,6 +47,13 @@ export const HEAD_BANK: readonly HeadRow[] = [
   ['a', ['tiny'], 'paper', 'boat', ['on', 'the', 'pond']], ['the', ['friendly'], 'dinner', 'lady', ['from', 'the', 'hall']],
 ];
 
+/** #2318: the test that picks the answer, per form, named by the words in play; never the bare answer. */
+export const npWhy = (kind: 'gap' | 'spot' | 'head', a: string, b = ''): string => ({
+  gap: `"${a}" can describe the ${b}, so it expands the noun phrase.`,
+  spot: 'It has a noun with describing words around it.',
+  head: `The phrase is about the ${a}; the other words describe it.`,
+})[kind];
+
 const LETTERS = ['A', 'B', 'C'];
 const NP_PROMPT = 'Which is an expanded noun phrase?';
 
@@ -59,6 +66,7 @@ function gap(rng: () => number): Question {
   const text = `${det} ___ ${head}`;
   const prompt = 'Which word fits the gap to expand the noun phrase?';
   return wordQ(rng, prompt, mod, [...clash], {
+    why: npWhy('gap', mod, head),
     visual: { type: 'sentence', text }, say: `${text.replace('___', 'blank')}. ${prompt}`, wide: true,
     hint: 'A word that describes the noun goes in the gap.', hintIsData: false,
   });
@@ -70,6 +78,7 @@ function spot(rng: () => number): Question {
   const lines = shuffle(rng, [np, pick(rng, VP_BANK), pick(rng, ADV_BANK)]);
   const answer = LETTERS[lines.indexOf(np)];
   return wordQ(rng, NP_PROMPT, answer, LETTERS.filter(l => l !== answer), {
+    why: npWhy('spot', np),
     visual: { type: 'sentence', text: lines.map((l, i) => `${LETTERS[i]}: ${l}`).join('\n') }, say: `${NP_PROMPT} ${lines.map((l, i) => `${LETTERS[i]}, ${l}`).join('. ')}`,
     hint: 'An expanded noun phrase has a noun with describing words around it.', hintIsData: false,
   });
@@ -80,6 +89,7 @@ function head(rng: () => number): Question {
   const row = pick(rng, HEAD_BANK), text = headText(row);
   const prompt = 'Which word is the main noun?';
   return wordQ(rng, prompt, row[3], [row[2], row[4][2], row[1][0]], {
+    why: npWhy('head', row[3]),
     visual: { type: 'sentence', text }, say: `${text}. ${prompt}`, wide: true,
     hint: 'The main noun is the one the whole phrase is about.', hintIsData: false,
   });
