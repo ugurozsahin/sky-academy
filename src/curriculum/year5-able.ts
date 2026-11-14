@@ -50,12 +50,22 @@ export const KEEP_E_BANK: readonly AbleRow[] = [
   ['leg', 'ible', ['able'], 'Her writing is neat and leg___.'],
 ];
 
+/** Stems that are not whole words: the word the ending is added to (-ate/-e dropped). */
+const ROOTS: Record<string, string> = { reli: 'rely', ador: 'adore', toler: 'tolerate' };
+/** #2318: the root you can hear for -able/-ably, none for -ible/-ibly, the kept e for -eable; never the bare ending. */
+export const ableWhy = (stem: string, answer: string): string => {
+  const word = stem + answer;
+  if (answer === 'eable') return `The e stays after ${stem.slice(-1)}, so it is ${word}.`;
+  if (answer.startsWith('i')) return `There is no root word to hear, so it is ${word}.`;
+  return `The root word is "${ROOTS[stem] ?? stem}", so it is ${word}.`;
+};
+
 /** One card: 2 bubbles on d1 and d2, 3 on d3. `say` speaks the whole word, then the sentence with "blank". */
 export function ableQ(rng: Rng, [stem, answer, decoys, sentence]: AbleRow, bubbles: number): Question {
   return wordQ(rng, 'Which ending is right?', answer, shuffle(rng, decoys).slice(0, bubbles - 1), {
     visual: { type: 'sentence', text: sentence },
     say: `${stem}${answer}. ${sentence.replace(`${stem}___`, 'blank')}`,
-    hint: 'Can you hear a whole word before the ending?', hintIsData: false,
+    hint: 'Can you hear a whole word before the ending?', hintIsData: false, why: ableWhy(stem, answer),
   });
 }
 
