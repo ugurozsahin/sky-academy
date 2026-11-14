@@ -58,12 +58,18 @@ export function uniqueWords(text: string, whole: string): string[] {
 export const bothGapped = ([before, inside, rest]: Row): string => `${before} _ ${inside} _${rest}`;
 /** A pair as one bubble label, e.g. `( )`; the decoys are pairs that never fence off a parenthesis. */
 export const pairLabel = (kind: Kind): string => MARKS[kind].join(' ');
+/** #2318: why each card is right, from this sentence; never the bare answer. */
+const PLURAL: Record<Kind, string> = { bracket: 'brackets', comma: 'commas', dash: 'dashes' };
+export const pairWhy = (kind: Kind, inside: string): string => `"${inside}" is extra, so ${PLURAL[kind]} go round it as a pair.`;
+export const missingWhy = (side: 'open' | 'close', inside: string): string => `Brackets come in a pair: one ${side === 'open' ? 'before' : 'after'} "${inside}".`;
+export const insideWhy = (word: string): string => `"${word}" sits between the pair, so it is part of the parenthesis.`;
 export const PAIR_DECOYS: readonly string[] = ['. .', '? ?', '! !', ': :'];
 
 function pairCard(rng: Rng): Question {
   const row = pick(rng, BANK), kind = pick(rng, KINDS);
   const decoys = shuffle(rng, [...PAIR_DECOYS]).slice(0, 2);
   return wordQ(rng, 'Which pair of marks is missing?', pairLabel(kind), decoys, {
+    why: pairWhy(kind, row[1]),
     visual: { type: 'sentence', text: bothGapped(row) },
     say: `${spoken(row)} Which pair of punctuation marks is missing?`, hint: 'The pair fences off the extra words.', hintIsData: false,
   });
@@ -76,6 +82,7 @@ function missingCard(rng: Rng): Question {
   const [open, close] = MARKS[kind];
   const answer = side === 'open' ? open : close; // the mark the child slices is the one the `_` replaced
   return wordQ(rng, 'Which mark is missing?', answer, ['(', ')', '.'], {
+    why: missingWhy(side, row[1]),
     visual: { type: 'sentence', text: gapped(row, kind, side) },
     say: `${spoken(row)} Which punctuation mark is missing?`, hint: 'Marks come in pairs.', hintIsData: false,
   });
@@ -87,6 +94,7 @@ function insideCard(rng: Rng): Question {
   const answer = pick(rng, uniqueWords(inside, text));
   const outside = shuffle(rng, uniqueWords(before + rest, text).filter(w => w !== answer)).slice(0, 3);
   return wordQ(rng, 'Which word is inside the parenthesis?', answer, outside, {
+    why: insideWhy(answer),
     visual: { type: 'sentence', text }, say: `${spoken(row)} Which word is inside the parenthesis?`,
     hint: 'It sits between the pair.', hintIsData: false,
   });
