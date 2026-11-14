@@ -39,6 +39,11 @@ export const CIAN_BANK: readonly ShunRow[] = [
   ['politi', 'cian', 'politics', 'The politi___ gave a speech.'],
 ];
 
+const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
+/** #2318: how the root word turns into the ending, never the bare answer. */
+export const shunWhy = (root: string, word: string, ending: string): string =>
+  ending === 'tion' && root.endsWith('d') ? `${cap(root)} ends in d, but ${word} still takes -tion.` : `${cap(root)} becomes ${word}: it takes -${ending}.`;
+
 const ENDINGS = ['tion', 'sion', 'ssion', 'cian'];
 
 /** d1: -tion and -cian, no root, 2 bubbles · d2: the root is the clue, all four endings · d3: adds the two exceptions. */
@@ -48,6 +53,7 @@ export const y4Shun: Generator = (d, rng) => {
   const word = stem + ending;
   const options = d === 1 ? ['tion', 'cian'] : ENDINGS;
   return wordQ(rng, d === 1 ? 'Which ending is right?' : `Root word: ${root}. Which ending is right?`, ending, shuffle(rng, options.filter(e => e !== ending)), {
+    why: shunWhy(root, word, ending),
     visual: { type: 'sentence', text: sentence },
     say: `${word}. ${sentence.replace('___', ending)}`,
     hint: 'Slice the right ending', hintIsData: false,

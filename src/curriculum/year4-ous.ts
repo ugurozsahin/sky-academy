@@ -34,12 +34,27 @@ export const OUS_BANK: readonly OusRow[] = [
 const D1: readonly OusRule[] = ['root', 'noroot'];
 const D2: readonly OusRule[] = [...D1, 'y-i', 'our-or'];
 
+const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
+/** #2318: the spelling rule applied to this word, never the bare answer. */
+export const ousWhy = (word: string, rule: OusRule): string => {
+  const stem = word.slice(0, -3);
+  switch (rule) {
+    case 'root': return `${cap(stem)} + ous: just add -ous.`;
+    case 'noroot': return `${cap(word)} has no root word: it just ends -ous.`;
+    case 'y-i': return 'The y in vary changes to i: various.';
+    case 'our-or': return `${cap(word)}: -our becomes -or before -ous.`;
+    case 'keep-e': return `${cap(word)} keeps its e before -ous.`;
+    case 'i-e': return `${cap(word)} has ${word[word.length - 4]} before -ous.`;
+  }
+};
+
 /** d1: root + -ous and no-obvious-root words · d2: adds y → i and -our → -or · d3: adds keep-the-e and the i/e words. */
 export const y4Ous: Generator = (d, rng) => {
   const rules = d === 1 ? D1 : d === 2 ? D2 : null;
   const rows = rules ? OUS_BANK.filter(r => rules.includes(r[1])) : OUS_BANK;
-  const [word, , sentence, decoys] = pick(rng, rows);
+  const [word, rule, sentence, decoys] = pick(rng, rows);
   return wordQ(rng, 'Which spelling is right?', word, shuffle(rng, [...decoys]), {
+    why: ousWhy(word, rule),
     visual: { type: 'sentence', text: sentence },
     say: `${word}. ${sentence.replace('___', word)}`,
     hint: 'Slice the right spelling', hintIsData: false, wide: true,
