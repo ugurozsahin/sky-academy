@@ -19,6 +19,18 @@ export const VERB_FRAMES: readonly string[] = [
   'The ___ are playing football.', 'The ___ were very tired.', 'The ___ have gone home.', 'The ___ are waiting outside.',
 ];
 
+/** #2318: the owner count and the plural's ending decide the apostrophe; never the bare answer. */
+export const possWhy = (kind: 'plain' | 'one' | 'regular' | 'irregular', one: string, many: string): string => ({
+  plain: 'A verb follows the gap, so nothing is owned: a plain plural.',
+  one: `One ${one} is the owner, so the apostrophe goes before the s.`,
+  regular: `"${many}" already ends in s, so the apostrophe goes after it.`,
+  irregular: `"${many}" does not end in s, so add 's like a singular.`,
+})[kind];
+
+/** The possessive card: one owner, or two with a plural that does or does not end in s. */
+const ownerWhy = (plural: boolean, regular: boolean, one: string, many: string): string =>
+  possWhy(!plural ? 'one' : regular ? 'regular' : 'irregular', one, many);
+
 /** d1: regular owners, one or many · d2: adds the irregular plurals · d3: half the cards are the plain-plural sentence form. */
 export const y4PluralPoss: Generator = (d, rng) => {
   const sentence = d === 3 && rng() < 0.5;
@@ -28,6 +40,7 @@ export const y4PluralPoss: Generator = (d, rng) => {
     const text = pick(rng, VERB_FRAMES);
     const wrong = regular ? [many + "'", one + "'s"] : [many + "'s", many + "s'"];
     return wordQ(rng, 'Which word fits the gap?', many, wrong, {
+      why: possWhy('plain', one, many),
       visual: { type: 'sentence', text: text },
       say: text.replace('___', 'blank'), hint: 'A plain plural, or does it own something?', hintIsData: false,
     });
@@ -38,6 +51,7 @@ export const y4PluralPoss: Generator = (d, rng) => {
   const slip = pick(rng, [many, regular ? many + "'s" : many + "s'"]);
   const text = `the ${owned} of ${plural ? 'two' : 'one'} ${plural ? many : one}: the ___ ${owned}`;
   return wordQ(rng, 'Which is right?', answer, shuffle(rng, [otherPoss, slip]), {
+    why: ownerWhy(plural, many.endsWith('s'), one, many),
     visual: { type: 'sentence', text },
     say: `The ${owned} of ${plural ? 'two' : 'one'} ${plural ? many : one}. The blank ${owned}. Where does the apostrophe go?`,
     hint: 'One owner or many? Where does the apostrophe go?', hintIsData: false,
