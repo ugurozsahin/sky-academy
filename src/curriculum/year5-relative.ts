@@ -40,6 +40,14 @@ export const OMIT_BANK: readonly OmitRow[] = [
   ['The game', 'we played was fun.'], ['The boy', 'I sat beside was kind.'], ['The story', 'the teacher read was exciting.'], ['The bag', 'she lost was red.'],
 ];
 
+/** #2318: what each relative pronoun points to; the why gives that job, never the bare answer. */
+const POINTS: Readonly<Record<string, string>> = {
+  who: 'a person', which: 'a thing, after a comma', whose: 'who owns something', where: 'a place', when: 'a time', that: 'a thing',
+};
+export const spotWhy = (a: string): string => `"${a}" is the relative pronoun: it points to ${POINTS[a]}.`;
+export const fitWhy = (a: string): string => `"${a}" fits: it points to ${POINTS[a]}.`;
+export const omitWhy = (noun: string): string => `The missing pronoun goes after "${noun}", the noun it tells us about.`;
+
 const bare = (w: string) => w.replace(/[^A-Za-z]/g, '');
 /** Content words of a sentence for bubbles: three or more letters, not `the`, not a pronoun, in sentence order. */
 function words(sentence: string, skip: readonly string[]): string[] {
@@ -51,6 +59,7 @@ function spot(rng: () => number): Question {
   const s = pick(rng, sentences);
   const answer = s.split(' ').map(bare).find(w => PRONOUNS.includes(w))!;
   return wordQ(rng, 'Slice the relative pronoun', answer, shuffle(rng, [...new Set(words(s, []))]).slice(0, 3), {
+    why: spotWhy(answer),
     visual: { type: 'sentence', text: s }, say: `${s} Slice the relative pronoun.`, wide: true,
     hint: 'It joins the extra information to the noun.', hintIsData: false,
   });
@@ -59,6 +68,7 @@ function spot(rng: () => number): Question {
 function choose(rng: () => number): Question {
   const [template, answer] = pick(rng, GAP_BANK);
   return wordQ(rng, 'Which relative pronoun fits the gap?', answer, shuffle(rng, DECOYS[answer]).slice(0, 2), {
+    why: fitWhy(answer),
     visual: { type: 'sentence', text: template }, say: `${template.replace('___', 'blank')} Which relative pronoun fits the gap?`, wide: true,
     hint: 'who is a person, whose is belonging, where is a place, when is a time, which is a thing after a comma.', hintIsData: false,
   });
@@ -70,6 +80,7 @@ function omitted(rng: () => number): Question {
   const text = `${before} ___ ${after}`;
   const prompt = 'Which word comes before the missing pronoun?';
   return wordQ(rng, prompt, answer, shuffle(rng, [...new Set(words(`${before} ${after}`, [answer]))]).slice(0, 3), {
+    why: omitWhy(answer),
     visual: { type: 'sentence', text }, say: `${text.replace('___', 'blank')} ${prompt}`, wide: true,
     hint: 'The missing word would go straight after the noun it tells us about.', hintIsData: false,
   });

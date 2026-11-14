@@ -41,13 +41,21 @@ export const wordsOf = (s: string): string[] => s.toLowerCase().match(/[a-z]+/g)
 /** The bank sentence's single marker word, as written. */
 const markerIn = (s: string, list: readonly string[]): string => s.match(/[A-Za-z]+/g)!.find(w => list.includes(w.toLowerCase()))!;
 
+/** #2318: the test for the class, applied to this sentence; never the bare answer. */
+export const modalWhy = (word: string, next: string): string => `"${word}" comes before "${next}", so it is a modal verb.`;
+export const adverbWhy = (word: string): string => `"${word}" says how likely it is: an adverb of possibility.`;
+export const sureWhy = (word: string, certain: boolean): string =>
+  certain ? `"${word}" says it is sure to happen: certain.` : `"${word}" only says it could happen: possible.`;
+
 /** Slice-the-word card (#2321): the marker plus three words of its own class that the sentence does not hold, so only sense separates them. */
-function spot(rng: () => number, bank: readonly string[], list: readonly string[], prompt: string, hint: string): Question {
+function spot(rng: () => number, bank: readonly string[], list: readonly string[], prompt: string, hint: string, why: (word: string, next: string) => string): Question {
   const s = pick(rng, bank);
   const answer = markerIn(s, list);
   const cap = (w: string): string => answer[0] === answer[0].toUpperCase() ? w[0].toUpperCase() + w.slice(1) : w;
   const decoys = shuffle(rng, list.filter(w => w !== answer.toLowerCase())).slice(0, 3).map(cap);
+  const ws = s.match(/[A-Za-z]+/g)!, next = ws[ws.indexOf(answer) + 1];
   return wordQ(rng, prompt, answer, decoys, {
+    why: why(answer.toLowerCase(), next.toLowerCase()),
     visual: { type: 'sentence', text: s }, say: `${s} ${prompt}.`, hint, hintIsData: false,
   });
 }
@@ -55,7 +63,9 @@ function spot(rng: () => number, bank: readonly string[], list: readonly string[
 function sure(rng: () => number): Question {
   const certain = rng() < 0.5;
   const s = pick(rng, certain ? CERTAIN_BANK : POSSIBLE_BANK);
+  const word = markerIn(s, certain ? CERTAIN : POSSIBLE).toLowerCase();
   return wordQ(rng, 'Which is it, certain or possible?', certain ? 'certain' : 'possible', [certain ? 'possible' : 'certain'], {
+    why: sureWhy(word, certain),
     visual: { type: 'sentence', text: s }, say: `${s} How sure is the writer? Certain, or only possible?`,
     hint: 'will is certain; might and perhaps only say it could happen.', hintIsData: false,
   });
@@ -63,6 +73,6 @@ function sure(rng: () => number): Question {
 
 /** d1: the modal verb · d2: the adverb of possibility · d3: certain or possible. */
 export const y5Modal: Generator = (d, rng) =>
-  d === 1 ? spot(rng, MODAL_BANK, MODALS, 'Slice the modal verb', 'A modal verb sits before another verb, like might go.')
-    : d === 2 ? spot(rng, ADVERB_BANK, ADVERBS, 'Slice the adverb of possibility', 'It says how likely something is, like perhaps.')
+  d === 1 ? spot(rng, MODAL_BANK, MODALS, 'Slice the modal verb', 'A modal verb sits before another verb, like might go.', modalWhy)
+    : d === 2 ? spot(rng, ADVERB_BANK, ADVERBS, 'Slice the adverb of possibility', 'It says how likely something is, like perhaps.', w => adverbWhy(w))
       : sure(rng);
