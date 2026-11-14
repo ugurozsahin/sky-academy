@@ -42,13 +42,18 @@ const WORDS: Record<Difficulty, readonly VerbRow[]> = { 1: SAME, 2: CHANGED, 3: 
 export const verbOf = ([, stem, suffix]: VerbRow) => stem + suffix;
 export const verbGap = ([, stem]: VerbRow) => stem + '___';
 
+/** #2318: says whether the root keeps all its letters or loses its end before the suffix, and names the whole verb. */
+export const verbWhy = (row: VerbRow): string => row[0] === row[1]
+  ? `"${row[0]}" keeps every letter, then -${row[2]}: ${verbOf(row)}.`
+  : `"${row[0]}" loses its last letters, so ${row[1]} + ${row[2]}: ${verbOf(row)}.`;
+
 export const verbQ = (rng: Rng, row: VerbRow, sentence: boolean): Question => {
   const [root, , suffix, text] = row;
   const gapped = text.replace('{}', verbGap(row));
   return wordQ(rng, sentence ? 'Slice the ending that finishes the verb' : `Slice the ending: ${root} into ${verbGap(row)}`, suffix, VERB_SUFFIXES.filter(s => s !== suffix), {
     ...(sentence ? { visual: { type: 'sentence', text: gapped } } : {}),
     say: sentence ? text.replace('{}', verbOf(row)) : `Make ${root} into a verb.`,
-    hint: 'Which ending makes it a verb?', hintIsData: false,
+    hint: 'Which ending makes it a verb?', hintIsData: false, why: verbWhy(row),
   });
 };
 

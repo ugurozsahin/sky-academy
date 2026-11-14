@@ -50,6 +50,9 @@ export const nonwords = (root: string): Prefix[] => PREFIXES.filter(p => verdict
 export const vpVerb = ([root, prefix]: VerbPrefixRow) => prefix + root;
 export const vpSentence = ([, prefix, , sentence]: VerbPrefixRow) => sentence.replace('___', prefix);
 
+/** #2318: the prefix with its job (the row's meaning) and the whole verb it makes. */
+export const vpWhy = (row: VerbPrefixRow): string => `${row[1]}- + ${row[0]} means "${row[2]}": ${vpVerb(row)}.`;
+
 const ROWS: Record<Difficulty, readonly VerbPrefixRow[]> = {
   1: VERBPREFIX_BANK, 2: VERBPREFIX_BANK, 3: VERBPREFIX_BANK.filter(r => nonwords(r[0]).length >= 3),
 };
@@ -60,7 +63,7 @@ export const verbPrefixQ = (rng: Rng, row: VerbPrefixRow, difficulty: Difficulty
   const gapped = difficulty === 1
     ? { prompt: `${meaning} = ___${root}`, say: `Blank-${root} means ${meaning}.` }
     : { prompt: 'Which prefix fits the gap?', say: sentence.replace('___', 'blank-'), visual: { type: 'sentence' as const, text: sentence } };
-  return wordQ(rng, gapped.prompt, prefix, ds, { ...gapped, hint: 'Slice the prefix', hintIsData: false });
+  return wordQ(rng, gapped.prompt, prefix, ds, { ...gapped, hint: 'Slice the prefix', hintIsData: false, why: vpWhy(row) });
 };
 
 export const y5VerbPrefix: Generator = (difficulty, rng) => verbPrefixQ(rng, pick(rng, ROWS[difficulty]), difficulty);
