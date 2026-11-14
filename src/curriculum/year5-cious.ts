@@ -46,6 +46,16 @@ const REST: CiousRow[] = [
 export const CIOUS_BANK: readonly CiousRow[] = [...CLUED, ...SOUND_L, ...REST].map(([s, e, ds, ...r]) => [s, e, ds.filter(d => d !== e), ...r]);
 const WORDS: Record<Difficulty, readonly CiousRow[]> = { 1: CIOUS_BANK.slice(0, CLUED.length), 2: CIOUS_BANK.slice(CLUED.length, CLUED.length + SOUND_L.length), 3: CIOUS_BANK };
 
+const VOWELS = 'aeiou';
+/** #2318: the root, the vowel/consonant rule, or (for the exceptions) the word to learn; never the bare ending. */
+export const ciousWhy = (stem: string, ending: string, clue?: string): string => {
+  const word = stem + ending;
+  if (clue) return `The root is "${clue}", so it is ${word}.`;
+  const vowel = VOWELS.includes(stem.slice(-1));
+  if (ending === 'cial' && vowel || ending === 'tial' && !vowel) return `After a ${vowel ? 'vowel' : 'consonant'} letter, the ending is -${ending}.`;
+  return `${word} is an exception: learn the whole word.`;
+};
+
 export const ciousQ = (rng: Rng, row: CiousRow, bubbles: number, showClue: boolean): Question => {
   const [stem, ending, decoys, sentence, clue] = row;
   const word = stem + ending;
@@ -56,7 +66,7 @@ export const ciousQ = (rng: Rng, row: CiousRow, bubbles: number, showClue: boole
   return wordQ(rng, showClue && clue ? `Clue: ${clue}. Which ending?` : 'Which ending is right?', ending, decoyPool, {
     visual: { type: 'sentence', text: sentence },
     say: `${sentence.replace('___', ending)} Which ending spells ${word}?`,
-    hint: 'Slice the right ending', hintIsData: false,
+    hint: 'Slice the right ending', hintIsData: false, why: ciousWhy(stem, ending, clue),
   });
 };
 
