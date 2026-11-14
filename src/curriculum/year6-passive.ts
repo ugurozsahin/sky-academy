@@ -41,33 +41,44 @@ const swapTense = (v: string): string => (v.startsWith('was ') ? v.replace('was 
 /** The d2 decoys, built from the row: the active verb, be + -ing in the same tense, the same passive in the other tense. */
 export const passiveDecoys = (r: PassiveRow): string[] => [r[2], `${r[3].split(' ')[0]} ${r[7]}`, swapTense(r[3])];
 
-const voiceCard = (rng: Parameters<Generator>[1], sentence: string, voice: 'active' | 'passive'): Question =>
+/** #2318: the test that settles each card: be + participle for a passive, the doer first for an active, the word "by" for who. */
+const cap = (s: string): string => s[0].toUpperCase() + s.slice(1);
+export const passiveWhy = (r: PassiveRow): string => `"${cap(r[3])}" is be + a participle: the sentence is passive.`;
+export const activeWhy = (r: PassiveRow): string => `${cap(r[5])} does it, and comes first: the sentence is active.`;
+export const NOT_PASSIVE_WHY = 'It has no be + participle, and the subject does it: active.';
+export const doerWhy = (r: PassiveRow, agentless: boolean): string => (agentless ? 'No "by" names the doer, so we are not told.' : `The doer follows "by": ${r[5]}.`);
+export const buildWhy = (r: PassiveRow): string => `The ${r[4]} of be, then the participle: ${r[3]}.`;
+
+const voiceCard = (rng: Parameters<Generator>[1], sentence: string, voice: 'active' | 'passive', why: string): Question =>
   wordQ(rng, 'Slice active or passive', voice, [voice === 'active' ? 'passive' : 'active'], {
-    visual: { type: 'sentence', text: sentence }, say: `Is this sentence active or passive? ${sentence}`, hint: 'The doer comes first in an active sentence', hintIsData: false, wide: true,
+    visual: { type: 'sentence', text: sentence }, say: `Is this sentence active or passive? ${sentence}`, hint: 'The doer comes first in an active sentence', hintIsData: false, wide: true, why,
   });
 
 export const y6Passive: Generator = (d: Difficulty, rng) => {
   if (d === 1) {
     const passive = rng() < 0.5;
-    if (passive) return voiceCard(rng, pick(rng, PASSIVES)[1], 'passive');
-    return voiceCard(rng, rng() < 0.5 ? pick(rng, PASSIVES)[0] : pick(rng, NOT_PASSIVE), 'active');
+    if (passive) { const r = pick(rng, PASSIVES); return voiceCard(rng, r[1], 'passive', passiveWhy(r)); }
+    if (rng() < 0.5) { const r = pick(rng, PASSIVES); return voiceCard(rng, r[0], 'active', activeWhy(r)); }
+    return voiceCard(rng, pick(rng, NOT_PASSIVE), 'active', NOT_PASSIVE_WHY);
   }
   if (d === 2) {
     const row = pick(rng, PASSIVES);
     const stem = row[1].replace(row[3], '___');
     return wordQ(rng, 'Slice the passive verb', row[3], passiveDecoys(row), {
-      visual: { type: 'sentence', text: `${row[0]}\n${stem}` }, say: `Make it passive. ${row[0]} ${stem.replace('___', 'blank')} Slice the passive verb.`, hint: 'Slice the passive verb', hintIsData: false, wide: true,
+      visual: { type: 'sentence', text: `${row[0]}\n${stem}` }, say: `Make it passive. ${row[0]} ${stem.replace('___', 'blank')} Slice the passive verb.`, hint: 'Slice the passive verb', hintIsData: false, wide: true, why: buildWhy(row),
     });
   }
   if (rng() < 0.5) {
     const roll = rng();
-    return roll < 0.5 ? voiceCard(rng, pick(rng, NOT_PASSIVE), 'active') : voiceCard(rng, pick(rng, PASSIVES)[1], 'passive');
+    if (roll < 0.5) return voiceCard(rng, pick(rng, NOT_PASSIVE), 'active', NOT_PASSIVE_WHY);
+    const r = pick(rng, PASSIVES);
+    return voiceCard(rng, r[1], 'passive', passiveWhy(r));
   }
   const row = pick(rng, PASSIVES);
   const agentless = row[8] !== '' && rng() < 0.5;
   const sentence = agentless ? row[8] : row[1];
   const answer = agentless ? NOT_TOLD : row[5];
   return wordQ(rng, 'Slice who did it', answer, [row[5], row[6], NOT_TOLD].filter(o => o !== answer), {
-    visual: { type: 'sentence', text: sentence }, say: `Who did it? ${sentence}`, hint: 'Look for by', hintIsData: false, wide: true,
+    visual: { type: 'sentence', text: sentence }, say: `Who did it? ${sentence}`, hint: 'Look for by', hintIsData: false, wide: true, why: doerWhy(row, agentless),
   });
 };
