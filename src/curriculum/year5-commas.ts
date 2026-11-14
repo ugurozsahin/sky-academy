@@ -42,6 +42,10 @@ export const whileSentence = ([s, aux, ing, det, noun, rest]: WhileRow): string 
 export const addressMeaning = (row: AddressRow): string => `We are talking to ${row[2]}.`;
 export const whileMeaning = ([, , ing, det, noun]: WhileRow): string => `Nobody was ${ing} ${det} ${noun}.`;
 
+/** #2318: where the comma goes and what it shows; never the bare answer. */
+export const addressWhy = (verb: string, name: string): string => `The comma goes after "${verb}", so ${name} is who we are talking to.`;
+export const whileWhy = (ing: string): string => `The comma goes after "${ing}", where the opening part ends and you pause.`;
+
 export const COMMA_PROMPT = 'Which word is before the comma?';
 const wordsOf = (s: string): string[] => s.replace(/[!?.]$/, '').split(' ');
 
@@ -52,9 +56,10 @@ function decoys(rng: Rng, sentence: string, answer: string, near: boolean): stri
   return [...new Set(pool.filter((w): w is string => !!w && w !== answer))];
 }
 
-function build(rng: Rng, d: Difficulty, sentence: string, answer: string, meaning: string, bubbles: number): Question {
+function build(rng: Rng, d: Difficulty, sentence: string, answer: string, meaning: string, bubbles: number, why: string): Question {
   const ds = decoys(rng, sentence, answer, d === 3).slice(0, bubbles - 1);
   return wordQ(rng, `${COMMA_PROMPT} ${meaning}`, answer, ds, {
+    why,
     visual: { type: 'sentence', text: sentence },
     say: `${meaning} ${sentence} Which word is before the comma?`, hint: 'Say it aloud: where would you pause?', hintIsData: false,
   });
@@ -63,12 +68,12 @@ function build(rng: Rng, d: Difficulty, sentence: string, answer: string, meanin
 export const y5Commas: Generator = (d: Difficulty, rng: Rng): Question => {
   if (d === 1) {
     const row = pick(rng, ADDRESS_SHORT);
-    return build(rng, d, addressSentence(row), row[1], addressMeaning(row), 3);
+    return build(rng, d, addressSentence(row), row[1], addressMeaning(row), 3, addressWhy(row[1], row[2]));
   }
   if (d === 3 && rng() < 0.5) {
     const row = pick(rng, ADDRESS_LONG);
-    return build(rng, d, addressSentence(row), row[1], addressMeaning(row), 4);
+    return build(rng, d, addressSentence(row), row[1], addressMeaning(row), 4, addressWhy(row[1], row[2]));
   }
   const row = pick(rng, WHILE_BANK);
-  return build(rng, d, whileSentence(row), row[2], whileMeaning(row), 4);
+  return build(rng, d, whileSentence(row), row[2], whileMeaning(row), 4, whileWhy(row[2]));
 };
