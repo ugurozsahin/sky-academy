@@ -52,6 +52,13 @@ export const fill = (fr: Frame, aux: string, pp: string) => fr.text.replace('{au
 const PAST_FRAMES = FRAMES.filter(x => x.anchor === 'past');
 const PRESENT_FRAMES = FRAMES.filter(x => x.anchor === 'present');
 
+/** #2318: the time test for the helper, the form that follows it for the participle; both end in the whole phrase. */
+export const perfectWhy = (fr: Frame, gap: 'aux' | 'pp'): string => {
+  const aux = helperOf(fr), pp = formsOf(fr)[2];
+  if (gap === 'pp') return `After ${aux} comes the participle: ${aux} ${pp}.`;
+  return fr.anchor === 'past' ? `It happened before another past moment, so: had ${pp}.` : `It matters now, so: ${aux} ${pp}.`;
+};
+
 /** `gap` says which word is sliced: the helper or the participle. */
 export const perfectQ = (rng: Rng, fr: Frame, gap: 'aux' | 'pp'): Question => {
   const [, past, pp] = formsOf(fr);
@@ -61,10 +68,10 @@ export const perfectQ = (rng: Rng, fr: Frame, gap: 'aux' | 'pp'): Question => {
   const blank = gap === 'aux' ? fill(fr, 'blank', pp) : fill(fr, aux, 'blank');
   return gap === 'aux'
     ? wordQ(rng, 'Slice the helper word that fits the sentence', aux, PERFECT_HELPERS.filter(h => h !== aux), {
-      visual: { type: 'sentence', text: shown }, say: blank, hint: 'Look at the other part of the sentence: did it happen before, or does it matter now?', hintIsData: false,
+      visual: { type: 'sentence', text: shown }, say: blank, hint: 'Look at the other part of the sentence: did it happen before, or does it matter now?', hintIsData: false, why: perfectWhy(fr, gap),
     })
     : wordQ(rng, 'Slice the word that fits the gap', pp, [forms[0], past], {
-      visual: { type: 'sentence', text: shown }, say: blank, hint: 'After had, has or have we need the form that goes with it.', hintIsData: false,
+      visual: { type: 'sentence', text: shown }, say: blank, hint: 'After had, has or have we need the form that goes with it.', hintIsData: false, why: perfectWhy(fr, gap),
     });
 };
 
