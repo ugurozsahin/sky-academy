@@ -28,8 +28,8 @@ const NOUN: AntRow[] = [
 ];
 /** d3 adds -ancy/-ency and the words that "just have to be learnt", with no clue. */
 const LEARNT: AntRow[] = [
-  ['hesit', 'ancy', 'ency', null, 'She spoke without hesit___.'],
-  ['vac', 'ancy', 'ency', null, 'The hotel has a vac___ for a family.'],
+  ['hesit', 'ancy', 'ency', 'hesitation', 'She spoke without hesit___.'],
+  ['vac', 'ancy', 'ency', 'vacate', 'The hotel has a vac___ for a family.'],
   ['frequ', 'ency', 'ancy', null, 'The frequ___ of the buses is every ten minutes.'],
   ['flu', 'ency', 'ancy', null, 'He reads with great flu___.'],
   ['ag', 'ency', 'ancy', null, 'Mum works for a travel ag___.'],
@@ -53,12 +53,17 @@ const LEARNT: AntRow[] = [
 export const ANT_BANK: readonly AntRow[] = [...ADJ, ...NOUN, ...LEARNT];
 const WORDS: Record<Difficulty, readonly AntRow[]> = { 1: ADJ, 2: NOUN, 3: ANT_BANK };
 
+/** #2318: the related word that gives the vowel away, or "learn it" where the NC gives no clue; never the bare ending. */
+export const antWhy = ([stem, ending, , clue]: AntRow): string => clue
+  ? `The related word "${clue}" has a clear ${ending[0]}, so it is ${stem + ending}.`
+  : `Nothing to hear, so it has to be learnt: ${stem + ending}.`;
+
 export const antQ = (rng: Rng, row: AntRow, showClue: boolean): Question => {
   const [stem, ending, twin, clue, sentence] = row;
   return wordQ(rng, showClue && clue ? `Clue: ${clue}. Which ending?` : 'Which ending is right?', ending, [twin], {
     visual: { type: 'sentence', text: sentence },
     say: `${sentence.replace('___', ending)} Which ending spells ${stem + ending}?`,
-    hint: 'Slice the right ending', hintIsData: false,
+    hint: 'Slice the right ending', hintIsData: false, why: antWhy(row),
   });
 };
 
