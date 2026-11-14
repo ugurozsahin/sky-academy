@@ -35,11 +35,13 @@ const D1: readonly OusRule[] = ['root', 'noroot'];
 const D2: readonly OusRule[] = [...D1, 'y-i', 'our-or'];
 
 const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
+/** #2318: the two root rows whose root loses its e before -ous (fame, nerve), so "just add -ous" would teach the wrong rule. */
+const DROP_E: Record<string, string> = { famous: 'Fame', nervous: 'Nerve' };
 /** #2318: the spelling rule applied to this word, never the bare answer. */
 export const ousWhy = (word: string, rule: OusRule): string => {
   const stem = word.slice(0, -3);
   switch (rule) {
-    case 'root': return `${cap(stem)} + ous: just add -ous.`;
+    case 'root': return word in DROP_E ? `${DROP_E[word]} loses its e: ${word}.` : `${cap(stem)} + ous: just add -ous.`;
     case 'noroot': return `${cap(word)} has no root word: it just ends -ous.`;
     case 'y-i': return 'The y in vary changes to i: various.';
     case 'our-or': return `${cap(word)}: -our becomes -or before -ous.`;

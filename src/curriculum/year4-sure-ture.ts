@@ -43,10 +43,10 @@ export const CHER_BANK: readonly SureTureRow[] = [
 ];
 
 const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
-const SOUND: Record<string, string> = { sure: 'zhur', ture: 'chur', sion: 'zhun' };
+const SOUND: Record<'sure' | 'ture' | 'sion', string> = { sure: 'zhur', ture: 'chur', sion: 'zhun' };
 /** #2318: what the ending sounds like, or why -cher is a root plus -er; never the bare answer. */
 export const sureWhy = (stem: string, ending: string): string =>
-  ending === 'cher' ? `${cap(stem + ending)} is ${stem}ch plus er, so -cher.` : `${cap(stem + ending)} ends -${ending}, which sounds like "${SOUND[ending]}".`;
+  ending === 'cher' ? `${cap(stem + ending)} is ${stem}ch plus er, so -cher.` : `${cap(stem + ending)} ends -${ending}, which sounds like "${SOUND[ending as keyof typeof SOUND]}".`;
 
 const ENDINGS = ['sure', 'ture', 'sion', 'cher'];
 
