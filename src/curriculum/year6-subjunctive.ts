@@ -41,7 +41,7 @@ const HINTS: Record<Kind, string> = {
 
 /** #2318: the reason the formal form wins, worded for the kind and ending in the form to learn. */
 export const subjunctiveWhy = (r: Row): string => r.kind === 'were' ? `It is only imagined, so formal writing says "were", not "${r.decoys[0]}".`
-  : r.kind === 'mandative' ? `After a demand the plain verb follows: "${r.answer}".`
+  : r.kind === 'mandative' ? `After insist, suggest or require, the plain verb follows: "${r.answer}".`
   : 'An imagined sentence can start with "Were" instead of "If".';
 
 /** The rows a difficulty may draw: d1 the I rows, d2 the other were rows and the mandatives, d3 every kind. */

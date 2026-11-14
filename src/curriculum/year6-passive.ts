@@ -44,8 +44,8 @@ export const passiveDecoys = (r: PassiveRow): string[] => [r[2], `${r[3].split('
 /** #2318: the test that settles each card: be + participle for a passive, the doer first for an active, the word "by" for who. */
 const cap = (s: string): string => s[0].toUpperCase() + s.slice(1);
 export const passiveWhy = (r: PassiveRow): string => `"${cap(r[3])}" is be + a participle: the sentence is passive.`;
-export const activeWhy = (r: PassiveRow): string => `${cap(r[5])} does it, and comes first: the sentence is active.`;
-export const NOT_PASSIVE_WHY = 'It has no be + participle, and the subject does it: active.';
+export const ACTIVE_WHY = 'The doer comes before the verb: the sentence is active.';
+export const NOT_PASSIVE_WHY = 'No be + participle, so it is active, even if it sounds passive.';
 export const doerWhy = (r: PassiveRow, agentless: boolean): string => (agentless ? 'No "by" names the doer, so we are not told.' : `The doer follows "by": ${r[5]}.`);
 export const buildWhy = (r: PassiveRow): string => `The ${r[4]} of be, then the participle: ${r[3]}.`;
 
@@ -58,7 +58,7 @@ export const y6Passive: Generator = (d: Difficulty, rng) => {
   if (d === 1) {
     const passive = rng() < 0.5;
     if (passive) { const r = pick(rng, PASSIVES); return voiceCard(rng, r[1], 'passive', passiveWhy(r)); }
-    if (rng() < 0.5) { const r = pick(rng, PASSIVES); return voiceCard(rng, r[0], 'active', activeWhy(r)); }
+    if (rng() < 0.5) { const r = pick(rng, PASSIVES); return voiceCard(rng, r[0], 'active', ACTIVE_WHY); }
     return voiceCard(rng, pick(rng, NOT_PASSIVE), 'active', NOT_PASSIVE_WHY);
   }
   if (d === 2) {
