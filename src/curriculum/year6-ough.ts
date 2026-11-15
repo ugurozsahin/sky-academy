@@ -49,11 +49,17 @@ const RHYME = OUGH.filter(r => r[1] !== 'cough' && r[1] !== 'thorough');
 const RHYME_TARGET_GROUPS: OughGroup[] = ['ought', 'rough', 'though', 'plough'];
 const D1_GROUPS: OughGroup[] = ['ought', 'rough', 'through'];
 
-const gapQ = (rng: Parameters<Generator>[1], sent: string, answer: string, decoys: string[], prompt?: string) => {
+/** #2318: the sound each ough group makes, so the why names the sound the letters stand for. */
+export const OUGH_SOUND: Record<OughGroup, string> = { ought: 'or', rough: 'uff', cough: 'off', though: 'oh', through: 'oo', thorough: 'uh', plough: 'ow' };
+export const oughWhy = (r: OughRow): string => `"ough" can say "${OUGH_SOUND[r[1]]}", as in ${r[0]}.`;
+export const eiWhy = (r: EiRow): string => r[3] ? `An exception to "except after c": learn ${r[0]}.` : `After c it is ei, not ie: ${r[0]}.`;
+export const rhymeWhy = (target: string, right: string, group: OughGroup): string => `${target} and ${right} both end in the "${OUGH_SOUND[group]}" sound.`;
+
+const gapQ = (rng: Parameters<Generator>[1], sent: string, answer: string, decoys: string[], why: string, prompt?: string) => {
   const text = sent.replace('_', '___');
   return wordQ(rng, prompt ?? text, answer, decoys, {
     visual: { type: 'sentence', text }, say: `${sent.replace('_', 'blank')} Which spelling is right?`,
-    hint: 'Which spelling fits the sentence?', hintIsData: false,
+    hint: 'Which spelling fits the sentence?', hintIsData: false, why,
   });
 };
 
@@ -63,21 +69,21 @@ const rhymeQ: Generator = (_d, rng) => {
   const right = pick(rng, RHYME.filter(r => r[1] === group && r !== target));
   const others = shuffle(rng, RHYME.filter(r => r[1] !== group)).slice(0, 3);
   return wordQ(rng, `Which word rhymes with ${target[0]}?`, right[0], others.map(r => r[0]), {
-    say: `Which word rhymes with ${target[0]}?`, hint: 'Say each word. Which one ends with the same sound?', hintIsData: false,
+    say: `Which word rhymes with ${target[0]}?`, hint: 'Say each word. Which one ends with the same sound?', hintIsData: false, why: rhymeWhy(target[0], right[0], group),
   });
 };
 
 export const y6Ough: Generator = (d: Difficulty, rng) => {
   if (d === 3) {
     if (rng() < 0.5) return rhymeQ(d, rng);
-    const [w, s, wrong] = pick(rng, EI_C.filter(r => r[3]));
-    return gapQ(rng, s, w, wrong, 'Which is spelt correctly?');
+    const row = pick(rng, EI_C.filter(r => r[3]));
+    return gapQ(rng, row[1], row[0], row[2], eiWhy(row), 'Which is spelt correctly?');
   }
   // d2 mixes the five ei-after-c words in with every ough group; the ie swap is always one of an ei card's decoys.
   if (d === 2 && rng() < 0.3) {
-    const [w, s, wrong] = pick(rng, EI_C.filter(r => !r[3]));
-    return gapQ(rng, s, w, [wrong[0], ...shuffle(rng, wrong.slice(1))]);
+    const row = pick(rng, EI_C.filter(r => !r[3]));
+    return gapQ(rng, row[1], row[0], [row[2][0], ...shuffle(rng, row[2].slice(1))], eiWhy(row));
   }
-  const [w, , s, wrong] = pick(rng, OUGH.filter(r => d === 2 || D1_GROUPS.includes(r[1])));
-  return gapQ(rng, s, w, shuffle(rng, wrong).slice(0, d === 1 ? 2 : 3));
+  const row = pick(rng, OUGH.filter(r => d === 2 || D1_GROUPS.includes(r[1])));
+  return gapQ(rng, row[2], row[0], shuffle(rng, row[3]).slice(0, d === 1 ? 2 : 3), oughWhy(row));
 };

@@ -41,6 +41,28 @@ export const Y6_HOMOPHONES: Y6HomRow[] = [
   ...pair(3, 'wary', 'weary', ['Be _ when a stranger offers you sweets.'], ['The _ travellers fell asleep after the journey.']),
 ];
 
+/** #2318: what each spelling means (or, for the -ce/-se pairs, which part of speech it is), so the why says which one the sentence needs. */
+export const Y6_HOM_MEANING: Record<string, string> = {
+  advice: 'is a noun: help you give', advise: 'is a verb: to give help', device: 'is a noun: a gadget', devise: 'is a verb: to plan or invent',
+  licence: 'is a noun: a permit', license: 'is a verb: to permit', practice: 'is a noun: training', practise: 'is a verb: to train',
+  prophecy: 'is a noun: a prediction', prophesy: 'is a verb: to predict',
+  aisle: 'is a path between seats', isle: 'is an island', aloud: 'means out loud', allowed: 'means permitted',
+  altar: 'is a holy table', alter: 'means change', bridal: 'is about a bride', bridle: 'is the head straps of a horse',
+  cereal: 'is a breakfast grain', serial: 'means in a series', draft: 'is a first version', draught: 'is a current of air',
+  guessed: 'means gave an answer without knowing', guest: 'is a visitor', heard: 'comes from hear', herd: 'is a group of animals',
+  led: 'is the past of lead', lead: 'is a heavy metal, or to guide', morning: 'is the start of the day', mourning: 'is feeling sad after a death',
+  past: 'is time gone by', passed: 'comes from pass', profit: 'is money gained', prophet: 'is a person who foretells',
+  stationary: 'means not moving', stationery: 'is pens and paper', steal: 'means take what is not yours', steel: 'is a strong metal',
+  ascent: 'is a climb up', assent: 'means agreement', descent: 'is a way down', dissent: 'means disagreement',
+  compliment: 'is a kind remark', complement: 'means goes well with', desert: 'is a dry, sandy place', dessert: 'is a sweet course',
+  farther: 'means more distance', father: 'is a dad', precede: 'means come before', proceed: 'means go on',
+  principal: 'is the head of a school', principle: 'is a rule to live by', wary: 'means careful', weary: 'means tired',
+};
+export const y6HomWhy = (answer: string): string => {
+  if (!(answer in Y6_HOM_MEANING)) throw new Error(`y6-homophones: no why for "${answer}"`);
+  return `${answer[0].toUpperCase()}${answer.slice(1)} ${Y6_HOM_MEANING[answer]}.`;
+};
+
 /** Words too long to read on a bubble (R-LBL, #1046): the card names both as A and B and the bubbles are the letters. */
 const LETTERED = ['compliment', 'complement'];
 
@@ -51,7 +73,7 @@ export const y6Homophones: Generator = (d: Difficulty, rng) => {
   const text = sent.replace('_', '___');
   if (LETTERED.includes(ans)) {
     const [a, b] = shuffle(rng, [ans, partner]);
-    return wordQ(rng, `A: ${a}. B: ${b}. ${text}`, a === ans ? 'A' : 'B', [a === ans ? 'B' : 'A'], { visual: { type: 'sentence', text }, say: sent.replace('_', 'blank'), hint: 'Which spelling fits the sentence?', hintIsData: false });
+    return wordQ(rng, `A: ${a}. B: ${b}. ${text}`, a === ans ? 'A' : 'B', [a === ans ? 'B' : 'A'], { visual: { type: 'sentence', text }, say: sent.replace('_', 'blank'), hint: 'Which spelling fits the sentence?', hintIsData: false, why: y6HomWhy(ans) });
   }
-  return wordQ(rng, text, ans, [partner], { visual: { type: 'sentence', text }, say: sent.replace('_', 'blank'), hint: 'Which spelling fits the sentence?', hintIsData: false });
+  return wordQ(rng, text, ans, [partner], { visual: { type: 'sentence', text }, say: sent.replace('_', 'blank'), hint: 'Which spelling fits the sentence?', hintIsData: false, why: y6HomWhy(ans) });
 };
