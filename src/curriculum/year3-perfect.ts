@@ -59,6 +59,15 @@ export function perfectAnswer([, verb, person, marker, kind]: PerfectRow): strin
   throw new Error(`y3-perfect: unknown time marker "${marker}"`);
 }
 
+/** #2318: the why names the time word and what it asks for, then the form: finished time takes the past, a link to now takes has/have. */
+export function perfectWhy(row: PerfectRow): string {
+  const [, verb, , marker, kind] = row;
+  const [, past, part] = VERBS[verb];
+  if (kind === 'a') return `After has or have, use "${part}", not "${past}".`;
+  if ((PAST_MARKERS as readonly string[]).includes(marker)) return `"${marker}" is a finished time, so use the past: "${past}".`;
+  return `"${marker}" links to now, so use has or have: "${perfectAnswer(row)}".`;
+}
+
 export const y3Perfect: Generator = (d, rng): Question => {
   const aux = d === 3 && rng() < 0.5;
   const row = pick(rng, aux ? PERFECT_D3_AUX : d === 1 ? PERFECT_D1 : PERFECT_D2);
@@ -72,6 +81,6 @@ export const y3Perfect: Generator = (d, rng): Question => {
   })();
   return wordQ(rng, `Which form of "${base}"?`, answer, ds, {
     visual: { type: 'sentence', text: sentence }, say: sentence.replace('___', 'blank'),
-    hint: 'Look for the time word', hintIsData: false,
+    hint: 'Look for the time word', hintIsData: false, why: perfectWhy(row),
   });
 };
