@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { AVOID } from '../../src/curriculum/util';
-import { LIST_INTROS, COMMA_ITEMS, BULLETS, bulletStyle } from '../../src/curriculum/year6-lists';
+import { LIST_INTROS, COMMA_ITEMS, BULLETS, bulletStyle, COLON_WHY, SEMICOLON_WHY } from '../../src/curriculum/year6-lists';
 import { rLblProblem } from './helpers/r-lbl';
 
 function rng(seed: number) {
@@ -74,9 +74,9 @@ describe('y6-lists (#1282)', () => {
     }
   });
 
-  it('a gap question shows the finished sentence as its why, so a bare mark is read in context (#2278)', () => {
+  it('a gap question names the mark\'s job in words (#2318, was the finished sentence in #2278)', () => {
     for (const d of [1, 2] as Difficulty[]) for (const q of draws(d, 100)) {
-      expect(q.why, text(q)).toBe(text(q).replace('_', q.answer));
+      expect(q.why).toBe(d === 1 ? COLON_WHY : SEMICOLON_WHY);
       expect(q.why).not.toContain('_');
     }
   });
