@@ -61,15 +61,29 @@ export const TENSE_LATE: TenseRow[] = [
   ['Yesterday Gran _ us with the bags after we arrived.', 'helped', ['help', 'helps', 'will help']],
 ];
 
+/** The why for agreement: names the subject and its number, never only the verb (#2318). The subject is the word after the determiner, or "Each". */
+export const agreeWhy = (sentence: string, answer: string): string => {
+  const w = sentence.split(' ');
+  const subject = (w[0] === 'Each' ? w[0] : w[1]).toLowerCase(), near = w[w.indexOf('_') - 1];
+  const number = answer === 'is' || answer === 'has' ? 'one' : 'more than one';
+  return near === subject ? `The subject is ${subject}: ${number}, so ${answer}.` : `The subject is ${subject}, not ${near}: ${number}, so ${answer}.`;
+};
+
+/** The why for tense: the time words set past, present or future (#2318). */
+export const tenseWhy = (answer: string): string =>
+  answer.startsWith('will ') ? `The time word looks ahead, so use will: ${answer}.`
+    : /ed$/.test(answer) ? `The time words are in the past, so use the past: ${answer}.`
+      : `Nowadays means now, so use the present: ${answer}.`;
+
 const agreeCard: (rng: Parameters<Generator>[1], row: AgreeRow, am: boolean) => ReturnType<Generator> = (rng, [sentence, answer, other], am) =>
   wordQ(rng, 'Slice the verb that fits', answer, am ? [other, 'am'] : [other], {
-    visual: { type: 'sentence', text: sentence }, say: `${sentence.replace('_', 'blank')} Slice the verb that fits.`,
+    visual: { type: 'sentence', text: sentence }, say: `${sentence.replace('_', 'blank')} Slice the verb that fits.`, why: agreeWhy(sentence, answer),
     hint: 'The verb agrees with the subject', hintIsData: false,
   });
 
 const tenseCard: (rng: Parameters<Generator>[1], row: TenseRow) => ReturnType<Generator> = (rng, [sentence, answer, others]) =>
   wordQ(rng, 'Slice the verb in the right tense', answer, others, {
-    visual: { type: 'sentence', text: sentence }, say: `${sentence.replace('_', 'blank')} Slice the verb in the right tense.`,
+    visual: { type: 'sentence', text: sentence }, say: `${sentence.replace('_', 'blank')} Slice the verb in the right tense.`, why: tenseWhy(answer),
     hint: 'Keep the same tense as the time words', hintIsData: false,
   });
 
