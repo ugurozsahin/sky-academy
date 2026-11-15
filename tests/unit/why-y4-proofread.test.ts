@@ -18,8 +18,15 @@ describe('y4-proofread says why (#2318)', () => {
     expect(proofreadWhy('height', 'hieght')).toContain('two letters swapped');
     expect(proofreadWhy('money', 'muney')).toContain('one wrong letter');
     expect(proofreadWhy('Perhaps', 'Perhapps')).toContain('extra letter');
-    for (const [t, w] of [['busy', 'bizzy'], ['picture', 'picher'], ['natural', 'nachural'], ['adventure', 'advencher'], ['creature', 'creacher']])
+    for (const [t, w] of [['busy', 'bizzy'], ['picture', 'picher'], ['natural', 'nachural'], ['adventure', 'advencher'], ['creature', 'creacher'], ['great', 'grait']])
       expect(proofreadWhy(t, w)).toBe(`"${w}" is not the right spelling. It is "${t}".`);
+  });
+  it('singleSlip is null when the difference is not one plain slip', () => {
+    expect(singleSlip('pretty', 'pretty')).toBeNull();
+    expect(singleSlip('pretty', 'pre')).toBeNull();
+    expect(singleSlip('Perhaps', 'perhaps')).toBeNull();
+    expect(singleSlip('great', 'grait')).toBeNull();
+    expect(singleSlip('abcde', 'cbade')).toBeNull();   // two letters differ, not neighbours
   });
   it('every bank row says only what is true, and the claim re-applies to give the right word', () => {
     for (const [, target, wrong] of [...D1_BANK, ...D2_BANK, ...D3_BANK]) {
@@ -27,9 +34,14 @@ describe('y4-proofread says why (#2318)', () => {
       expect(why.length, why).toBeLessThanOrEqual(70);
       expect(why).toContain(`"${wrong}"`); expect(why).toContain(`"${target}"`);
       const t = target.toLowerCase(), w = wrong.toLowerCase();
+      const diffs = Array.from(t).flatMap((c, i) => (c === w[i] ? [] : [i]));
       if (slip === 'missing') expect(w.length).toBe(t.length - 1);
       else if (slip === 'extra') expect(w.length).toBe(t.length + 1);
-      else if (slip) expect(w.length).toBe(t.length);
+      else if (slip === 'wrong') { expect(w.length).toBe(t.length); expect(diffs).toHaveLength(1); }
+      else if (slip === 'swapped') {
+        const [i] = diffs; expect(diffs).toEqual([i, i + 1]);
+        expect(t.slice(0, i) + t[i + 1] + t[i] + t.slice(i + 2)).toBe(w);
+      }
       else expect(why).toContain('not the right spelling');
     }
   });

@@ -73,7 +73,8 @@ export const D3_BANK: readonly ProofreadRow[] = [
 
 const MAX_LETTERS = 9;
 /** #2318: the one slip a misspelling is, when it is exactly one (a letter dropped, added or changed, or two neighbours swapped); else null. */
-export const singleSlip = (target: string, wrong: string): 'missing' | 'extra' | 'wrong' | 'swapped' | null => {
+export type Slip = 'missing' | 'extra' | 'wrong' | 'swapped';
+export const singleSlip = (target: string, wrong: string): Slip | null => {
   const t = target.toLowerCase(), w = wrong.toLowerCase();
   if (t === w) return null;
   const drop = (long: string, short: string) => long.length === short.length + 1 && Array.from(long).some((_, i) => long.slice(0, i) + long.slice(i + 1) === short);
@@ -85,7 +86,7 @@ export const singleSlip = (target: string, wrong: string): 'missing' | 'extra' |
   if (diff.length === 2 && diff[1] === diff[0] + 1 && t[diff[0]] === w[diff[1]] && t[diff[1]] === w[diff[0]]) return 'swapped';
   return null;
 };
-const SLIP_TEXT = { missing: 'is missing a letter', extra: 'has an extra letter', wrong: 'has one wrong letter', swapped: 'has two letters swapped' } as const;
+const SLIP_TEXT: Record<Slip, string> = { missing: 'is missing a letter', extra: 'has an extra letter', wrong: 'has one wrong letter', swapped: 'has two letters swapped' };
 /** #2318: what is wrong with the shown spelling, only when it is true, then the right one — never the bare answer. */
 export const proofreadWhy = (target: string, wrong: string): string => {
   const slip = singleSlip(target, wrong);
