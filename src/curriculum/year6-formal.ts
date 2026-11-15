@@ -43,17 +43,27 @@ export const REGISTER_PAIRS: [string, string][] = [
   ['Pupils require a pencil.', "Pupils need a pencil, don't they?"],
 ];
 
+/** #2318: d1/d2 say which word is the formal one and what it replaces, never the bare answer. */
+export const formalWordWhy = ([informal, formal]: FormalRow): string => `"${informal}" is chatty. "${formal}" is the formal word.`;
+/** #2318: d3 names what makes the informal sentence chatty: a question tag, a short form, or an everyday phrase. */
+export const registerWhy = (formal: string, informal: string): string => {
+  if (/, [a-z']+ [a-z]+\?$/i.test(informal) || /^Just /.test(informal)) return 'A question tag makes it chatty. A formal letter has none.';
+  if (/[a-z]'[a-z]/i.test(informal)) return 'Short forms like "don\'t" are chatty. A formal letter writes both words.';
+  const row = FORMAL_WORDS.find(([i, f]) => informal.toLowerCase().includes(i) && formal.toLowerCase().includes(f));
+  return row ? `"${row[0]}" is chatty. A formal letter says "${row[1]}".` : 'The other one is chatty. A formal letter sounds more serious.';
+};
+
 /** A label this long cannot be read on a bubble (R-LBL, #1046): the card names the words as A, B, C and the bubbles are the letters. */
 const LONG = 10;
 const LETTERS = ['A', 'B', 'C', 'D'];
 
 /** The card as pick-one words, or as lettered choices when any word is too long to read on a bubble. */
-function wordsCard(rng: Parameters<Generator>[1], prompt: string, lead: string, say: string, hint: string, answer: string, wrong: string[]): Question {
-  const q = wordQ(rng, prompt, answer, wrong, { visual: lead ? { type: 'sentence', text: lead } : undefined, say, hint, hintIsData: false });
+function wordsCard(rng: Parameters<Generator>[1], prompt: string, lead: string, say: string, hint: string, answer: string, wrong: string[], why: string): Question {
+  const q = wordQ(rng, prompt, answer, wrong, { visual: lead ? { type: 'sentence', text: lead } : undefined, say, hint, hintIsData: false, why });
   if (q.options.every(o => o.length <= LONG)) return q;
   const list = q.options.map((o, i) => `${LETTERS[i]}: ${o}`).join('\n');
   const lettered = wordQ(rng, prompt, LETTERS[q.options.indexOf(answer)], LETTERS.slice(0, q.options.length).filter(l => l !== LETTERS[q.options.indexOf(answer)]), {
-    visual: { type: 'sentence', text: lead ? `${lead}\n${list}` : list }, say, hint, hintIsData: false,
+    visual: { type: 'sentence', text: lead ? `${lead}\n${list}` : list }, say, hint, hintIsData: false, why,
   });
   return { ...lettered, options: LETTERS.slice(0, q.options.length), wide: false };
 }
@@ -71,15 +81,15 @@ export const y6Formal: Generator = (d: Difficulty, rng) => {
     const formalFirst = rng() < 0.5;
     const [a, b] = formalFirst ? [formal, informal] : [informal, formal];
     return wordQ(rng, 'Which sentence suits a formal letter?', formalFirst ? 'A' : 'B', [formalFirst ? 'B' : 'A'], {
-      visual: { type: 'sentence', text: `A: ${a}\nB: ${b}` }, say: `Which sentence suits a formal letter? A: ${a} B: ${b}`, hint: 'Pick the one for a formal letter', hintIsData: false,
+      visual: { type: 'sentence', text: `A: ${a}\nB: ${b}` }, say: `Which sentence suits a formal letter? A: ${a} B: ${b}`, hint: 'Pick the one for a formal letter', hintIsData: false, why: registerWhy(formal, informal),
     });
   }
   const row = pick(rng, FORMAL_WORDS);
   const [informal, formal, sentence] = row;
   if (d === 1) {
-    return wordsCard(rng, `Formal word for "${informal}"?`, '', `What is the formal word for ${informal}?`, 'Slice the formal word', formal, otherFormals(rng, row, 2));
+    return wordsCard(rng, `Formal word for "${informal}"?`, '', `What is the formal word for ${informal}?`, 'Slice the formal word', formal, otherFormals(rng, row, 2), formalWordWhy(row));
   }
   const others = shuffle(rng, FORMAL_WORDS.filter(x => x !== row)).slice(0, 2).map(x => x[0]);
   const text = `${sentence.replace('_', '___')}\n(${informal})`;
-  return wordsCard(rng, 'Slice the formal word', text, `${sentence.replace('_', 'blank')} The informal word is ${informal}. Slice the formal word.`, 'Slice the formal word', formal, [informal, ...others]);
+  return wordsCard(rng, 'Slice the formal word', text, `${sentence.replace('_', 'blank')} The informal word is ${informal}. Slice the formal word.`, 'Slice the formal word', formal, [informal, ...others], formalWordWhy(row));
 };
