@@ -40,13 +40,20 @@ export const byNoun = (sentence: string): string => sentence.replace(/\.$/, '').
 const hintFor = (role: 'subject' | 'object') => role === 'subject'
   ? 'The subject is the do-er, the word that goes with the verb' : 'The object is what the verb acts upon';
 
+/** The why on a wrong slice (#2318): the role's test, said with the sentence's own words. */
+export const roleWhy = (row: SubjObjRow, role: 'subject' | 'object'): string => {
+  const [sentence, subject, verb, object, kind] = row;
+  if (role === 'object') return `"${object}" is what the verb "${verb}" acts on.`;
+  return kind === 'passive' ? `"${subject}" has the verb done to it; ${byNoun(sentence)} follows "by".` : `"${subject}" is the do-er of the verb "${verb}".`;
+};
+
 function card(rng: () => number, row: SubjObjRow, role: 'subject' | 'object') {
   const [sentence, subject, verb, object, kind] = row;
   const answer = role === 'subject' ? subject : object!;
   const swapped = role === 'subject' ? (kind === 'passive' ? byNoun(sentence) : object!) : subject;
   const stem = `Which word is the ${role}?`;
   return wordQ(rng, stem, answer, [swapped, verb], {
-    visual: { type: 'sentence', text: sentence }, say: `${stem} ${sentence}`, hint: hintFor(role), hintIsData: false,
+    visual: { type: 'sentence', text: sentence }, say: `${stem} ${sentence}`, hint: hintFor(role), hintIsData: false, why: roleWhy(row, role),
   });
 }
 
