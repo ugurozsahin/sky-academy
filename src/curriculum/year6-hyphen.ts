@@ -4,13 +4,13 @@
 import type { Generator, Question } from './types';
 import { pick, shuffle, wordQ } from './util';
 
-/** [plain, hyphened, sentence needing plain, sentence needing hyphened]; each sentence holds one `_`. */
-export const RE_PAIRS: readonly (readonly [string, string, string, string])[] = [
-  ['recover', 're-cover', 'I hope Gran will _ from her cold soon.', 'The sofa is torn, so we will _ it with new cloth.'],
-  ['resign', 're-sign', 'Dad will _ from his job today.', 'The pen leaked, so please _ the card.'],
-  ['remark', 're-mark', 'She did not _ on the weather.', 'The teacher had to _ the wrong test.'],
-  ['reserve', 're-serve', 'We _ a table for six at the cafe.', 'The player fell, so she had to _ the ball.'],
-  ['resort', 're-sort', 'The family went to a seaside _ for the week.', 'The cards fell, so we must _ them by colour.'],
+/** [plain, hyphened, sentence needing plain, sentence needing hyphened, what the plain word means]; each sentence holds one `_`. */
+export const RE_PAIRS: readonly (readonly [string, string, string, string, string])[] = [
+  ['recover', 're-cover', 'I hope Gran will _ from her cold soon.', 'The sofa is torn, so we will _ it with new cloth.', 'get well again'],
+  ['resign', 're-sign', 'Dad will _ from his job today.', 'The pen leaked, so please _ the card.', 'give up a job'],
+  ['remark', 're-mark', 'She did not _ on the weather.', 'The teacher had to _ the wrong test.', 'say something'],
+  ['reserve', 're-serve', 'We _ a table for six at the cafe.', 'The player fell, so she had to _ the ball.', 'book ahead'],
+  ['resort', 're-sort', 'The family went to a seaside _ for the week.', 'The cards fell, so we must _ them by colour.', 'a holiday place'],
 ];
 
 /** [prefix, root]; the first list takes a hyphen (vowel meets vowel), the second does not. Only words whose solid spelling is not the standard one (so not coordinate, cooperate, preorder). */
@@ -32,16 +32,21 @@ export const COMPOUNDS: readonly (readonly [string, string, string, string])[] =
 const isVowel = (c: string): boolean => 'aeiou'.includes(c);
 /** The d2 oracle, computed from the pair, not stored. */
 export const needsHyphen = ([prefix, root]: readonly [string, string]): boolean => isVowel(prefix.at(-1)!) && isVowel(root[0]);
+/** The d1 why: both meanings, the hyphened one built from the word itself. */
+export const reWhy = ([plain, hyphened, , , means]: readonly string[]): string => `"${plain}" means ${means}; "${hyphened}" means ${hyphened.slice(3)} again.`;
+/** The d2 why: the vowel rule, with the hyphened spelling. */
+export const vowelWhy = ([prefix, root]: readonly [string, string]): string => `A vowel meets a vowel in "${prefix + root}", so it takes a hyphen: ${prefix}-${root}.`;
 const solid = ([prefix, root]: readonly string[]): string => prefix + root;
 
 function meaning(rng: () => number): Question {
-  const [plain, hyphened, sPlain, sHyph] = pick(rng, RE_PAIRS);
+  const pair = pick(rng, RE_PAIRS);
+  const [plain, hyphened, sPlain, sHyph] = pair;
   const hy = rng() < 0.5;
   const text = hy ? sHyph : sPlain;
   const prompt = `Which fits the gap, ${plain} or ${hyphened}?`;   // the pair is in the prompt, so repeat-avoidance sees it (the key ignores a sentence visual)
   return wordQ(rng, prompt, hy ? hyphened : plain, [hy ? plain : hyphened], {
     visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${prompt}`,
-    hint: 'A hyphen can give a word a different meaning.', hintIsData: false,
+    hint: 'A hyphen can give a word a different meaning.', hintIsData: false, why: reWhy(pair),
   });
 }
 
@@ -49,7 +54,7 @@ function vowelRule(rng: () => number): Question {
   const yes = pick(rng, HYPHEN_ROOTS);
   const no = shuffle(rng, SOLID_ROOTS).slice(0, 2);
   return wordQ(rng, 'Which word takes a hyphen under the vowel rule?', solid(yes), no.map(solid), {
-    hint: 'A prefix ending in a vowel, before a word starting with one.', hintIsData: false,
+    hint: 'A prefix ending in a vowel, before a word starting with one.', hintIsData: false, why: vowelWhy(yes),
     say: 'Which word takes a hyphen under the vowel rule?',
   });
 }
@@ -63,6 +68,7 @@ function compound(rng: () => number): Question {
   const prompt = onlyHyphened ? `Which one can only mean ${mH}?` : `Which one could mean ${mO}?`;
   return wordQ(rng, prompt, letterOf(onlyHyphened), [letterOf(!onlyHyphened)], {
     visual: { type: 'sentence', text: `A: ${a} / B: ${b}` }, say: `${prompt} A: ${a}. B: ${b}.`, hint: 'The hyphen joins the words so they work as one.', hintIsData: false,
+    why: onlyHyphened ? `The hyphen joins the words: ${mH}.` : `Without a hyphen it could mean ${mO}.`,
   });
 }
 

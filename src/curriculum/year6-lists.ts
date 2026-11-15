@@ -40,20 +40,25 @@ export const BULLETS: readonly (readonly [string, string, string])[] = [
 
 const joinList = (items: readonly string[]): string => `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 const SAY = 'Which punctuation mark goes in the gap?';
+/** The rules, not the sentence: a bare ':' or ';' is still shown in its sentence by the card (#2278). */
+export const COLON_WHY = 'After a complete clause, a colon introduces the list.';
+export const SEMI_WHY = 'Items that hold commas are split by semicolons.';
+/** The d3 why: what the two matching bullets do. */
+export const bulletWhy = (capital: boolean): string => `The other two ${capital ? 'start with a capital and end with a full stop' : 'start in lower case and have no full stop'}.`;
 const HINT = 'Look at the clause before the gap and at the list after it.';
 
 function colon(rng: () => number): Question {
   const [clause, items] = pick(rng, LIST_INTROS);
   const text = `${clause} _ ${joinList(items)}.`;
   return wordQ(rng, SAY, ':', [',', ';'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false,
-    why: text.replace('_', ':') });   // #2278: a bare ':' is a tiny glyph, so the outcome line shows it in its sentence
+    why: COLON_WHY });
 }
 
 function semicolon(rng: () => number): Question {
   const [clause, [a, b, c]] = pick(rng, COMMA_ITEMS);
   const text = `${clause}: ${a} _ ${b}; and ${c}.`;
   return wordQ(rng, SAY, ';', [',', ':'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false,
-    why: text.replace('_', ';') });
+    why: SEMI_WHY });
 }
 
 /** The (first letter is a capital, ends with a full stop) signature the d3 oracle compares. */
@@ -71,7 +76,7 @@ function bullets(rng: () => number): Question {
   const prompt = 'Which bullet point is punctuated differently?';
   return wordQ(rng, prompt, shown[odd], shown.filter((_, i) => i !== odd), {
     visual: { type: 'sentence', text: shown.map(s => `• ${s}`).join('   ') }, say: `${prompt} ${shown.join('. ')}`,
-    hint: 'Two bullet points are punctuated the same way.', hintIsData: false,
+    hint: 'Two bullet points are punctuated the same way.', hintIsData: false, why: bulletWhy(capital),
   });
 }
 
