@@ -34,17 +34,21 @@ function fromOthers(rng: Parameters<Generator>[1], row: SynRow, n: number): stri
   return shuffle(rng, SYN_ANT.filter(r => r !== row)).slice(0, n).map(r => pick(rng, [r[0], r[1], r[2]]));
 }
 
+/** The why: names the relation, never the bare answer (#2318). */
+export const synWhy = (word: string, other: string, same: boolean): string =>
+  same ? `${other[0].toUpperCase()}${other.slice(1)} means the same as ${word}.` : `${other[0].toUpperCase()}${other.slice(1)} is the opposite of ${word}.`;
+
 export const y6Synonyms: Generator = (d: Difficulty, rng) => {
   const row = pick(rng, SYN_ANT);
   const [word, syn, ant, sentence] = row;
   if (d === 1) {
     return wordQ(rng, `Which word is a synonym of ${word}?`, syn, [ant, ...fromOthers(rng, row, 1)], {
-      say: `Which word is a synonym of ${word}?`, hint: 'A synonym means the same', hintIsData: false,
+      say: `Which word is a synonym of ${word}?`, why: synWhy(word, syn, true), hint: 'A synonym means the same', hintIsData: false,
     });
   }
   if (d === 2) {
     return wordQ(rng, `Which word is an antonym of ${word}?`, ant, [syn, ...fromOthers(rng, row, 2)], {
-      say: `Which word is an antonym of ${word}?`, hint: 'An antonym means the opposite', hintIsData: false,
+      say: `Which word is an antonym of ${word}?`, why: synWhy(word, ant, false), hint: 'An antonym means the opposite', hintIsData: false,
     });
   }
   const same = rng() < 0.5;
@@ -52,7 +56,7 @@ export const y6Synonyms: Generator = (d: Difficulty, rng) => {
   const text = sentence.replace(new RegExp(`\\b${word}\\b`, 'i'), upper);
   const stem = same ? `Which word means the same as ${upper} here?` : `Which word means the opposite of ${upper} here?`;
   return wordQ(rng, stem, same ? syn : ant, [same ? ant : syn, ...fromOthers(rng, row, 2)], {
-    visual: { type: 'sentence', text }, say: `${sentence} ${same ? `Which word means the same as ${word} here?` : `Which word means the opposite of ${word} here?`}`,
+    visual: { type: 'sentence', text }, why: synWhy(word, same ? syn : ant, same), say: `${sentence} ${same ? `Which word means the same as ${word} here?` : `Which word means the opposite of ${word} here?`}`,
     hint: same ? 'Pick the word that means the same' : 'Pick the word that means the opposite', hintIsData: false,
   });
 };
