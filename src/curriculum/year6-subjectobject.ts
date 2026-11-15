@@ -37,6 +37,9 @@ export const SUBJ_OBJ: SubjObjRow[] = [
 /** The noun after "by" on a passive row: the misconception decoy for the subject. */
 export const byNoun = (sentence: string): string => sentence.replace(/\.$/, '').split(' ').slice(-1)[0];
 
+/** The whole by-phrase of a passive ("by the twins"), so the why never needs a verb to agree with its noun. */
+export const byPhrase = (sentence: string): string => sentence.replace(/\.$/, '').slice(sentence.indexOf(' by ') + 1);
+
 const hintFor = (role: 'subject' | 'object') => role === 'subject'
   ? 'The subject is the do-er, the word that goes with the verb' : 'The object is what the verb acts upon';
 
@@ -44,7 +47,7 @@ const hintFor = (role: 'subject' | 'object') => role === 'subject'
 export const roleWhy = (row: SubjObjRow, role: 'subject' | 'object'): string => {
   const [sentence, subject, verb, object, kind] = row;
   if (role === 'object') return `"${object}" is what the verb "${verb}" acts on.`;
-  return kind === 'passive' ? `"${subject}" has the verb done to it; ${byNoun(sentence)} follows "by".` : `"${subject}" is the do-er of the verb "${verb}".`;
+  return kind === 'passive' ? `"${subject}" has the verb done to it; "${byPhrase(sentence)}" names the do-er.` : `"${subject}" is the do-er of the verb "${verb}".`;
 };
 
 function card(rng: () => number, row: SubjObjRow, role: 'subject' | 'object') {
