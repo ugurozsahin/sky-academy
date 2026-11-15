@@ -14,7 +14,22 @@ describe('y4-standard says why (#2318)', () => {
     expect(standardWhy(OTHER_VERBS[1])).toBe('After "have", use "done", not "did".');
     expect(standardWhy(OTHER_VERBS[5])).toBe('After "has", use "come", not "came".');
   });
+  it('every row: the rule, the subject with a capital I, the auxiliary in lower case', () => {
+    for (const row of [...WAS_WERE, ...OTHER_VERBS]) {
+      const [sentence, standard, local] = row, why = standardWhy(row);
+      expect(why).toContain(`"${standard}", not "${local}"`);
+      if (standard === 'was' || standard === 'were') {
+        const w = sentence.split(' ')[0];
+        expect(why.startsWith(`With "${w === 'I' ? 'I' : w.toLowerCase()}",`)).toBe(true);
+      } else {
+        const aux = /\b(has|have|had)\b/i.exec(sentence.split('___')[0]);
+        expect(why.startsWith(aux ? `After "${aux[1].toLowerCase()}",` : 'On its own,')).toBe(true);
+      }
+    }
+    expect(standardWhy(WAS_WERE[5])).toBe('With "I", use "was", not "were".');
+    expect(standardWhy(OTHER_VERBS[3])).toBe('After "have", use "seen", not "saw".');
+  });
   it('every draw has a short why that is not the bare answer', () => {
-    for (const d of [1, 2, 3] as const) for (const q of draws(d)) { expect(q.why).toBeTruthy(); expect(q.why).not.toBe(q.answer); expect(q.why!.split(/\s+/).length).toBeLessThanOrEqual(14); }
+    for (const d of [1, 2, 3] as const) for (const q of draws(d)) { expect(q.why).toBeTruthy(); expect(q.why).toContain(`"${q.answer}"`); expect(q.why).not.toBe(q.answer); expect(q.why!.split(/\s+/).length).toBeLessThanOrEqual(14); }
   });
 });

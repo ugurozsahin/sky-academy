@@ -21,9 +21,12 @@ export const OTHER_VERBS: readonly StdRow[] = [
   ['He ___ a long story.', 'wrote', 'written'], ['She has ___ a letter.', 'written', 'wrote'],
 ];
 
+/** The sentence's first word, lower-cased except the pronoun "I", which is always a capital. */
+const subjectOf = (sentence: string): string => { const w = sentence.split(' ')[0]; return w === 'I' ? w : w.toLowerCase(); };
+
 /** #2318: the why gives the rule, never the bare answer: was/were go by the subject, done/seen/gone by the word before the gap. */
 export function standardWhy([sentence, standard, local]: StdRow): string {
-  if (standard === 'was' || standard === 'were') return `With "${sentence.split(' ')[0].toLowerCase()}", use "${standard}", not "${local}".`;
+  if (standard === 'was' || standard === 'were') return `With "${subjectOf(sentence)}", use "${standard}", not "${local}".`;
   const aux = /\b(has|have|had)\b/i.exec(sentence.split('___')[0]);
   return aux ? `After "${aux[1].toLowerCase()}", use "${standard}", not "${local}".` : `On its own, use the past: "${standard}", not "${local}".`;
 }
