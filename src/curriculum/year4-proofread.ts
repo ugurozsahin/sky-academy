@@ -72,11 +72,25 @@ export const D3_BANK: readonly ProofreadRow[] = [
 ];
 
 const MAX_LETTERS = 9;
-/** #2318: what is wrong with the shown spelling, then the right one — never the bare answer. */
-export const proofreadWhy = (target: string, wrong: string): string =>
-  wrong.length < target.length ? `"${wrong}" is missing a letter. It is "${target}".`
-    : wrong.length > target.length ? `"${wrong}" has an extra letter. It is "${target}".`
-    : `"${wrong}" has a wrong letter or two swapped. It is "${target}".`;
+/** #2318: the one slip a misspelling is, when it is exactly one (a letter dropped, added or changed, or two neighbours swapped); else null. */
+export const singleSlip = (target: string, wrong: string): 'missing' | 'extra' | 'wrong' | 'swapped' | null => {
+  const t = target.toLowerCase(), w = wrong.toLowerCase();
+  if (t === w) return null;
+  const drop = (long: string, short: string) => long.length === short.length + 1 && Array.from(long).some((_, i) => long.slice(0, i) + long.slice(i + 1) === short);
+  if (drop(t, w)) return 'missing';
+  if (drop(w, t)) return 'extra';
+  if (t.length !== w.length) return null;
+  const diff = Array.from(t).flatMap((c, i) => (c === w[i] ? [] : [i]));
+  if (diff.length === 1) return 'wrong';
+  if (diff.length === 2 && diff[1] === diff[0] + 1 && t[diff[0]] === w[diff[1]] && t[diff[1]] === w[diff[0]]) return 'swapped';
+  return null;
+};
+const SLIP_TEXT = { missing: 'is missing a letter', extra: 'has an extra letter', wrong: 'has one wrong letter', swapped: 'has two letters swapped' } as const;
+/** #2318: what is wrong with the shown spelling, only when it is true, then the right one — never the bare answer. */
+export const proofreadWhy = (target: string, wrong: string): string => {
+  const slip = singleSlip(target, wrong);
+  return slip ? `"${wrong}" ${SLIP_TEXT[slip]}. It is "${target}".` : `"${wrong}" is not the right spelling. It is "${target}".`;
+};
 const bare = (w: string) => w.replace(/[.,?!;:]/g, '');
 
 function card(rng: Rng, [sentence, target, wrong, listWord]: ProofreadRow, d: Difficulty): Question {
