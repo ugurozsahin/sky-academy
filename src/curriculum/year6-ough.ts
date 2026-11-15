@@ -52,8 +52,8 @@ const D1_GROUPS: OughGroup[] = ['ought', 'rough', 'through'];
 /** #2318: the sound each ough group makes, so the why names the sound the letters stand for. */
 export const OUGH_SOUND: Record<OughGroup, string> = { ought: 'or', rough: 'uff', cough: 'off', though: 'oh', through: 'oo', thorough: 'uh', plough: 'ow' };
 export const oughWhy = (r: OughRow): string => `"ough" can say "${OUGH_SOUND[r[1]]}", as in ${r[0]}.`;
-export const eiWhy = (r: EiRow): string => r[3] ? `An exception to "except after c": learn ${r[0]}.` : `After c it is ei, not ie: ${r[0]}.`;
-export const rhymeWhy = (target: string, right: string, group: OughGroup): string => `${target} and ${right} both end in the "${OUGH_SOUND[group]}" sound.`;
+export const eiWhy = (r: EiRow): string => r[3] ? `Not "i before e" here: learn ${r[0]}.` : `After c it is ei, not ie: ${r[0]}.`;
+export const rhymeWhy = (target: string, right: string, group: OughGroup): string => `"ough" says "${OUGH_SOUND[group]}" in both ${target} and ${right}.`;
 
 const gapQ = (rng: Parameters<Generator>[1], sent: string, answer: string, decoys: string[], why: string, prompt?: string) => {
   const text = sent.replace('_', '___');

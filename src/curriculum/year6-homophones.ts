@@ -59,7 +59,7 @@ export const Y6_HOM_MEANING: Record<string, string> = {
   principal: 'is the head of a school', principle: 'is a rule to live by', wary: 'means careful', weary: 'means tired',
 };
 export const y6HomWhy = (answer: string): string => {
-  if (!(answer in Y6_HOM_MEANING)) throw new Error(`y6-homophones: no why for "${answer}"`);
+  if (!Object.hasOwn(Y6_HOM_MEANING, answer)) throw new Error(`y6-homophones: no why for "${answer}"`);
   return `${answer[0].toUpperCase()}${answer.slice(1)} ${Y6_HOM_MEANING[answer]}.`;
 };
 

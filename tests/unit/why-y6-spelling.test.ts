@@ -11,8 +11,8 @@ describe('y6-ough says why (#2318)', () => {
   it('words each kind', () => {
     expect(oughWhy(OUGH[0])).toBe('"ough" can say "or", as in ought.');
     expect(eiWhy(EI_C[0])).toBe('After c it is ei, not ie: deceive.');
-    expect(eiWhy(EI_C.find(r => r[3])!)).toContain('exception');
-    expect(rhymeWhy('bought', 'ought', 'ought')).toBe('bought and ought both end in the "or" sound.');
+    expect(eiWhy(EI_C.find(r => r[3])!)).toBe('Not "i before e" here: learn protein.');
+    expect(rhymeWhy('bought', 'ought', 'ought')).toBe('"ough" says "or" in both bought and ought.');
   });
 });
 
@@ -31,6 +31,8 @@ describe.each(['y6-ough', 'y6-homophones'])('%s sets a short why on every questi
     for (const d of [1, 2, 3] as const) for (const q of draws(id, d)) {
       expect(q.why).toBeTruthy();
       expect(q.why).not.toBe(q.answer);
+      if (id === 'y6-ough' && q.why!.includes('i before e')) expect(['protein', 'caffeine', 'seize']).toContain(q.answer);
+      if (id === 'y6-ough' && q.why!.includes('both')) expect(q.why).toMatch(/^"ough" says "(or|uff|oh|ow)" in both \w+ and \w+\.$/);
       expect(q.why).not.toMatch(/undefined/);
       expect(q.why!.split(/\s+/).length).toBeLessThanOrEqual(14);
     }
