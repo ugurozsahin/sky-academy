@@ -66,5 +66,6 @@ export const y3Speech: Generator = (d, rng): Question => {
   const prompt = 'Which has the inverted commas in the right place?';
   return wordQ(rng, prompt, answer, labels.filter(l => l !== answer), {
     visual: { type: 'sentence', text: versions.map((v, i) => `${labels[i]}  ${v.text}`).join('\n') }, say: prompt,
+    why: `Wrap only the spoken words: ${version(row, reportingFirst, 'right')}`, // #2318
   });
 };
