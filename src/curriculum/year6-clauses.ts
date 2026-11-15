@@ -36,6 +36,12 @@ export const SUB_PAIRS: SubRow[] = [
 ];
 
 const gapped = (a: string, b: string): string => `${a} _ ${b}.`;
+export const SEMICOLON_WHY = 'Both clauses could stand alone, so a semicolon joins them.';
+export const COLON_WHY = 'The second clause explains the first, so a colon fits.';
+export const DASH_WHY = 'A dash joins the two clauses with a pause before the second.';
+export const BOUNDARY_WHY = 'The semicolon goes where the first clause ends.';
+export const CAN_WHY = 'Both clauses could stand alone, so a semicolon can join them.';
+export const CANNOT_WHY = 'The first clause cannot stand alone, so it takes a comma.';
 const FLAG = 'Each clause could stand alone, so a comma is too weak to join them';
 
 function markCard(d: Difficulty, rng: () => number) {
@@ -46,6 +52,7 @@ function markCard(d: Difficulty, rng: () => number) {
   return wordQ(rng, 'Which mark joins these two clauses?', answer, decoys, {
     visual: { type: 'sentence', text: gapped(row[0], row[1]) },
     say: `Which punctuation mark joins these two clauses? ${row[0]}. Blank. ${row[1]}.`, hint: FLAG, hintIsData: false,
+    why: d === 1 ? SEMICOLON_WHY : colon ? COLON_WHY : DASH_WHY,
   });
 }
 
@@ -58,7 +65,7 @@ export function positionCard(rng: () => number) {
   const gaps = [...others, boundary].sort((x, y) => x - y);
   const text = words.map((w, i) => (gaps.includes(i) ? `[${'ABC'[gaps.indexOf(i)]}] ${w}` : w)).join(' ') + '.';
   return wordQ(rng, 'Which gap takes the semicolon?', 'ABC'[gaps.indexOf(boundary)], ['A', 'B', 'C'], {
-    visual: { type: 'sentence', text }, say: `Which gap takes the semicolon? ${a}, ${b}. Pick the gap between the two clauses.`, hint: FLAG, hintIsData: false,
+    visual: { type: 'sentence', text }, say: `Which gap takes the semicolon? ${a}, ${b}. Pick the gap between the two clauses.`, hint: FLAG, hintIsData: false, why: BOUNDARY_WHY,
   });
 }
 
@@ -67,7 +74,7 @@ function canCard(rng: () => number) {
   const [a, b] = yes ? pick(rng, CLAUSE_PAIRS) : pick(rng, SUB_PAIRS);
   return wordQ(rng, 'Which is right: can a semicolon go there?', yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
     visual: { type: 'sentence', text: gapped(a, b) }, say: `Can a semicolon go in the gap? ${a}. Blank. ${b}.`,
-    hint: 'A comma belongs after a clause that cannot stand alone', hintIsData: false,
+    hint: 'A comma belongs after a clause that cannot stand alone', hintIsData: false, why: yes ? CAN_WHY : CANNOT_WHY,
   });
 }
 
