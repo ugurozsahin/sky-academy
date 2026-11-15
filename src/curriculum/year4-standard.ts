@@ -21,19 +21,31 @@ export const OTHER_VERBS: readonly StdRow[] = [
   ['He ___ a long story.', 'wrote', 'written'], ['She has ___ a letter.', 'written', 'wrote'],
 ];
 
+/** The sentence's first word, lower-cased except the pronoun "I", which is always a capital. */
+const subjectOf = (sentence: string): string => { const w = sentence.split(' ')[0]; return w === 'I' ? w : w.toLowerCase(); };
+
+/** #2318: the why gives the rule, never the bare answer: was/were go by the subject, done/seen/gone by the word before the gap. */
+export function standardWhy([sentence, standard, local]: StdRow): string {
+  if (standard === 'was' || standard === 'were') return `With "${subjectOf(sentence)}", use "${standard}", not "${local}".`;
+  const aux = /\b(has|have|had)\b/i.exec(sentence.split('___')[0]);
+  return aux ? `After "${aux[1].toLowerCase()}", use "${standard}", not "${local}".` : `On its own, use the past: "${standard}", not "${local}".`;
+}
+
 /** d1: was/were only · d2: every verb pair · d3: find the one word that is not Standard English in a whole sentence. */
 export const y4Standard: Generator = (d, rng) => {
   if (d === 3) {
-    const [sentence, , local] = pick(rng, [...WAS_WERE, ...OTHER_VERBS]);
+    const row = pick(rng, [...WAS_WERE, ...OTHER_VERBS]);
+    const [sentence, , local] = row;
     const text = sentence.replace('___', local);
     const others = [...new Set(text.replace(/[.?!]/g, '').split(' '))].filter(w => w !== local);
     return wordQ(rng, 'Which word is not Standard English?', local, shuffle(rng, others).slice(0, 3), {
-      visual: { type: 'sentence', text }, say: text, hint: 'One verb here is a local spoken form.', hintIsData: false, wide: true,
+      visual: { type: 'sentence', text }, say: text, hint: 'One verb here is a local spoken form.', hintIsData: false, wide: true, why: standardWhy(row),
     });
   }
-  const [sentence, standard, local] = pick(rng, d === 1 ? WAS_WERE : [...WAS_WERE, ...OTHER_VERBS]);
+  const row = pick(rng, d === 1 ? WAS_WERE : [...WAS_WERE, ...OTHER_VERBS]);
+  const [sentence, standard, local] = row;
   return wordQ(rng, 'Which is Standard English?', standard, [local], {
     visual: { type: 'sentence', text: sentence }, say: sentence.replace('___', 'blank'),
-    hint: 'Which verb do we write in Standard English?', hintIsData: false,
+    hint: 'Which verb do we write in Standard English?', hintIsData: false, why: standardWhy(row),
   });
 };
