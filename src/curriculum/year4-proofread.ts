@@ -72,6 +72,11 @@ export const D3_BANK: readonly ProofreadRow[] = [
 ];
 
 const MAX_LETTERS = 9;
+/** #2318: what is wrong with the shown spelling, then the right one — never the bare answer. */
+export const proofreadWhy = (target: string, wrong: string): string =>
+  wrong.length < target.length ? `"${wrong}" is missing a letter. It is "${target}".`
+    : wrong.length > target.length ? `"${wrong}" has an extra letter. It is "${target}".`
+    : `"${wrong}" has a wrong letter or two swapped. It is "${target}".`;
 const bare = (w: string) => w.replace(/[.,?!;:]/g, '');
 
 function card(rng: Rng, [sentence, target, wrong, listWord]: ProofreadRow, d: Difficulty): Question {
@@ -91,7 +96,7 @@ function card(rng: Rng, [sentence, target, wrong, listWord]: ProofreadRow, d: Di
   if (d > 1 && longer.length) chosen.push(longer[0]);
   for (const w of shuffle(rng, pool)) if (chosen.length < bubbles - 1 && !chosen.includes(w)) chosen.push(w);
   const q = wordQ(rng, 'Which word is spelt wrong?', wrong, chosen.slice(0, 3),
-    { hint: 'Read each word slowly, letter by letter', hintIsData: false, wide: true });
+    { hint: 'Read each word slowly, letter by letter', hintIsData: false, wide: true, why: proofreadWhy(target, wrong) });
   q.options = shuffle(rng, [wrong, ...chosen.slice(0, bubbles - 1)]); // wordQ stops at four options; d3 shows five
   q.visual = { type: 'sentence', text: shown };
   q.spelt = target;   // #2277: the outcome line shows the right spelling, not only the misspelling
