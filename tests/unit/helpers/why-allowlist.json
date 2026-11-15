@@ -60,7 +60,6 @@
 "y5-story-measure",
 "y5-factopinion",
 "y5-wordlist",
-
 "y6-story",
 "y6-inference",
 "y6-figurative",
@@ -70,7 +69,6 @@
 "y6-synonyms",
 "y6-cohesion",
 "y6-clauses",
-"y6-lists",
 "y6-subjectobject",
 "y6-consistency"
 ]

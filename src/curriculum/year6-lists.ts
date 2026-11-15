@@ -40,24 +40,32 @@ export const BULLETS: readonly (readonly [string, string, string])[] = [
 
 const joinList = (items: readonly string[]): string => `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 const SAY = 'Which punctuation mark goes in the gap?';
+/** The d1/d2 whys: the mark's job, named in words so a tiny glyph is never the only clue. */
+export const COLON_WHY = 'A colon comes after a complete clause and introduces a list.';
+export const SEMICOLON_WHY = 'A semicolon separates list items that already hold commas.';
 const HINT = 'Look at the clause before the gap and at the list after it.';
 
 function colon(rng: () => number): Question {
   const [clause, items] = pick(rng, LIST_INTROS);
   const text = `${clause} _ ${joinList(items)}.`;
   return wordQ(rng, SAY, ':', [',', ';'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false,
-    why: text.replace('_', ':') });   // #2278: a bare ':' is a tiny glyph, so the outcome line shows it in its sentence
+    why: COLON_WHY });   // #2318: the job of the mark in words (a finished sentence ran past the 14-word limit; #2278 wanted the glyph in context)
 }
 
 function semicolon(rng: () => number): Question {
   const [clause, [a, b, c]] = pick(rng, COMMA_ITEMS);
   const text = `${clause}: ${a} _ ${b}; and ${c}.`;
   return wordQ(rng, SAY, ';', [',', ':'], { visual: { type: 'sentence', text }, say: `${text.replace('_', 'blank')} ${SAY}`, hint: HINT, hintIsData: false,
-    why: text.replace('_', ';') });
+    why: SEMICOLON_WHY });
 }
 
 /** The (first letter is a capital, ends with a full stop) signature the d3 oracle compares. */
 export const bulletStyle = (s: string): string => `${/^[A-Z]/.test(s)}/${s.endsWith('.')}`;
+
+/** The d3 why: the style two bullets share, so the odd one is the one that breaks it. */
+export const bulletWhy = (capital: boolean): string => capital
+  ? 'Two bullets start with a capital and end with a full stop.'
+  : 'Two bullets start with a small letter and have no full stop.';
 
 function bullets(rng: () => number): Question {
   const items = shuffle(rng, pick(rng, BULLETS));
@@ -71,7 +79,7 @@ function bullets(rng: () => number): Question {
   const prompt = 'Which bullet point is punctuated differently?';
   return wordQ(rng, prompt, shown[odd], shown.filter((_, i) => i !== odd), {
     visual: { type: 'sentence', text: shown.map(s => `• ${s}`).join('   ') }, say: `${prompt} ${shown.join('. ')}`,
-    hint: 'Two bullet points are punctuated the same way.', hintIsData: false,
+    hint: 'Two bullet points are punctuated the same way.', hintIsData: false, why: bulletWhy(capital),
   });
 }
 
