@@ -39,6 +39,11 @@ const HINTS: Record<Kind, string> = {
   inversion: 'A formal way to start an imagined sentence',
 };
 
+/** #2318: the reason the formal form wins, worded for the kind and ending in the form to learn. */
+export const subjunctiveWhy = (r: Row): string => r.kind === 'were' ? `It is only imagined, so formal writing says "were", not "${r.decoys[0]}".`
+  : r.kind === 'mandative' ? `After insist, suggest or require, the plain verb follows: "${r.answer}".`
+  : 'An imagined sentence can start with "Were" instead of "If".';
+
 /** The rows a difficulty may draw: d1 the I rows, d2 the other were rows and the mandatives, d3 every kind. */
 export const rowsFor = (d: Difficulty): readonly Row[] => SUBJUNCTIVES.filter(r =>
   d === 3 || (d === 1 ? r.kind === 'were' && r.person === 'I' : r.kind === 'mandative' || (r.kind === 'were' && r.person === 'other')));
@@ -46,6 +51,6 @@ export const rowsFor = (d: Difficulty): readonly Row[] => SUBJUNCTIVES.filter(r 
 export const y6Subjunctive: Generator = (d: Difficulty, rng: Rng): Question => {
   const row = pick(rng, rowsFor(d));
   return wordQ(rng, STEM, row.answer, shuffle(rng, [...row.decoys]), {
-    visual: { type: 'sentence', text: row.text }, say: `${STEM} ${row.text.replace('_', 'blank')}`, hint: HINTS[row.kind], hintIsData: false,
+    visual: { type: 'sentence', text: row.text }, say: `${STEM} ${row.text.replace('_', 'blank')}`, hint: HINTS[row.kind], hintIsData: false, why: subjunctiveWhy(row),
   });
 };
