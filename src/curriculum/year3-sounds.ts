@@ -31,6 +31,32 @@ export const OU_BANK: readonly SpellRuleRow[] = [
   ['southern', 'Spain is in ___ Europe.', ['suthern', 'sutherne', 'southen']],
 ];
 
+// #2318: the rule or memory trick for the tricky part of each word, never the bare word.
+export const SOUNDS_WHY: Record<string, string> = {
+  myth: 'The i sound is spelt y: m-y-th.',
+  gym: 'The i sound is spelt y: g-y-m.',
+  Egypt: 'The i sound is spelt y: Eg-y-pt.',
+  pyramid: 'The first i sound is spelt y: p-y-ramid.',
+  mystery: 'The i sound is spelt y: m-y-stery.',
+  symbol: 'The i sound is spelt y: s-y-mbol.',
+  lyric: 'The i sound is spelt y: l-y-ric.',
+  crystal: 'The i sound is spelt y: cr-y-stal.',
+  system: 'The i sound is spelt y: s-y-stem.',
+  typical: 'The i sound is spelt y: t-y-pical.',
+  young: 'The u sound is spelt ou: y-ou-ng.',
+  touch: 'The u sound is spelt ou: t-ou-ch.',
+  double: 'The u sound is spelt ou: d-ou-ble.',
+  trouble: 'The u sound is spelt ou: tr-ou-ble.',
+  country: 'The u sound is spelt ou: c-ou-ntry.',
+  cousin: 'The u sound is spelt ou: c-ou-sin.',
+  couple: 'The u sound is spelt ou: c-ou-ple.',
+  courage: 'The u sound is spelt ou: c-ou-rage.',
+  nourish: 'The u sound is spelt ou: n-ou-rish.',
+  southern: 'The u sound is spelt ou: s-ou-thern.',
+};
+
 /** d1: ou words, 2 bubbles · d2: y words, 3 bubbles · d3: both mixed, 4 bubbles. */
-export const y3Sounds: Generator = (d, rng) =>
-  spellRuleQ(rng, pick(rng, d === 1 ? OU_BANK : d === 2 ? Y_BANK : [...Y_BANK, ...OU_BANK]), d + 1);
+export const y3Sounds: Generator = (d, rng) => {
+  const row = pick(rng, d === 1 ? OU_BANK : d === 2 ? Y_BANK : [...Y_BANK, ...OU_BANK]);
+  return spellRuleQ(rng, row, d + 1, SOUNDS_WHY[row[0]]);
+};
