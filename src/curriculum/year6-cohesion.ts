@@ -48,6 +48,7 @@ export const ELLIPSES: readonly EllipsisRow[] = [
 const LETTERS = ['A', 'B', 'C', 'D'];
 const listed = (linkers: readonly string[]): string => linkers.map((l, i) => `${LETTERS[i]} ${l}`).join('\n');
 const HINT = 'Opposite, because of it, or an example';
+const MEANS: Record<Relation, string> = { contrast: 'the second idea is the opposite', consequence: 'the second happens because of the first', addition: 'the second adds to the first', example: 'the second gives an example' };   // #2318
 
 /** A lettered card: one linker per offered relation, the answer is the letter of the asked relation's linker. */
 function linkCard(rng: Rng, asked: Relation, offered: readonly Relation[], lead: string, visual?: string): Question {
@@ -58,6 +59,7 @@ function linkCard(rng: Rng, asked: Relation, offered: readonly Relation[], lead:
   return wordQ(rng, lead, answer, letters.filter(x => x !== answer), {
     visual: { type: 'sentence', text: visual ? `${visual}\n${list}` : list },
     say: `${gapped ? `${gapped} ` : ''}${lead}`, hint: HINT, hintIsData: false,
+    why: `${chosen.find(c => c.r === asked)!.l.replace(/^./, m => m.toUpperCase())}: ${MEANS[asked]}.`,   // #2318
   });
 }
 
@@ -72,10 +74,10 @@ function passageCard(rng: Rng): Question {
 }
 
 function ellipsisCard(rng: Rng): Question {
-  const [short, missing, , decoys] = pick(rng, ELLIPSES);
+  const [short, missing, full, decoys] = pick(rng, ELLIPSES);
   return wordQ(rng, 'Which words have been left out?', missing, [...decoys], {
     visual: { type: 'sentence', text: short }, say: `${short} Which words have been left out?`,
-    hint: 'Say the sentence in full: what words come back?', hintIsData: false,
+    hint: 'Say the sentence in full: what words come back?', hintIsData: false, why: full,   // #2318
   });
 }
 
