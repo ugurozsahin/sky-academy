@@ -484,9 +484,10 @@ const y1Alphabet: Generator = (d, rng) => {
 };
 const y1Days: Generator = (d, rng) => {
   const day = pick(rng, DAYS);
-  if (d === 3) return spellQ(rng, day, '📅', 3);   // days keep their capital letter (Y1 grammar)
+  const why = `${day}: days start with a capital letter.`;   // #2318
+  if (d === 3) return { ...spellQ(rng, day, '📅', 3), why };   // days keep their capital letter (Y1 grammar)
   const idx = ri(rng, 1, Math.min(4, day.length - 1));
-  return gapQ(rng, day, idx, daysDecoyPool(day, idx), '📅', `Which letter is missing from ${day}?`);
+  return { ...gapQ(rng, day, idx, daysDecoyPool(day, idx), '📅', `Which letter is missing from ${day}?`), why };
 };
 /** #2320: a decoy is a letter that could fill the gap in a child's spelling — a vowel for a vowel, a common consonant for a consonant — never q, z or x (`F_iday` offering q, c, z was a giveaway). */
 const COMMON_CONSONANTS = 'bcdfghlmnprstwy';
