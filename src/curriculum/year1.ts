@@ -405,8 +405,9 @@ const y1Alien: Generator = (d, rng) => {
 };
 const y1Spelling: Generator = (d, rng) => {
   const w = pick(rng, Y1_CEW.filter(x => x in TRICKY && x.length >= (d === 1 ? 2 : 3) && x.length <= (d === 3 ? 6 : 4)));
-  if (d === 3 && rng() < 0.5) return spellQ(rng, w, undefined, 3);
-  const q = trickyGap(rng, w);                                   // #2322: three letter bubbles, two at d1
+  const why = `${w}: the tricky letter is "${w[TRICKY[w][0]]}".`;   // #2318
+  if (d === 3 && rng() < 0.5) return { ...spellQ(rng, w, undefined, 3), why };
+  const q = { ...trickyGap(rng, w), why };                       // #2322: three letter bubbles, two at d1
   const keep = d === 1 ? 2 : 3;
   const decoys = q.options.filter(o => o !== q.answer).slice(0, keep - 1);
   return { ...q, options: shuffle(rng, [q.answer, ...decoys]) };
