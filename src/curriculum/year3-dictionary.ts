@@ -44,5 +44,7 @@ export const y3Dictionary: Generator = (d: Difficulty, rng): Question => {
   const words = shuffle(rng, g).slice(0, size);
   const sequence = [...words].sort((a, b) => a.localeCompare(b, 'en'));
   const prompt = 'Slice them in dictionary order';
-  return { prompt, say: prompt, answer: sequence.join(' '), sequence, options: shuffle(rng, words), wide: true, hint: `Look at the ${ORDINAL[n]} letter`, hintIsData: false };
+  return { prompt, say: prompt, answer: sequence.join(' '), sequence, options: shuffle(rng, words), wide: true, hint: `Look at the ${ORDINAL[n]} letter`, hintIsData: false,
+    // #2318: the why names the deciding letters in the order they fall; commas, never hyphens, so the voice never says "minus".
+    why: `${ORDINAL[n][0].toUpperCase()}${ORDINAL[n].slice(1)} letters in order: ${sequence.map(w => w[n - 1]).join(', ')}` };
 };
