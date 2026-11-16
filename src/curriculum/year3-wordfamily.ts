@@ -36,12 +36,16 @@ const decoysFor = (rng: () => number, root: string, like: readonly string[], n: 
   return [...shuffle(rng, pool.filter(shares)), ...shuffle(rng, pool.filter(w => !shares(w)))].slice(0, n);
 };
 
+/** #2318: the family a word belongs to, for the why line. */
+const rootOf = (w: string): string => FAMILIES.find(f => f[1].includes(w))![0];
+const joinWords = (ws: readonly string[]): string => ws.length === 2 ? `${ws[0]} and ${ws[1]}` : `${ws.slice(0, -1).join(', ')} and ${ws[ws.length - 1]}`;
+
 const memberQ = (rng: () => number): Question => {
   const [root, members] = pick(rng, FAMILIES);
   const answer = pick(rng, members);
   const decoys = decoysFor(rng, root, [answer], 2);
   const prompt = `Which word is in the same family as ${root}?`;
-  return { prompt, answer, options: shuffle(rng, [answer, ...decoys]), wide: true, say: prompt, hint: 'Look for the same root word', hintIsData: false };
+  return { prompt, answer, options: shuffle(rng, [answer, ...decoys]), wide: true, say: prompt, hint: 'Look for the same root word', hintIsData: false, why: `${answer} is built from the root ${root}.` };
 };
 
 const oddQ = (rng: () => number): Question => {
@@ -49,7 +53,7 @@ const oddQ = (rng: () => number): Question => {
   const three = shuffle(rng, members).slice(0, 3);
   const answer = decoysFor(rng, root, three, 1)[0];
   const prompt = `Which word is not in the ${root} family?`;
-  return { prompt, answer, options: shuffle(rng, [answer, ...three]), wide: true, say: prompt, hint: 'Three words share one root', hintIsData: false };
+  return { prompt, answer, options: shuffle(rng, [answer, ...three]), wide: true, say: prompt, hint: 'Three words share one root', hintIsData: false, why: `${answer} comes from ${rootOf(answer)}, not ${root}.` };
 };
 
 const allQ = (rng: () => number): Question => {
@@ -57,7 +61,7 @@ const allQ = (rng: () => number): Question => {
   const targets = shuffle(rng, members).slice(0, rng() < 0.5 ? 2 : 3);
   const decoys = decoysFor(rng, root, targets, 2);
   const prompt = `Slice every word in the ${root} family.`;
-  return anyOrderQ(rng, prompt, targets, decoys, { wide: true, say: prompt, hint: 'They all share the same root', hintIsData: false });
+  return anyOrderQ(rng, prompt, targets, decoys, { wide: true, say: prompt, hint: 'They all share the same root', hintIsData: false, why: `${joinWords(targets)} all come from ${root}.` });
 };
 
 export const y3WordFamily: Generator = (d: Difficulty, rng) => (d === 1 ? memberQ(rng) : d === 2 ? oddQ(rng) : allQ(rng));
