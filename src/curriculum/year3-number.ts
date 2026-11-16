@@ -279,13 +279,13 @@ function tensGap(rng: () => number): Question {
   const fill = shuffle(rng, [...NUM_WORDS.slice(11, 20), ...TENS_WORDS].filter(short));
   const ds = [...new Set([...named, ...fill.filter(w => w !== answer)])].slice(0, 3);
   const prompt = `${n} is ${NUM_WORDS[h]} hundred and ___${o ? `-${NUM_WORDS[o]}` : ''}`;
-  return wordQ(rng, prompt, answer, ds, { say: `${n} is ${NUM_WORDS[h]} hundred and what${o ? `, ${NUM_WORDS[o]}` : ''}?`, hint: 'Slice the tens word', hintIsData: false });
+  return wordQ(rng, prompt, answer, ds, { say: `${n} is ${NUM_WORDS[h]} hundred and what${o ? `, ${NUM_WORDS[o]}` : ''}?`, hint: 'Slice the tens word', hintIsData: false, why: `${n} is ${NUM_WORDS[h]} hundred and ${answer}${o ? `-${NUM_WORDS[o]}` : ''}.` });
 }
 
 export const y3Words: Generator = (d, rng) => {
   if (d === 3) return tensGap(rng);
   const n = wordsNumber(d, rng), words = wordsTo1000(n);
-  return wordQ(rng, words, fmtN(n), wordsDecoys(n, rng).map(fmtN), { say: `Which number is ${words}?`, visual: { type: 'word', text: words } });
+  return wordQ(rng, words, fmtN(n), wordsDecoys(n, rng).map(fmtN), { say: `Which number is ${words}?`, visual: { type: 'word', text: words }, why: `"${words}" says ${fmtN(n)}.` });
 };
 
 export const Y3_NUMBER: Topic[] = [
