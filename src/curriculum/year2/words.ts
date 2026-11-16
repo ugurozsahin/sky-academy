@@ -8,8 +8,9 @@ import { TRICKY, trickyGap } from '../tricky-gaps';
 // ---------- Year 2 writing ----------
 export const y2Spelling: Generator = (d, rng) => {
   const w = pick(rng, Y2_CEW.filter(x => x in TRICKY && x.length <= (d === 1 ? 5 : d === 2 ? 7 : 10)));
-  if (d === 3 && rng() < 0.4) return spellQ(rng, w, undefined, 3);
-  return trickyGap(rng, w);
+  const why = `${w}: the tricky letter is "${w[TRICKY[w][0]]}".`;   // #2318
+  if (d === 3 && rng() < 0.4) return { ...spellQ(rng, w, undefined, 3), why };
+  return { ...trickyGap(rng, w), why };
 };
 export const CONTRACTIONS: [string, string][] = [['do not', "don't"], ['cannot', "can't"], ['is not', "isn't"], ['I am', "I'm"], ['it is', "it's"], ['you are', "you're"], ['we will', "we'll"], ['did not', "didn't"], ['has not', "hasn't"], ['they are', "they're"], ['I will', "I'll"], ['could not', "couldn't"]];
 /**
