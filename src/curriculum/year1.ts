@@ -474,13 +474,13 @@ const y1Alphabet: Generator = (d, rng) => {
     const letters = LETTERS.slice(i + 1, i + 4);
     const pool = LETTERS.filter(l => !letters.includes(l));
     const ds = [shown, ...shuffle(rng, pool.filter(l => l !== shown))].slice(0, 3);
-    return { prompt: `Slice the next three letters after ${shown}`, say: `Slice the next three letters after ${say}`, answer: letters.join(''), sequence: letters, options: shuffle(rng, [...letters, ...ds]), visual: { type: 'word', text: shown }, hint: 'Slice the letters in order', hintIsData: false };
+    return { prompt: `Slice the next three letters after ${shown}`, say: `Slice the next three letters after ${say}`, answer: letters.join(''), sequence: letters, options: shuffle(rng, [...letters, ...ds]), visual: { type: 'word', text: shown }, hint: 'Slice the letters in order', hintIsData: false, why: `${letters.join(', ')} come after ${shown}.` };   // #2318
   }
   const answer = LETTERS[i + dir], word = dir === 1 ? 'after' : 'before';
   const near = [LETTERS[i - dir], LETTERS[i + 2 * dir]].filter((l): l is string => l !== undefined && l !== answer);
   const ds = [...near, ...shuffle(rng, LETTERS.filter(l => l !== answer && l !== shown && !near.includes(l)))].slice(0, d === 1 ? 2 : 3);
   const q = wordQ(rng, `Which letter comes ${word} ${shown}?`, answer, ds, { say: `Which letter comes ${word} ${say}?`, visual: { type: 'word', text: shown }, hint: 'Think of the alphabet song', hintIsData: false });
-  return q;
+  return { ...q, why: dir === 1 ? `${answer} comes after ${shown} in the alphabet.` : `${answer} comes before ${shown} in the alphabet.` };   // #2318
 };
 const y1Days: Generator = (d, rng) => {
   const day = pick(rng, DAYS);
