@@ -178,13 +178,13 @@ export const y2Time: Generator = (d, rng) => {
 };
 export const y2Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 10 : 21, d === 1 ? 20 : d === 2 ? 60 : 100);
-  if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 100, say: `Which number is ${numberWord(n)}?`, visual: { type: 'word', text: numberWord(n) }, distractors: [n + 10, n - 10, n + 1] });
+  if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 100, say: `Which number is ${numberWord(n)}?`, visual: { type: 'word', text: numberWord(n) }, distractors: [n + 10, n - 10, n + 1], why: `The word "${numberWord(n)}" says ${n}.` });
   // At n = 100 (the top of the range, only reachable at d3) both n+10 and n+1 fall outside [0,100], leaving
   // only two neighbours — a card with three bubbles instead of four (#462 rail). n-2 is there as a fourth
   // candidate for that boundary; unreachable everywhere else in the range, where the first four already
   // give three or more.
   const ds = shuffle(rng, [n + 10, n - 10, n + 1, n - 1, n - 2].filter(x => x >= 0 && x <= 100)).slice(0, 3).map(numberWord);
-  return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which words say ${n}?` });
+  return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which words say ${n}?`, why: `${n} is written "${numberWord(n)}".` });
 };
 export const y2Skip: Generator = (d, rng) => {
   const step = d === 1 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 3, 5, 10]);
