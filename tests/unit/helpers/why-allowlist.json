@@ -29,8 +29,6 @@
 "y3-check",
 "y3-story-as",
 "y3-story",
-"y3-wordlist",
-
 "y3-dictionary",
 "y3-dictation",
 "y4-mistake",
@@ -38,17 +36,13 @@
 "y4-story-md",
 "y4-retrieve",
 "y4-context",
-"y4-wordlist",
-
 "y5-story",
 "y5-story-md",
 "y5-truefalse",
 "y5-mixed",
 "y5-story-measure",
 "y5-factopinion",
-"y5-wordlist",
 "y6-story",
 "y6-inference",
-"y6-figurative",
-"y6-wordlist"
+"y6-figurative"
 ]
