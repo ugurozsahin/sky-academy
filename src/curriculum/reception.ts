@@ -332,7 +332,8 @@ const rCapitals: Generator = (d, rng) => {
   const twins = (R_LOOKALIKE[l] ?? []).filter(x => pool.includes(x));
   const ordered = [...(twins.length ? [pick(rng, twins)] : []), ...shuffle(rng, pool)].filter((x, i, a) => a.indexOf(x) === i);
   const ds = ordered.slice(0, d === 1 ? 2 : 3).map(x => (upper ? x : x.toUpperCase()));
-  return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown }, say: `Find the ${upper ? 'small' : 'capital'} letter that matches ${l}`, hint: upper ? 'Find the lower-case letter' : 'Find the capital letter', hintIsData: false });
+  const q = wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown }, say: `Find the ${upper ? 'small' : 'capital'} letter that matches ${l}`, hint: upper ? 'Find the lower-case letter' : 'Find the capital letter', hintIsData: false });
+  return { ...q, why: upper ? `Big ${shown}, small ${ans}: the same letter.` : `Small ${shown}, big ${ans}: the same letter.` };   // #2318
 };
 /**
  * Reception tricky words (#968) — the phase 2/3 exception words *Letters and Sounds* lists as read on sight
@@ -364,7 +365,8 @@ const rTricky: Generator = (d, rng) => {
   const pool = rTrickyPool(d);
   const w = pick(rng, pool);
   const ds = rTrickyDecoys(rng, pool, w, d);
-  return wordQ(rng, 'Find the word you hear', w, ds, { say: `Find the word: ${w}`, listen: w, peek: true });
+  const q = wordQ(rng, 'Find the word you hear', w, ds, { say: `Find the word: ${w}`, listen: w, peek: true });
+  return { ...q, why: `The word is ${w}.` };   // #2318
 };
 const rBuild: Generator = (d, rng) => {
   const [w, e] = pickWord(rng, d, rWords(d));
