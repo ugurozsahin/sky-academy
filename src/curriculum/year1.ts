@@ -354,7 +354,7 @@ const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fis
 export { DIGRAPH_WORDS };
 // #2318: what the two missing letters do, never the bare letters.
 export const DIGRAPH_WHY: Record<string, string> = Object.fromEntries(
-  ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh'].map(g => [g, `The letters ${g[0]} and ${g[1]} together make one sound: ${g}.`]));
+  ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh'].map(g => [g, `Two letters make one sound: ${g}.`]));
 const y1Digraphs: Generator = (d, rng) => {
   const [w, dg, e] = pick(rng, DIGRAPH_WORDS);
   const idx = w.indexOf(dg);
