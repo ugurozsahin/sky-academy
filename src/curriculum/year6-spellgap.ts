@@ -6,6 +6,7 @@ import { pick, shuffle, spellQ } from './util';
 import { chunkQ } from './spelling-ks2';
 import type { WordForm } from './spelling-ks2';
 import { Y6_WORDLIST } from './wordlist-y6';
+import { GAP_WHY } from './year6-spellgap-why';
 
 /** One gap word: a list form (sentence, chunks for a long word) plus `swap`, the confusable letter of its usual misspelling. */
 export type GapWord = WordForm & { swap?: string };
@@ -63,7 +64,7 @@ export const gapped = (x: GapWord): string => x.s.replace(new RegExp(`\\b${x.w}\
 
 export function gapQ(rng: Parameters<Generator>[1], x: GapWord): Question {
   const say = `The word is ${x.w}. ${x.s} The word is ${x.w}.`;
-  const dictation = { prompt: gapped(x), say, visual: undefined, peek: true };
+  const dictation = { prompt: gapped(x), say, visual: undefined, peek: true, why: GAP_WHY[x.w] };
   if (x.chunks) return { ...chunkQ(rng, x.w, x.chunks, x.decoys ?? []), ...dictation, peekHint: 'Slice the parts in order' };
   const q = spellQ(rng, x.w);
   if (x.swap && !q.options.includes(x.swap)) {
