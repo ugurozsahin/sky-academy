@@ -6,16 +6,18 @@ const rngOf = (seed: number) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = 
 const gen = (id: string) => TOPICS.find(t => t.id === id)!.gen;
 
 describe('Reception letter topics say why (#2318)', () => {
-  it('r-capitals pairs the big and small letter, and the pair is the answer', () => {
+  it.each([1, 2, 3] as const)('r-capitals pairs the shown letter with its answer at difficulty %i', d => {
     for (let s = 1; s <= 100; s++) {
-      const q = gen('r-capitals')(2, rngOf(s));
-      expect(q.why).toMatch(/^(Big|Small) \S, (small|big) \S: the same letter\.$/);
-      expect(q.why).toContain(q.answer);
+      const q = gen('r-capitals')(d, rngOf(s));
+      const shown = (q.visual as { text: string }).text;
+      const upper = shown === shown.toUpperCase();
+      expect(q.why).toBe(upper ? `Big ${shown}, small ${q.answer}: the same letter.` : `Small ${shown}, big ${q.answer}: the same letter.`);
+      expect(q.answer.toLowerCase()).toBe(shown.toLowerCase());
     }
   });
-  it('r-tricky names the word that was heard', () => {
+  it.each([1, 2, 3] as const)('r-tricky names the word that was heard at difficulty %i', d => {
     for (let s = 1; s <= 100; s++) {
-      const q = gen('r-tricky')(3, rngOf(s));
+      const q = gen('r-tricky')(d, rngOf(s));
       expect(q.why).toBe(`The word is ${q.answer}.`);
     }
   });
