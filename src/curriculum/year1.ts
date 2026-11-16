@@ -352,12 +352,15 @@ const y1SoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE3, PHASE3,
 const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['thumb', 'th', '👍'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['toilet', 'oi', '🚽'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
 /** Exported for the `y1-digraphs` reachable-spelling fixture (#445). */
 export { DIGRAPH_WORDS };
+// #2318: what the two missing letters do, never the bare letters.
+export const DIGRAPH_WHY: Record<string, string> = Object.fromEntries(
+  ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh'].map(g => [g, `The letters ${g[0]} and ${g[1]} together make one sound: ${g}.`]));
 const y1Digraphs: Generator = (d, rng) => {
   const [w, dg, e] = pick(rng, DIGRAPH_WORDS);
   const idx = w.indexOf(dg);
   const shown = w.slice(0, idx) + '__' + w.slice(idx + 2);
   const ds = shuffle(rng, DIGRAPHS.filter(x => x !== dg)).slice(0, d === 1 ? 2 : 3);
-  return wordQ(rng, shown, dg, ds, { visual: { type: 'word', text: shown, emoji: e }, say: `${w}. Which two letters are missing from ${w}?`, hint: 'Slice the missing sound', hintIsData: false });
+  return wordQ(rng, shown, dg, ds, { visual: { type: 'word', text: shown, emoji: e }, say: `${w}. Which two letters are missing from ${w}?`, hint: 'Slice the missing sound', hintIsData: false, why: DIGRAPH_WHY[dg] });
 };
 /**
  * "Real or Alien?" (#982): decode a *printed* word rather than a grapheme heard aloud — the Phonics
