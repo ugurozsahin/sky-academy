@@ -30,6 +30,7 @@ export function wordListQ(rng: Rng, entry: WordEntry, d: Difficulty): Question {
   const f = pick(rng, entry.forms);
   const dictation = d === 1 ? {} : { say: `The word is ${f.w}. ${f.s} The word is ${f.w}.`, visual: { type: 'sentence' as const, text: f.s.replace(f.w, '___') } };
   const listWord = entry.forms[0].w;   // #1289: one record per list entry, whichever form the card drew
-  if (f.chunks) return chunkQ(rng, f.w, f.chunks, f.decoys ?? [], { ...dictation, listWord, peek: true, peekHint: 'Slice the parts in order' });
-  return { ...spellQ(rng, f.w), ...dictation, listWord, peek: true, peekHint: 'Slice the letters in order' };
+  // #2318: the why shows the word in the order it is built, so a wrong slice shows where the letters went; commas, never hyphens, because the voice reads "-" as "minus".
+  if (f.chunks) return chunkQ(rng, f.w, f.chunks, f.decoys ?? [], { ...dictation, listWord, peek: true, peekHint: 'Slice the parts in order', why: `Parts in order: ${f.chunks.join(', ')}` });
+  return { ...spellQ(rng, f.w), ...dictation, listWord, peek: true, peekHint: 'Slice the letters in order', why: `Letters in order: ${[...f.w].join(', ')}` };
 }
