@@ -41,7 +41,7 @@ export const rInitial: Generator = (d, rng) => {
   const why = `${kw} starts with ${kw[0]}: say it slowly.`;   // #2318
   if (d < 3) {
     const say = `Which picture starts like ${kw}?`;
-    return { ...wordQ(rng, say, targets[0], decoys(rng, kw, d === 1 ? 2 : 3), { visual, say, hint, hintIsData: false }), why: `${kw} and ${pairs[0][0]} both start with ${kw[0]}.` };
+    return { ...wordQ(rng, say, targets[0], decoys(rng, kw, d === 1 ? 2 : 3), { visual, say, hint, hintIsData: false }), why: `${kw} and ${pairs[0][0]} start with the ${kw[0]} sound.` };
   }
   const t = rng() < 0.5 ? 2 : 3;
   const say = `Slice every picture that starts like ${kw}`;
