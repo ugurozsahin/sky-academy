@@ -53,12 +53,12 @@ export const EI_BANK: readonly OriginsRow[] = [
   ['fr', 'eigh', 't', 'The fr___t train was very long.'],
 ];
 
-type Family = { bank: readonly OriginsRow[]; pool: readonly string[] };
-const CH_K: Family = { bank: CH_K_BANK, pool: ['ch', 'k', 'c'] };
-const CH_SH: Family = { bank: CH_SH_BANK, pool: ['ch', 'sh', 's'] };
-const GUE_QUE: Family = { bank: GUE_QUE_BANK, pool: ['gue', 'que', 'g', 'ck'] };
-const SC: Family = { bank: SC_BANK, pool: ['sc', 's', 'c'] };
-const EI: Family = { bank: EI_BANK, pool: ['ei', 'eigh', 'ey', 'ay'] };
+type Family = { bank: readonly OriginsRow[]; pool: readonly string[]; rule: string };
+const CH_K: Family = { bank: CH_K_BANK, pool: ['ch', 'k', 'c'], rule: 'Greek: ch says k' };
+const CH_SH: Family = { bank: CH_SH_BANK, pool: ['ch', 'sh', 's'], rule: 'French: ch says sh' };
+const GUE_QUE: Family = { bank: GUE_QUE_BANK, pool: ['gue', 'que', 'g', 'ck'], rule: 'French: gue and que end the word' };
+const SC: Family = { bank: SC_BANK, pool: ['sc', 's', 'c'], rule: 'Latin: sc says s' };
+const EI: Family = { bank: EI_BANK, pool: ['ei', 'eigh', 'ey', 'ay'], rule: 'ei, eigh and ey say ay' };
 export const FAMILIES: readonly Family[] = [CH_K, CH_SH, GUE_QUE, SC, EI];
 /** The spelling-by-sound decoy every card of a family offers. */
 export const PHONETIC: readonly string[] = ['k', 'sh', 'ck', 's', 'ay'];
@@ -79,5 +79,6 @@ export const y4Origins: Generator = (d, rng) => {
     visual: { type: 'sentence', text: sentence },
     say: `${pre}${answer}${post}. ${sentence.replace('___', answer)}`,
     hint: 'Slice the missing letters', hintIsData: false,
+    why: `${pre}${answer}${post}: ${fam.rule}.`,
   });
 };
