@@ -162,13 +162,13 @@ const y1MoreLess: Generator = (d, rng) => {
 };
 const y1Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 1 : 10, d === 3 ? 20 : d === 2 ? 15 : 10);
-  if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 20, say: 'Which number is this word?', visual: { type: 'word', text: numberWord(n) } });
+  if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 20, say: 'Which number is this word?', visual: { type: 'word', text: numberWord(n) }, why: `The word "${numberWord(n)}" says ${n}.` });
   // At the top of the range (n = 20, only reachable at d3) both n+1 and n+2 fall outside [0,20], leaving only
   // two neighbours — a card with three bubbles instead of four (#462 rail). n±3 is there as a fourth
   // candidate so a boundary this tight never runs the pool short; unreachable in the middle of the range,
   // where the first four already give three or more.
   const ds = shuffle(rng, [n - 1, n + 1, n + 2, n - 2, n - 3, n + 3].filter(x => x >= 0 && x <= 20)).slice(0, 3).map(numberWord);
-  return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which word says ${n}?`, hint: 'Slice the word', hintIsData: false });
+  return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which word says ${n}?`, hint: 'Slice the word', hintIsData: false, why: `${n} is written "${numberWord(n)}".` });
 };
 /**
  * #987: Year 1 names a half and a quarter of "an object, shape or quantity". The shape card draws the `fraction`
