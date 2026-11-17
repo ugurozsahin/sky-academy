@@ -39,8 +39,12 @@ const isComparison = (s: string): boolean => wordsOf(s).includes('than');
 const EASY_FACTS = FACTS.filter(f => !isComparison(f));
 const EASY_OPINIONS = OPINIONS.filter(o => hasMarker(o, OBVIOUS_MARKERS));
 
+/** #2318: the clue word an opinion leans on (every opinion in the bank has one — the unit test's oracle). */
+const markerOf = (s: string): string => wordsOf(s).find(w => OPINION_MARKERS.includes(w)) ?? '';
+
 const ask = (rng: Rng, text: string, answer: 'fact' | 'opinion'): Question =>
   wordQ(rng, 'Fact or opinion?', answer, ['fact', 'opinion'], {
+    why: answer === 'fact' ? 'You could check it, so it is a fact.' : `"${markerOf(text)}" is what someone thinks, so it is an opinion.`,
     visual: { type: 'sentence', text }, say: `${text} Fact or opinion?`, hint: 'Could you check it?', hintIsData: false,
   });
 
@@ -53,7 +57,10 @@ function anyOrderCard(rng: Rng): Question {
     .map((l, i) => ({ ...l, letter: 'ABC'[i] }));
   const kind = wantOpinion ? 'opinion' : 'fact';
   const prompt = `Slice every ${kind}`;
+  const marks = [...new Set(lines.filter(l => wantOpinion ? l.t : !l.t).map(l => `"${markerOf(l.s)}"`))];   // #2318: the clue words behind the opinions, each once
+  const why = wantOpinion ? (marks.length > 1 ? `${marks.join(' and ')} are what people think, so they are opinions.` : `${marks[0]} is what someone thinks, so both are opinions.`) : `${marks[0]} is what someone thinks, so it is an opinion.`;
   return anyOrderQ(rng, prompt, lines.filter(l => l.t).map(l => l.letter), lines.filter(l => !l.t).map(l => l.letter), {
+    why,
     visual: { type: 'sentence', text: lines.map(l => `${l.letter}  ${l.s}`).join('\n') },
     say: `${lines.map(l => `${l.letter}. ${l.s}`).join(' ')} ${prompt}`, hint: 'Could you check it?', hintIsData: false,
   });
