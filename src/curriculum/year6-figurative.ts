@@ -76,8 +76,9 @@ export const BANK: readonly Item[] = [
 export const whyDevice = (i: Item): string => {
   if (i.device === 'simile') return 'A simile compares using "like" or "as".';
   if (i.device === 'metaphor') return 'A metaphor says one thing is another, with no "like" or "as".';
-  const verb = HUMAN_ACTIONS.find(v => i.text.toLowerCase().split(/[^a-z]+/).includes(v))!;
-  return `Only a person ${verb}: a thing doing it is personification.`;
+  const verb = HUMAN_ACTIONS.find(v => i.text.toLowerCase().split(/[^a-z]+/).includes(v));
+  if (!verb) throw new Error(`whyDevice: no human action in personification "${i.text}"`);
+  return `"${verb}" is something only a person does, so this is personification.`;
 };
 
 const DEVICES: readonly Device[] = ['simile', 'metaphor', 'personification'];
