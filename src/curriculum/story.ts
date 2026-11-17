@@ -19,6 +19,18 @@ export const STORIES: readonly Story[] = [
   [['We mix the batter.', '🥣'], ['We bake a cake.', '🎂'], ['We have a party.', '🎉']],
 ];
 
+/** One line per story, same order as STORIES: what makes the order (#2318). At most 8 words. */
+export const WHYS: readonly string[] = [
+  'An egg cracks first, then the chick grows.',
+  'A seed grows into a flower we pick.',
+  'A caterpillar eats, then becomes a butterfly.',
+  'The sun comes out, then the snow melts.',
+  'Wheat is cut, baked into bread, then eaten.',
+  'Rain falls first, then the rainbow shines.',
+  'Tea comes first, then teeth, then bed.',
+  'We mix, then bake, then have the party.',
+];
+
 /** Decoys per difficulty. */
 const DECOYS = [0, 1, 2] as const;
 
@@ -28,7 +40,8 @@ export function storyQ(rng: Rng, d: Difficulty, show: boolean): Question {
   const text = story.map(e => e[0]).join(' ');
   const pool = STORIES.flat().map(e => e[1]).filter(e => !sequence.includes(e));
   const decoys = shuffle(rng, [...new Set(pool)]).slice(0, DECOYS[d - 1]);
-  return { prompt: 'Put the story in order', say: `Put the story in order: ${text}`, answer: sequence.join(''), sequence, options: shuffle(rng, [...sequence, ...decoys]),
+  const why = WHYS[STORIES.indexOf(story)];
+  return { prompt: 'Put the story in order', why, say: `Put the story in order: ${text}`, answer: sequence.join(''), sequence, options: shuffle(rng, [...sequence, ...decoys]),
     visual: show ? { type: 'sentence', text } : { type: 'word', text: '📖' }, hint: show ? 'Slice the pictures in the order they happen' : 'Listen, then slice the pictures in order', hintIsData: false,
     listen: show ? undefined : text, peek: !show };
 }
