@@ -348,7 +348,7 @@ export function soundQ(rng: Rng, pool: Sound[], distractPool: Sound[], decoys: n
   const ws = shuffle(rng, words).slice(0, 3);
   const ds = shuffle(rng, distractPool.filter(s => s[1] !== ph)).slice(0, decoys).map(s => s[0]);
   const where = pos === 'start' ? 'start with' : pos === 'end' ? 'end with' : 'have in the middle';
-  return wordQ(rng, '🔊 Listen!', g, ds, { why: `${ws.join(', ')} ${where} "${g}".`, say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}`, hintIsData: false });
+  return wordQ(rng, '🔊 Listen!', g, ds, { why: `${ws.join(', ')} ${pos === 'middle' ? `have "${g}" in the middle` : `${where} "${g}"`}.`, say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}`, hintIsData: false });
 }
 
 export const Y1_CEW = ['the', 'a', 'do', 'to', 'today', 'of', 'said', 'says', 'are', 'were', 'was', 'is', 'his', 'has', 'you', 'your', 'they', 'be', 'he', 'me', 'she', 'we', 'no', 'go', 'so', 'by', 'my', 'here', 'there', 'where', 'love', 'come', 'some', 'one', 'once', 'ask', 'friend', 'school', 'put', 'push', 'pull', 'full', 'house', 'our'];

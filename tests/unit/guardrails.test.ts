@@ -920,7 +920,7 @@ describe('guard rails', () => {
         .map(line => `${file}: ${line.trim()}`));
     expect(hits, "a new or changed ' · ' hint/listen line — check it is genuinely unordered before updating this list").toEqual([
       "/src/curriculum/util.ts: hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,",
-      "/src/curriculum/util.ts: return wordQ(rng, '🔊 Listen!', g, ds, { why: `${ws.join(', ')} ${where} \"${g}\".`, say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}`, hintIsData: false });",
+      "/src/curriculum/util.ts: return wordQ(rng, '🔊 Listen!', g, ds, { why: `${ws.join(', ')} ${pos === 'middle' ? `have \"${g}\" in the middle` : `${where} \"${g}\"`}.`, say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}`, hintIsData: false });",
     ]);
   });
 
