@@ -316,10 +316,11 @@ const rSoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE2, PHASE2, 
 const rLetterSound: Generator = (d, rng) => {
   // #135: filtering by role, not deleting from CVC — `egg` keeps its (correct) place at d1, it is only kept
   // out of the d3 draw whose gap it would answer wrong.
-  if (d === 1) { const [w, e] = pickWord(rng, d, rWords(d)); return gapQ(rng, w, 0, decoyLetters(d, w), e, `${w}. Which sound does ${w} start with?`); }
-  if (d === 2) { const [w, e] = pickWord(rng, d, rWords(d).filter(([w]) => finalIsGenuine(w))); return gapQ(rng, w, 2, decoyLetters(d, w), e, `${w}. Which sound does ${w} end with?`); }
+  // #2318: the why names the word and the sound at the gap, in the order they are said.
+  if (d === 1) { const [w, e] = pickWord(rng, d, rWords(d)); return { ...gapQ(rng, w, 0, decoyLetters(d, w), e, `${w}. Which sound does ${w} start with?`), why: `${w} starts with ${w[0]}: say it slowly.` }; }
+  if (d === 2) { const [w, e] = pickWord(rng, d, rWords(d).filter(([w]) => finalIsGenuine(w))); return { ...gapQ(rng, w, 2, decoyLetters(d, w), e, `${w}. Which sound does ${w} end with?`), why: `${w} ends with ${w[2]}: say it slowly.` }; }
   const [w, e] = pickWord(rng, d, rWords(d).filter(([w]) => medialIsGenuine(w)));
-  return gapQ(rng, w, 1, VOWELS, e, `${w}. Which sound is in the middle of ${w}?`);
+  return { ...gapQ(rng, w, 1, VOWELS, e, `${w}. Which sound is in the middle of ${w}?`), why: `${w}: the middle sound is ${w[1]}.` };
 };
 /** #2320: the letters a Reception child really mixes up (mirror and near-twin shapes); a decoy is one of these whenever it is in the pool. */
 export const R_LOOKALIKE: Record<string, string[]> = { b: ['d', 'p'], d: ['b', 'q'], p: ['q', 'b'], q: ['p', 'd'], m: ['n', 'w'], n: ['m', 'u'], u: ['n', 'v'], v: ['u', 'w'], w: ['v', 'm'], i: ['l', 'j'], l: ['i'], j: ['i'] };
@@ -370,7 +371,7 @@ const rTricky: Generator = (d, rng) => {
 };
 const rBuild: Generator = (d, rng) => {
   const [w, e] = pickWord(rng, d, rWords(d));
-  return spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4, decoyLetters(d, w));
+  return { ...spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4, decoyLetters(d, w)), why: `${[...w].join('-')}: ${w}. Say each sound, then blend.` };   // #2318
 };
 /**
  * #967: the ELG Word Reading goal itself — sound-blend a *written* word — so unlike every other Reception
