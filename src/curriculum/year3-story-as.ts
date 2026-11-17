@@ -64,7 +64,9 @@ export const y3StoryAs: Generator = (d, rng): Question => {
       if (i >= 0) { decoys[i] = v; placed.push(v); }
     }
     if (d === 3 && !decoys.includes(vals[1])) continue;
-    const card = wordQ(rng, story(false), label(answer), decoys.map(label), { say: story(true) });
+    // #2318: the number sentence each step tells (no unit: the spoken why would mispronounce "ml"), e.g. "345 + 120 = 465".
+    const why = steps.map((s, i) => `${vals[i]} ${s.add ? '+' : '-'} ${s.b} = ${vals[i + 1]}`).join(', then ');
+    const card = wordQ(rng, story(false), label(answer), decoys.map(label), { say: story(true), why });
     return d === 3 ? { ...card, slow: true } : card;
   }
 };
