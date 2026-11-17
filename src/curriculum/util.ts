@@ -529,7 +529,7 @@ export function sentenceQ(rng: Rng, sentence: string, emoji: string, decoyPool: 
   const bare = (w: string) => w.toLowerCase().replace(/[.!?,]/g, '');
   const used = new Set(words.map(bare));
   const ds = shuffle(rng, decoyPool.filter(w => !used.has(bare(w)))).slice(0, Math.min(decoys, 10 - words.length));
-  return { prompt: 'Build the sentence', say: `Build the sentence: ${sentence}`, answer: sentence, sequence: words, options: shuffle(rng, [...words, ...ds]), wide: true,
+  return { prompt: 'Build the sentence', why: `Starts "${words[0]}", ends with ${({ '?': 'a question mark', '!': 'an exclamation mark' } as Record<string, string>)[sentence.slice(-1)] ?? 'a full stop'}.`, say: `Build the sentence: ${sentence}`, answer: sentence, sequence: words, options: shuffle(rng, [...words, ...ds]), wide: true,
     visual: show ? { type: 'sentence', text: sentence } : { type: 'word', text: emoji }, hint: show ? 'Slice the words in order' : 'Listen, then slice the words in order', hintIsData: false,
     listen: show ? undefined : sentence, peek: !show };
 }
