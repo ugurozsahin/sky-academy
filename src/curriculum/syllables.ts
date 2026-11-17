@@ -15,6 +15,14 @@ export const BEAT_WORDS: readonly BeatWord[] = [
   ['umbrella', 3, '☂️'], ['dinosaur', 3, '🦕'], ['kangaroo', 3, '🦘'], ['potato', 3, '🥔'], ['crocodile', 3, '🐊'],
 ];
 
+/** #2318: where each word breaks when clapped, for the `why` line. Words of one beat are not split. */
+export const BEAT_SPLIT: Record<string, string> = {
+  rabbit: 'rab-bit', pencil: 'pen-cil', monkey: 'mon-key', tiger: 'ti-ger', apple: 'ap-ple', spider: 'spi-der',
+  candle: 'can-dle', rocket: 'rock-et', turtle: 'tur-tle', penguin: 'pen-guin', elephant: 'el-e-phant',
+  banana: 'ba-na-na', octopus: 'oc-to-pus', tomato: 'to-ma-to', butterfly: 'but-ter-fly', umbrella: 'um-brel-la',
+  dinosaur: 'di-no-saur', kangaroo: 'kan-ga-roo', potato: 'po-ta-to', crocodile: 'croc-o-dile',
+};
+
 /** Highest option shown at each difficulty, and the longest word drawn, per year (`maxBeats` 2 = Reception). */
 const optionCeiling = (maxBeats: number, d: Difficulty) => (maxBeats === 2 ? (d === 1 ? 2 : 3) : d === 3 ? 4 : 3);
 const wordCeiling = (maxBeats: number, d: Difficulty) => (maxBeats === 2 || d === 1 ? 2 : 3);
@@ -29,5 +37,6 @@ export function syllableQ(rng: Rng, d: Difficulty, maxBeats: 2 | 3): Question {
     min: 1, max: top, n: top - 1, distractors,
     say: `${word}. How many beats in ${word}?`,
     visual: { type: 'word', text: word, emoji },
+    why: beats === 1 ? `${word} is one beat: clap once.` : `${BEAT_SPLIT[word]}: clap ${beats} times.`,
   });
 }
