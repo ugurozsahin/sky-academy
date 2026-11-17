@@ -72,6 +72,15 @@ export const BANK: readonly Item[] = [
   { text: 'Opportunity knocked at the door.', device: 'personification', hard: true },
 ];
 
+/** #2318: the test that makes the device that device — the `why` after a miss. Personification quotes the human action. */
+export const whyDevice = (i: Item): string => {
+  if (i.device === 'simile') return 'A simile compares using "like" or "as".';
+  if (i.device === 'metaphor') return 'A metaphor says one thing is another, with no "like" or "as".';
+  const verb = HUMAN_ACTIONS.find(v => i.text.toLowerCase().split(/[^a-z]+/).includes(v));
+  if (!verb) throw new Error(`whyDevice: no human action in personification "${i.text}"`);
+  return `"${verb}" is something only a person does, so this is personification.`;
+};
+
 const DEVICES: readonly Device[] = ['simile', 'metaphor', 'personification'];
 const KEY = 'S simile, M metaphor or P personification?';
 const KEY_D1 = 'S simile or M metaphor?';
@@ -83,7 +92,7 @@ export const y6Figurative: Generator = (d: Difficulty, rng: Rng): Question => {
   const letters = devices.map(v => LETTER[v]);
   const ask = d === 1 ? 'Is this a simile or a metaphor?' : 'Is this a simile, a metaphor or personification?';
   const prompt = d === 1 ? KEY_D1 : KEY, wrong = letters.filter(l => l !== LETTER[item.device]);
-  const extra = { visual: { type: 'sentence', text: item.text } as const, say: `${item.text} ${ask}` };
+  const extra = { visual: { type: 'sentence', text: item.text } as const, say: `${item.text} ${ask}`, why: whyDevice(item) };
   // Only difficulty 1 keeps the like/as test: with three devices it would hand over the simile (#2274).
   return d === 1
     ? wordQ(rng, prompt, LETTER[item.device], wrong, { ...extra, hint: 'Is there a like or an as?', hintIsData: false })
