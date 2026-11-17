@@ -44,7 +44,7 @@ const markerOf = (s: string): string => wordsOf(s).find(w => OPINION_MARKERS.inc
 
 const ask = (rng: Rng, text: string, answer: 'fact' | 'opinion'): Question =>
   wordQ(rng, 'Fact or opinion?', answer, ['fact', 'opinion'], {
-    why: answer === 'fact' ? 'You could check it, so it is a fact.' : `"${markerOf(text)}" is a feeling, so it is an opinion.`,
+    why: answer === 'fact' ? 'You could check it, so it is a fact.' : `"${markerOf(text)}" is what someone thinks, so it is an opinion.`,
     visual: { type: 'sentence', text }, say: `${text} Fact or opinion?`, hint: 'Could you check it?', hintIsData: false,
   });
 
@@ -57,8 +57,8 @@ function anyOrderCard(rng: Rng): Question {
     .map((l, i) => ({ ...l, letter: 'ABC'[i] }));
   const kind = wantOpinion ? 'opinion' : 'fact';
   const prompt = `Slice every ${kind}`;
-  const marks = lines.filter(l => wantOpinion ? l.t : !l.t).map(l => `"${markerOf(l.s)}"`);   // #2318: the feeling words behind the opinions
-  const why = wantOpinion ? `${marks.join(' and ')} are feelings, so they are opinions.` : `${marks[0]} is a feeling, so it is an opinion.`;
+  const marks = [...new Set(lines.filter(l => wantOpinion ? l.t : !l.t).map(l => `"${markerOf(l.s)}"`))];   // #2318: the clue words behind the opinions, each once
+  const why = wantOpinion ? (marks.length > 1 ? `${marks.join(' and ')} are what people think, so they are opinions.` : `${marks[0]} is what someone thinks, so both are opinions.`) : `${marks[0]} is what someone thinks, so it is an opinion.`;
   return anyOrderQ(rng, prompt, lines.filter(l => l.t).map(l => l.letter), lines.filter(l => !l.t).map(l => l.letter), {
     why,
     visual: { type: 'sentence', text: lines.map(l => `${l.letter}  ${l.s}`).join('\n') },

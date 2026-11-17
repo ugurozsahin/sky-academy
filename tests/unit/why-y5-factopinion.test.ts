@@ -12,7 +12,7 @@ describe('y5-factopinion says why (#2318)', () => {
       const q = gen(d, rngOf(s));
       const text = (q.visual as { text: string }).text;
       if (q.answer === 'fact') { expect(q.why).toBe('You could check it, so it is a fact.'); continue; }
-      const m = q.why!.match(/^"(\w+)" is a feeling/)!;
+      const m = q.why!.match(/^"(\w+)" is what someone thinks/)!;
       expect(OPINION_MARKERS, q.why).toContain(m[1]);
       expect(wordsOf(text), q.why).toContain(m[1]);
     }
@@ -22,6 +22,7 @@ describe('y5-factopinion says why (#2318)', () => {
       const q = gen(3, rngOf(s));
       const words = [...q.why!.matchAll(/"(\w+)"/g)].map(m => m[1]);
       expect(words.length).toBeGreaterThan(0);
+      expect(new Set(words).size, q.why).toBe(words.length); // no clue word quoted twice
       for (const w of words) { expect(OPINION_MARKERS, q.why).toContain(w); expect(wordsOf((q.visual as { text: string }).text), q.why).toContain(w); }
     }
   });
