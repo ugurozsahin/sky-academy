@@ -22,21 +22,23 @@ function decoys(rng: Rng, answer: string, slips: string[]): string[] {
   return out;
 }
 
-const q = (rng: Rng, prompt: string, answer: string, slips: string[], say: string, hint: string): Question =>
-  wordQ(rng, prompt, answer, decoys(rng, answer, slips), { say, hint, hintIsData: false });
+const q = (rng: Rng, prompt: string, answer: string, slips: string[], say: string, hint: string, why: string): Question =>
+  wordQ(rng, prompt, answer, decoys(rng, answer, slips), { say, hint, hintIsData: false, why });
 
 function toMixed(rng: Rng): Question {
   const d = ri(rng, 2, 12), w = ri(rng, 1, 5), r = ri(rng, 1, d - 1), n = w * d + r, ans = mix(w, r, d);
   const lab = imp(n, d);
   return q(rng, `${lab} = ?`, ans, [mix(r, w, d), imp(n - d, d), mix(w + 1, r, d), mix(w, d - r, d), mix(w - 1, r, d), mix(w, r, d + 1)],
-    `${cap(ks2Say(lab))} equals what mixed number?`, 'How many whole ones fit in the top? What is left over?');
+    `${cap(ks2Say(lab))} equals what mixed number?`, 'How many whole ones fit in the top? What is left over?',
+    `${w} whole${w > 1 ? 's' : ''} use up ${w * d}/${d}, so ${r}/${d} is left over.`);
 }
 
 function toImproper(rng: Rng): Question {
   const d = ri(rng, 2, 12), w = ri(rng, 1, 5), r = ri(rng, 1, d - 1), ans = imp(w * d + r, d);
   const lab = mix(w, r, d);
   return q(rng, `${lab} = ?`, ans, [imp(w + r, d), imp(w * r + d, d), imp(w * d - r, d), imp(w * d + r, w * d), imp(w * d + r + 1, d), imp(w * d + r - 1, d)],
-    `${cap(ks2Say(lab))} equals what fraction?`, 'Whole × bottom, then add the top');
+    `${cap(ks2Say(lab))} equals what fraction?`, 'Whole × bottom, then add the top',
+    `${w} × ${d} = ${w * d}, then add ${r} on top.`);
 }
 
 function sumOver1(rng: Rng): Question {
@@ -46,7 +48,8 @@ function sumOver1(rng: Rng): Question {
     const w = Math.floor(t / d), r = t - w * d;
     const ans = mix(w, r, d), p = `${imp(a, d)} + ${imp(b, d)} = ?`;
     return q(rng, `${p} Write it as a mixed number.`, ans, [imp(t, d + d), mix(w + 1, r, d), mix(w, b, d), mix(w, a, d), mix(w, t, d), mix(w - 1, r, d)],
-      `${cap(ks2Say(p.replace(' = ?', '')))} equals what? Write it as a mixed number.`, 'Add the tops, then see how many wholes it makes');
+      `${cap(ks2Say(p.replace(' = ?', '')))} equals what? Write it as a mixed number.`, 'Add the tops, then see how many wholes it makes',
+      `${a} + ${b} = ${t} over ${d}: ${w} whole${w > 1 ? 's' : ''} and ${r}/${d}.`);
   }
 }
 
