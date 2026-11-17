@@ -17,10 +17,15 @@ function estimate(rng: () => number): Question {
     if (add ? a + b > 1000 || ans > 900 : a - b < 100) continue; // no 4-digit label (#1047 wants a comma)
     const decoys = [ans - 100, ans + 100, ans / 10, ans - 200, ans + 200].filter(v => v > 0 && v < 1000 && v !== ans);
     const sign = add ? '+' : MINUS;
-    return wordQ(rng, `About how much is ${a} ${sign} ${b}?`, String(ans), decoys.map(String),
+    const q = wordQ(rng, `About how much is ${a} ${sign} ${b}?`, String(ans), decoys.map(String),
       { say: `About how much is ${a} ${add ? 'plus' : 'minus'} ${b}?` });
+    return { ...q, why: `${a} is near ${hundred(a)} and ${b} is near ${hundred(b)}: ${hundred(a)} ${sign} ${hundred(b)} = ${ans}.` };   // #2318
   }
 }
+
+/** #2318: the inverse, worked out: take one part from the total, or add back what was taken. */
+const checkWhy = (add: boolean, a: number, b: number, c: number, other: number) =>
+  add ? `Take away one part: ${c} ${MINUS} ${other} = ${c - other}, the other part.` : `Add back what you took: ${c} + ${b} = ${a}.`;
 
 function check(d: Difficulty, rng: () => number): Question {
   for (;;) {
@@ -31,13 +36,15 @@ function check(d: Difficulty, rng: () => number): Question {
     if (c < 100 || c > 999 || a === b || b === 2 * a || a === 2 * b || (d === 3 && !columns(a, b, add))) continue;
     const sign = add ? '+' : MINUS;
     // `ans` is the calculation that checks it: c − b (or c − a, never both) for an addition, c + b for a subtraction.
-    const ans = add ? `${c} ${MINUS} ${rng() < 0.5 ? b : a}` : `${c} + ${b}`;
+    const other = rng() < 0.5 ? b : a;
+    const ans = add ? `${c} ${MINUS} ${other}` : `${c} + ${b}`;
     const decoys = add
       ? [`${a} + ${c}`, `${Math.max(a, b)} ${MINUS} ${Math.min(a, b)}`, `${c} + ${b}`]
       : [`${a} + ${c}`, `${a} + ${b}`, `${c} ${MINUS} ${b}`];
     const say = (s: string) => s.replace(MINUS, 'minus').replace('+', 'plus');
-    return wordQ(rng, `Which checks ${a} ${sign} ${b} = ${c}?`, ans, decoys,
+    const q = wordQ(rng, `Which checks ${a} ${sign} ${b} = ${c}?`, ans, decoys,
       { say: `Which calculation checks ${say(`${a} ${sign} ${b}`)} equals ${c}?` });
+    return { ...q, why: checkWhy(add, a, b, c, other) };
   }
 }
 

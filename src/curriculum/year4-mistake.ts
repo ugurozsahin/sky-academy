@@ -73,7 +73,11 @@ export const y4Mistake: Generator = (d: Difficulty, rng): Question => {
     const names = SAY.slice(0, cols).reverse();
     const say = `${ks2Say(sum)}. Which column has the mistake: ${names.slice(0, -1).join(', ')} or ${names[cols - 1]}?`;
     const card = wordQ(rng, 'Which column has the mistake?', LETTERS[w.col], options.filter(o => o !== LETTERS[w.col]), { visual: { type: 'sentence', text: sum }, say, hint: 'Check each column, ones first', hintIsData: false });
-    return { ...card, options, wide: false };
+    const r = add ? a + b : a - b, right = Math.floor(r / 10 ** w.col) % 10, shown = Math.floor(w.value / 10 ** w.col) % 10;
+    const why = w.kind === 'carry'
+      ? (add ? `The carry from the ${SAY[w.col - 1]} column was left out of the ${SAY[w.col]} column.` : `The ten taken from the ${SAY[w.col]} column was not crossed out.`)
+      : `The ${SAY[w.col]} column should be ${right}, not ${shown}.`;   // #2318
+    return { ...card, options, wide: false, why };
   }
   throw new Error(`y4-mistake: no card for d${d}`);
 };
