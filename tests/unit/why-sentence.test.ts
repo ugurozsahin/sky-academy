@@ -16,4 +16,14 @@ describe('sentence games say why (#2318)', () => {
       expect(q.why!.split(/\s+/).length).toBeLessThanOrEqual(8);
     }
   });
+
+  it('pins the wording of each mark', () => {
+    const seen = new Map<string, string>();
+    for (const id of ['r-sentence', 'y1-sentence', 'y2-sentence', 'y3-dictation']) for (let s = 1; s <= 200; s++) {
+      const q = gen(id)(2, rngOf(s)); seen.set(String(q.answer).slice(-1), q.why!);
+    }
+    expect(seen.get('.')).toMatch(/^Starts "[^"]+", ends with a full stop\.$/);
+    expect(seen.get('?')).toMatch(/^Starts "[^"]+", ends with a question mark\.$/);
+    expect(seen.get('!')).toMatch(/^Starts "[^"]+", ends with an exclamation mark\.$/);
+  });
 });
