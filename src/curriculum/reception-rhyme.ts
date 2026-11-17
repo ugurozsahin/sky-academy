@@ -35,7 +35,7 @@ export const rRhyme: Generator = (d, rng) => {
   const [word, rime] = pick(rng, R_RHYME_BANK);
   const target = key(rime);
   const mates = R_RHYME_BANK.filter(([w, r]) => r === rime && w !== word);
-  const [, , right] = pick(rng, mates);
+  const [mate, , right] = pick(rng, mates);
   const used = new Set<string>();
   const decoys: string[] = [];
   for (const [, r, e] of shuffle(rng, R_RHYME_BANK)) {
@@ -43,5 +43,6 @@ export const rRhyme: Generator = (d, rng) => {
     used.add(r); decoys.push(e);
   }
   const say = `Which picture rhymes with ${word}?`;
-  return wordQ(rng, say, right, decoys, { visual: { type: 'word', text: word }, say, hint: `Say ${word}. Which picture ends with the same sound?`, hintIsData: false });
+  const q = wordQ(rng, say, right, decoys, { visual: { type: 'word', text: word }, say, hint: `Say ${word}. Which picture ends with the same sound?`, hintIsData: false });
+  return { ...q, why: `${word} and ${mate} both end in -${rime}.` };   // #2318
 };

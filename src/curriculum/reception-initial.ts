@@ -36,12 +36,14 @@ export const rInitial: Generator = (d, rng) => {
   const [kw, kwEmoji] = pick(rng, d === 3 ? MANY : ONE);
   const visual = { type: 'word' as const, text: kw, emoji: kwEmoji };
   const hint = `Say ${kw} slowly. What sound does it start with?`;
-  const targets = shuffle(rng, matches(kw)).map(([, e]) => e);
+  const pairs = shuffle(rng, matches(kw));
+  const targets = pairs.map(([, e]) => e);
+  const why = `${kw} starts with ${kw[0]}: say it slowly.`;   // #2318
   if (d < 3) {
     const say = `Which picture starts like ${kw}?`;
-    return wordQ(rng, say, targets[0], decoys(rng, kw, d === 1 ? 2 : 3), { visual, say, hint, hintIsData: false });
+    return { ...wordQ(rng, say, targets[0], decoys(rng, kw, d === 1 ? 2 : 3), { visual, say, hint, hintIsData: false }), why: `${kw} and ${pairs[0][0]} start with the ${kw[0]} sound.` };
   }
   const t = rng() < 0.5 ? 2 : 3;
   const say = `Slice every picture that starts like ${kw}`;
-  return anyOrderQ(rng, say, targets.slice(0, t), decoys(rng, kw, 5 - t), { visual, say, hint, hintIsData: false });
+  return { ...anyOrderQ(rng, say, targets.slice(0, t), decoys(rng, kw, 5 - t), { visual, say, hint, hintIsData: false }), why };
 };
