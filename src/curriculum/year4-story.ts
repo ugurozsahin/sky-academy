@@ -71,7 +71,9 @@ export const y4Story: Generator = (d, rng): Question => {
     const ds = decoys(d, ops, n, rng);
     if (!ds) continue;
     const label = (v: number) => unit ? `${f(v)} ${unit}` : f(v);
-    const card = wordQ(rng, story(false), label(n.answer), ds.map(label), { say: story(true) });
+    // #2318: the number sentence of each step (no unit: the spoken why would mispronounce "ml"), e.g. "850 + 120 = 970, then 970 - 340 = 630".
+    const why = `${f(n.a)} ${ops[0]} ${f(n.b)} = ${f(n.mid)}, then ${f(n.mid)} ${ops[1]} ${f(n.c)} = ${f(n.answer)}`;
+    const card = wordQ(rng, story(false), label(n.answer), ds.map(label), { say: story(true), why });
     return d === 3 ? { ...card, slow: true } : card;
   }
 };
