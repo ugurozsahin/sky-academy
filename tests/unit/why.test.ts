@@ -64,3 +64,11 @@ describe('the contraction why names the letters left out (#2318)', () => {
     expect(contractionWhy(s, l)).toBe(`${s} is ${l}, with ${gap} left out.`);
   });
 });
+
+describe('the y5-mixed why agrees its verb with the wholes', () => {
+  it('1 whole uses, 2 wholes use', async () => {
+    const { mixedWhy } = await import('../../src/curriculum/year5-mixed');
+    expect(mixedWhy(1, 4, 3)).toBe('1 whole uses up 4/4, so 3/4 is left over.');
+    expect(mixedWhy(2, 4, 3)).toBe('2 wholes use up 8/4, so 3/4 is left over.');
+  });
+});
