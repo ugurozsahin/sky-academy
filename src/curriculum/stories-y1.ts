@@ -34,7 +34,7 @@ export const Y1_STORIES: StoryItem[] = [
   lit(1, SHOP, 'Who went to the shop with Ben?', 'Dad', ['Mum', 'Gran'], 'with Dad'),
   lit(2, SHOP, 'Where did Ben go?', 'shop', ['park', 'farm'], 'went to the shop'),
   lit(2, SHOP, 'What did Ben carry?', 'eggs', ['milk', 'loaf'], 'Ben carried the eggs'),
-  lit(1, SNOW, 'Who ran out to play?', 'Lily', ['Mum', 'Tom'], 'Lily put on her coat, hat and gloves. Then she ran out'),
+  lit(1, SNOW, 'Who ran out to play?', 'Lily', ['Mum', 'Tom'], 'Lily put on her coat, hat and gloves'),
   inf(SNOW, 'What is the weather like?', 'cold', ['hot', 'warm'], 'coat, hat and gloves'),
   lit(1, BED, 'Who turns off the light?', 'Mum', ['Jack', 'Dad'], 'Mum turns off the light'),
   lit(2, BED, 'Where is Jack?', 'bed', ['car', 'bath'], 'Jack is in bed'),
@@ -52,4 +52,4 @@ export const Y1_STORIES: StoryItem[] = [
   inf(PUP, 'How is the pup now?', 'muddy', ['sleepy', 'hungry'], 'The pup ran in the mud'),
 ];
 
-export const y1StoryTime = colourBubbles(storyGen(Y1_STORIES));
+export const y1StoryTime = colourBubbles(storyGen(Y1_STORIES, true));
