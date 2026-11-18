@@ -138,5 +138,7 @@ export const y2Patterns: Generator = (d, rng) => {
     visual: { type: 'strip', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
     say: last ? 'Look at the pattern. What comes next?' : 'Look at the pattern. Which one is missing?',
     hint: last ? 'Slice what comes next' : 'Slice the missing one', hintIsData: false,
+    // The repeating part is the reason; it is at most three objects, so it fits the KS1 limit of eight words.
+    why: `The pattern repeats ${unit.join(' ')}.`,
   });
 };
