@@ -11,6 +11,7 @@ describe('y4-retrieve why (#2318)', () => {
     for (const item of Y4_NONFICTION) {
       const q = storyBankQ(item, rng(1), true);
       expect(q.why, item.question).toBe(`"${item.evidence}"`);
+      expect(item.evidence.toLowerCase(), item.question).toContain(item.answer.toLowerCase());
       expect(item.story, item.question).toContain(item.evidence);
       expect(item.evidence.split(/\s+/).length, item.evidence).toBeLessThanOrEqual(12);
     }
