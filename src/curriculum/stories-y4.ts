@@ -19,7 +19,7 @@ const lit = (d: 1 | 2 | 3, story: string, question: string, answer: string, deco
   ({ story, question, answer, decoys, evidence, kind: 'literal', d });
 
 export const Y4_NONFICTION: StoryItem[] = [
-  lit(1, ROMANS, 'Who built straight roads?', 'Romans', ['Vikings', 'Saxons'], 'The Romans came to Britain nearly two thousand years ago. They built straight roads'),
+  lit(1, ROMANS, 'Who built straight roads?', 'Romans', ['Vikings', 'Saxons'], 'They built straight roads'),
   lit(2, ROMANS, 'How many thousand years ago did the Romans come?', 'two', ['five', 'ten'], 'nearly two thousand years ago'),
   lit(3, ROMANS, 'What did the Romans build to wash in?', 'baths', ['wells', 'ponds'], 'warm baths'),
   lit(1, VOLCANO, 'What bursts out of a volcano with the ash?', 'lava', ['water', 'wind'], 'Hot lava and ash burst out'),
@@ -51,4 +51,4 @@ export const Y4_NONFICTION: StoryItem[] = [
   lit(3, THAMES, 'Who do boats carry along the river?', 'people', ['pirates', 'knights'], 'Boats carry people'),
 ];
 
-export const y4Retrieve = colourBubbles(storyGen(Y4_NONFICTION));
+export const y4Retrieve = colourBubbles(storyGen(Y4_NONFICTION, true));
