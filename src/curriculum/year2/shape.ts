@@ -119,6 +119,7 @@ export const y2Symmetry: Generator = (d, rng) => {
  * and a pattern showing only one period leaves "what comes next" genuinely open.
  */
 const PATTERN_GLYPHS = PATTERN_OBJECTS.map(([g]) => g);
+const NAME_OF = new Map(PATTERN_OBJECTS);
 /** Unit shapes as letters: which positions repeat, filled with objects at generation time. */
 const UNITS_D1 = ['AB', 'ABC'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
 export const y2Patterns: Generator = (d, rng) => {
@@ -138,5 +139,8 @@ export const y2Patterns: Generator = (d, rng) => {
     visual: { type: 'strip', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
     say: last ? 'Look at the pattern. What comes next?' : 'Look at the pattern. Which one is missing?',
     hint: last ? 'Slice what comes next' : 'Slice the missing one', hintIsData: false,
+    // The repeating part is the reason, in object names: `why` is spoken, and a speech engine reads a glyph by its
+    // colour or skips it. At most three names, so it fits the KS1 limit of eight words.
+    why: `The pattern repeats ${unit.map(o => NAME_OF.get(o)).join(', ')}.`,
   });
 };
