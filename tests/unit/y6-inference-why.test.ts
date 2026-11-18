@@ -7,13 +7,17 @@ import type { Difficulty, Rng } from '../../src/curriculum';
 const rng = (seed: number): Rng => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 
 describe('y6-inference why (#2318)', () => {
-  it('every bank item quotes its evidence, inside the KS2 twelve-word limit', () => {
+  it('every bank item quotes its evidence, inside the twelve-word limit', () => {
     for (const item of Y6_INFERENCE) {
       const q = storyBankQ(item, rng(1), true);
       expect(q.why, item.question).toBe(`"${item.evidence}"`);
       expect(item.story, item.question).toContain(item.evidence);
       expect(item.evidence.split(/\s+/).length, item.evidence).toBeLessThanOrEqual(12);
     }
+  });
+  it('the Priya question quotes the sentence that explains the hiding (#2691 review)', () => {
+    const item = Y6_INFERENCE.find(i => i.question.startsWith('Why did Priya'))!;
+    expect(storyBankQ(item, rng(1), true).why).toContain('Gran was coming for tea');
   });
   it('without the switch a story question has no why', () => {
     expect(storyBankQ(Y6_INFERENCE[0], rng(1)).why).toBeUndefined();
