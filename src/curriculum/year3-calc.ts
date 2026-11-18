@@ -79,18 +79,19 @@ export const Y3_STORY = {
 export const y3Story: Generator = (d, rng) => {
   const kind = pick(rng, d === 1 ? ['scale'] : d === 2 ? ['pairs', 'share'] : ['scale', 'pairs']);
   const w = (n: number, spoken: boolean) => spoken ? numberWord(n) : `${n}`; // the spoken form says the numbers in words
-  let unit = '', ans: number, add: number, near: number[], text: (spoken: boolean) => string;
+  let unit = '', ans: number, add: number, near: number[], why: string, text: (spoken: boolean) => string;
   if (kind === 'scale') {
     const [u, s1, s2, ask] = pick(rng, Y3_STORY.scale), k = d === 3 ? 8 : pick(rng, [2, 3, 4, 5, 10]), a = ri(rng, 2, Math.floor(100 / k));
-    unit = u; ans = a * k; add = a + k; near = [ans + k, ans - k, ans + a, ans - a, k];
+    unit = u; ans = a * k; add = a + k; near = [ans + k, ans - k, ans + a, ans - a, k]; why = `${a} × ${k} = ${ans}`;
     text = sp => [s1.replace('#', u ? `${w(a, sp)} ${sp ? UNIT_WORD[u] : u}` : w(a, sp)), s2.replace('#', w(k, sp)), ask].join(' ');
   } else if (kind === 'pairs') {
     const [x, y, z] = pick(rng, Y3_STORY.pairs), n = ri(rng, 2, 6), m = ri(rng, 2, 6);
     ans = d === 3 ? m : n * m; add = d === 3 ? n * m - n : n + m; near = d === 3 ? [m + n, m - n, n, m + 1, m - 1] : [ans + n, ans - n, ans + m, ans - m];
+    why = d === 3 ? `${n * m} ÷ ${n} = ${m}` : `${n} × ${m} = ${ans}`;
     text = sp => d === 3 ? `${w(n * m, sp)} ${z} from ${w(n, sp)} ${x}. How many ${y}?` : `${w(n, sp)} ${x} and ${w(m, sp)} ${y}. How many ${z}?`;
   } else {
     const [thing, who, ask] = pick(rng, Y3_STORY.share), g = pick(rng, [3, 4, 8]), e = ri(rng, 2, 12);
-    ans = e; add = g * e - g; near = [e + g, e - g, g, e + 1, e - 1];
+    ans = e; add = g * e - g; near = [e + g, e - g, g, e + 1, e - 1]; why = `${g * e} ÷ ${g} = ${e}`;
     text = sp => `${w(g * e, sp)} ${thing} shared equally between ${w(g, sp)} ${who}. ${ask}`;
   }
   // #1058: the adding slip first, then one decoy sharing the answer's units digit and one its leading digit, then the rest of `near`
@@ -100,7 +101,7 @@ export const y3Story: Generator = (d, rng) => {
   need(v => String(v)[0] === String(ans)[0], [...near, ans + 1, ans - 1, ans + 2, ans - 2, ans / 10]);
   for (const v of [...near, ...nearby(rng, ans, 6, 0, 100)]) if (out.length < 3 && ok(v, out)) out.push(v);
   const label = (v: number) => unit ? `${v} ${unit}` : `${v}`;
-  return wordQ(rng, text(false), label(ans), out.slice(0, 3).map(label), { say: text(true) });
+  return wordQ(rng, text(false), label(ans), out.slice(0, 3).map(label), { say: text(true), why });   // #2318: the number sentence that solves it (no unit: the spoken why would mispronounce "ml")
 };
 
 export const Y3_CALC: Topic[] = [
