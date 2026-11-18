@@ -215,3 +215,18 @@ describe('y1-alien (#982): Real or Alien?, both banks hand-curated', () => {
 // word" cards exist there), and either 1 real + 3 alien or 3 real + 1 alien at d3 (never both shapes for the same
 // set, since the counts differ). The answer is always the set's unique minority-bank member, so a set can only ever
 // recur with the one answer it was drawn with.
+
+describe('y1-alien why (#2318): spoken after a wrong slice, so it names no word', () => {
+  it('never contains an option, since TTS mispronounces the pseudo-words (#893)', () => {
+    const t = TOPICS.find(x => x.id === 'y1-alien')!;
+    let seed = 1;
+    const rng = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+      const q = t.gen(d, rng);
+      expect(q.why).toBeTruthy();
+      const said = q.why!.toLowerCase().match(/[a-z]+/g)!;
+      // whole words only: "out" is a real option at d3 and "Sound it out" is the sentence
+      for (const o of q.options.filter(x => x !== 'out')) expect(said, `${q.why} names ${o}`).not.toContain(o.toLowerCase());
+    }
+  });
+});

@@ -393,14 +393,14 @@ const y1Alien: Generator = (d, rng) => {
     const decoys = shuffle(rng, reals).slice(0, n - 1);
     return wordQ(rng, 'Which one is the alien word? 👾', target, decoys, {
       say: `${cap(numberWord(decoys.length))} of these ${decoys.length === 1 ? 'is a real word' : 'are real words'}. Slice the alien word 👾!`,
-      hint: 'Which one is not a real word?', hintIsData: false, why: `Say it: ${target} is not a real word.`,   // #2318
+      hint: 'Which one is not a real word?', hintIsData: false, why: 'Sound it out: alien words mean nothing.',
     });
   }
   const target = pick(rng, reals);
   const decoys = shuffle(rng, fakes).slice(0, n - 1);
   return wordQ(rng, 'Which one is the real word?', target, decoys, {
     say: `${cap(numberWord(decoys.length))} of these ${decoys.length === 1 ? 'is an alien word' : 'are alien words'}. Slice the real word!`,
-    hint: 'Which one is a real word?', hintIsData: false, why: `Say it: ${target} is a real word.`,   // #2318
+    hint: 'Which one is a real word?', hintIsData: false, why: 'Sound it out: a real word makes sense.',
   });
 };
 const y1Spelling: Generator = (d, rng) => {
