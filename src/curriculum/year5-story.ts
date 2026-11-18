@@ -82,7 +82,9 @@ export const y5Story: Generator = (d, rng): Question => {
     if (prompt.length > MAX) continue; // three lines at 390 px (#1051; the test measures it)
     const ds = decoys(d, ops, n, rng);
     if (!ds) continue;
-    const card = wordQ(rng, prompt, f(n.runs[n.runs.length - 1]), ds.map(f), { say: prompt });
+    // #2318: the whole number sentence, left to right, e.g. "6,500 - 1,200 + 800 = 6,100".
+    const why = `${f(n.vals[0])} ${ops.map((op, k) => `${op} ${f(n.vals[k + 1])}`).join(' ')} = ${f(n.runs[n.runs.length - 1])}`;
+    const card = wordQ(rng, prompt, f(n.runs[n.runs.length - 1]), ds.map(f), { say: prompt, why });
     return d === 3 ? { ...card, slow: true } : card;
   }
   throw new Error(`y5-story: no card fits at d${d}`);
