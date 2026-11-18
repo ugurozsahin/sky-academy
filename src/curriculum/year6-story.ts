@@ -61,7 +61,9 @@ function story(d: Difficulty, rng: Rng): Question {
     const ok = (v: number) => Number.isInteger(v) && v >= 1 && v <= max;
     const ds = decoys(named.filter(ok).map(f), fills.filter(ok).map(f), f(answer));
     if (ds.length < 3 || !ds.includes(f(early))) continue;
-    return wordQ(rng, prompt, f(answer), ds, { say: q(prompt).say });
+    // #2318: the whole number sentence, left to right, e.g. "6,500 - 1,200 + 800 = 6,100".
+    const why = `${f(n.vals[0])} ${ops[0]} ${f(n.vals[1])} ${ops[1]} ${f(c)} = ${f(answer)}`;
+    return wordQ(rng, prompt, f(answer), ds, { say: q(prompt).say, why });
   }
   throw new Error(`y6-story: no card fits at d${d}`);
 }
@@ -89,7 +91,9 @@ function estimate(rng: Rng): Question {
     const named = [est * 10, est / 10, apply(round(a, pa), op, b), apply(a, op, round(b, pb))];
     const fills = shuffle(rng, [100, 1000, 200, 500].flatMap(m => [est + m, est - m]));
     const ds = decoys(named.filter(v => v > 0 && v !== est).map(f), fills.filter(v => v > 0).map(f), f(est));
-    return { ...wordQ(rng, prompt, f(est), ds, { say: q(prompt).say }), slow: true };
+    // #2318: the rounded sum, e.g. "380 × 20 = 7,600".
+    const why = `${f(round(a, pa))} ${op === '-' ? '-' : op} ${f(round(b, pb))} = ${f(est)}`;
+    return { ...wordQ(rng, prompt, f(est), ds, { say: q(prompt).say, why }), slow: true };
   }
 }
 
