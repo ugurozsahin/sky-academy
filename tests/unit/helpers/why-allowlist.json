@@ -1,16 +1,12 @@
 [
-"r-storytime",
-"r-read",
-"r-trace",
-"y1-story",
-"y1-trace",
-"y1-tracenum",
-
-
-"y2-trace",
-"y4-story-md",
-"y5-story-md",
-"y5-story-measure",
-
-"y6-inference"
+  "r-storytime",
+  "r-read",
+  "r-trace",
+  "y1-story",
+  "y1-trace",
+  "y1-tracenum",
+  "y2-trace",
+  "y4-story-md",
+  "y5-story-md",
+  "y5-story-measure"
 ]

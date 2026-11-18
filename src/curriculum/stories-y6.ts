@@ -71,4 +71,4 @@ export const NOT_DECOYS: Record<string, string[]> = {
   'Why did Ben hurry indoors?': ['fear'],
 };
 
-export const y6Inference = storyGen(Y6_INFERENCE);
+export const y6Inference = storyGen(Y6_INFERENCE, true);
