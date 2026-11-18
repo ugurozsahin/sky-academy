@@ -108,11 +108,18 @@ export const decoyPool = ([s, , cat, answer, not = []]: InferItem): string[] => 
   return Object.keys(CATEGORIES[cat]).filter(a => a !== answer && !not.includes(a) && !clued.includes(a));
 };
 
+/** The reason after a wrong slice (#2318): the clue word in the sentence that points to the answer. */
+export const clueWhy = ([s, , cat, answer]: InferItem): string => {
+  const clue = wordsOf(s).find(w => CATEGORIES[cat][answer].includes(w));
+  return clue ? `"${clue}" is the clue: ${answer}` : `The clue points to: ${answer}`;
+};
+
 /** d1: how someone feels, 3 bubbles · d2: adds weather and place, 4 · d3: adds what happened just before, 4. */
 export const y2Infer: Generator = (d: Difficulty, rng) => {
   const item = pick(rng, INFER_BANK.filter(i => LADDER[d].includes(i[2])));
   const [s, question, , answer] = item;
   return wordQ(rng, question, answer, shuffle(rng, decoyPool(item)).slice(0, d === 1 ? 2 : 3), {
     visual: { type: 'sentence', text: s }, say: `${s} ${question}`, hint: 'Look for the clue', hintIsData: false,
+    why: clueWhy(item),
   });
 };
