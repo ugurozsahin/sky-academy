@@ -17,15 +17,18 @@ export interface StoryItem {
 export const STORY_MAX_CHARS = 160;
 
 /** A generator drawing an item of the asked difficulty (the nearest one when the bank has none). */
-export function storyGen(bank: readonly StoryItem[]): Generator {
+export function storyGen(bank: readonly StoryItem[], withWhy = false): Generator {
   return (d: Difficulty, rng: Rng) => {
     const own = bank.filter(i => i.d === d);
-    return storyBankQ(pick(rng, own.length ? own : bank), rng);
+    return storyBankQ(pick(rng, own.length ? own : bank), rng, withWhy);
   };
 }
 
-export function storyBankQ(item: StoryItem, rng: Rng): Question {
-  return wordQ(rng, item.question, item.answer, item.decoys, { say: `${item.story} ${item.question}`, story: item.story });
+/** With `withWhy` (#2318) the reason after a wrong slice is the words of the story that settle it. */
+export function storyBankQ(item: StoryItem, rng: Rng, withWhy = false): Question {
+  return wordQ(rng, item.question, item.answer, item.decoys, {
+    say: `${item.story} ${item.question}`, story: item.story, ...(withWhy ? { why: `"${item.evidence}"` } : {}),
+  });
 }
 
 const words = (s: string): string[] => s.toLowerCase().match(/[a-z']+/g) ?? [];
