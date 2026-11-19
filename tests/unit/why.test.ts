@@ -45,6 +45,10 @@ describe('every topic has a why or is on the allow-list (#2316)', () => {
   it('the allow-list names only real topics', () => {
     for (const id of listed) expect(TOPICS.some(t => t.id === id), id).toBe(true);
   });
+  // The named reason for every id on the list (#2318): a tracing card has no answer to explain, so no wrong slice ever shows a why.
+  it('the allow-list holds only tracing topics, which have no answer to explain', () => {
+    for (const id of listed) expect(TOPICS.find(t => t.id === id)?.input, `${id}: say why it has no why, or give it one`).toBe('tracing');
+  });
   for (const t of TOPICS) {
     it(`${t.id}: ${listed.has(t.id) ? 'on the allow-list, so some question still has no why' : 'sets a short why on every question'}`, () => {
       const qs = draws(t);
