@@ -86,8 +86,9 @@ function distributive(rng: Rng): Question {
   const answer = partial ? up : whole;
   const wrong = partial ? [tp, whole] : [tp, up];
     const options = decoyValues(rng, answer, wrong).map(f);
-  return partial ? wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt) })
-    : wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt), hint: 'Split into tens and ones, multiply each', hintIsData: false });
+  const why = partial ? `${f(tp)} + ${f(up)} = ${f(whole)}, so ${f(up)}` : `${f(t * 10)} × ${f(m)} = ${f(tp)}, ${f(u)} × ${f(m)} = ${f(up)}, ${f(tp)} + ${f(up)} = ${f(whole)}`;
+  return partial ? wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt), why })
+    : wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt), hint: 'Split into tens and ones, multiply each', hintIsData: false, why });
 }
 
 function scaling(rng: Rng): Question {
@@ -95,7 +96,7 @@ function scaling(rng: Rng): Question {
     const [unit, text] = pick(rng, SCALING), a = ri(rng, 2, 12), b = ri(rng, 2, 12);
     if (a === b) continue; // a + b would equal a × b at 2 and 2; equal numbers read as a trick
     const prompt = text.replace('{a}', f(a)).replace('{b}', f(b));
-    return wordQ(rng, prompt, label(a * b, unit), decoyValues(rng, a * b, [a + b]).map(v => label(v, unit)), { say: ks2Say(prompt) });
+    return wordQ(rng, prompt, label(a * b, unit), decoyValues(rng, a * b, [a + b]).map(v => label(v, unit)), { say: ks2Say(prompt), why: `${f(a)} × ${f(b)} = ${f(a * b)}` });
   }
 }
 
@@ -106,7 +107,8 @@ function counting(rng: Rng): Question {
     const answer = kind === 'cor' ? a * b : a * b + c;
     const prompt = text.replace('{a}', f(a)).replace('{b}', f(b)).replace('{c}', f(c));
     const wrong = kind === 'cor' ? [a + b] : [a * b, a * b * c];
-    return wordQ(rng, prompt, f(answer), decoyValues(rng, answer, wrong).map(f), { say: ks2Say(prompt) });
+    const why = kind === 'cor' ? `${f(a)} × ${f(b)} = ${f(answer)}` : `${f(a)} × ${f(b)} = ${f(a * b)}, ${f(a * b)} + ${f(c)} = ${f(answer)}`;
+    return wordQ(rng, prompt, f(answer), decoyValues(rng, answer, wrong).map(f), { say: ks2Say(prompt), why });
   }
 }
 
