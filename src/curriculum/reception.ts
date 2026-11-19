@@ -395,7 +395,7 @@ const rRead: Generator = (d, rng) => {
     const candidates = d === 1 ? rest.filter(([ow]) => ow[0] !== w[0]) : rest;
     decoyWords = shuffle(rng, candidates).slice(0, d === 1 ? 2 : 3);
   }
-  return wordQ(rng, 'Read it!', e, decoyWords.map(([, em]) => em), { visual: { type: 'word', text: w }, say: 'Read the word. Slice its picture.' });
+  return wordQ(rng, 'Read it!', e, decoyWords.map(([, em]) => em), { visual: { type: 'word', text: w }, say: 'Read the word. Slice its picture.', why: `Blend the sounds: it says ${w}.` });
 };
 // Tracing is letter *formation*, so difficulty 3 keeps the whole alphabet — a child learns to write `q` and
 // the handwriting ELG covers all 26, whatever phase the sound belongs to. Stages 1 and 2 still follow the
