@@ -6,36 +6,36 @@ import { ri, pick, wordQ } from './util';
 import { dec, fmt } from './ks2num';
 import { ks2Say } from './ks2say';
 
-interface Draw { nums: number[]; answer: number; oneStep: number; wrongOp: number }
+interface Draw { nums: number[]; answer: number; oneStep: number; wrongOp: number; why: (l: (v: number) => string) => string }
 interface Template { text: string; money?: boolean; draw: (rng: Rng) => Draw }
 
 const pickOf = (rng: Rng, xs: number[]) => pick(rng, xs);
 /** A scaling problem "p of something is v; how much for q?": numbers [p, p×u, q]. */
 function scale(rng: Rng, ps: number[], us: number[], ms: number[]): Draw {
   const p = pickOf(rng, ps), u = pickOf(rng, us), q = p * pickOf(rng, ms), v = p * u;
-  return { nums: [p, v, q], answer: u * q, oneStep: u, wrongOp: v + (q - p) };
+  return { nums: [p, v, q], answer: u * q, oneStep: u, wrongOp: v + (q - p), why: l => `${l(v)} ÷ ${p} = ${l(u)}, ${l(u)} × ${q} = ${l(u * q)}` };
 }
 /** "A rate for t units is v; how much for q?" with q not a multiple of t. */
 function rate3(rng: Rng, ts: number[], us: number[], qs: number[]): Draw {
   const t = pickOf(rng, ts), u = pickOf(rng, us);
   let q = pickOf(rng, qs); while (q === t) q = pickOf(rng, qs);
-  return { nums: [t, t * u, q], answer: u * q, oneStep: u, wrongOp: t * u + (q - t) };
+  return { nums: [t, t * u, q], answer: u * q, oneStep: u, wrongOp: t * u + (q - t), why: l => `${l(t * u)} ÷ ${t} = ${l(u)}, ${l(u)} × ${q} = ${l(u * q)}` };
 }
 /** A fraction k/n of a whole n×m: numbers [n×m]. */
 function share(rng: Rng, n: number, k: number, ms: number[]): Draw {
   const m = pickOf(rng, ms), whole = n * m;
-  return { nums: [whole], answer: k * m, oneStep: m, wrongOp: whole * n };
+  return { nums: [whole], answer: k * m, oneStep: m, wrongOp: whole * n, why: l => k === 1 ? `${l(whole)} ÷ ${n} = ${l(m)}` : `${l(whole)} ÷ ${n} = ${l(m)}, ${l(m)} × ${k} = ${l(k * m)}` };
 }
 function unitRate(rng: Rng, ns: number[], us: number[], countFirst = false): Draw {
   const n = pickOf(rng, ns), u = pickOf(rng, us);
-  return { nums: countFirst ? [n, n * u] : [n * u, n], answer: u, oneStep: n * u * n, wrongOp: n * u - n };
+  return { nums: countFirst ? [n, n * u] : [n * u, n], answer: u, oneStep: n * u * n, wrongOp: n * u - n, why: l => `${l(n * u)} ÷ ${n} = ${l(u)}` };
 }
 
 /** [d1 ×4, d2 ×4, d3 ×4]. The prompt is the text with each `#` filled from `nums` in order. */
 export const BANK: Template[][] = [
   [
     { text: 'A recipe for # uses # g of flour. How much for #?', draw: r => scale(r, [2, 3, 4, 5, 6], [25, 50, 75, 100, 150], [2, 3, 4, 5]) },
-    { text: 'A pump moves # litres a minute. How many litres in # minutes?', draw: r => { const a = ri(r, 12, 90), t = ri(r, 3, 12); return { nums: [a, t], answer: a * t, oneStep: a, wrongOp: a + t }; } },
+    { text: 'A pump moves # litres a minute. How many litres in # minutes?', draw: r => { const a = ri(r, 12, 90), t = ri(r, 3, 12); return { nums: [a, t], answer: a * t, oneStep: a, wrongOp: a + t, why: l => `${l(a)} × ${t} = ${l(a * t)}` }; } },
     { text: '# pens cost £#. How much do # pens cost?', money: true, draw: r => scale(r, [2, 3, 4, 5], [2, 3, 4, 5, 6, 8, 9], [2, 3, 4, 5]) },
     { text: 'A car uses # litres to go # km. How far on # litres?', draw: r => scale(r, [2, 3, 4, 5], [12, 15, 18, 20, 25], [2, 3, 4, 5]) },
   ],
@@ -83,6 +83,6 @@ export const y5StoryMd: Generator = (d: Difficulty, rng): Question => {
   const prompt = t.text.replace(/#/g, () => fmt(dec(w.nums[i++], 0)));
   const ds = decoys(w);
   if (ds.length < 3 || prompt.length > MAX) throw new Error(`y5-story-md: no card fits at d${d}`);
-  const card = wordQ(rng, prompt, lab(w.answer, t.money), ds.map(v => lab(v, t.money)), { say: ks2Say(prompt) });
+  const card = wordQ(rng, prompt, lab(w.answer, t.money), ds.map(v => lab(v, t.money)), { say: ks2Say(prompt), why: w.why(v => lab(v, t.money)) });
   return d === 3 ? { ...card, slow: true } : card;
 };
