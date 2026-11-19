@@ -12,12 +12,12 @@ describe('y4-story-md says why (#2318)', () => {
       const q = gen(d, rngOf(s));
       const why = q.why!;
       expect(why, `d${d} seed ${s}`).toBeTruthy();
-      expect(why.split(/\s+/).length, why).toBeLessThanOrEqual(16);
+      expect(why.split(/\s+/).length, why).toBeLessThanOrEqual(14);
       const nums = why.match(/\d[\d,]*/g)!.map(num);
-      // each "a × b = c" / "a + b = c" chain link is true
-      for (const m of why.matchAll(/(\d[\d,]*) ([×+]) (\d[\d,]*) = (\d[\d,]*)/g)) {
-        const [a, b, c] = [num(m[1]), num(m[3]), num(m[4])];
-        expect(m[2] === '×' ? a * b : a + b, why).toBe(c);
+      // every "x = y = z" chain: each side evaluates (× before +) to one value
+      for (const link of why.split(', ')) {
+        const vals = link.split(' = ').map(side => side.split(' + ').reduce((sum, term) => sum + term.split(' × ').reduce((p, n) => p * num(n), 1), 0));
+        if (vals.length > 1) expect(new Set(vals).size, why).toBe(1);
       }
       const answer = num(q.answer.replace(/[^\d,]/g, ''));
       expect(nums, why).toContain(answer);

@@ -86,7 +86,7 @@ function distributive(rng: Rng): Question {
   const answer = partial ? up : whole;
   const wrong = partial ? [tp, whole] : [tp, up];
     const options = decoyValues(rng, answer, wrong).map(f);
-  const why = partial ? `${f(tp)} + ${f(up)} = ${f(whole)}, so ${f(up)}` : `${f(t * 10)} × ${f(m)} = ${f(tp)}, ${f(u)} × ${f(m)} = ${f(up)}, ${f(tp)} + ${f(up)} = ${f(whole)}`;
+  const why = partial ? `${f(tp)} + ${f(up)} = ${f(whole)}, so ${f(up)}` : `${f(t * 10)} × ${f(m)} + ${f(u)} × ${f(m)} = ${f(tp)} + ${f(up)} = ${f(whole)}`;
   return partial ? wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt), why })
     : wordQ(rng, prompt, f(answer), options, { say: ks2Say(prompt), hint: 'Split into tens and ones, multiply each', hintIsData: false, why });
 }
