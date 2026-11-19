@@ -88,16 +88,16 @@ const y1Story: Generator = (d, rng) => {
     // out exactly the `eaten` group (review finding) leaves the stated `left` count showing normally, the
     // same cross-out `fiveFrames()` already draws for an ordinary take-away — a bare `n: a` with no `n2` (the
     // first version of this branch) drew a uniform group with nothing for the story's "are left" to point at.
-    return numQ(rng, p, eaten, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -eaten }, distractors: [a + left, a, eaten + 1, eaten - 1] });
+    return numQ(rng, p, eaten, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -eaten }, distractors: [a + left, a, eaten + 1, eaten - 1], why: `${a} − ${left} = ${eaten}` });
   }
   if (kind === 1) {
     const a = ri(rng, 4, max), b = ri(rng, 2, a - 2), answer = a - b;
     const p = `${a} ${bank.noun}${d === 1 ? '' : ' ' + bank.place}. ${b} ${bank.leave}. How many${d === 1 ? '' : ' now'}?`;
-    return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -b }, distractors: [a + b, a, answer + 1, answer - 1] });
+    return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -b }, distractors: [a + b, a, answer + 1, answer - 1], why: `${a} − ${b} = ${answer}` });
   }
   const a = ri(rng, 2, max - 2), b = ri(rng, 2, max - a), answer = a + b;
   const p = `${a} ${bank.noun}${d === 1 ? '' : ' ' + bank.place}. ${b} ${bank.join}. How many${d === 1 ? '' : ' now'}?`;
-  return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: b }, distractors: [Math.abs(a - b), Math.max(a, b), answer + 1, answer - 1] });
+  return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: b }, distractors: [Math.abs(a - b), Math.max(a, b), answer + 1, answer - 1], why: `${a} + ${b} = ${answer}` });
 };
 const y1Sub: Generator = (d, rng) => {
   const max = d === 1 ? 10 : d === 2 ? 15 : 20;
