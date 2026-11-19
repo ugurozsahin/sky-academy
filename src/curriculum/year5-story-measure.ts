@@ -9,7 +9,7 @@ import { ks2Say } from './ks2say';
 
 /** How a template writes a number: `q` a plain decimal, `m` a money amount in pence (dp 2). */
 interface Fmt { q: (d: Dec) => string; m: (d: Dec) => string }
-interface Draw { text: (f: Fmt) => string; answer: Dec; cands: Dec[]; money?: boolean }
+interface Draw { text: (f: Fmt) => string; why: (f: Fmt) => string; answer: Dec; cands: Dec[]; money?: boolean }
 
 const moneyLabel = (d: Dec) => '£' + fmt(d, { fixedDp: 2 });
 function moneySay(d: Dec): string {
@@ -30,53 +30,53 @@ const small = (a: Dec) => divPow10(a, 1);
 // d1: one step, add or subtract tenths of one unit.
 const sub = (name: (a: string, b: string) => string) => (rng: Rng): Draw => {
   const a = ri(rng, 20, 99), b = ri(rng, 3, a - 8), A = tenths(a), B = tenths(b), ans = subDec(A, B);
-  return { text: f => name(f.q(A), f.q(B)), answer: ans, cands: [shift(ans), addDec(A, B), small(ans)] };
+  return { text: f => name(f.q(A), f.q(B)), why: f => `${f.q(A)} - ${f.q(B)} = ${f.q(ans)}`, answer: ans, cands: [shift(ans), addDec(A, B), small(ans)] };
 };
 const add = (name: (a: string, b: string) => string) => (rng: Rng): Draw => {
   const a = ri(rng, 6, 59), b = ri(rng, 6, 59), A = tenths(a), B = tenths(b), ans = addDec(A, B);
-  return { text: f => name(f.q(A), f.q(B)), answer: ans, cands: [shift(ans), subDec(A.v >= B.v ? A : B, A.v >= B.v ? B : A), small(ans)] };
+  return { text: f => name(f.q(A), f.q(B)), why: f => `${f.q(A)} + ${f.q(B)} = ${f.q(ans)}`, answer: ans, cands: [shift(ans), subDec(A.v >= B.v ? A : B, A.v >= B.v ? B : A), small(ans)] };
 };
 
 // d2: one step, multiply or divide by a whole number.
 const mulQ = (name: (n: number, u: string) => string) => (rng: Rng): Draw => {
   const n = ri(rng, 3, 9), U = tenths(ri(rng, 12, 48)), ans = mulDecByInt(U, n);
-  return { text: f => name(n, f.q(U)), answer: ans, cands: [shift(ans), addDec(U, whole(n)), small(ans)] };
+  return { text: f => name(n, f.q(U)), why: f => `${n} × ${f.q(U)} = ${f.q(ans)}`, answer: ans, cands: [shift(ans), addDec(U, whole(n)), small(ans)] };
 };
 const mulMoney = (rng: Rng): Draw => {
   const n = ri(rng, 3, 9), P = price(rng, 105, 495), ans = mulDecByInt(P, n);
-  return { text: f => `${n} tickets cost ${f.m(P)} each. What is the total cost?`, answer: ans, cands: [shift(ans), addDec(P, dec(n * 100, 2)), small(ans)], money: true };
+  return { text: f => `${n} tickets cost ${f.m(P)} each. What is the total cost?`, why: f => `${n} × ${f.m(P)} = ${f.m(ans)}`, answer: ans, cands: [shift(ans), addDec(P, dec(n * 100, 2)), small(ans)], money: true };
 };
 const divQ = (name: (n: number, t: string) => string) => (rng: Rng): Draw => {
   const n = ri(rng, 3, 9), ans = tenths(ri(rng, 12, 48)), T = mulDecByInt(ans, n);
-  return { text: f => name(n, f.q(T)), answer: ans, cands: [shift(ans), mulDecByInt(T, n), small(ans)] };
+  return { text: f => name(n, f.q(T)), why: f => `${f.q(T)} ÷ ${n} = ${f.q(ans)}`, answer: ans, cands: [shift(ans), mulDecByInt(T, n), small(ans)] };
 };
 const divMoney = (rng: Rng): Draw => {
   const n = ri(rng, 3, 9), ans = price(rng, 55, 295), T = mulDecByInt(ans, n);
-  return { text: f => `${n} pens cost ${f.m(T)} in all. What does one pen cost?`, answer: ans, cands: [shift(ans), mulDecByInt(T, n), small(ans)], money: true };
+  return { text: f => `${n} pens cost ${f.m(T)} in all. What does one pen cost?`, why: f => `${f.m(T)} ÷ ${n} = ${f.m(ans)}`, answer: ans, cands: [shift(ans), mulDecByInt(T, n), small(ans)], money: true };
 };
 
 // d3: two steps, or scaling.
 const recipe = (rng: Rng): Draw => {
   const p = pick(rng, [2, 4, 5]), u = pick(rng, [25, 50, 75, 100]), q = pick(rng, [3, 6, 8, 10, 12].filter(x => x !== p)), amt = p * u, ans = whole(u * q);
   const things = pick(rng, ['flour', 'sugar', 'rice']);
-  return { text: () => `A recipe for ${p} uses ${amt} g of ${things}. How many grams for ${q}?`, answer: ans, cands: [shift(ans), whole(u), whole(amt + q - p), small(ans)] };
+  return { text: () => `A recipe for ${p} uses ${amt} g of ${things}. How many grams for ${q}?`, why: () => `${amt} ÷ ${p} = ${u}, ${u} × ${q} = ${u * q} g`, answer: ans, cands: [shift(ans), whole(u), whole(amt + q - p), small(ans)] };
 };
 const kgPlusG = (rng: Rng): Draw => {
   const a = pick(rng, [3, 5, 7, 12, 15, 25]), g = pick(rng, [150, 250, 350, 450, 50]), ans = whole(a * 100 + g);
-  return { text: f => `How many grams is ${f.q(tenths(a))} kg + ${g} g?`, answer: ans, cands: [small(ans), whole(a + g), shift(ans), whole(a * 10 + g)] };
+  return { text: f => `How many grams is ${f.q(tenths(a))} kg + ${g} g?`, why: f => `${f.q(tenths(a))} kg = ${a * 100} g, ${a * 100} + ${g} = ${a * 100 + g}`, answer: ans, cands: [small(ans), whole(a + g), shift(ans), whole(a * 10 + g)] };
 };
 const change = (rng: Rng): Draw => {
   const n = ri(rng, 2, 4), P = price(rng, 120, 290), note = pick(rng, [10, 20].filter(x => x * 100 > n * P.v + 100)), total = mulDecByInt(P, n), N = dec(note * 100, 2), ans = subDec(N, total);
   const what = pick(rng, ['books', 'toys', 'cards']);
-  return { text: f => `${n} ${what} cost ${f.m(P)} each. How much change from ${f.m(N)}?`, answer: ans, cands: [shift(ans), total, subDec(N, P), small(ans)], money: true };
+  return { text: f => `${n} ${what} cost ${f.m(P)} each. How much change from ${f.m(N)}?`, why: f => `${n} × ${f.m(P)} = ${f.m(total)}, ${f.m(N)} - ${f.m(total)} = ${f.m(ans)}`, answer: ans, cands: [shift(ans), total, subDec(N, P), small(ans)], money: true };
 };
 const jug = (rng: Rng): Draw => {
   const n = ri(rng, 3, 6), b = ri(rng, 2, 4), a = ri(rng, n * b + 5, n * b + 30), A = tenths(a), B = tenths(b), used = mulDecByInt(B, n), ans = subDec(A, used);
-  return { text: f => `A jug holds ${f.q(A)} litres. ${n} cups of ${f.q(B)} litres are poured out. Litres left?`, answer: ans, cands: [shift(ans), subDec(A, B), addDec(A, used), small(ans)] };
+  return { text: f => `A jug holds ${f.q(A)} litres. ${n} cups of ${f.q(B)} litres are poured out. Litres left?`, why: f => `${n} × ${f.q(B)} = ${f.q(used)}, ${f.q(A)} - ${f.q(used)} = ${f.q(ans)}`, answer: ans, cands: [shift(ans), subDec(A, B), addDec(A, used), small(ans)] };
 };
 const scaleMoney = (rng: Rng): Draw => {
   const c = ri(rng, 2, 4), q = pick(rng, [5, 6, 8, 10].filter(x => x !== c)), U = price(rng, 25, 95), T = mulDecByInt(U, c), ans = mulDecByInt(U, q);
-  return { text: f => `${c} apples cost ${f.m(T)}. How much do ${q} apples cost?`, answer: ans, cands: [shift(ans), U, mulDecByInt(T, q), small(ans)], money: true };
+  return { text: f => `${c} apples cost ${f.m(T)}. How much do ${q} apples cost?`, why: f => `${f.m(T)} ÷ ${c} = ${f.m(U)}, ${f.m(U)} × ${q} = ${f.m(ans)}`, answer: ans, cands: [shift(ans), U, mulDecByInt(T, q), small(ans)], money: true };
 };
 
 const BANK: Array<Array<(rng: Rng) => Draw>> = [
@@ -110,7 +110,7 @@ function finish(rng: Rng, d: Difficulty, w: Draw): Question {
     if (ds.length < 3 && c.v > 0 && s !== ans && !ds.includes(s)) ds.push(s);
   }
   const prompt = w.text(WRITE), say = ks2Say(w.text(SPEAK).replace(/\?/g, '.'));
-  const q = wordQ(rng, prompt, ans, ds, { say, hint: HINTS[d - 1], hintIsData: false });
+  const q = wordQ(rng, prompt, ans, ds, { say, hint: HINTS[d - 1], hintIsData: false, why: w.why(WRITE) });
   return d === 3 ? { ...q, slow: true } : q;
 }
 
