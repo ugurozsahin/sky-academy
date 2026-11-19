@@ -44,4 +44,4 @@ export const R_STORIES: StoryItem[] = [
   many(BALLS, 'How many balls does the girl have?', 4, 'four', 'four balls'),
 ];
 
-export const rStoryTime = storyGen(R_STORIES);
+export const rStoryTime = storyGen(R_STORIES, true);
