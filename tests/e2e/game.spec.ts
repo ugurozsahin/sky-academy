@@ -2319,6 +2319,8 @@ test.describe('Sharpwise', () => {
     await expect(page.locator('.item[data-item="trail-gold"] [data-buy]')).toBeDisabled();     // 200 coins needed, balance is 100
     await seed({ spent: 0 });                                                                   // balance 200
     await page.click('#rewards'); await page.click('#shop');
+    await expect(page.locator('#balance b')).toHaveText('200');                                 // the reseeded save was read, so Buy is enabled — a stale 100 fails here in seconds, not after a 3-minute click (#2700)
+    await expect(page.locator('.item[data-item="trail-gold"] [data-buy]')).toBeEnabled();
     await page.click('.item[data-item="trail-gold"] [data-buy]');
     await expect(page.locator('#balance b')).toHaveText('0');
     await expect(page.locator('.item[data-item="trail-gold"]')).toHaveClass(/\bon\b/);
