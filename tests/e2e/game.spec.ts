@@ -2910,6 +2910,10 @@ test.describe('Sharpwise', () => {
     expect(keywords.split(' · ')).toHaveLength(3);
     expect(await page.evaluate(() => window.__sna.arena!.paused), 'a verdict landing mid-wave never freezes the bubbles').toBe(false);
     await expect(page.locator('#speak')).toBeHidden();                        // the words are on the card: no dead 🔊
+    // The probe's silence budget is real time, so the wave above has been falling for seconds and its target can
+    // leave the arena between answerAll's wait and slice (nightly 2026-11-23: "the target fell before answer()").
+    // Ask a fresh question — full flight ahead of it — and answer that one, which is what "answerable" claims.
+    await page.evaluate(() => { window.__sna.session.nextQuestion(); });
     await answerAll(page, 1);                                                 // and the question can actually be answered
   });
 
