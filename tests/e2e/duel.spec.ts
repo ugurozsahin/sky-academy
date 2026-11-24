@@ -74,6 +74,15 @@ async function forceTopicAndClick(page: Page, index: number, poolSize: number, e
   await page.evaluate(() => { const w = window as any; if (w.__realRandom) { Math.random = w.__realRandom; delete w.__realRandom; } });
 }
 
+/**
+ * Open the duel's topic chooser and wait for it to be there before anyone clicks a card (#2706): on a slow
+ * runner the nightly once clicked a card the overlay had not finished drawing and never reached `.duel-screen`.
+ * Waiting on the overlay itself replaces a longer timeout downstream.
+ */
+async function openDuelChooser(page: Page) {
+  await page.click('#duel');
+  await expect(page.locator('#island-overlay:not([hidden]) .topic[data-mixed]')).toBeVisible();
+}
 async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0, opts?: { pickTopic?: string; noSpeech?: boolean; refuseWrites?: boolean; forceTopic?: { index: number; poolSize: number; topicId: string } }) {
   // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
   // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
@@ -97,10 +106,10 @@ async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins
   await expect(page.locator('.home')).toBeVisible();
   await page.click('.island[data-year="year1"]');
   const ft = opts?.forceTopic;
-  if (ft) await forceTopicAndClick(page, ft.index, ft.poolSize, ft.topicId, async () => { await page.click('#duel'); await page.click('.topic[data-mixed]'); });   // #957: Random, as before
+  if (ft) await forceTopicAndClick(page, ft.index, ft.poolSize, ft.topicId, async () => { await openDuelChooser(page); await page.click('.topic[data-mixed]'); });   // #957: Random, as before
   else {
     if (opts?.pickTopic && topicById(opts.pickTopic)?.subject === 'writing') await page.click('.tab[data-s="writing"]');   // the chooser lists the open subject only (#648)
-    await page.click('#duel'); await page.click(opts?.pickTopic ? `#island-overlay .topic[data-id="${opts.pickTopic}"]` : '.topic[data-mixed]'); }
+    await openDuelChooser(page); await page.click(opts?.pickTopic ? `#island-overlay .topic[data-id="${opts.pickTopic}"]` : '.topic[data-mixed]'); }
   await expect(page.locator('.duel-screen')).toBeVisible();
   await page.waitForFunction(() => window.__sna?.state().prompt);
 }
