@@ -223,9 +223,11 @@ test.describe('Ninja Duel', () => {
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
     // Read off `arenas`, already on the hooks contract, rather than `bubbles()`: that one reports only the
     // bubbles in flight *now* and drops every field fixed at spawn, which is exactly what has to be compared.
+    // `vx` is read as `ovx`, the arc fixed at spawn: a launched bubble's live `vx` is nudged by collision
+    // resolution, so two halves captured a frame apart can differ with the deal itself identical (#2705).
     const captureWave = () => page.evaluate(() => {
       const spawned = (p: 'a' | 'b') => window.__sna.arenas[p].bubbles.map(b =>
-        ({ label: b.label, launchAt: b.launchAt, r: b.r, vx: b.vx, g: b.g, color: b.color }));
+        ({ label: b.label, launchAt: b.launchAt, r: b.r, vx: b.ovx, g: b.g, color: b.color }));
       return { a: spawned('a'), b: spawned('b'), answer: window.__sna.state().answer };
     });
     const round1 = await captureWave();
